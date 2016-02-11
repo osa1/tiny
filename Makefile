@@ -1,9 +1,16 @@
-CC := clang
+CC 			= clang
+CC_FLAGS 	= -std=gnu11
 
-tiny: src/main.c
-	$(CC) $^ -o $@ -g -lncurses -Wall -Wpedantic
+objs = main.o textfield.o
+
+tiny: $(objs)
+	$(CC) $^ -o $@ -g -lncurses
+
+%.o: src/%.c
+	$(CC) -Iinclude $^ -c -o $@ -g -Wall -Wpedantic -Wextra $(CC_FLAGS)
 
 .PHONE: clean
 
 clean:
-	rm tiny
+	rm -f tiny
+	rm -f *.o

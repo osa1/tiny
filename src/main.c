@@ -12,19 +12,14 @@
 
 #include <ncurses.h>
 
+#include "settings.h"
+#include "textfield.h"
+
 // According to rfc2812, IRC messages can't exceed 512 characters - and this
 // includes \r\n, which follows every IRC message.
 #define RECV_BUF_SIZE 512
 
 static char recv_buf[ RECV_BUF_SIZE ] = {0};
-
-////////////////////////////////////////////////////////////////////////////////
-
-#define MIN(x, y) (x < y ? x : y)
-
-////////////////////////////////////////////////////////////////////////////////
-
-#define COLOR_CURSOR 1
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -40,8 +35,6 @@ typedef struct _layout
 void mainloop( Layout );
 void abort_msg( Layout*, const char* fmt, ... );
 int clear_cr_nl();
-void draw_input_line( Layout*, char[ RECV_BUF_SIZE ] );
-void handle_input( int, char[ RECV_BUF_SIZE ], int* cursor );
 
 int main()
 {
@@ -76,7 +69,9 @@ void mainloop( Layout layout )
     abort_msg( &layout, "Connecting..." );
     wrefresh( stdscr );
 
-    struct addrinfo hints = {};
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+
     struct addrinfo* res;
 
     hints.ai_family = AF_INET;
@@ -108,8 +103,8 @@ void mainloop( Layout layout )
     FD_SET( sock, &rfds );
     int fdmax = sock;
 
-    char input_buf[ RECV_BUF_SIZE ] = {0};
-    int input_cursor = 0;
+    TextField input_field;
+    textfield_new(&input_field, 10, layout.width);
 
     while ( true )
     {
@@ -125,7 +120,7 @@ void mainloop( Layout layout )
             // stdin is ready
             abort_msg( &layout, "stdin is ready" );
             int ch = getch();
-            handle_input( ch, input_buf, &input_cursor );
+            textfield_keypressed(&input_field, ch);
         }
         else if ( FD_ISSET( sock, &rfds_ ) )
         {
@@ -164,35 +159,9 @@ void mainloop( Layout layout )
             }
         }
 
-        draw_input_line( &layout, input_buf );
+        textfield_draw(&input_field, 0, layout.height - 2);
 
         wrefresh( stdscr );
-    }
-}
-
-void handle_input( int ch, char input[ RECV_BUF_SIZE ], int* cursor )
-{
-    // FIXME: We may miss the array if cursor goes too far.
-    // FIXME: Actually, we should have the 510-char limit for input. We can
-    //        just send messages in multiple send()s.
-    // FIXME: Actually, 510-char limit is already broken. Messages will have
-    //        PRIVMSG etc. prefix so we actually have less space.
-    assert( *cursor >= 0 && *cursor <= RECV_BUF_SIZE );
-
-    if ( ch == KEY_BACKSPACE )
-    {
-
-        if ( *cursor > 0 )
-        {
-            *cursor -= 1;
-        }
-
-        input[ *cursor ] = '\0';
-    }
-    else if ( *cursor + 1 < RECV_BUF_SIZE )
-    {
-        input[ *cursor ] = ch;
-        *cursor = *cursor + 1;
     }
 }
 
@@ -212,6 +181,7 @@ int clear_cr_nl()
         if ( recv_buf[ i ] == '\r' )
         {
             recv_buf[ i ] = 0;
+            // TODO: This segfaults
             recv_buf[ i + 1 ] = 0;
             return i;
         }
@@ -222,30 +192,6 @@ int clear_cr_nl()
     }
 
     return 0;
-}
-
-void draw_input_line( Layout* layout, char input[ RECV_BUF_SIZE ] )
-{
-    int row = layout->height - 2;
-
-    mvwaddch( stdscr, row, 0, '>' );
-    mvwaddch( stdscr, row, 1, ' ' );
-
-    // input is null terminated, right? RIGHT?
-    mvwaddstr( stdscr, row, 2, input );
-
-    // draw cursor
-    int len = strlen( input ) + 2;
-
-    attron( COLOR_PAIR( COLOR_CURSOR ) );
-    mvwaddch( stdscr, row, len, ' ' );
-    attroff( COLOR_PAIR( COLOR_CURSOR ) );
-
-    // clear rest of the line
-    while ( ++len < MIN( layout->width, RECV_BUF_SIZE ) + 2 )
-    {
-        mvwaddch( stdscr, row, len, ' ' );
-    }
 }
 
 void abort_msg( Layout* layout, const char* fmt, ... )
