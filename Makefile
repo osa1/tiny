@@ -1,7 +1,7 @@
 CC 			= clang
 CC_FLAGS 	= -std=gnu11
 
-objs = main.o textfield.o
+objs = main.o textfield.o textarea.o
 
 tiny: $(objs)
 	$(CC) $^ -o $@ -g -lncurses

@@ -1,6 +1,8 @@
 #ifndef __TINY_TEXTFIELD_H
 #define __TINY_TEXTFIELD_H
 
+// Single-line input field.
+
 struct TextField_
 {
     // Buffer size in _bytes_. The textfield won't accept more input and start

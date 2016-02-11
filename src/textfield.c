@@ -12,12 +12,13 @@ int textfield_new(TextField* textfield, int buffer_len, int width)
 {
     // Add one for null termination.
     char* buffer = malloc(buffer_len + 1);
-    memset(buffer, 0, buffer_len + 1);
 
     if (buffer == NULL)
     {
         return 1;
     }
+
+    memset(buffer, 0, buffer_len + 1);
 
     // Note that we don't take null termination into account here, the byte at
     // the cursor should always be safe to modify.

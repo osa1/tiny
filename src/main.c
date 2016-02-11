@@ -13,6 +13,7 @@
 #include <ncurses.h>
 
 #include "settings.h"
+#include "textarea.h"
 #include "textfield.h"
 
 // According to rfc2812, IRC messages can't exceed 512 characters - and this
@@ -50,7 +51,7 @@ int main()
     int scr_height, scr_width;
     getmaxyx( stdscr, scr_height, scr_width );
 
-    Layout layout = {scr_width, scr_height, 0, 0};
+    Layout layout = { scr_width, scr_height, 0, 0 };
 
     mainloop( layout );
 
@@ -106,6 +107,9 @@ void mainloop( Layout layout )
     TextField input_field;
     textfield_new(&input_field, 10, layout.width);
 
+    TextArea msg_area;
+    textarea_new(&msg_area, 100, layout.width, layout.height - 2);
+
     while ( true )
     {
         fd_set rfds_ = rfds;
@@ -140,7 +144,11 @@ void mainloop( Layout layout )
                 abort_msg( &layout, "recv() got partial msg of len %d",
                            recv_ret );
 
+
                 int cursor_inc = clear_cr_nl();
+
+                textarea_add_line(&msg_area, recv_buf, cursor_inc);
+
                 mvwprintw( stdscr, layout.cursor_y, layout.cursor_x, recv_buf );
                 layout.cursor_x += cursor_inc;
 
