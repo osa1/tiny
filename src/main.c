@@ -79,7 +79,7 @@ void mainloop( Layout layout )
 
     if ( getaddrinfo( "chat.freenode.org", "6665", &hints, &res ) )
     {
-        abort_msg( &layout, "getaddrinfo failed: %d", errno );
+        abort_msg( &layout, "getaddrinfo(): %s", strerror(errno) );
         wrefresh( stdscr );
         return;
     }
@@ -88,12 +88,12 @@ void mainloop( Layout layout )
 
     if ( connect( sock, res->ai_addr, res->ai_addrlen ) )
     {
-        abort_msg( &layout, "connect() failed: %d", errno );
+        abort_msg( &layout, "connect(): %s", strerror(errno) );
         wrefresh( stdscr );
         return;
     }
 
-    abort_msg( &layout, "seems like worked %d", 10 );
+    abort_msg( &layout, "seems like worked" );
     wrefresh( stdscr );
 
     fd_set rfds;
@@ -111,7 +111,7 @@ void mainloop( Layout layout )
         fd_set rfds_ = rfds;
         if ( select( fdmax + 1, &rfds_, NULL, NULL, NULL ) == -1 )
         {
-            abort_msg( &layout, "select() failed" );
+            abort_msg( &layout, "select(): %s", strerror(errno) );
             break;
         }
 
@@ -128,7 +128,7 @@ void mainloop( Layout layout )
             int recv_ret = recv( sock, recv_buf, RECV_BUF_SIZE, 0 );
             if ( recv_ret == -1 )
             {
-                abort_msg( &layout, "recv() error: %d", errno );
+                abort_msg( &layout, "recv(): %s", strerror(errno) );
             }
             else if ( recv_ret == 0 )
             {
