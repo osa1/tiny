@@ -1,6 +1,8 @@
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <errno.h>
 #include <netdb.h>
@@ -16,6 +18,16 @@
 
 static char recv_buf[ RECV_BUF_SIZE ] = {0};
 
+////////////////////////////////////////////////////////////////////////////////
+
+#define MIN(x, y) (x < y ? x : y)
+
+////////////////////////////////////////////////////////////////////////////////
+
+#define COLOR_CURSOR 1
+
+////////////////////////////////////////////////////////////////////////////////
+
 typedef struct _layout
 {
     int32_t width;
@@ -28,7 +40,8 @@ typedef struct _layout
 void mainloop( Layout );
 void abort_msg( Layout*, const char* fmt, ... );
 int clear_cr_nl();
-void draw_input_line( Layout* );
+void draw_input_line( Layout*, char[ RECV_BUF_SIZE ] );
+void handle_input( int, char[ RECV_BUF_SIZE ], int* cursor );
 
 int main()
 {
@@ -37,6 +50,9 @@ int main()
     keypad( stdscr, TRUE );
     curs_set( 0 );
     raw();
+
+    start_color();
+    init_pair( COLOR_CURSOR, COLOR_WHITE, COLOR_GREEN );
 
     int scr_height, scr_width;
     getmaxyx( stdscr, scr_height, scr_width );
@@ -57,6 +73,9 @@ int main()
 
 void mainloop( Layout layout )
 {
+    abort_msg( &layout, "Connecting..." );
+    wrefresh( stdscr );
+
     struct addrinfo hints = {};
     struct addrinfo* res;
 
@@ -106,6 +125,7 @@ void mainloop( Layout layout )
             // stdin is ready
             abort_msg( &layout, "stdin is ready" );
             int ch = getch();
+            handle_input( ch, input_buf, &input_cursor );
         }
         else if ( FD_ISSET( sock, &rfds_ ) )
         {
@@ -144,9 +164,35 @@ void mainloop( Layout layout )
             }
         }
 
-        draw_input_line( &layout );
+        draw_input_line( &layout, input_buf );
 
         wrefresh( stdscr );
+    }
+}
+
+void handle_input( int ch, char input[ RECV_BUF_SIZE ], int* cursor )
+{
+    // FIXME: We may miss the array if cursor goes too far.
+    // FIXME: Actually, we should have the 510-char limit for input. We can
+    //        just send messages in multiple send()s.
+    // FIXME: Actually, 510-char limit is already broken. Messages will have
+    //        PRIVMSG etc. prefix so we actually have less space.
+    assert( *cursor >= 0 && *cursor <= RECV_BUF_SIZE );
+
+    if ( ch == KEY_BACKSPACE )
+    {
+
+        if ( *cursor > 0 )
+        {
+            *cursor -= 1;
+        }
+
+        input[ *cursor ] = '\0';
+    }
+    else if ( *cursor + 1 < RECV_BUF_SIZE )
+    {
+        input[ *cursor ] = ch;
+        *cursor = *cursor + 1;
     }
 }
 
@@ -178,7 +224,29 @@ int clear_cr_nl()
     return 0;
 }
 
-void draw_input_line( Layout* layout ) {}
+void draw_input_line( Layout* layout, char input[ RECV_BUF_SIZE ] )
+{
+    int row = layout->height - 2;
+
+    mvwaddch( stdscr, row, 0, '>' );
+    mvwaddch( stdscr, row, 1, ' ' );
+
+    // input is null terminated, right? RIGHT?
+    mvwaddstr( stdscr, row, 2, input );
+
+    // draw cursor
+    int len = strlen( input ) + 2;
+
+    attron( COLOR_PAIR( COLOR_CURSOR ) );
+    mvwaddch( stdscr, row, len, ' ' );
+    attroff( COLOR_PAIR( COLOR_CURSOR ) );
+
+    // clear rest of the line
+    while ( ++len < MIN( layout->width, RECV_BUF_SIZE ) + 2 )
+    {
+        mvwaddch( stdscr, row, len, ' ' );
+    }
+}
 
 void abort_msg( Layout* layout, const char* fmt, ... )
 {
@@ -195,6 +263,4 @@ void abort_msg( Layout* layout, const char* fmt, ... )
     vwprintw( stdscr, fmt, argptr );
 
     va_end( argptr );
-
-    wrefresh( stdscr );
 }
