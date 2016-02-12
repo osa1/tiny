@@ -31,7 +31,19 @@ int textfield_new(TextField* textfield, int buffer_len, int width)
     return 0;
 }
 
-void textfield_keypressed(TextField* textfield, int key)
+void textfield_clean(TextField* textfield)
+{
+    free(textfield->buffer);
+    textfield->buffer = NULL;
+}
+
+void textfield_reset(TextField* textfield)
+{
+    memset(textfield->buffer, 0, textfield->buffer_len);
+    textfield->cursor = 0;
+}
+
+KeypressRet textfield_keypressed(TextField* textfield, int key)
 {
     assert( textfield->cursor >= 0 &&
             textfield->cursor <= textfield->buffer_len );
@@ -44,12 +56,20 @@ void textfield_keypressed(TextField* textfield, int key)
         }
 
         textfield->buffer[ textfield->cursor ] = '\0';
+        return HANDLED;
+    }
+    else if (key == KEY_ENTER || key == 10)
+    {
+        return SHIP_IT;
     }
     else if (textfield->cursor < textfield->buffer_len)
     {
         textfield->buffer[ textfield->cursor ] = key;
         textfield->cursor += 1;
+        return HANDLED;
     }
+
+    return IGNORED;
 }
 
 void textfield_draw(TextField* textfield, int pos_x, int pos_y)

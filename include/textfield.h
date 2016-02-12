@@ -25,7 +25,24 @@ typedef struct TextField_ TextField;
 
 int textfield_new(TextField* textfield, int buffer_len, int width);
 
-void textfield_keypressed(TextField* textfield, int key);
+void textfield_clean(TextField* textfield);
+
+void textfield_reset(TextField* textfield);
+
+////////////////////////////////////////////////////////////////////////////////
+
+enum KeypressRet_ {
+    SHIP_IT = 1,
+    HANDLED,
+    IGNORED,
+    ABORT,
+};
+
+typedef enum KeypressRet_ KeypressRet;
+
+KeypressRet textfield_keypressed(TextField* textfield, int key);
+
+////////////////////////////////////////////////////////////////////////////////
 
 void textfield_draw(TextField* textfield, int pos_x, int pos_y);
 

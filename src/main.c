@@ -124,7 +124,18 @@ void mainloop( Layout layout )
             // stdin is ready
             abort_msg( &layout, "stdin is ready" );
             int ch = getch();
-            textfield_keypressed(&input_field, ch);
+            KeypressRet ret = textfield_keypressed(&input_field, ch);
+            if (ret == SHIP_IT)
+            {
+                // Ops.. This won't work. We need \r\n.
+                send(sock, input_field.buffer, strlen(input_field.buffer), 0);
+                textarea_add_line(&msg_area, input_field.buffer, strlen(input_field.buffer));
+                textfield_reset(&input_field);
+            }
+            else if (ret == ABORT)
+            {
+
+            }
         }
         else if ( FD_ISSET( sock, &rfds_ ) )
         {
@@ -144,32 +155,16 @@ void mainloop( Layout layout )
                 abort_msg( &layout, "recv() got partial msg of len %d",
                            recv_ret );
 
-
                 int cursor_inc = clear_cr_nl();
-
                 textarea_add_line(&msg_area, recv_buf, cursor_inc);
-
-                mvwprintw( stdscr, layout.cursor_y, layout.cursor_x, recv_buf );
-                layout.cursor_x += cursor_inc;
-
-                if ( layout.cursor_x > layout.width )
-                {
-                    mvwprintw( stdscr, layout.cursor_y + 1, 0,
-                               recv_buf + ( layout.cursor_x - layout.width ) );
-                    layout.cursor_x = 0;
-                    layout.cursor_y += 2;
-                }
-                else
-                {
-                    layout.cursor_x = 0;
-                    layout.cursor_y += 1;
-                }
             }
         }
 
+        // For now draw everyting from scratch on any event
+        wclear(stdscr);
         textfield_draw(&input_field, 0, layout.height - 2);
-
-        wrefresh( stdscr );
+        textarea_draw(&msg_area, 0, 0);
+        wrefresh(stdscr);
     }
 }
 
@@ -184,12 +179,11 @@ void mainloop( Layout layout )
 //   cursor etc.
 int clear_cr_nl()
 {
-    for ( int i = 0; i < RECV_BUF_SIZE; ++i )
+    for ( int i = 0; i < RECV_BUF_SIZE - 1; ++i )
     {
         if ( recv_buf[ i ] == '\r' )
         {
-            recv_buf[ i ] = 0;
-            // TODO: This segfaults
+            recv_buf[ i     ] = 0;
             recv_buf[ i + 1 ] = 0;
             return i;
         }
