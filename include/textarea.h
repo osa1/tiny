@@ -20,8 +20,6 @@ struct TextArea_
     struct Line_*   live_lines;
     struct Line_*   live_lines_end;
 
-    struct Line_*   free_lines;
-
     // Rendering related
     int             width;
     int             height;
@@ -39,7 +37,7 @@ typedef struct TextArea_ TextArea;
 
 int textarea_new(TextArea* textarea, int max_lines, int width, int height);
 
-void textarea_free(TextArea* textarea);
+void textarea_clean(TextArea* textarea);
 
 int textarea_add_line(TextArea* textarea, char* line, size_t line_len);
 
