@@ -2,13 +2,16 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <errno.h>
 #include <netdb.h>
+#include <signal.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <ncurses.h>
 
@@ -28,8 +31,30 @@ void mainloop();
 void abort_msg(const char* fmt, ...);
 int clear_cr_nl();
 
+////////////////////////////////////////////////////////////////////////////////
+
+static volatile sig_atomic_t got_sigwinch = 0;
+
+void sigwinch_handler(int sig)
+{
+    got_sigwinch = 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 int main()
 {
+    struct sigaction sa;
+    sa.sa_handler = sigwinch_handler;
+    sa.sa_flags = SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+
+    if (sigaction(SIGWINCH, &sa, NULL) == -1)
+    {
+        printf("Can't register SIGWINCH action.\n");
+        exit(1);
+    }
+
     initscr();
     noecho();
     keypad( stdscr, TRUE );
@@ -41,7 +66,6 @@ int main()
 
     mainloop();
 
-    getch();
     endwin();
 
     return 0;
@@ -97,26 +121,49 @@ void mainloop()
         fd_set rfds_ = rfds;
         if ( select( fdmax + 1, &rfds_, NULL, NULL, NULL ) == -1 )
         {
-            abort_msg("select(): %s", strerror(errno) );
-            break;
-        }
+            if (errno == ERESTART)
+            {
+                // probably SIGWINCH during select()
+                if (got_sigwinch == 1)
+                {
+                    got_sigwinch = 0;
+                    endwin();
+                    refresh();
 
-        if ( FD_ISSET( 0, &rfds_ ) )
+                    input_field.width = COLS;
+                    msg_area.height = LINES - 2;
+                    msg_area.width = COLS;
+
+                    continue;
+                }
+                else
+                {
+                    // TODO: report this
+                    break;
+                }
+            }
+        }
+        else if ( FD_ISSET( 0, &rfds_ ) )
         {
             // stdin is ready
-            abort_msg("stdin is ready" );
             int ch = getch();
             KeypressRet ret = textfield_keypressed(&input_field, ch);
             if (ret == SHIP_IT)
             {
                 // Ops.. This won't work. We need \r\n.
-                send(sock, input_field.buffer, strlen(input_field.buffer), 0);
-                textarea_add_line(&msg_area, input_field.buffer, strlen(input_field.buffer));
+                int msg_len = strlen(input_field.buffer);
+
+                // We need \r\n suffix before sending the message.
+                // FIXME: This is not how you do it though.
+                input_field.buffer[msg_len    ] = '\r';
+                input_field.buffer[msg_len + 1] = '\n';
+                send(sock, input_field.buffer, msg_len + 2, 0);
+                textarea_add_line(&msg_area, input_field.buffer, msg_len);
                 textfield_reset(&input_field);
             }
             else if (ret == ABORT)
             {
-
+                break;
             }
         }
         else if ( FD_ISSET( sock, &rfds_ ) )
@@ -148,6 +195,8 @@ void mainloop()
         textarea_draw(&msg_area, 0, 0);
         wrefresh(stdscr);
     }
+
+    close(sock);
 }
 
 // This is used for two things:
