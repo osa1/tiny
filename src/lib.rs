@@ -6,6 +6,7 @@ extern crate rustbox;
 
 pub mod msg_area;
 pub mod text_field;
+pub mod msg;
 
 use std::io::Read;
 use std::io::Write;
@@ -17,6 +18,8 @@ use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
 use msg_area::MsgArea;
 use text_field::{TextField, TextFieldRet};
+
+use msg::Msg;
 
 pub struct Tiny {
     stream : TcpStream,
