@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
-use tiny::msg_widget::MsgWidget;
+use tiny::msg_field::MsgWidget;
 use tiny::text_field::{TextField, TextFieldRet};
 
 fn main() {

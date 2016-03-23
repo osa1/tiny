@@ -33,12 +33,13 @@ impl TextField {
         }
     }
 
-    pub fn get_msg(&self) -> &Vec<char> {
-        &self.buffer
+    pub fn get_msg(&mut self) -> &mut Vec<char> {
+        &mut self.buffer
     }
 
     pub fn clear_buffer(&mut self) {
         self.buffer.clear();
+        self.move_cursor(0);
     }
 
     pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
@@ -122,6 +123,7 @@ impl TextField {
     }
 
     // NOTE: This doesn't do bounds checking! Use dec_cursor() and inc_cursor().
+    // move_cursor(0) should always be safe.
     fn move_cursor(&mut self, cursor : i32) {
         self.cursor = cursor;
 
