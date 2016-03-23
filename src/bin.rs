@@ -3,9 +3,7 @@
 extern crate alloc_system;
 extern crate libc;
 extern crate rustbox;
-
-mod msg_widget;
-mod text_field;
+extern crate tiny;
 
 use std::io::Read;
 use std::io::Write;
@@ -15,8 +13,8 @@ use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
-use msg_widget::MsgWidget;
-use text_field::{TextField, TextFieldRet};
+use tiny::msg_widget::MsgWidget;
+use tiny::text_field::{TextField, TextFieldRet};
 
 fn main() {
     let rustbox = RustBox::init(InitOptions {

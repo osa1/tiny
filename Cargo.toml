@@ -3,6 +3,14 @@ name = "tiny_rust"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 
+[lib]
+name = "tiny"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tiny"
+path = "src/bin.rs"
+
 [dependencies]
 libc = "0.2.8"
 rustbox = { git = "https://github.com/gchp/rustbox.git" }
