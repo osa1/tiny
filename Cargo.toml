@@ -1,0 +1,8 @@
+[package]
+name = "tiny_rust"
+version = "0.1.0"
+authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+
+[dependencies]
+libc = "0.2.8"
+rustbox = { git = "https://github.com/gchp/rustbox.git" }
