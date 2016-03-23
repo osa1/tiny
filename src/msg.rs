@@ -1,3 +1,5 @@
+use utils::find_char;
+
 #[derive(Debug)]
 pub struct Msg {
     prefix  : Option<String>,
@@ -63,7 +65,6 @@ fn parse_params(mut chrs : &[char]) -> Result<Vec<String>, String> {
     } else {
         let mut ret : Vec<String> = Vec::new();
 
-        let mut end_idx = 0;
         loop {
             match find_char(chrs, ' ') {
                 None => {
@@ -80,13 +81,4 @@ fn parse_params(mut chrs : &[char]) -> Result<Vec<String>, String> {
 
         Ok(ret)
     }
-}
-
-fn find_char(chrs : &[char], chr0 : char) -> Option<usize> {
-    for (chr_idx, chr) in chrs.iter().enumerate() {
-        if *chr == chr0 {
-            return Some(chr_idx);
-        }
-    }
-    None
 }

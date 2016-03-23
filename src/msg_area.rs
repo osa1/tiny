@@ -1,4 +1,6 @@
 use std::cmp::min;
+use std::io::Write;
+use std::io;
 
 use rustbox::{RustBox, Style, Color};
 
@@ -22,9 +24,6 @@ impl MsgArea {
     }
 
     pub fn add_msg(&mut self, msg : &Vec<char>) {
-        // The vector shouldn't have newlines ('\n'), but we don't check it here
-        // for now.
-
         let msg_str : String = msg.iter().cloned().collect();
 
         // Decide whether to scroll
@@ -34,6 +33,18 @@ impl MsgArea {
         }
 
         self.msgs.push(msg_str);
+    }
+
+    pub fn add_msg_str(&mut self, msg_str : &str) {
+        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str);
+
+        // Decide whether to scroll
+        let need_to_scroll = self.scroll + self.height == self.msgs.len() as i32;
+        if need_to_scroll {
+            self.scroll = (self.msgs.len() as i32) + 1 - self.height;
+        }
+
+        self.msgs.push(msg_str.to_owned());
     }
 
     pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
