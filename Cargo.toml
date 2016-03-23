@@ -9,7 +9,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "tiny"
-path = "src/bin.rs"
+path = "bin/main.rs"
 
 [dependencies]
 libc = "0.2.8"
