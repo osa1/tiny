@@ -1,5 +1,4 @@
-use std::cmp::{max, min};
-use std::io::BufRead;
+use std::cmp::min;
 
 use rustbox::{RustBox, Style, Color};
 
