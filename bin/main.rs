@@ -1,5 +1,7 @@
 extern crate tiny;
 
+use tiny::Tiny;
+
 fn main() {
-    tiny::mainloop();
+    Tiny::new().mainloop();
 }

@@ -100,6 +100,14 @@ impl TUI {
         self.rustbox.present();
     }
 
+    pub fn show_incoming_msg(&mut self, msg : &str) {
+        self.msg_area.add_msg_str(msg);
+    }
+
+    pub fn show_outgoing_msg(&mut self, msg : &str) {
+        self.msg_area.add_msg_str(msg);
+    }
+
     pub fn show_user_error(&mut self, msg : &str) {
         self.msg_area.add_err_msg_str(msg);
     }

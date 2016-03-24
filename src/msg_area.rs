@@ -43,7 +43,7 @@ impl MsgArea {
 
     #[inline]
     pub fn add_msg_str(&mut self, msg_str : &str) {
-        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str);
+        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str).unwrap();
         self.add_msg_str_(msg_str, Style::empty(), Color::Default, Color::Default);
     }
 
