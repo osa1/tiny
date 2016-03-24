@@ -51,19 +51,10 @@ impl MsgArea {
             let (line, rest) = msg_slice.split_at(min(msg_slice.len(), split as usize));
             msg_slice = rest;
 
-            if first_line {
-                lines.push(Line {
-                    msg: line.iter().cloned().collect(),
-                    continuation: false,
-                });
-            } else {
-                let mut string : String = line.iter().cloned().collect();
-                string.insert(0, LINEBREAK);
-                lines.push(Line {
-                    msg: string,
-                    continuation: true,
-                });
-            }
+            lines.push(Line {
+                msg: line.iter().cloned().collect(),
+                continuation: !first_line,
+            });
         }
 
         if need_to_scroll {
@@ -82,9 +73,20 @@ impl MsgArea {
         let mut row = self.height - 1;
         let mut line_idx = min(self.scroll + self.height, self.msgs.len() as i32 - 1);
         while line_idx >= 0 {
+            let line = &self.msgs[line_idx as usize];
+
+            if line.continuation {
+                rustbox.print_char(pos_x as usize, (pos_y + row) as usize,
+                                   Style::empty(), Color::Blue, Color::Default,
+                                   LINEBREAK);
+            }
+
+            let pos_x = if line.continuation { pos_x + 1 } else { pos_x };
+
             rustbox.print(pos_x as usize, (pos_y + row) as usize,
                           Style::empty(), Color::Blue, Color::Default,
-                          &self.msgs[line_idx as usize].msg);
+                          &line.msg);
+
             row -= 1;
             line_idx -= 1;
         }
