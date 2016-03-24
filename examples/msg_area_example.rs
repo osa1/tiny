@@ -15,7 +15,7 @@ fn loop_() -> Option<String> {
     }).unwrap();
 
     let mut text_field = TextField::new(20);
-    let mut msg_area  = MsgArea::new((rustbox.height() - 1) as i32);
+    let mut msg_area  = MsgArea::new(20, (rustbox.height() - 1) as i32);
 
     loop {
         rustbox.clear();

@@ -25,7 +25,7 @@ use msg_area::MsgArea;
 use text_field::{TextField, TextFieldRet};
 
 use msg::Msg;
-use utils::{find_byte, find_char};
+use utils::{find_byte};
 
 pub struct Tiny {
     stream : TcpStream,
@@ -70,7 +70,7 @@ impl Tiny {
         // messages.
         let mut msg_buf : Vec<u8> = Vec::new();
 
-        let mut msg_area   = MsgArea::new(rustbox.height() as i32 - 1);
+        let mut msg_area   = MsgArea::new(rustbox.width() as i32, rustbox.height() as i32 - 1);
         let mut text_field = TextField::new(rustbox.width() as i32);
 
         loop {
@@ -130,6 +130,7 @@ impl Tiny {
                             Some(cr_idx) => {
                                 msg_buf.extend_from_slice(&read_buf_[ 0 .. cr_idx ]);
                                 msg_area.add_msg_str(str::from_utf8(msg_buf.borrow()).unwrap());
+                                msg_area.add_msg_str(format!("{:?}", Msg::parse(&msg_buf)).borrow());
                                 msg_buf.clear();
                                 // Next char should be NL, skip that.
                                 read_buf_ = &read_buf_[ cr_idx + 2 .. ];
