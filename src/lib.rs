@@ -13,6 +13,7 @@ pub mod text_field;
 
 use std::borrow::Borrow;
 use std::error::Error;
+use std::ffi::CString;
 use std::io::Read;
 use std::io::Write;
 use std::io;
@@ -150,11 +151,16 @@ impl Tiny {
                 };
 
             if ret == -1 {
-                panic!("select failed!");
+                let err_c_msg =
+                    unsafe { CString::from_raw(libc::strerror(*libc::__errno_location())) };
+
+                tui.show_conn_error(
+                    format!("Internal error: select() failed: {}",
+                            err_c_msg.to_str().unwrap()).borrow());
             }
 
             // stdin is ready
-            if unsafe { libc::FD_ISSET(0, &mut fd_set_) } {
+            else if unsafe { libc::FD_ISSET(0, &mut fd_set_) } {
                 if self.handle_stdin(tui) == LoopRet::Abort { return LoopRet::Abort; }
             }
 
