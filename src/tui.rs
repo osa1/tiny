@@ -16,11 +16,14 @@ pub struct TUI {
     text_field : TextField,
 }
 
+#[derive(Debug)]
 pub enum TUIRet {
     Abort,
     KeyHandled,
     KeyIgnored(Key),
     EventIgnored(Event),
+
+    /// INVARIANT: The vec will have at least one char.
     SendMsg(Vec<char>),
 }
 
@@ -95,5 +98,13 @@ impl TUI {
         self.msg_area.draw(&self.rustbox, 0, 0);
         self.text_field.draw(&self.rustbox, 0, (self.rustbox.height() - 1) as i32);
         self.rustbox.present();
+    }
+
+    pub fn show_user_error(&mut self, msg : &str) {
+        self.msg_area.add_err_msg_str(msg);
+    }
+
+    pub fn show_conn_error(&mut self, msg : &str) {
+        self.msg_area.add_err_msg_str(msg);
     }
 }

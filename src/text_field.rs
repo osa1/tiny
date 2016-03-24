@@ -108,7 +108,11 @@ impl TextField {
             Key::Enter => {
                 let ret = mem::replace(&mut self.buffer, Vec::new());
                 self.move_cursor(0);
-                TextFieldRet::SendMsg(ret)
+                if ret.len() == 0 {
+                    TextFieldRet::KeyHandled
+                } else {
+                    TextFieldRet::SendMsg(ret)
+                }
             },
             _ => TextFieldRet::KeyIgnored,
         }
