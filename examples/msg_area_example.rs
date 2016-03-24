@@ -28,9 +28,8 @@ fn loop_() -> Option<String> {
             Ok(Event::KeyEvent(Key::Esc)) => return None,
             Ok(Event::KeyEvent(key)) => {
                 match text_field.keypressed(key) {
-                    TextFieldRet::SendMsg => {
-                        msg_area.add_msg(text_field.get_msg().borrow());
-                        text_field.clear_buffer();
+                    TextFieldRet::SendMsg(msg) => {
+                        msg_area.add_msg(&msg);
                     },
                     _ => {}
                 }

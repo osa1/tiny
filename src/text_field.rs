@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use std::cmp::{max, min};
+use std::mem;
 
 use rustbox::{RustBox, Style, Color};
 use rustbox::keyboard::Key;
@@ -18,7 +19,7 @@ pub struct TextField {
 }
 
 pub enum TextFieldRet {
-    SendMsg,
+    SendMsg(Vec<char>),
     KeyHandled,
     KeyIgnored,
 }
@@ -104,7 +105,11 @@ impl TextField {
                 self.inc_cursor();
                 TextFieldRet::KeyHandled
             },
-            Key::Enter => TextFieldRet::SendMsg,
+            Key::Enter => {
+                let ret = mem::replace(&mut self.buffer, Vec::new());
+                self.move_cursor(0);
+                TextFieldRet::SendMsg(ret)
+            },
             _ => TextFieldRet::KeyIgnored,
         }
     }
