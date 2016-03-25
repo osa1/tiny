@@ -1,5 +1,5 @@
 [package]
-name = "tiny_rust"
+name = "tiny"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 

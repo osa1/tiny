@@ -1,5 +1,5 @@
 [root]
-name = "tiny_rust"
+name = "tiny"
 version = "0.1.0"
 dependencies = [
  "libc 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
