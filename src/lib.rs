@@ -112,6 +112,8 @@ impl Tiny {
 
         // Why can't disable the timeout?
         self.stream.as_ref().unwrap().set_read_timeout(Some(Duration::from_millis(1))).unwrap();
+        self.stream.as_ref().unwrap().set_write_timeout(None).unwrap();
+        self.stream.as_ref().unwrap().set_nodelay(true).unwrap();
 
         //////////////////////////////////////
         // Set up the descriptors for select()
@@ -187,13 +189,27 @@ impl Tiny {
                 // TODO: What to do here?
                 LoopRet::Continue
             },
-            TUIRet::SendMsg(msg) => {
-                let msg_str : String = msg.iter().cloned().collect();
-                writeln!(io::stderr(), "sending msg: {}", msg_str).unwrap();
-                self.stream.as_ref()
-                           .unwrap()
-                           .write_all(msg_str.as_bytes()).unwrap();
-                tui.show_outgoing_msg(msg_str.borrow());
+            TUIRet::SendMsg(mut msg) => {
+                // Add CR-LF and send
+                msg.push('\r');
+                msg.push('\n');
+                {
+                    let msg_str : String = msg.iter().cloned().collect();
+                    self.stream.as_ref()
+                               .unwrap()
+                               .write_all(msg_str.as_bytes()).unwrap();
+                }
+
+                // Use another version without CR-LF to show the message
+                {
+                    let msg_slice : &[char] = msg.borrow();
+                    let msg_slice : &[char] = &msg_slice[ 0 .. msg.len() - 2]; // Drop CRLF
+                    let msg_str : String = msg_slice.iter().cloned().collect();
+                    let msg_slice : &str = msg_str.borrow();
+                    writeln!(io::stderr(), "sending msg: {}", msg_slice).unwrap();
+                    tui.show_outgoing_msg(msg_slice);
+                }
+
                 LoopRet::Continue
             },
             _ => LoopRet::Continue
