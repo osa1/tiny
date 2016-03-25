@@ -56,7 +56,6 @@ impl Comms {
                 // TODO: I don't understand why this happens. I'm ``randomly''
                 // getting "temporarily unavailable" errors.
                 // return vec![CommsRet::ShowErr(format!("error in read(): {:?}", err))];
-
                 self.read_buf = unsafe { mem::zeroed() };
                 return vec![];
             },
@@ -83,10 +82,11 @@ impl Comms {
                         // reading until a complete message is read.
                         match find_byte(read_buf_, 0) {
                             None => {
-                                self.msg_buf.extend_from_slice(read_buf_);
+                                Comms::add_to_msg_buf(&mut self.msg_buf, read_buf_);
                             },
                             Some(slice_end) => {
-                                self.msg_buf.extend_from_slice(&read_buf_[ 0 .. slice_end ]);
+                                Comms::add_to_msg_buf(
+                                    &mut self.msg_buf, &read_buf_[ 0 .. slice_end ]);
                             }
                         }
                         break;
@@ -98,10 +98,10 @@ impl Comms {
                         // just push the whole thing to the msg_buf so that when
                         // we read NL in the next read() we get a whole mssage.
                         if cr_idx == read_buf_.len() - 1 {
-                            self.msg_buf.extend_from_slice(read_buf_);
+                            Comms::add_to_msg_buf(&mut self.msg_buf, read_buf_);
                             break;
                         } else {
-                            self.msg_buf.extend_from_slice(&read_buf_[ 0 .. cr_idx ]);
+                            Comms::add_to_msg_buf(&mut self.msg_buf, &read_buf_[ 0 .. cr_idx ]);
                             Comms::handle_msg(&mut self.stream, &mut ret, self.msg_buf.borrow());
                             self.msg_buf.clear();
 
@@ -116,6 +116,13 @@ impl Comms {
         self.read_buf = unsafe { mem::zeroed() };
 
         ret
+    }
+
+    #[inline]
+    fn add_to_msg_buf(msg_buf : &mut Vec<u8>, slice : &[u8]) {
+        // Some invisible ASCII characters causing glitches on some terminals,
+        // we filter those out here.
+        msg_buf.extend(slice.iter().filter(|c| **c != 0x2 /* STX */));
     }
 
     // Can't make this a method -- we need TcpStream mut but in the call site

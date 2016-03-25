@@ -5,7 +5,7 @@ use std::io;
 
 use rustbox::{RustBox, Style, Color};
 
-static LINEBREAK : char = '↳';
+static LINEBREAK : char = '\\';
 
 pub struct MsgArea {
     msgs   : Vec<Line>,
@@ -48,12 +48,14 @@ impl MsgArea {
     }
 
     #[inline]
-    pub fn add_server_msg(&mut self, msg : &str) {
-        self.add_msg_str_(msg, Style::empty(), Color::Yellow, Color::Default);
+    pub fn add_server_msg(&mut self, msg_str : &str) {
+        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str).unwrap();
+        self.add_msg_str_(msg_str, Style::empty(), Color::Yellow, Color::Default);
     }
 
     #[inline]
     pub fn add_err_msg_str(&mut self, msg_str : &str) {
+        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str).unwrap();
         self.add_msg_str_(msg_str, Style::empty(), Color::White, Color::Red);
     }
 
