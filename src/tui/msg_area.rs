@@ -1,5 +1,5 @@
 use std::borrow::Borrow;
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::io::Write;
 use std::io;
 
@@ -157,11 +157,11 @@ impl MsgArea {
     }
 
     pub fn page_up(&mut self) {
-
+        self.scroll = max(0, self.scroll - 10);
     }
 
     pub fn page_down(&mut self) {
-
+        self.scroll = min(self.scroll + 10, (self.msgs.len() as i32) - self.height);
     }
 
     /// Do we need to scroll when adding a new message?
