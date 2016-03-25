@@ -71,8 +71,8 @@ impl MsgArea {
 
     pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
         let mut row = self.height - 1;
-        let mut line_idx = min(self.scroll + self.height, self.msgs.len() as i32 - 1);
-        while line_idx >= 0 {
+        let mut line_idx = min(self.scroll + self.height, self.msgs.len() as i32) - 1;
+        while line_idx >= 0 && row >= 0 {
             let line = &self.msgs[line_idx as usize];
 
             if line.continuation {
@@ -143,6 +143,26 @@ impl MsgArea {
     }
 
     ////////////////////////////////////////////////////////////////////////////
+
+    pub fn scroll_up(&mut self) {
+        if self.scroll > 0 {
+            self.scroll -= 1;
+        }
+    }
+
+    pub fn scroll_down(&mut self) {
+        if (self.msgs.len() as i32) > self.scroll + self.height {
+            self.scroll += 1;
+        }
+    }
+
+    pub fn page_up(&mut self) {
+
+    }
+
+    pub fn page_down(&mut self) {
+
+    }
 
     /// Do we need to scroll when adding a new message?
     #[inline]

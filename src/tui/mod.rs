@@ -48,21 +48,52 @@ impl TUI {
 
     /// Should be called when stdin is ready.
     pub fn keypressed(&mut self) -> TUIRet {
-        match self.rustbox.peek_event(Duration::new(0, 0), false) {
+        match self.rustbox.poll_event(false) {
             Ok(Event::KeyEvent(Key::Esc)) => {
                 TUIRet::Abort
             },
+
+            ////////////////////////////////////////////////////////////////////
+            // Scrolling related
+
+            Ok(Event::KeyEvent(Key::Ctrl('p'))) => {
+                self.msg_area.scroll_up();
+                TUIRet::KeyHandled
+            },
+
+            Ok(Event::KeyEvent(Key::Ctrl('n'))) => {
+                self.msg_area.scroll_down();
+                TUIRet::KeyHandled
+            },
+
+            Ok(Event::KeyEvent(Key::PageUp)) => {
+                self.msg_area.page_up();
+                TUIRet::KeyHandled
+            },
+
+            Ok(Event::KeyEvent(Key::PageDown)) => {
+                self.msg_area.page_down();
+                TUIRet::KeyHandled
+            },
+
+            ////////////////////////////////////////////////////////////////////
+
             Ok(Event::KeyEvent(key)) => {
                 // TODO: Handle ret
                 match self.text_field.keypressed(key) {
                     TextFieldRet::SendMsg(msg) => TUIRet::SendMsg(msg),
                     TextFieldRet::KeyHandled => TUIRet::KeyHandled,
-                    TextFieldRet::KeyIgnored => TUIRet::KeyIgnored(key),
+                    TextFieldRet::KeyIgnored => {
+                        self.show_server_msg("KEY IGNORED", format!("{:?}", key).as_ref());
+                        TUIRet::KeyIgnored(key)
+                    }
                 }
             },
+
             Ok(ev) => {
                 TUIRet::EventIgnored(ev)
             },
+
             Err(_) => {
                 // TODO: Log for further investigation
                 TUIRet::KeyHandled
@@ -76,22 +107,10 @@ impl TUI {
         loop {
             self.draw();
 
-            match self.rustbox.poll_event(false) {
-                Ok(Event::KeyEvent(Key::Esc)) => {
-                    return TUIRet::Abort;
-                },
-                Ok(Event::KeyEvent(key)) => {
-                    match self.text_field.keypressed(key) {
-                        TextFieldRet::SendMsg(msg) => {
-                            return TUIRet::SendMsg(msg);
-                        },
-                        _ => {}
-                    }
-                },
-                Ok(_) => {},
-                Err(_) => {
-                    // TODO: Log for further investigation
-                }
+            match self.keypressed() {
+                ret @ TUIRet::Abort => { return ret; },
+                ret @ TUIRet::SendMsg(_) => { return ret; },
+                _ => {}
             }
         }
     }

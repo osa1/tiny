@@ -79,11 +79,14 @@ impl TextField {
             Key::Ctrl(ch) => {
                 if ch == 'a' {
                     self.move_cursor(0);
+                    TextFieldRet::KeyHandled
                 } else if ch == 'e' {
                     let cur = self.buffer.len() as i32; // Rust sucks
                     self.move_cursor(cur);
+                    TextFieldRet::KeyHandled
                 } else if ch == 'k' {
                     self.buffer.drain(self.cursor as usize ..);
+                    TextFieldRet::KeyHandled
                 } else if ch == 'w' {
                     // TODO: First consume whitespace under the cursor
                     let end_range = self.cursor as usize;
@@ -94,8 +97,10 @@ impl TextField {
                     }
                     self.buffer.drain(begin_range .. end_range);
                     self.move_cursor(begin_range as i32);
+                    TextFieldRet::KeyHandled
+                } else {
+                    TextFieldRet::KeyIgnored
                 }
-                TextFieldRet::KeyHandled
             },
             Key::Left => {
                 self.dec_cursor();

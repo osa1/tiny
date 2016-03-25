@@ -3,38 +3,20 @@ extern crate rustbox;
 
 use std::borrow::Borrow;
 
-use tiny::tui::msg_area::MsgArea;
-use tiny::tui::text_field::{TextField, TextFieldRet};
-
-use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
+use tiny::tui::{TUI, TUIRet};
 
 fn loop_() -> Option<String> {
-    let rustbox = RustBox::init(InitOptions {
-        input_mode: InputMode::Esc,
-        buffer_stderr: false,
-    }).unwrap();
-
-    let mut text_field = TextField::new(20);
-    let mut msg_area  = MsgArea::new(20, (rustbox.height() - 1) as i32);
+    let mut tui = TUI::new();
 
     loop {
-        rustbox.clear();
-        msg_area.draw(&rustbox, 0, 0);
-        text_field.draw(&rustbox, 0, (rustbox.height() - 1) as i32);
-        rustbox.present();
-
-        match rustbox.poll_event(false) {
-            Err(err) => return Some(format!("{:?}", err)),
-            Ok(Event::KeyEvent(Key::Esc)) => return None,
-            Ok(Event::KeyEvent(key)) => {
-                match text_field.keypressed(key) {
-                    TextFieldRet::SendMsg(msg) => {
-                        msg_area.add_msg(&msg);
-                    },
-                    _ => {}
-                }
+        match tui.idle_loop() {
+            TUIRet::SendMsg(cmd) => {
+                tui.show_outgoing_msg(cmd.into_iter().collect::<String>().borrow());
             },
-            Ok(_) => {},
+            TUIRet::Abort => {
+                return None;
+            },
+            _ => {}
         }
     }
 }
