@@ -3,8 +3,8 @@ extern crate rustbox;
 
 use std::borrow::Borrow;
 
-use tiny::msg_area::MsgArea;
-use tiny::text_field::{TextField, TextFieldRet};
+use tiny::tui::msg_area::MsgArea;
+use tiny::tui::text_field::{TextField, TextFieldRet};
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 

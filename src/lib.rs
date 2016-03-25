@@ -5,11 +5,9 @@ extern crate libc;
 extern crate rustbox;
 
 mod cmd;
-mod tui;
 mod utils;
 pub mod msg;
-pub mod msg_area;
-pub mod text_field;
+pub mod tui;
 
 use std::borrow::Borrow;
 use std::error::Error;

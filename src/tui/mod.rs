@@ -1,9 +1,12 @@
+pub mod msg_area;
+pub mod text_field;
+
 use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
-use msg_area::MsgArea;
-use text_field::{TextField, TextFieldRet};
+use self::msg_area::MsgArea;
+use self::text_field::{TextField, TextFieldRet};
 
 pub struct TUI {
     /// Termbox instance
