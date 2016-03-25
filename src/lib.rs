@@ -255,18 +255,28 @@ impl Tiny {
                         break;
                     },
                     Some(cr_idx) => {
-                        self.msg_buf.extend_from_slice(&read_buf_[ 0 .. cr_idx ]);
-                        match str::from_utf8(self.msg_buf.borrow()) {
-                            Err(err) =>
-                                tui.show_conn_error(
-                                    format!("Can't parse incoming message: {}", err).borrow()),
-                            Ok(str) => tui.show_incoming_msg(str),
+                        // We have a CR, however, we don't have any guarantees
+                        // that a single read() will read both CR and LF. So if
+                        // we have a CR, but that's the last byte, we should
+                        // just push the whole thing to the msg_buf so that when
+                        // we read NL in the next read() we get a whole mssage.
+                        if cr_idx == read_buf_.len() - 1 {
+                            self.msg_buf.extend_from_slice(read_buf_);
+                            break;
+                        } else {
+                            self.msg_buf.extend_from_slice(&read_buf_[ 0 .. cr_idx ]);
+                            match str::from_utf8(self.msg_buf.borrow()) {
+                                Err(err) =>
+                                    tui.show_conn_error(
+                                        format!("Can't parse incoming message: {}", err).borrow()),
+                                        Ok(str) => tui.show_incoming_msg(str),
+                            }
+
+                            self.msg_buf.clear();
+
+                            // Next char is NL, drop that too.
+                            read_buf_ = &read_buf_[ cr_idx + 2 .. ];
                         }
-
-                        self.msg_buf.clear();
-
-                        // Next char should be NL, skip that.
-                        read_buf_ = &read_buf_[ cr_idx + 2 .. ];
                     }
                 }
             }
