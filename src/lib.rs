@@ -175,7 +175,7 @@ impl Tiny {
                 // Use another version without CR-LF to show the message
                 {
                     let msg_slice : &[char] = msg.borrow();
-                    let msg_slice : &[char] = &msg_slice[ 0 .. msg.len() - 2]; // Drop CRLF
+                    let msg_slice : &[char] = &msg_slice[ 0 .. msg.len() - 2 ]; // Drop CRLF
                     let msg_str : String = msg_slice.iter().cloned().collect();
                     let msg_slice : &str = msg_str.borrow();
                     writeln!(io::stderr(), "sending msg: {}", msg_slice).unwrap();
