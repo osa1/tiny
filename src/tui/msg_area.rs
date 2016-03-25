@@ -48,6 +48,11 @@ impl MsgArea {
     }
 
     #[inline]
+    pub fn add_server_msg(&mut self, msg : &str) {
+        self.add_msg_str_(msg, Style::empty(), Color::Yellow, Color::Default);
+    }
+
+    #[inline]
     pub fn add_err_msg_str(&mut self, msg_str : &str) {
         self.add_msg_str_(msg_str, Style::empty(), Color::White, Color::Red);
     }

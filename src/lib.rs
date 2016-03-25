@@ -201,6 +201,9 @@ impl Tiny {
                 },
                 CommsRet::ShowIncomingMsg(msg) => {
                     tui.show_incoming_msg(msg.borrow());
+                },
+                CommsRet::ShowServerMsg { ty, msg } => {
+                    tui.show_server_msg(ty.borrow(), msg.borrow());
                 }
             }
         }

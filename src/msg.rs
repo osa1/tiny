@@ -2,18 +2,20 @@ use utils::{find_byte, log_stderr_bytes};
 
 #[derive(Debug)]
 pub struct Msg {
-    prefix  : Option<Vec<u8>>,
-    command : Command,
-    params  : Vec<Vec<u8>>,
+    // Does not include the ':' prefix
+    pub prefix  : Option<Vec<u8>>,
+    pub command : Command,
+    pub params  : Vec<Vec<u8>>,
 }
 
 #[derive(Debug)]
 pub enum Command {
-    Str(Vec<u8>),
+    Str(String),
     Num(u16),
 }
 
 impl Msg {
+    /// Parse a complete IRC message. NOTE: The string should NOT have CR-NL.
     pub fn parse(msg : &[u8]) -> Result<Msg, String> {
         if msg.len() == 0 {
             return Err("Empty msg".to_owned());
@@ -39,7 +41,11 @@ impl Msg {
             let (command, slice_) = slice.split_at(ws_idx);
             slice = &slice_[ 1 .. ]; // drop the space
             match reply_num(command) {
-                None => Command::Str(command.to_owned()),
+                None => Command::Str(unsafe {
+                    // Command strings are added by the server and they're
+                    // always ASCII strings, so this is safe and O(1).
+                    String::from_utf8_unchecked(command.to_owned())
+                }),
                 Some(num) => Command::Num(num)
             }
         };
@@ -80,10 +86,8 @@ fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
 
     if chrs[0] == b':' {
         let start_idx = 1; // drop the colon
-        // Consume the thing until \r\n
-        let end_idx   = find_byte(chrs, b'\r').unwrap();
         Ok(vec![
-           (&chrs[ start_idx .. end_idx ]).to_owned()
+           (&chrs[ start_idx .. ]).to_owned()
         ])
     } else {
         let mut ret : Vec<Vec<u8>> = Vec::new();
@@ -91,8 +95,7 @@ fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
         loop {
             match find_byte(chrs, b' ') {
                 None => {
-                    // Hopefully the rest if just \r\n
-                    // TODO: Make sure
+                    ret.push(chrs.to_owned());
                     break;
                 },
                 Some(end_idx) => {
@@ -104,4 +107,12 @@ fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
 
         Ok(ret)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn parse_error_1() {
+    let msg = b"ERROR :Closing Link: 127.0.0.1 (Client Quit)";
+    assert!(Msg::parse(msg).is_ok());
 }
