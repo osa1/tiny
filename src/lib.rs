@@ -5,6 +5,7 @@ extern crate libc;
 extern crate rustbox;
 
 mod cmd;
+mod comms;
 mod utils;
 pub mod msg;
 pub mod tui;
@@ -12,28 +13,18 @@ pub mod tui;
 use std::borrow::Borrow;
 use std::error::Error;
 use std::ffi::CString;
-use std::io::Read;
 use std::io::Write;
 use std::io;
 use std::mem;
-use std::net::TcpStream;
-use std::os::unix::io::AsRawFd;
-use std::str;
-use std::time::Duration;
 
 use cmd::Cmd;
+use comms::{Comms, CommsRet};
 use tui::{TUI, TUIRet};
-use utils::find_byte;
 
 pub struct Tiny {
-    /// Buffer used to read bytes from the socket.
-    read_buf : [u8; 512],
-
-    /// _Partial_ messages collected here until they make a complete message.
-    msg_buf  : Vec<u8>,
-
-    /// TCP stream to the IRC server.
-    stream   : Option<TcpStream>,
+    /// A connection to a server is maintained by 'Comms'. No 'Comms' mean no
+    /// connection.
+    comms : Option<Comms>,
 }
 
 #[derive(PartialEq, Eq)]
@@ -42,9 +33,7 @@ enum LoopRet { Abort, Continue, Disconnected }
 impl Tiny {
     pub fn new() -> Tiny {
         Tiny {
-            read_buf: [0; 512],
-            msg_buf: Vec::new(),
-            stream: None,
+            comms: None,
         }
     }
 
@@ -52,18 +41,18 @@ impl Tiny {
         let mut tui = TUI::new();
 
         loop {
-            match self.stream {
+            match self.comms {
                 None => {
-                    if self.mainloop_no_stream(&mut tui) == LoopRet::Abort { break; }
+                    if self.mainloop_no_comms(&mut tui) == LoopRet::Abort { break; }
                 },
                 Some(_) => {
-                    if self.mainloop_stream(&mut tui) == LoopRet::Abort { break; }
+                    if self.mainloop_comms(&mut tui) == LoopRet::Abort { break; }
                 }
             }
         }
     }
 
-    fn mainloop_no_stream(&mut self, tui : &mut TUI) -> LoopRet {
+    fn mainloop_no_comms(&mut self, tui : &mut TUI) -> LoopRet {
         // I want my tail calls back
         loop {
             match tui.idle_loop() {
@@ -73,12 +62,12 @@ impl Tiny {
                         match Cmd::parse(&cmd) {
                             Ok(Cmd::Connect(server)) => {
                                 writeln!(io::stderr(), "trying to connect: {}", server).unwrap();
-                                match TcpStream::connect::<&str>(server.borrow()) {
+                                match Comms::try_connect(server.borrow()) {
                                     Err(err) => {
                                         tui.show_conn_error(err.description());
                                     },
-                                    Ok(stream) => {
-                                        self.stream = Some(stream);
+                                    Ok(comms) => {
+                                        self.comms = Some(comms);
                                         return LoopRet::Continue;
                                     }
                                 }
@@ -103,20 +92,9 @@ impl Tiny {
         }
     }
 
-    fn mainloop_stream(&mut self, tui : &mut TUI) -> LoopRet {
-
-        ////////////////////
-        // Set up the socket
-
-        // Why can't disable the timeout?
-        self.stream.as_ref().unwrap().set_read_timeout(Some(Duration::from_millis(1))).unwrap();
-        self.stream.as_ref().unwrap().set_write_timeout(None).unwrap();
-        self.stream.as_ref().unwrap().set_nodelay(true).unwrap();
-
-        //////////////////////////////////////
+    fn mainloop_comms(&mut self, tui : &mut TUI) -> LoopRet {
         // Set up the descriptors for select()
-
-        let stream_fd = self.stream.as_ref().unwrap().as_raw_fd();
+        let stream_fd = self.comms.as_ref().unwrap().get_raw_fd();
 
         let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
         unsafe {
@@ -127,9 +105,7 @@ impl Tiny {
 
         let nfds = stream_fd + 1;
 
-        /////////////////
         // Start the loop
-
         self.mainloop_stream_(tui, fd_set, stream_fd, nfds)
     }
 
@@ -193,9 +169,7 @@ impl Tiny {
                 msg.push('\n');
                 {
                     let msg_str : String = msg.iter().cloned().collect();
-                    self.stream.as_ref()
-                               .unwrap()
-                               .write_all(msg_str.as_bytes()).unwrap();
+                    self.comms.as_mut().unwrap().send_raw(msg_str.as_bytes()).unwrap();
                 }
 
                 // Use another version without CR-LF to show the message
@@ -215,78 +189,26 @@ impl Tiny {
     }
 
     fn handle_socket(&mut self, tui : &mut TUI) -> LoopRet {
-        // Handle disconnects
-        match self.stream.as_ref().unwrap().read(&mut self.read_buf) {
-            Err(_) => {
-                // TODO: I don't understand why this happens. I'm randomly
-                // getting "temporarily unavailable" errors.
-                // tui.show_conn_error(format!("Connection lost: {}", err).borrow());
-                // return LoopRet::Disconnected;
-            },
-            Ok(bytes_read) => {
-                if bytes_read == 0 {
-                    tui.show_conn_error("Connection lost");
-                    return LoopRet::Disconnected;
+        let mut disconnect = false;
+
+        for ret in self.comms.as_mut().unwrap().read_incoming_msg() {
+            match ret {
+                CommsRet::Disconnected => {
+                    disconnect = true;
+                },
+                CommsRet::ShowErr(err) => {
+                    tui.show_conn_error(err.borrow());
+                },
+                CommsRet::ShowIncomingMsg(msg) => {
+                    tui.show_incoming_msg(msg.borrow());
                 }
             }
         }
 
-        // Have we read any CRLFs? In that case just process the message and
-        // update the buffers. Otherwise just push the partial message to the
-        // buffer.
-        {
-            // (Creating a new scope for read_buf_)
-            let mut read_buf_ : &[u8] = &self.read_buf;
-            loop {
-                match find_byte(read_buf_, b'\r') {
-                    None => {
-                        // Push the partial message to the message buffer, keep
-                        // reading until a complete message is read.
-                        match find_byte(read_buf_, 0) {
-                            None => {
-                                self.msg_buf.extend_from_slice(read_buf_);
-                            },
-                            Some(slice_end) => {
-                                self.msg_buf.extend_from_slice(&read_buf_[ 0 .. slice_end ]);
-                            }
-                        };
-                        break;
-                    },
-                    Some(cr_idx) => {
-                        // We have a CR, however, we don't have any guarantees
-                        // that a single read() will read both CR and LF. So if
-                        // we have a CR, but that's the last byte, we should
-                        // just push the whole thing to the msg_buf so that when
-                        // we read NL in the next read() we get a whole mssage.
-                        if cr_idx == read_buf_.len() - 1 {
-                            self.msg_buf.extend_from_slice(read_buf_);
-                            break;
-                        } else {
-                            self.msg_buf.extend_from_slice(&read_buf_[ 0 .. cr_idx ]);
-                            match str::from_utf8(self.msg_buf.borrow()) {
-                                Err(err) =>
-                                    tui.show_conn_error(
-                                        format!("Can't parse incoming message: {}", err).borrow()),
-                                        Ok(str) => tui.show_incoming_msg(str),
-                            }
-
-                            self.msg_buf.clear();
-
-                            // Next char is NL, drop that too.
-                            read_buf_ = &read_buf_[ cr_idx + 2 .. ];
-                        }
-                    }
-                }
-            }
-        }
-
-        self.read_buf = unsafe { mem::zeroed() };
-
-        LoopRet::Continue
+        if disconnect { LoopRet::Disconnected } else { LoopRet::Continue }
     }
 
     fn reset_state(&mut self) {
-        self.stream = None;
-        self.msg_buf.clear();
+        self.comms = None;
     }
 }
