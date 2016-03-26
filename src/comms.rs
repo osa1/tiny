@@ -5,6 +5,7 @@ use std::io;
 use std::mem;
 use std::net::TcpStream;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::str;
 use std::time::Duration;
 
 use msg::{Msg, Command};
@@ -12,7 +13,7 @@ use utils::find_byte;
 
 pub struct Comms {
     /// The TCP connection to the server.
-    stream : TcpStream,
+    stream   : TcpStream,
 
     /// Buffer used to read bytes from the socket.
     read_buf : [u8; 512],
@@ -34,19 +35,20 @@ pub enum CommsRet {
 }
 
 impl Comms {
-    pub fn new(stream : TcpStream) -> Comms {
-        stream.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
-        stream.set_write_timeout(None).unwrap();
-        stream.set_nodelay(true).unwrap();
-        Comms {
-            stream: stream,
+    pub fn try_connect(server : &str, nick : &str, hostname : &str, realname : &str)
+                       -> io::Result<Comms> {
+        let mut comms = Comms {
+            stream: try!(TcpStream::connect(server)),
             read_buf: [0; 512],
             msg_buf: Vec::new(),
-        }
+        };
+        try!(comms.introduce(nick, hostname, realname));
+        Ok(comms)
     }
 
-    pub fn try_connect(hostname : &str) -> io::Result<Comms> {
-        TcpStream::connect(hostname).map(Comms::new)
+    fn introduce(&mut self, nick : &str, hostname : &str, realname : &str) -> io::Result<()> {
+        try!(Msg::user(hostname, realname, &mut self.stream));
+        Msg::nick(nick, &mut self.stream)
     }
 
     pub fn read_incoming_msg(&mut self) -> Vec<CommsRet> {
@@ -142,24 +144,26 @@ impl Comms {
     }
 
     fn handle_str_command(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
-                          prefix : Option<Vec<u8>>, cmd : String, params : Vec<Vec<u8>>) {
-        // match cmd.as_str() {
-        //     "NOTICE" | "MODE"  => {
-        //         let text = params.into_iter().last().unwrap();
-        //         ret.push(CommsRet::ShowServerMsg {
-        //             ty: cmd,
-        //             msg: String::from_utf8(text).unwrap(),
-        //         });
-        //     },
+                          prefix : Option<Vec<u8>>, cmd : String, mut params : Vec<Vec<u8>>) {
+        if cmd == "PING" {
+            debug_assert!(params.len() == 1);
+            Msg::pong(unsafe {
+                        str::from_utf8_unchecked(params.into_iter().nth(0).unwrap().as_ref())
+                      }, stream).unwrap();
+        } else {
+            prefix.map(|mut v| {
+                v.insert(0, b'[');
+                v.push(b']');
+                params.insert(0, v);
+            });
 
-        //     _ => {},
-        // }
-        ret.push(CommsRet::ShowServerMsg {
-            ty: cmd,
-            msg: params.into_iter().map(|s| unsafe {
-                String::from_utf8_unchecked(s)
-            }).collect::<Vec<String>>().join(" "), // FIXME: intermediate vector
-        });
+            ret.push(CommsRet::ShowServerMsg {
+                ty: cmd,
+                msg: params.into_iter().map(|s| unsafe {
+                    String::from_utf8_unchecked(s)
+                }).collect::<Vec<String>>().join(" "), // FIXME: intermediate vector
+            });
+        }
     }
 
     fn handle_num_command(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,

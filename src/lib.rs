@@ -25,15 +25,22 @@ pub struct Tiny {
     /// A connection to a server is maintained by 'Comms'. No 'Comms' mean no
     /// connection.
     comms : Option<Comms>,
+
+    nick: String,
+    hostname: String,
+    realname: String,
 }
 
 #[derive(PartialEq, Eq)]
 enum LoopRet { Abort, Continue, Disconnected }
 
 impl Tiny {
-    pub fn new() -> Tiny {
+    pub fn new(nick : String, hostname : String, realname : String) -> Tiny {
         Tiny {
             comms: None,
+            nick: nick,
+            hostname: hostname,
+            realname: realname,
         }
     }
 
@@ -62,7 +69,10 @@ impl Tiny {
                         match Cmd::parse(&cmd) {
                             Ok(Cmd::Connect(server)) => {
                                 writeln!(io::stderr(), "trying to connect: {}", server).unwrap();
-                                match Comms::try_connect(server.borrow()) {
+                                match Comms::try_connect(server.borrow(),
+                                                         self.nick.borrow(),
+                                                         self.hostname.borrow(),
+                                                         self.realname.borrow()) {
                                     Err(err) => {
                                         tui.show_conn_error(err.description());
                                     },

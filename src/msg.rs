@@ -1,3 +1,6 @@
+use std::io::Write;
+use std::io;
+
 use utils::{find_byte, log_stderr_bytes};
 
 #[derive(Debug)]
@@ -57,6 +60,36 @@ impl Msg {
             command: command,
             params: params,
         })
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Message generation
+
+    pub fn user<W : Write>(hostname : &str, realname : &str, mut sink : W) -> io::Result<()> {
+        write!(sink, "USER {} 0 * :{}\r\n", hostname, realname)
+    }
+
+    pub fn nick<W : Write>(arg : &str, mut sink : W) -> io::Result<()> {
+        write!(sink, "NICK {}\r\n", arg)
+    }
+
+    pub fn pong<W : Write>(arg : &str, mut sink : W) -> io::Result<()> {
+        write!(sink, "PONG {}\r\n", arg)
+    }
+
+    pub fn join<W : Write>(channel : &str, mut sink : W) -> io::Result<()> {
+        write!(sink, "JOIN {}\r\n", channel)
+    }
+
+    pub fn privmsg<W : Write>(msgtarget : &str, msg : &str, mut sink : W) -> io::Result<()> {
+        write!(sink, "PRIVMSG {} {}\r\n", msgtarget, msg)
+    }
+
+    pub fn quit<W : Write>(msg : Option<&str>, mut sink : W) -> io::Result<()> {
+        match msg {
+            None => write!(sink, "QUIT\r\n"),
+            Some(msg) => write!(sink, "QUIT {}\r\n", msg)
+        }
     }
 }
 
