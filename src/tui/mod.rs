@@ -1,6 +1,7 @@
 pub mod msg_area;
 pub mod text_field;
 
+use std::cmp::max;
 use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
@@ -53,6 +54,13 @@ impl TUI {
                 TUIRet::Abort
             },
 
+            Ok(Event::ResizeEvent(width, height)) => {
+                // This never happens, probably because the our select() loop,
+                // termbox can't really get resize signals.
+                self.resize(width, height);
+                TUIRet::KeyHandled
+            }
+
             ////////////////////////////////////////////////////////////////////
             // Scrolling related
 
@@ -99,6 +107,11 @@ impl TUI {
                 TUIRet::KeyHandled
             }
         }
+    }
+
+    pub fn resize(&mut self, width : i32, height : i32) {
+        self.msg_area.resize(width, max(0, height - 1));
+        self.text_field.resize(width);
     }
 
     /// Loop until something's entered to the user input field. Useful for

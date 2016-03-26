@@ -34,6 +34,12 @@ impl TextField {
         }
     }
 
+    pub fn resize(&mut self, width : i32) {
+        self.width = width;
+        let cursor = self.cursor;
+        self.move_cursor(cursor);
+    }
+
     pub fn get_msg(&mut self) -> &mut Vec<char> {
         &mut self.buffer
     }
@@ -81,7 +87,7 @@ impl TextField {
                     self.move_cursor(0);
                     TextFieldRet::KeyHandled
                 } else if ch == 'e' {
-                    let cur = self.buffer.len() as i32; // Rust sucks
+                    let cur = self.buffer_len();
                     self.move_cursor(cur);
                     TextFieldRet::KeyHandled
                 } else if ch == 'k' {
@@ -123,11 +129,16 @@ impl TextField {
         }
     }
 
+    #[inline]
+    fn buffer_len(&self) -> i32 {
+        self.buffer.len() as i32
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Manipulating cursor
 
     fn inc_cursor(&mut self) {
-        let cur = min(self.buffer.len() as i32, self.cursor + 1);
+        let cur = min(self.buffer_len(), self.cursor + 1);
         self.move_cursor(cur);
     }
 
@@ -141,14 +152,24 @@ impl TextField {
     fn move_cursor(&mut self, cursor : i32) {
         self.cursor = cursor;
 
-        let left_end  = self.scroll;
-        let right_end = self.scroll + self.width;
+        if self.buffer_len() + 1 < self.width {
+            self.scroll = 0;
+        } else {
+            let scrolloff = { if self.width < 2 * SCROLLOFF + 1 { 0 } else { SCROLLOFF } };
 
-        if cursor - SCROLLOFF < left_end {
-            self.scroll = max(0, cursor - SCROLLOFF);
-        } else if cursor + SCROLLOFF > right_end {
-            self.scroll = min(max(0, cursor + SCROLLOFF - self.width),
-                              max(0, self.buffer.len() as i32 - self.width));
+            let left_end  = self.scroll;
+            let right_end = self.scroll + self.width;
+
+            if cursor - scrolloff < left_end {
+                self.scroll = max(0, cursor - scrolloff);
+            } else if cursor + scrolloff >= right_end {
+                self.scroll = min(// +1 because cursor should be visible, i.e.
+                                  // right_end > cursor should hold after this
+                                  max(0, cursor + 1 + scrolloff - self.width),
+                                  // +1 because cursor goes one more character
+                                  // after the buffer, to be able to add chars
+                                  max(0, self.buffer_len() + 1 - self.width));
+            }
         }
     }
 }
