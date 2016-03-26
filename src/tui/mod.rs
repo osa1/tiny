@@ -49,7 +49,10 @@ impl TUI {
 
     /// Should be called when stdin is ready.
     pub fn keypressed(&mut self) -> TUIRet {
-        match self.rustbox.poll_event(false) {
+        // We should use peek() instead of poll() as we now call this function
+        // when a signal occurs. We don't want to wait forever if the signal
+        // doesn't handled by termbox and triggered an event.
+        match self.rustbox.peek_event(Duration::new(0, 0), false) {
             Ok(Event::KeyEvent(Key::Esc)) => {
                 TUIRet::Abort
             },
