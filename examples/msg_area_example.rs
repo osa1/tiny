@@ -30,16 +30,16 @@ fn loop_() -> Option<String> {
                          std::ptr::null_mut())   // timeval
         };
 
-        if ret == -1 {
-            let err_c_msg =
-                unsafe { CStr::from_ptr(libc::strerror(*libc::__errno_location())) }
-                    .to_string_lossy();
+        // if ret == -1 {
+        //     let err_c_msg =
+        //         unsafe { CStr::from_ptr(libc::strerror(*libc::__errno_location())) }
+        //             .to_string_lossy();
 
-            tui.show_conn_error(
-                format!("Internal error: select() failed: {}", err_c_msg).borrow());
-        }
+        //     tui.show_conn_error(
+        //         format!("Internal error: select() failed: {}", err_c_msg).borrow());
+        // }
 
-        else if unsafe { libc::FD_ISSET(0, &mut fd_set_) } {
+        if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
             match tui.keypressed() {
                 TUIRet::SendMsg(cmd) => {
                     tui.show_outgoing_msg(cmd.into_iter().collect::<String>().borrow());

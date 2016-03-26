@@ -12,7 +12,7 @@ pub mod tui;
 
 use std::borrow::Borrow;
 use std::error::Error;
-use std::ffi::CString;
+use std::ffi::CStr;
 use std::io::Write;
 use std::io;
 use std::mem;
@@ -136,17 +136,24 @@ impl Tiny {
                                  std::ptr::null_mut())   // timeval
                 };
 
-            if ret == -1 {
-                let err_c_msg =
-                    unsafe { CString::from_raw(libc::strerror(*libc::__errno_location())) };
+            // if ret == -1 {
+            //     let err_c_msg =
+            //         unsafe { CStr::from_ptr(libc::strerror(*libc::__errno_location())) }
+            //             .to_string_lossy();
+            //
+            //     tui.show_conn_error(
+            //         format!("Internal error: select() failed: {}", err_c_msg).borrow());
+            // }
 
-                tui.show_conn_error(
-                    format!("Internal error: select() failed: {}",
-                            err_c_msg.to_str().unwrap()).borrow());
-            }
-
-            // stdin is ready
-            else if unsafe { libc::FD_ISSET(0, &mut fd_set_) } {
+            // A resize signal (SIGWINCH) causes select() to fail, but termbox's
+            // signal handler runs and we need to run termbox's poll_event() to
+            // be able to catch the resize event. So, when stdin is ready we
+            // call the TUI event handler, but we also call it when select() is
+            // interrupted for some reason, just to be able to handle resize
+            // events.
+            //
+            // See also https://github.com/nsf/termbox/issues/71.
+            if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
                 if self.handle_stdin(tui) == LoopRet::Abort { return LoopRet::Abort; }
             }
 
