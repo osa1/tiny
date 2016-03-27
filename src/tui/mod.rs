@@ -1,23 +1,25 @@
+pub mod messaging;
 pub mod msg_area;
+pub mod tabbed;
 pub mod text_field;
+pub mod widget;
 
 use std::cmp::max;
 use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
+use self::messaging::MessagingUI;
 use self::msg_area::MsgArea;
-use self::text_field::{TextField, TextFieldRet};
+use self::text_field::TextField;
+use self::widget::{Widget, WidgetRet};
 
 pub struct TUI {
     /// Termbox instance
     rustbox : RustBox,
 
     /// Incoming and sent messages appear
-    msg_area : MsgArea,
-
-    /// User input field
-    text_field : TextField,
+    msg_ui  : MessagingUI,
 }
 
 #[derive(Debug)]
@@ -39,10 +41,7 @@ impl TUI {
         }).unwrap();
 
         TUI {
-            msg_area: MsgArea::new(tui.width() as i32, tui.height() as i32 - 1),
-            text_field: TextField::new(tui.width() as i32),
-
-            // need to move this last
+            msg_ui: MessagingUI::new(tui.width() as i32, tui.height() as i32),
             rustbox: tui,
         }
     }
@@ -64,40 +63,11 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            ////////////////////////////////////////////////////////////////////
-            // Scrolling related
-
-            Ok(Event::KeyEvent(Key::Ctrl('p'))) => {
-                self.msg_area.scroll_up();
-                TUIRet::KeyHandled
-            },
-
-            Ok(Event::KeyEvent(Key::Ctrl('n'))) => {
-                self.msg_area.scroll_down();
-                TUIRet::KeyHandled
-            },
-
-            Ok(Event::KeyEvent(Key::PageUp)) => {
-                self.msg_area.page_up();
-                TUIRet::KeyHandled
-            },
-
-            Ok(Event::KeyEvent(Key::PageDown)) => {
-                self.msg_area.page_down();
-                TUIRet::KeyHandled
-            },
-
-            ////////////////////////////////////////////////////////////////////
-
             Ok(Event::KeyEvent(key)) => {
-                // TODO: Handle ret
-                match self.text_field.keypressed(key) {
-                    TextFieldRet::SendMsg(msg) => TUIRet::SendMsg(msg),
-                    TextFieldRet::KeyHandled => TUIRet::KeyHandled,
-                    TextFieldRet::KeyIgnored => {
-                        self.show_server_msg("KEY IGNORED", format!("{:?}", key).as_ref());
-                        TUIRet::KeyIgnored(key)
-                    }
+                match self.msg_ui.keypressed(key) {
+                    WidgetRet::KeyHandled => TUIRet::KeyHandled,
+                    WidgetRet::KeyIgnored => TUIRet::KeyIgnored(key),
+                    WidgetRet::Input(v)   => TUIRet::SendMsg(v),
                 }
             },
 
@@ -113,8 +83,7 @@ impl TUI {
     }
 
     pub fn resize(&mut self, width : i32, height : i32) {
-        self.msg_area.resize(width, max(0, height - 1));
-        self.text_field.resize(width);
+        self.msg_ui.resize(width, height);
     }
 
     /// Loop until something's entered to the user input field. Useful for
@@ -133,28 +102,7 @@ impl TUI {
 
     pub fn draw(&self) {
         self.rustbox.clear();
-        self.msg_area.draw(&self.rustbox, 0, 0);
-        self.text_field.draw(&self.rustbox, 0, (self.rustbox.height() - 1) as i32);
+        self.msg_ui.draw(&self.rustbox, 0, 0);
         self.rustbox.present();
-    }
-
-    pub fn show_server_msg(&mut self, ty : &str, msg : &str) {
-        self.msg_area.add_server_msg(format!("[{}] {}", ty, msg).as_ref());
-    }
-
-    pub fn show_incoming_msg(&mut self, msg : &str) {
-        self.msg_area.add_msg_str(msg);
-    }
-
-    pub fn show_outgoing_msg(&mut self, msg : &str) {
-        self.msg_area.add_msg_str(msg);
-    }
-
-    pub fn show_user_error(&mut self, msg : &str) {
-        self.msg_area.add_err_msg_str(msg);
-    }
-
-    pub fn show_conn_error(&mut self, msg : &str) {
-        self.msg_area.add_err_msg_str(msg);
     }
 }

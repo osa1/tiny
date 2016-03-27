@@ -22,13 +22,13 @@ use comms::{Comms, CommsRet};
 use tui::{TUI, TUIRet};
 
 pub struct Tiny {
-    /// A connection to a server is maintained by 'Comms'. No 'Comms' mean no
+    /// A connection to a server is maintained by 'Comms'. No 'Comms' means no
     /// connection.
-    comms : Option<Comms>,
+    comms    : Option<Comms>,
 
-    nick: String,
-    hostname: String,
-    realname: String,
+    nick     : String,
+    hostname : String,
+    realname : String,
 }
 
 #[derive(PartialEq, Eq)]
@@ -74,7 +74,7 @@ impl Tiny {
                                                          self.hostname.borrow(),
                                                          self.realname.borrow()) {
                                     Err(err) => {
-                                        tui.show_conn_error(err.description());
+                                        //tui.show_conn_error(err.description());
                                     },
                                     Ok(comms) => {
                                         self.comms = Some(comms);
@@ -82,16 +82,13 @@ impl Tiny {
                                     }
                                 }
                             },
-                            // Ok(_) => {
-                            //     tui.show_conn_error("Not connected.");
-                            // },
                             Err(err_msg) => {
-                                tui.show_user_error(err_msg.borrow());
+                                // tui.show_user_error(err_msg.borrow());
                             }
                         }
                     } else {
                         // Trying to send a message - not going to happen
-                        tui.show_user_error("Can't send message - not connected to a server.");
+                        //tui.show_user_error("Can't send message - not connected to a server.");
                     }
                 },
                 TUIRet::Abort => { return LoopRet::Abort; },
@@ -196,7 +193,7 @@ impl Tiny {
                     let msg_str : String = msg_slice.iter().cloned().collect();
                     let msg_slice : &str = msg_str.borrow();
                     writeln!(io::stderr(), "sending msg: {}", msg_slice).unwrap();
-                    tui.show_outgoing_msg(msg_slice);
+                    //tui.show_outgoing_msg(msg_slice);
                 }
 
                 LoopRet::Continue
@@ -213,14 +210,14 @@ impl Tiny {
                 CommsRet::Disconnected => {
                     disconnect = true;
                 },
-                CommsRet::ShowErr(err) => {
-                    tui.show_conn_error(err.borrow());
+                CommsRet::Err(err) => {
+                    //tui.show_conn_error(err.borrow());
                 },
-                CommsRet::ShowIncomingMsg(msg) => {
-                    tui.show_incoming_msg(msg.borrow());
+                CommsRet::IncomingMsg { pfx, ty, msg } => {
+                    //tui.show_incoming_msg(msg.borrow());
                 },
-                CommsRet::ShowServerMsg { ty, msg } => {
-                    tui.show_server_msg(ty.borrow(), msg.borrow());
+                CommsRet::SentMsg { ty, msg } => {
+                    //tui.show_server_msg(ty.borrow(), msg.borrow());
                 }
             }
         }

@@ -4,7 +4,8 @@ use std::io::Write;
 use std::io;
 use std::mem;
 
-use rustbox::{RustBox, Style, Color};
+use rustbox::{RustBox, Style, Color, Key};
+use tui::widget::{Widget, WidgetRet};
 
 static LINEBREAK : char = '\\';
 
@@ -57,7 +58,7 @@ impl MsgArea {
     ////////////////////////////////////////////////////////////////////////////
     // Resizing
 
-    pub fn resize(&mut self, width : i32, height : i32) {
+    fn resize_(&mut self, width : i32, height : i32) {
         // either scroll to bottom ...
         let scroll_to_bottom       = self.need_to_scroll();
         // ... or make sure the first visible line is still visible
@@ -171,7 +172,7 @@ impl MsgArea {
         self.add_msg_(msg, Style::empty(), Color::White, Color::Red);
     }
 
-    pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+    fn draw_(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
         let mut row = self.height - 1;
         let mut line_idx = min(self.scroll + self.height, self.lines.len() as i32) - 1;
         while line_idx >= 0 && row >= 0 {
@@ -276,5 +277,19 @@ impl MsgArea {
     #[inline]
     fn need_to_scroll(&self) -> bool {
         self.scroll + self.height == self.lines.len() as i32
+    }
+}
+
+impl Widget for MsgArea {
+    fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+        self.draw_(rustbox, pos_x, pos_y)
+    }
+
+    fn keypressed(&mut self, key : Key) -> WidgetRet {
+        WidgetRet::KeyIgnored
+    }
+
+    fn resize(&mut self, width : i32, height : i32) {
+        self.resize_(width, height)
     }
 }

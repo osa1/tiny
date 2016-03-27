@@ -15,8 +15,9 @@ pub struct Comms {
     /// The TCP connection to the server.
     stream   : TcpStream,
 
-    /// Buffer used to read bytes from the socket.
-    read_buf : [u8; 512],
+    /// Prefix used for the messages originated from the server.
+    /// Unknown prior to the first server message. (Does NOT include the ':')
+    pfx      : Option<String>,
 
     /// _Partial_ messages collected here until they make a complete message.
     msg_buf  : Vec<u8>,
@@ -24,22 +25,33 @@ pub struct Comms {
 
 pub enum CommsRet {
     Disconnected,
-    ShowErr(String),
-    ShowIncomingMsg(String),
+    Err(String),
 
-    /// Some kind of info message from the server (instead of another client)
-    ShowServerMsg {
+    IncomingMsg {
+        pfx: String,
         ty: String,
         msg: String,
     },
+
+    /// A message without prefix. From RFC 2812:
+    /// > If the prefix is missing from the message, it is assumed to have
+    /// > originated from the connection from which it was received from.
+    SentMsg {
+        ty: String,
+        msg: String,
+    }
 }
 
 impl Comms {
     pub fn try_connect(server : &str, nick : &str, hostname : &str, realname : &str)
                        -> io::Result<Comms> {
+        let stream = try!(TcpStream::connect(server));
+        try!(stream.set_read_timeout(Some(Duration::from_millis(10))));
+        try!(stream.set_write_timeout(None));
+
         let mut comms = Comms {
-            stream: try!(TcpStream::connect(server)),
-            read_buf: [0; 512],
+            stream: stream,
+            pfx: None,
             msg_buf: Vec::new(),
         };
         try!(comms.introduce(nick, hostname, realname));
@@ -52,92 +64,81 @@ impl Comms {
     }
 
     pub fn read_incoming_msg(&mut self) -> Vec<CommsRet> {
+        let mut read_buf : [u8; 512] = [0; 512];
+
         // Handle disconnects
-        match self.stream.read(&mut self.read_buf) {
+        match self.stream.read(&mut read_buf) {
             Err(_) => {
                 // TODO: I don't understand why this happens. I'm ``randomly''
                 // getting "temporarily unavailable" errors.
                 // return vec![CommsRet::ShowErr(format!("error in read(): {:?}", err))];
-                self.read_buf = unsafe { mem::zeroed() };
                 return vec![];
             },
             Ok(bytes_read) => {
                 if bytes_read == 0 {
-                    self.read_buf = unsafe { mem::zeroed() };
                     return vec![CommsRet::Disconnected];
                 }
             }
         }
 
-        let mut ret : Vec<CommsRet> = Vec::with_capacity(2);
+        self.add_to_msg_buf(&read_buf);
+        self.handle_msgs()
+    }
+
+    #[inline]
+    fn add_to_msg_buf(&mut self, slice : &[u8]) {
+        // Some invisible ASCII characters causing glitches on some terminals,
+        // we filter those out here.
+        self.msg_buf.extend(slice.iter().filter(|c| **c != 0x1 /* SOH */ || **c != 0x2 /* STX */));
+    }
+
+    fn handle_msgs(&mut self) -> Vec<CommsRet> {
+        let mut ret = Vec::with_capacity(1);
 
         // Have we read any CRLFs? In that case just process the message and
-        // update the buffers. Otherwise just push the partial message to the
+        // update buffers. Otherwise just leave the partial message in the
         // buffer.
-        {
-            // (Creating a new scope for read_buf_)
-            let mut read_buf_ : &[u8] = &self.read_buf;
-            loop {
-                match find_byte(read_buf_, b'\r') {
-                    None => {
-                        // Push the partial message to the message buffer, keep
-                        // reading until a complete message is read.
-                        match find_byte(read_buf_, 0) {
-                            None => {
-                                Comms::add_to_msg_buf(&mut self.msg_buf, read_buf_);
-                            },
-                            Some(slice_end) => {
-                                Comms::add_to_msg_buf(
-                                    &mut self.msg_buf, &read_buf_[ 0 .. slice_end ]);
-                            }
-                        }
+        loop {
+            match find_byte(self.msg_buf.borrow(), b'\r') {
+                None => { break; },
+                Some(cr_idx) => {
+                    // We have a CR, however, we don't have any guarantees that
+                    // a single read() will read both CR and LF. So if we have a
+                    // CR, but that's the last byte, we should just wait until
+                    // we read NL too.
+                    if cr_idx == self.msg_buf.len() - 1 {
                         break;
-                    },
-                    Some(cr_idx) => {
-                        // We have a CR, however, we don't have any guarantees
-                        // that a single read() will read both CR and LF. So if
-                        // we have a CR, but that's the last byte, we should
-                        // just push the whole thing to the msg_buf so that when
-                        // we read NL in the next read() we get a whole mssage.
-                        if cr_idx == read_buf_.len() - 1 {
-                            Comms::add_to_msg_buf(&mut self.msg_buf, read_buf_);
-                            break;
-                        } else {
-                            Comms::add_to_msg_buf(&mut self.msg_buf, &read_buf_[ 0 .. cr_idx ]);
-                            Comms::handle_msg(&mut self.stream, &mut ret, self.msg_buf.borrow());
-                            self.msg_buf.clear();
-
-                            // Next char is NL, drop that too.
-                            read_buf_ = &read_buf_[ cr_idx + 2 .. ];
+                    } else {
+                        assert!(self.msg_buf[cr_idx + 1] == b'\n');
+                        // Don't include CRLF
+                        let msg = Msg::parse(&self.msg_buf[ 0 .. cr_idx ]);
+                        // Update the server prefix if we don't know it already
+                        for m in msg.iter() {
+                            self.pfx = m.pfx.clone().map(|v| {
+                                unsafe { String::from_utf8_unchecked(v) }
+                            });
                         }
+                        // Finally handle the message
+                        Comms::handle_msg(&mut self.stream, msg, &mut ret);
+                        // Update the buffer (drop CRLF)
+                        self.msg_buf.drain(0 .. cr_idx + 2);
                     }
                 }
             }
         }
 
-        self.read_buf = unsafe { mem::zeroed() };
-
         ret
     }
 
-    #[inline]
-    fn add_to_msg_buf(msg_buf : &mut Vec<u8>, slice : &[u8]) {
-        // Some invisible ASCII characters causing glitches on some terminals,
-        // we filter those out here.
-        msg_buf.extend(slice.iter().filter(|c| **c != 0x2 /* STX */));
-    }
-
-    // Can't make this a method -- we need TcpStream mut but in the call site
-    // msg_buf is borrwed as mutable too.
-    fn handle_msg(stream : &mut TcpStream, ret : &mut Vec<CommsRet>, msg_buf : &[u8]) {
-        match Msg::parse(msg_buf) {
+    fn handle_msg(stream : &mut TcpStream, msg : Result<Msg, String>, ret : &mut Vec<CommsRet>) {
+        match msg {
             Err(err_msg) => {
-                ret.push(CommsRet::ShowErr(err_msg));
+                ret.push(CommsRet::Err(err_msg));
             },
-            Ok(Msg { prefix, command, params }) => {
+            Ok(Msg { pfx, command, params }) => {
                 match command {
-                    Command::Str(str) => Comms::handle_str_command(stream, ret, prefix, str, params),
-                    Command::Num(num) => Comms::handle_num_command(stream, ret, prefix, num, params),
+                    Command::Str(str) => Comms::handle_str_command(stream, ret, pfx, str, params),
+                    Command::Num(num) => Comms::handle_num_command(stream, ret, pfx, num, params),
                 }
             }
         }
@@ -151,62 +152,32 @@ impl Comms {
                         str::from_utf8_unchecked(params.into_iter().nth(0).unwrap().as_ref())
                       }, stream).unwrap();
         } else {
-            prefix.map(|mut v| {
-                v.insert(0, b'[');
-                v.push(b']');
-                params.insert(0, v);
-            });
-
-            ret.push(CommsRet::ShowServerMsg {
-                ty: cmd,
-                msg: params.into_iter().map(|s| unsafe {
-                    String::from_utf8_unchecked(s)
-                }).collect::<Vec<String>>().join(" "), // FIXME: intermediate vector
-            });
+            match prefix {
+                None => {
+                    ret.push(CommsRet::SentMsg {
+                        ty: cmd,
+                        msg: params.into_iter().map(|s| unsafe {
+                            String::from_utf8_unchecked(s)
+                        }).collect::<Vec<_>>().join(" "), // FIXME: intermediate vector
+                    });
+                },
+                Some(pfx) => {
+                    ret.push(CommsRet::IncomingMsg {
+                        pfx: unsafe { String::from_utf8_unchecked(pfx) },
+                        ty: cmd,
+                        msg: params.into_iter().map(|s| unsafe {
+                            String::from_utf8_unchecked(s)
+                        }).collect::<Vec<_>>().join(" "), // FIXME: intermediate vector
+                    });
+                }
+            }
         }
     }
 
     fn handle_num_command(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
                           prefix : Option<Vec<u8>>, num : u16, params : Vec<Vec<u8>>) {
-        match num {
-            // 001 => {
-            //     ret.push(CommsRet::ShowServerMsg {
-            //         ty: "WELCOME".to_owned(),
-            //         msg: unsafe { String::from_utf8_unchecked(params.into_iter().last().unwrap()) },
-            //     });
-            // },
-
-            // // Info messages with just one parameter
-            // 002 | 003 | 004 | 005 | 375 | 372 | 376
-            //     // More than more params, but we want to show just the last
-            //     // param
-            //     | 265 | 266 => {
-            //     ret.push(CommsRet::ShowServerMsg {
-            //         ty: "INFO".to_owned(),
-            //         msg: unsafe { String::from_utf8_unchecked(params.into_iter().last().unwrap()) },
-            //     });
-            // },
-
-            // // Info messages with more than one parameters to show
-            // 251 | 252 | 253 | 254 | 255 => {
-            //     ret.push(CommsRet::ShowServerMsg {
-            //         ty: "INFO".to_owned(),
-            //         msg: params.into_iter().map(|s| unsafe {
-            //             String::from_utf8_unchecked(s)
-            //         }).collect::<Vec<String>>().join(" "), // FIXME: intermediate vector
-            //     });
-            // },
-
-            // Just show the rest
-            _ => {
-                ret.push(CommsRet::ShowServerMsg {
-                    ty: "UNKNOWN".to_owned(),
-                    msg: params.into_iter().map(|s| unsafe {
-                        String::from_utf8_unchecked(s)
-                    }).collect::<Vec<String>>().join(" "), // FIXME: intermediate vector
-                });
-            }
-        }
+        // TODO
+        Comms::handle_str_command(stream, ret, prefix, "UNKNOWN".to_owned(), params)
     }
 
     /// Get the RawFd, to be used with select() or other I/O multiplexer.

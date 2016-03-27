@@ -5,6 +5,8 @@ use std::mem;
 use rustbox::{RustBox, Style, Color};
 use rustbox::keyboard::Key;
 
+use tui::widget::{Widget, WidgetRet};
+
 // TODO: Make this a setting
 static SCROLLOFF : i32 = 5;
 
@@ -18,12 +20,6 @@ pub struct TextField {
     width : i32,
 }
 
-pub enum TextFieldRet {
-    SendMsg(Vec<char>),
-    KeyHandled,
-    KeyIgnored,
-}
-
 impl TextField {
     pub fn new(width : i32) -> TextField {
         TextField {
@@ -34,7 +30,7 @@ impl TextField {
         }
     }
 
-    pub fn resize(&mut self, width : i32) {
+    fn resize_(&mut self, width : i32, _ : i32) {
         self.width = width;
         let cursor = self.cursor;
         self.move_cursor(cursor);
@@ -49,7 +45,7 @@ impl TextField {
         self.move_cursor(0);
     }
 
-    pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+    fn draw_(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
         // draw text
         let buffer_borrow : &[char] = self.buffer.borrow();
 
@@ -68,31 +64,31 @@ impl TextField {
                            Style::empty(), Color::Blue, Color::Blue, ' ');
     }
 
-    pub fn keypressed(&mut self, key : Key) -> TextFieldRet {
+    fn keypressed_(&mut self, key : Key) -> WidgetRet {
         match key {
             Key::Char(ch) => {
                 self.buffer.insert(self.cursor as usize, ch);
                 self.inc_cursor();
-                TextFieldRet::KeyHandled
+                WidgetRet::KeyHandled
             },
             Key::Backspace => {
                 if self.cursor > 0 {
                     self.buffer.remove(self.cursor as usize - 1);
                     self.dec_cursor();
                 }
-                TextFieldRet::KeyHandled
+                WidgetRet::KeyHandled
             },
             Key::Ctrl(ch) => {
                 if ch == 'a' {
                     self.move_cursor(0);
-                    TextFieldRet::KeyHandled
+                    WidgetRet::KeyHandled
                 } else if ch == 'e' {
                     let cur = self.buffer_len();
                     self.move_cursor(cur);
-                    TextFieldRet::KeyHandled
+                    WidgetRet::KeyHandled
                 } else if ch == 'k' {
                     self.buffer.drain(self.cursor as usize ..);
-                    TextFieldRet::KeyHandled
+                    WidgetRet::KeyHandled
                 } else if ch == 'w' {
                     // TODO: First consume whitespace under the cursor
                     let end_range = self.cursor as usize;
@@ -103,29 +99,29 @@ impl TextField {
                     }
                     self.buffer.drain(begin_range .. end_range);
                     self.move_cursor(begin_range as i32);
-                    TextFieldRet::KeyHandled
+                    WidgetRet::KeyHandled
                 } else {
-                    TextFieldRet::KeyIgnored
+                    WidgetRet::KeyIgnored
                 }
             },
             Key::Left => {
                 self.dec_cursor();
-                TextFieldRet::KeyHandled
+                WidgetRet::KeyHandled
             },
             Key::Right => {
                 self.inc_cursor();
-                TextFieldRet::KeyHandled
+                WidgetRet::KeyHandled
             },
             Key::Enter => {
                 let ret = mem::replace(&mut self.buffer, Vec::new());
                 self.move_cursor(0);
                 if ret.len() == 0 {
-                    TextFieldRet::KeyHandled
+                    WidgetRet::KeyHandled
                 } else {
-                    TextFieldRet::SendMsg(ret)
+                    WidgetRet::Input(ret)
                 }
             },
-            _ => TextFieldRet::KeyIgnored,
+            _ => WidgetRet::KeyIgnored,
         }
     }
 
@@ -171,5 +167,19 @@ impl TextField {
                                   max(0, self.buffer_len() + 1 - self.width));
             }
         }
+    }
+}
+
+impl Widget for TextField {
+    fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+        self.draw_(rustbox, pos_x, pos_y)
+    }
+
+    fn keypressed(&mut self, key : Key) -> WidgetRet {
+        self.keypressed_(key)
+    }
+
+    fn resize(&mut self, width : i32, height : i32) {
+        self.resize_(width, height)
     }
 }

@@ -6,7 +6,7 @@ use utils::{find_byte, log_stderr_bytes};
 #[derive(Debug)]
 pub struct Msg {
     // Does not include the ':' prefix
-    pub prefix  : Option<Vec<u8>>,
+    pub pfx     : Option<Vec<u8>>,
     pub command : Command,
     pub params  : Vec<Vec<u8>>,
 }
@@ -26,13 +26,13 @@ impl Msg {
 
         let mut slice = msg;
 
-        let prefix : Option<Vec<u8>> = {
+        let pfx : Option<Vec<u8>> = {
             if msg[0] == b':' {
                 // parse prefix
                 let ws_idx = find_byte(slice, b' ').unwrap();
-                let (prefix, slice_) = slice.split_at(ws_idx);
+                let (pfx, slice_) = slice.split_at(ws_idx);
                 slice = &slice_[ 1 .. ]; // drop the space
-                Some(prefix.to_owned())
+                Some(pfx.to_owned())
             } else {
                 log_stderr_bytes("Can't parse msg prefix:", msg);
                 None
@@ -56,7 +56,7 @@ impl Msg {
         let params = try!(parse_params(slice));
 
         Ok(Msg {
-            prefix: prefix,
+            pfx: pfx,
             command: command,
             params: params,
         })
