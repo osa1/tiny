@@ -63,7 +63,7 @@ impl Tiny {
         // I want my tail calls back
         loop {
             match tui.idle_loop() {
-                TUIRet::SendMsg(cmd) => {
+                TUIRet::Input(_, cmd) => {
                     if cmd[0] == '/' {
                         // a command attempt
                         match Cmd::parse(&cmd) {
@@ -177,7 +177,7 @@ impl Tiny {
                 // TODO: What to do here?
                 LoopRet::Continue
             },
-            TUIRet::SendMsg(mut msg) => {
+            TUIRet::Input(_, mut msg) => {
                 // Add CR-LF and send
                 msg.push('\r');
                 msg.push('\n');
@@ -211,10 +211,10 @@ impl Tiny {
                     disconnect = true;
                 },
                 CommsRet::Err(err) => {
-                    //tui.show_conn_error(err.borrow());
+                    tui.show_conn_error(err.borrow());
                 },
                 CommsRet::IncomingMsg { pfx, ty, msg } => {
-                    //tui.show_incoming_msg(msg.borrow());
+                    tui.show_incoming_msg(pfx.borrow(), ty.borrow(), msg.borrow());
                 },
                 CommsRet::SentMsg { ty, msg } => {
                     //tui.show_server_msg(ty.borrow(), msg.borrow());

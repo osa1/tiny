@@ -76,22 +76,27 @@ impl MessagingUI {
         self.text_field.resize(width, 1);
     }
 
+    #[inline]
     pub fn show_server_msg(&mut self, ty : &str, msg : &str) {
         self.msg_area.add_server_msg(format!("[{}] {}", ty, msg).as_ref());
     }
 
-    pub fn show_incoming_msg(&mut self, msg : &str) {
+    #[inline]
+    pub fn show_incoming_msg(&mut self, ty : &str, msg : &str) {
         self.msg_area.add_msg_str(msg);
     }
 
+    #[inline]
     pub fn show_outgoing_msg(&mut self, msg : &str) {
         self.msg_area.add_msg_str(msg);
     }
 
+    #[inline]
     pub fn show_user_error(&mut self, msg : &str) {
         self.msg_area.add_err_msg_str(msg);
     }
 
+    #[inline]
     pub fn show_conn_error(&mut self, msg : &str) {
         self.msg_area.add_err_msg_str(msg);
     }

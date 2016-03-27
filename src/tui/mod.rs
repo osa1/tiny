@@ -11,6 +11,7 @@ use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
 use self::messaging::MessagingUI;
 use self::msg_area::MsgArea;
+use self::tabbed::{Tabbed, TabbedRet};
 use self::text_field::TextField;
 use self::widget::{Widget, WidgetRet};
 
@@ -18,8 +19,8 @@ pub struct TUI {
     /// Termbox instance
     rustbox : RustBox,
 
-    /// Incoming and sent messages appear
-    msg_ui  : MessagingUI,
+    /// A tab for every server + channel
+    ui      : Tabbed,
 }
 
 #[derive(Debug)]
@@ -30,7 +31,7 @@ pub enum TUIRet {
     EventIgnored(Event),
 
     /// INVARIANT: The vec will have at least one char.
-    SendMsg(Vec<char>),
+    Input(String, Vec<char>),
 }
 
 impl TUI {
@@ -41,7 +42,7 @@ impl TUI {
         }).unwrap();
 
         TUI {
-            msg_ui: MessagingUI::new(tui.width() as i32, tui.height() as i32),
+            ui: Tabbed::new(tui.width() as i32, tui.height() as i32),
             rustbox: tui,
         }
     }
@@ -64,10 +65,13 @@ impl TUI {
             }
 
             Ok(Event::KeyEvent(key)) => {
-                match self.msg_ui.keypressed(key) {
-                    WidgetRet::KeyHandled => TUIRet::KeyHandled,
-                    WidgetRet::KeyIgnored => TUIRet::KeyIgnored(key),
-                    WidgetRet::Input(v)   => TUIRet::SendMsg(v),
+                match self.ui.keypressed(key) {
+                    TabbedRet::KeyHandled    => TUIRet::KeyHandled,
+                    TabbedRet::KeyIgnored    => TUIRet::KeyIgnored(key),
+                    TabbedRet::Input(pfx, v) =>
+                        // Channel names are usually just a few characters long,
+                        // copying is easier than managing Cow<> etc.
+                        TUIRet::Input(pfx.to_owned(), v),
                 }
             },
 
@@ -83,7 +87,7 @@ impl TUI {
     }
 
     pub fn resize(&mut self, width : i32, height : i32) {
-        self.msg_ui.resize(width, height);
+        self.ui.resize(width, height);
     }
 
     /// Loop until something's entered to the user input field. Useful for
@@ -94,7 +98,7 @@ impl TUI {
 
             match self.keypressed() {
                 ret @ TUIRet::Abort => { return ret; },
-                ret @ TUIRet::SendMsg(_) => { return ret; },
+                ret @ TUIRet::Input(_, _) => { return ret; },
                 _ => {}
             }
         }
@@ -102,7 +106,19 @@ impl TUI {
 
     pub fn draw(&self) {
         self.rustbox.clear();
-        self.msg_ui.draw(&self.rustbox, 0, 0);
+        self.ui.draw(&self.rustbox, 0, 0);
         self.rustbox.present();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    #[inline]
+    pub fn show_incoming_msg(&mut self, pfx : &str, ty : &str, msg : &str) {
+        self.ui.show_incoming_msg(pfx, ty, msg);
+    }
+
+    #[inline]
+    pub fn show_conn_error(&mut self, err : &str) {
+
     }
 }
