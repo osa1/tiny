@@ -1,14 +1,24 @@
 use std::io::Write;
 use std::io;
+use std::str;
 
 use utils::{find_byte, log_stderr_bytes};
 
 #[derive(Debug)]
 pub struct Msg {
-    // Does not include the ':' prefix
-    pub pfx     : Option<Vec<u8>>,
+    pub pfx     : Option<Pfx>,
     pub command : Command,
     pub params  : Vec<Vec<u8>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Pfx {
+    Server(String),
+    User {
+        nick : String,
+        /// user@host
+        user : String,
+    },
 }
 
 #[derive(Debug)]
@@ -26,13 +36,13 @@ impl Msg {
 
         let mut slice = msg;
 
-        let pfx : Option<Vec<u8>> = {
+        let pfx : Option<Pfx> = {
             if msg[0] == b':' {
                 // parse prefix
                 let ws_idx = find_byte(slice, b' ').unwrap();
                 let (pfx, slice_) = slice.split_at(ws_idx);
                 slice = &slice_[ 1 .. ]; // drop the space
-                Some(pfx.to_owned())
+                Some(parse_pfx(pfx))
             } else {
                 log_stderr_bytes("Can't parse msg prefix:", msg);
                 None
@@ -110,6 +120,18 @@ fn reply_num(bs : &[u8]) -> Option<u16> {
 #[inline]
 fn is_num_ascii(b : u8) -> bool {
     b >= b'0' && b <= b'9'
+}
+
+fn parse_pfx(pfx : &[u8]) -> Pfx {
+    match find_byte(pfx, b'!') {
+        None => Pfx::Server(unsafe { str::from_utf8_unchecked(pfx).to_owned() }),
+        Some(idx) => {
+            Pfx::User {
+                nick: unsafe { str::from_utf8_unchecked(&pfx[ 0 .. idx ]).to_owned() },
+                user: unsafe { str::from_utf8_unchecked(&pfx[ idx + 1 .. ]).to_owned() }
+            }
+        }
+    }
 }
 
 fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {

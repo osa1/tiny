@@ -3,6 +3,7 @@ use std::borrow::Borrow;
 use rustbox::keyboard::Key;
 use rustbox::RustBox;
 
+use msg::Pfx;
 use tui::messaging::MessagingUI;
 use tui::widget::{Widget, WidgetRet};
 
@@ -17,14 +18,20 @@ pub struct Tabbed {
 }
 
 struct Tab {
-    name   : String,
-    widget : MessagingUI,
+    serv_name : String,
+    pfx       : Pfx,
+    widget    : MessagingUI,
 }
 
 pub enum TabbedRet<'t> {
     KeyHandled,
     KeyIgnored,
-    Input(&'t str, Vec<char>),
+
+    Input {
+        serv_name : &'t str,
+        pfx       : &'t Pfx,
+        msg       : Vec<char>
+    },
 }
 
 impl Tabbed {
@@ -37,29 +44,30 @@ impl Tabbed {
         }
     }
 
-    pub fn new_tab(&mut self, tab_name : String, widget : MessagingUI) {
-        match self.active_idx {
-            None => {
-                self.tabs.push(Tab {
-                    name: tab_name,
-                    widget: widget,
-                });
-                self.active_idx = Some((self.tabs.len() as i32) - 1);
-            },
-            Some(idx) => {
-                self.tabs.insert((idx + 1) as usize, Tab {
-                    name: tab_name,
-                    widget: widget,
-                });
-                self.active_idx = Some(idx + 1);
-            }
-        }
+    pub fn new_tab(&mut self, serv_name : String, pfx : Pfx, widget : MessagingUI) {
+        panic!()
+        // match self.active_idx {
+        //     None => {
+        //         self.tabs.push(Tab {
+        //             pfx: pfx,
+        //             widget: widget,
+        //         });
+        //         self.active_idx = Some((self.tabs.len() as i32) - 1);
+        //     },
+        //     Some(idx) => {
+        //         self.tabs.insert((idx + 1) as usize, Tab {
+        //             name: tab_name,
+        //             widget: widget,
+        //         });
+        //         self.active_idx = Some(idx + 1);
+        //     }
+        // }
     }
 
-    pub fn close_tab(&mut self, tab_name : &str) -> Option<MessagingUI> {
-        let tab_idx : Option<usize> = self.find_tab_idx(tab_name);
-        tab_idx.map(|tab_idx| self.tabs.remove(tab_idx).widget)
-    }
+    // pub fn close_tab(&mut self, tab_name : &str) -> Option<MessagingUI> {
+    //     let tab_idx : Option<usize> = self.find_tab_idx(tab_name);
+    //     tab_idx.map(|tab_idx| self.tabs.remove(tab_idx).widget)
+    // }
 
     pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
         match self.active_idx {
@@ -75,8 +83,14 @@ impl Tabbed {
                 match self.tabs[idx as usize].widget.keypressed(key) {
                     WidgetRet::KeyHandled => TabbedRet::KeyHandled,
                     WidgetRet::KeyIgnored => TabbedRet::KeyIgnored,
-                    WidgetRet::Input(input) =>
-                        TabbedRet::Input(self.tabs[idx as usize].name.borrow(), input),
+                    WidgetRet::Input(input) => {
+                        let tab = &self.tabs[idx as usize];
+                        TabbedRet::Input {
+                            serv_name: &tab.serv_name,
+                            pfx: &tab.pfx,
+                            msg: input,
+                        }
+                    },
                 }
             }
         }
@@ -93,26 +107,28 @@ impl Tabbed {
     // Interfacing with tabs
 
     #[inline]
-    fn find_tab_mut(&mut self, pfx : &str) -> Option<&mut Tab> {
-        self.tabs.iter_mut().find(|t| t.name.as_str() == pfx)
+    fn find_tab_mut(&mut self, pfx : &Pfx) -> Option<&mut Tab> {
+        // self.tabs.iter_mut().find(|t| t.name.as_str() == pfx)
+        panic!()
     }
 
     #[inline]
-    fn find_tab_idx(&self, pfx : &str) -> Option<usize> {
-        self.tabs.iter().enumerate().find(|t| t.1.name.as_str() == pfx).map(|t| t.0)
+    fn find_tab_idx(&self, pfx : &Pfx) -> Option<usize> {
+        // self.tabs.iter().enumerate().find(|t| t.1.name.as_str() == pfx).map(|t| t.0)
+        panic!()
     }
 
-    pub fn show_incoming_msg(&mut self, pfx : &str, ty : &str, msg : &str) {
+    pub fn show_incoming_msg(&mut self, serv_name : &str, pfx : &Pfx, ty : &str, msg : &str) {
         // We need a *mut here instead of &mut because Rust suck. Basically if
         // this value is a None, an Option<&mut Tab> still has a reference to
         // &mut self so we can't call any methods.
-        let tab : Option<*mut Tab> = self.find_tab_mut(pfx).map(|t| (t as *mut _));
+        let tab : Option<*mut Tab> = self.find_tab_mut(&pfx).map(|t| (t as *mut _));
         match tab {
             None => {
                 let width = self.width;
                 let height = self.height;
-                self.new_tab(pfx.to_owned(), MessagingUI::new(width, height));
-                self.show_incoming_msg(pfx, ty, msg);
+                self.new_tab(serv_name.to_owned(), pfx.clone(), MessagingUI::new(width, height));
+                self.show_incoming_msg(serv_name, pfx, ty, msg);
             },
             Some(p) => {
                 unsafe { (*p).widget.show_incoming_msg(ty, msg) };

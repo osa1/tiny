@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
+use msg::Pfx;
 use self::messaging::MessagingUI;
 use self::msg_area::MsgArea;
 use self::tabbed::{Tabbed, TabbedRet};
@@ -31,7 +32,13 @@ pub enum TUIRet {
     EventIgnored(Event),
 
     /// INVARIANT: The vec will have at least one char.
-    Input(String, Vec<char>),
+    // Can't make Pfx a ref because of this weird error:
+    // https://users.rust-lang.org/t/borrow-checker-bug/5165
+    Input {
+        serv_name : String,
+        pfx       : Pfx,
+        msg       : Vec<char>,
+    },
 }
 
 impl TUI {
@@ -66,12 +73,15 @@ impl TUI {
 
             Ok(Event::KeyEvent(key)) => {
                 match self.ui.keypressed(key) {
-                    TabbedRet::KeyHandled    => TUIRet::KeyHandled,
-                    TabbedRet::KeyIgnored    => TUIRet::KeyIgnored(key),
-                    TabbedRet::Input(pfx, v) =>
-                        // Channel names are usually just a few characters long,
-                        // copying is easier than managing Cow<> etc.
-                        TUIRet::Input(pfx.to_owned(), v),
+                    TabbedRet::KeyHandled => TUIRet::KeyHandled,
+                    TabbedRet::KeyIgnored => TUIRet::KeyIgnored(key),
+                    TabbedRet::Input{ serv_name, pfx, msg } => {
+                        TUIRet::Input {
+                            serv_name: serv_name.to_owned(),
+                            pfx: pfx.clone(),
+                            msg: msg,
+                        }
+                    }
                 }
             },
 
@@ -98,7 +108,7 @@ impl TUI {
 
             match self.keypressed() {
                 ret @ TUIRet::Abort => { return ret; },
-                ret @ TUIRet::Input(_, _) => { return ret; },
+                ret @ TUIRet::Input { .. } => { return ret; },
                 _ => {}
             }
         }
@@ -113,8 +123,8 @@ impl TUI {
     ////////////////////////////////////////////////////////////////////////////
 
     #[inline]
-    pub fn show_incoming_msg(&mut self, pfx : &str, ty : &str, msg : &str) {
-        self.ui.show_incoming_msg(pfx, ty, msg);
+    pub fn show_incoming_msg(&mut self, serv_name : &str, pfx : &Pfx, ty : &str, msg : &str) {
+        self.ui.show_incoming_msg(serv_name, pfx, ty, msg);
     }
 
     #[inline]

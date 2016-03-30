@@ -11,6 +11,7 @@ pub mod msg;
 pub mod tui;
 
 use std::borrow::Borrow;
+use std::cmp::max;
 use std::error::Error;
 use std::ffi::CStr;
 use std::io::Write;
@@ -19,12 +20,12 @@ use std::mem;
 
 use cmd::Cmd;
 use comms::{Comms, CommsRet};
+use msg::Pfx;
 use tui::{TUI, TUIRet};
 
 pub struct Tiny {
-    /// A connection to a server is maintained by 'Comms'. No 'Comms' means no
-    /// connection.
-    comms    : Option<Comms>,
+    /// A connection to a server is maintained by 'Comms'.
+    comms    : Vec<Comms>,
 
     nick     : String,
     hostname : String,
@@ -32,12 +33,16 @@ pub struct Tiny {
 }
 
 #[derive(PartialEq, Eq)]
-enum LoopRet { Abort, Continue, Disconnected }
+enum LoopRet {
+    Abort,
+    Continue,
+    // Disconnected { fd : libc::c_int }
+}
 
 impl Tiny {
     pub fn new(nick : String, hostname : String, realname : String) -> Tiny {
         Tiny {
-            comms: None,
+            comms: Vec::with_capacity(1),
             nick: nick,
             hostname: hostname,
             realname: realname,
@@ -48,78 +53,31 @@ impl Tiny {
         let mut tui = TUI::new();
 
         loop {
-            match self.comms {
-                None => {
-                    if self.mainloop_no_comms(&mut tui) == LoopRet::Abort { break; }
-                },
-                Some(_) => {
-                    if self.mainloop_comms(&mut tui) == LoopRet::Abort { break; }
-                }
-            }
-        }
-    }
+            // Set up the descriptors for select()
+            let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
 
-    fn mainloop_no_comms(&mut self, tui : &mut TUI) -> LoopRet {
-        // I want my tail calls back
-        loop {
-            match tui.idle_loop() {
-                TUIRet::Input(_, cmd) => {
-                    if cmd[0] == '/' {
-                        // a command attempt
-                        match Cmd::parse(&cmd) {
-                            Ok(Cmd::Connect(server)) => {
-                                writeln!(io::stderr(), "trying to connect: {}", server).unwrap();
-                                match Comms::try_connect(server.borrow(),
-                                                         self.nick.borrow(),
-                                                         self.hostname.borrow(),
-                                                         self.realname.borrow()) {
-                                    Err(err) => {
-                                        //tui.show_conn_error(err.description());
-                                    },
-                                    Ok(comms) => {
-                                        self.comms = Some(comms);
-                                        return LoopRet::Continue;
-                                    }
-                                }
-                            },
-                            Err(err_msg) => {
-                                // tui.show_user_error(err_msg.borrow());
-                            }
-                        }
-                    } else {
-                        // Trying to send a message - not going to happen
-                        //tui.show_user_error("Can't send message - not connected to a server.");
-                    }
-                },
-                TUIRet::Abort => { return LoopRet::Abort; },
-                ret => {
-                    panic!("TUI.idle_loop() returned unexpected ret value: {:?}", ret);
-                }
-            }
-        }
-    }
-
-    fn mainloop_comms(&mut self, tui : &mut TUI) -> LoopRet {
-        // Set up the descriptors for select()
-        let stream_fd = self.comms.as_ref().unwrap().get_raw_fd();
-
-        let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
-        unsafe {
             // 0 is stdin
-            libc::FD_SET(0, &mut fd_set);
-            libc::FD_SET(stream_fd, &mut fd_set);
+            unsafe { libc::FD_SET(0, &mut fd_set); }
+
+            let mut max_fd : libc::c_int = 0;
+            for comm in self.comms.iter() {
+                let fd = comm.get_raw_fd();
+                max_fd = max(fd, max_fd);
+                unsafe { libc::FD_SET(fd, &mut fd_set); }
+            }
+
+            let nfds = max_fd + 1;
+
+            // Start the loop
+            if self.mainloop_(&mut tui, fd_set, nfds) == LoopRet::Abort {
+                break;
+            }
         }
-
-        let nfds = stream_fd + 1;
-
-        // Start the loop
-        self.mainloop_stream_(tui, fd_set, stream_fd, nfds)
     }
 
-    fn mainloop_stream_(&mut self, tui : &mut TUI,
-                        fd_set    : libc::fd_set,
-                        stream_fd : libc::c_int,
-                        nfds      : libc::c_int) -> LoopRet {
+    fn mainloop_(&mut self, tui : &mut TUI,
+                 fd_set : libc::fd_set,
+                 nfds   : libc::c_int) -> LoopRet {
         loop {
             tui.draw();
 
@@ -133,15 +91,6 @@ impl Tiny {
                                  std::ptr::null_mut())   // timeval
                 };
 
-            // if ret == -1 {
-            //     let err_c_msg =
-            //         unsafe { CStr::from_ptr(libc::strerror(*libc::__errno_location())) }
-            //             .to_string_lossy();
-            //
-            //     tui.show_conn_error(
-            //         format!("Internal error: select() failed: {}", err_c_msg).borrow());
-            // }
-
             // A resize signal (SIGWINCH) causes select() to fail, but termbox's
             // signal handler runs and we need to run termbox's poll_event() to
             // be able to catch the resize event. So, when stdin is ready we
@@ -154,78 +103,50 @@ impl Tiny {
                 if self.handle_stdin(tui) == LoopRet::Abort { return LoopRet::Abort; }
             }
 
-            // Socket is ready
-            else if unsafe { libc::FD_ISSET(stream_fd, &mut fd_set_) } {
-                // TODO: Handle disconnects
-                match self.handle_socket(tui) {
-                    LoopRet::Abort => { return LoopRet::Abort; },
-                    LoopRet::Disconnected => {
-                        self.reset_state();
-                        return LoopRet::Disconnected;
-                    },
-                    LoopRet::Continue => {}
+            // A socket is ready
+            // TODO: Can multiple sockets be set in single select() call? I
+            // assume yes for now.
+            else {
+                for comm in self.comms.iter_mut() {
+                    let fd = comm.get_raw_fd();
+                    if unsafe { libc::FD_ISSET(fd, &mut fd_set_) } {
+                        // TODO: Handle disconnects
+                        if Tiny::handle_socket(tui, comm) == LoopRet::Abort { return LoopRet::Abort; }
+                    }
                 }
-                if self.handle_socket(tui) == LoopRet::Abort { return LoopRet::Abort; }
             }
         }
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+
     fn handle_stdin(&mut self, tui : &mut TUI) -> LoopRet {
         match tui.keypressed() {
             TUIRet::Abort => LoopRet::Abort,
-            TUIRet::EventIgnored(_) => {
-                // TODO: What to do here?
-                LoopRet::Continue
-            },
-            TUIRet::Input(_, mut msg) => {
-                // Add CR-LF and send
-                msg.push('\r');
-                msg.push('\n');
-                {
-                    let msg_str : String = msg.iter().cloned().collect();
-                    self.comms.as_mut().unwrap().send_raw(msg_str.as_bytes()).unwrap();
+            TUIRet::Input { serv_name, pfx, mut msg } => {
+                // We know msg has at least one character as the TUI won't
+                // accept it otherwise.
+                if msg[0] == '/' {
+                    self.handle_command(serv_name, pfx, msg)
+                } else {
+                    self.send_msg(serv_name, pfx, msg)
                 }
-
-                // Use another version without CR-LF to show the message
-                {
-                    let msg_slice : &[char] = msg.borrow();
-                    let msg_slice : &[char] = &msg_slice[ 0 .. msg.len() - 2 ]; // Drop CRLF
-                    let msg_str : String = msg_slice.iter().cloned().collect();
-                    let msg_slice : &str = msg_str.borrow();
-                    writeln!(io::stderr(), "sending msg: {}", msg_slice).unwrap();
-                    //tui.show_outgoing_msg(msg_slice);
-                }
-
-                LoopRet::Continue
             },
             _ => LoopRet::Continue
         }
     }
 
-    fn handle_socket(&mut self, tui : &mut TUI) -> LoopRet {
-        let mut disconnect = false;
-
-        for ret in self.comms.as_mut().unwrap().read_incoming_msg() {
-            match ret {
-                CommsRet::Disconnected => {
-                    disconnect = true;
-                },
-                CommsRet::Err(err) => {
-                    tui.show_conn_error(err.borrow());
-                },
-                CommsRet::IncomingMsg { pfx, ty, msg } => {
-                    tui.show_incoming_msg(pfx.borrow(), ty.borrow(), msg.borrow());
-                },
-                CommsRet::SentMsg { ty, msg } => {
-                    //tui.show_server_msg(ty.borrow(), msg.borrow());
-                }
-            }
-        }
-
-        if disconnect { LoopRet::Disconnected } else { LoopRet::Continue }
+    fn handle_command(&mut self, serv_name : String, pfx : Pfx, msg : Vec<char>) -> LoopRet {
+        panic!()
     }
 
-    fn reset_state(&mut self) {
-        self.comms = None;
+    fn send_msg(&mut self, serv_name : String, pfx : Pfx, msg : Vec<char>) -> LoopRet {
+        panic!()
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    fn handle_socket(tui : &mut TUI, comm : &mut Comms) -> LoopRet {
+        panic!()
     }
 }

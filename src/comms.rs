@@ -8,37 +8,37 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
 use std::time::Duration;
 
-use msg::{Msg, Command};
+use msg::{Msg, Pfx, Command};
 use utils::find_byte;
 
 pub struct Comms {
     /// The TCP connection to the server.
-    stream   : TcpStream,
+    stream    : TcpStream,
 
-    /// Prefix used for the messages originated from the server.
-    /// Unknown prior to the first server message. (Does NOT include the ':')
-    pfx      : Option<String>,
+    serv_name : String,
 
     /// _Partial_ messages collected here until they make a complete message.
-    msg_buf  : Vec<u8>,
+    msg_buf   : Vec<u8>,
 }
 
-pub enum CommsRet {
+pub enum CommsRet<'a> {
     Disconnected,
     Err(String),
 
     IncomingMsg {
-        pfx: String,
-        ty: String,
-        msg: String,
+        serv_name : &'a str,
+        pfx       : Pfx,
+        ty        : String,
+        msg       : String,
     },
 
     /// A message without prefix. From RFC 2812:
     /// > If the prefix is missing from the message, it is assumed to have
     /// > originated from the connection from which it was received from.
     SentMsg {
-        ty: String,
-        msg: String,
+        serv_name : &'a str,
+        ty        : String,
+        msg       : String,
     }
 }
 
@@ -50,20 +50,35 @@ impl Comms {
         try!(stream.set_write_timeout(None));
 
         let mut comms = Comms {
-            stream: stream,
-            pfx: None,
-            msg_buf: Vec::new(),
+            stream:     stream,
+            serv_name:  server.to_owned(),
+            msg_buf:    Vec::new(),
         };
         try!(comms.introduce(nick, hostname, realname));
         Ok(comms)
     }
+
+    /// Get the RawFd, to be used with select() or other I/O multiplexer.
+    pub fn get_raw_fd(&self) -> RawFd {
+        self.stream.as_raw_fd()
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Sending messages
 
     fn introduce(&mut self, nick : &str, hostname : &str, realname : &str) -> io::Result<()> {
         try!(Msg::user(hostname, realname, &mut self.stream));
         Msg::nick(nick, &mut self.stream)
     }
 
-    pub fn read_incoming_msg(&mut self) -> Vec<CommsRet> {
+    pub fn send_raw(&mut self, bytes : &[u8]) -> io::Result<()> {
+        self.stream.write_all(bytes)
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Receiving messages
+
+    pub fn read_incoming_msg<'a>(&'a mut self) -> Vec<CommsRet<'a>> {
         let mut read_buf : [u8; 512] = [0; 512];
 
         // Handle disconnects
@@ -92,7 +107,7 @@ impl Comms {
         self.msg_buf.extend(slice.iter().filter(|c| **c != 0x1 /* SOH */ || **c != 0x2 /* STX */));
     }
 
-    fn handle_msgs(&mut self) -> Vec<CommsRet> {
+    fn handle_msgs<'a>(&'a mut self) -> Vec<CommsRet<'a>> {
         let mut ret = Vec::with_capacity(1);
 
         // Have we read any CRLFs? In that case just process the message and
@@ -112,14 +127,7 @@ impl Comms {
                         assert!(self.msg_buf[cr_idx + 1] == b'\n');
                         // Don't include CRLF
                         let msg = Msg::parse(&self.msg_buf[ 0 .. cr_idx ]);
-                        // Update the server prefix if we don't know it already
-                        for m in msg.iter() {
-                            self.pfx = m.pfx.clone().map(|v| {
-                                unsafe { String::from_utf8_unchecked(v) }
-                            });
-                        }
-                        // Finally handle the message
-                        Comms::handle_msg(&mut self.stream, msg, &mut ret);
+                        Comms::handle_msg(self.serv_name.borrow(), &mut self.stream, msg, &mut ret);
                         // Update the buffer (drop CRLF)
                         self.msg_buf.drain(0 .. cr_idx + 2);
                     }
@@ -130,31 +138,39 @@ impl Comms {
         ret
     }
 
-    fn handle_msg(stream : &mut TcpStream, msg : Result<Msg, String>, ret : &mut Vec<CommsRet>) {
+    fn handle_msg<'a>(serv_name : &'a str,
+                      stream : &mut TcpStream,
+                      msg : Result<Msg, String>,
+                      ret : &mut Vec<CommsRet<'a>>) {
         match msg {
             Err(err_msg) => {
                 ret.push(CommsRet::Err(err_msg));
             },
             Ok(Msg { pfx, command, params }) => {
                 match command {
-                    Command::Str(str) => Comms::handle_str_command(stream, ret, pfx, str, params),
-                    Command::Num(num) => Comms::handle_num_command(stream, ret, pfx, num, params),
+                    Command::Str(str) =>
+                        Comms::handle_str_command(serv_name, stream, ret, pfx, str, params),
+                    Command::Num(num) =>
+                        Comms::handle_num_command(serv_name, stream, ret, pfx, num, params),
                 }
             }
         }
     }
 
-    fn handle_str_command(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
-                          prefix : Option<Vec<u8>>, cmd : String, mut params : Vec<Vec<u8>>) {
+    fn handle_str_command<'a>(serv_name : &'a str,
+                              stream : &mut TcpStream,
+                              ret : &mut Vec<CommsRet<'a>>,
+                              pfx : Option<Pfx>, cmd : String, mut params : Vec<Vec<u8>>) {
         if cmd == "PING" {
             debug_assert!(params.len() == 1);
             Msg::pong(unsafe {
                         str::from_utf8_unchecked(params.into_iter().nth(0).unwrap().as_ref())
                       }, stream).unwrap();
         } else {
-            match prefix {
+            match pfx {
                 None => {
                     ret.push(CommsRet::SentMsg {
+                        serv_name: serv_name,
                         ty: cmd,
                         msg: params.into_iter().map(|s| unsafe {
                             String::from_utf8_unchecked(s)
@@ -163,7 +179,8 @@ impl Comms {
                 },
                 Some(pfx) => {
                     ret.push(CommsRet::IncomingMsg {
-                        pfx: unsafe { String::from_utf8_unchecked(pfx) },
+                        serv_name: serv_name.borrow(),
+                        pfx: pfx,
                         ty: cmd,
                         msg: params.into_iter().map(|s| unsafe {
                             String::from_utf8_unchecked(s)
@@ -174,18 +191,11 @@ impl Comms {
         }
     }
 
-    fn handle_num_command(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
-                          prefix : Option<Vec<u8>>, num : u16, params : Vec<Vec<u8>>) {
+    fn handle_num_command<'a>(serv_name : &'a str,
+                              stream : &mut TcpStream,
+                              ret : &mut Vec<CommsRet<'a>>,
+                              prefix : Option<Pfx>, num : u16, params : Vec<Vec<u8>>) {
         // TODO
-        Comms::handle_str_command(stream, ret, prefix, "UNKNOWN".to_owned(), params)
-    }
-
-    /// Get the RawFd, to be used with select() or other I/O multiplexer.
-    pub fn get_raw_fd(&self) -> RawFd {
-        self.stream.as_raw_fd()
-    }
-
-    pub fn send_raw(&mut self, bytes : &[u8]) -> io::Result<()> {
-        self.stream.write_all(bytes)
+        Comms::handle_str_command(serv_name, stream, ret, prefix, "UNKNOWN".to_owned(), params)
     }
 }
