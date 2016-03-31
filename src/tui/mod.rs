@@ -54,6 +54,10 @@ impl TUI {
         }
     }
 
+    pub fn new_server_tab(&mut self, serv_name : String) {
+
+    }
+
     /// Should be called when stdin is ready.
     pub fn keypressed(&mut self) -> TUIRet {
         // We should use peek() instead of poll() as we now call this function
@@ -129,6 +133,21 @@ impl TUI {
 
     #[inline]
     pub fn show_conn_error(&mut self, err : &str) {
+
+    }
+
+    #[inline]
+    pub fn show_cmd_error(&mut self, err : &str) {
+
+    }
+
+    #[inline]
+    pub fn show_server_msg(&mut self, serv_name : &str, msg : &str) {
+
+    }
+
+    #[inline]
+    pub fn show_server_err(&mut self, serv_name : &str, msg : &str) {
 
     }
 }

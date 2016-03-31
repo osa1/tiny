@@ -27,6 +27,8 @@ pub struct Tiny {
     /// A connection to a server is maintained by 'Comms'.
     comms    : Vec<Comms>,
 
+    tui      : TUI,
+
     nick     : String,
     hostname : String,
     realname : String,
@@ -43,6 +45,7 @@ impl Tiny {
     pub fn new(nick : String, hostname : String, realname : String) -> Tiny {
         Tiny {
             comms: Vec::with_capacity(1),
+            tui: TUI::new(),
             nick: nick,
             hostname: hostname,
             realname: realname,
@@ -50,8 +53,6 @@ impl Tiny {
     }
 
     pub fn mainloop(&mut self) {
-        let mut tui = TUI::new();
-
         loop {
             // Set up the descriptors for select()
             let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
@@ -69,17 +70,15 @@ impl Tiny {
             let nfds = max_fd + 1;
 
             // Start the loop
-            if self.mainloop_(&mut tui, fd_set, nfds) == LoopRet::Abort {
+            if self.mainloop_(fd_set, nfds) == LoopRet::Abort {
                 break;
             }
         }
     }
 
-    fn mainloop_(&mut self, tui : &mut TUI,
-                 fd_set : libc::fd_set,
-                 nfds   : libc::c_int) -> LoopRet {
+    fn mainloop_(&mut self, fd_set : libc::fd_set, nfds : libc::c_int) -> LoopRet {
         loop {
-            tui.draw();
+            self.tui.draw();
 
             let mut fd_set_ = fd_set.clone();
             let ret =
@@ -100,7 +99,7 @@ impl Tiny {
             //
             // See also https://github.com/nsf/termbox/issues/71.
             if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-                if self.handle_stdin(tui) == LoopRet::Abort { return LoopRet::Abort; }
+                if self.handle_stdin() == LoopRet::Abort { return LoopRet::Abort; }
             }
 
             // A socket is ready
@@ -111,7 +110,9 @@ impl Tiny {
                     let fd = comm.get_raw_fd();
                     if unsafe { libc::FD_ISSET(fd, &mut fd_set_) } {
                         // TODO: Handle disconnects
-                        if Tiny::handle_socket(tui, comm) == LoopRet::Abort { return LoopRet::Abort; }
+                        if Tiny::handle_socket(&mut self.tui, comm) == LoopRet::Abort {
+                            return LoopRet::Abort;
+                        }
                     }
                 }
             }
@@ -120,14 +121,15 @@ impl Tiny {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_stdin(&mut self, tui : &mut TUI) -> LoopRet {
-        match tui.keypressed() {
+    fn handle_stdin(&mut self) -> LoopRet {
+        match self.tui.keypressed() {
             TUIRet::Abort => LoopRet::Abort,
             TUIRet::Input { serv_name, pfx, mut msg } => {
                 // We know msg has at least one character as the TUI won't
                 // accept it otherwise.
                 if msg[0] == '/' {
-                    self.handle_command(serv_name, pfx, msg)
+                    self.handle_command(serv_name, pfx,
+                                        (&msg[ 1 .. ]).into_iter().cloned().collect())
                 } else {
                     self.send_msg(serv_name, pfx, msg)
                 }
@@ -136,8 +138,41 @@ impl Tiny {
         }
     }
 
-    fn handle_command(&mut self, serv_name : String, pfx : Pfx, msg : Vec<char>) -> LoopRet {
-        panic!()
+    fn handle_command(&mut self, serv_name : String, pfx : Pfx, msg : String) -> LoopRet {
+        let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
+        if words[0] == "connect" {
+            self.connect(words[1]);
+            LoopRet::Continue
+        } else if words[0] == "quit" {
+            LoopRet::Abort
+        } else {
+            self.tui.show_cmd_error(format!("Unsupported command: {}", words[0]).borrow());
+            LoopRet::Continue
+        }
+    }
+
+    fn connect(&mut self, serv_name : &str) {
+        match serv_name.find(':') {
+            None => {
+                self.tui.show_conn_error("connect: Need a <host>:<port>");
+            },
+            Some(split) => {
+                let host = &serv_name[ 0 .. split ];
+                self.tui.new_server_tab(host.to_owned());
+                self.tui.show_server_msg(host, "Connecting...");
+
+                // TODO: This will block the UI
+
+                match Comms::try_connect(serv_name, &self.nick, &self.hostname, &self.realname) {
+                    Ok(comms) => {
+                        self.comms.push(comms);
+                    },
+                    Err(err) => {
+                        self.tui.show_server_err(host, &format!("Error: {}", err));
+                    }
+                }
+            }
+        }
     }
 
     fn send_msg(&mut self, serv_name : String, pfx : Pfx, msg : Vec<char>) -> LoopRet {
