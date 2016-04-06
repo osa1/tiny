@@ -40,9 +40,11 @@ impl Msg {
             if msg[0] == b':' {
                 // parse prefix
                 let ws_idx = find_byte(slice, b' ').unwrap();
-                let (pfx, slice_) = slice.split_at(ws_idx);
+                let (mut pfx, slice_) = slice.split_at(ws_idx);
+                // drop the : from pfx
+                pfx = &pfx[ 1 .. ];
                 slice = &slice_[ 1 .. ]; // drop the space
-                Some(parse_pfx(pfx))
+                Some(parse_pfx(&pfx))
             } else {
                 log_stderr_bytes("Can't parse msg prefix:", msg);
                 None
