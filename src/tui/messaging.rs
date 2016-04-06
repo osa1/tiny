@@ -1,6 +1,7 @@
-use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
+use rustbox::{RustBox, Key};
 
 use tui::msg_area::MsgArea;
+use tui::style::Style;
 use tui::text_field::TextField;
 use tui::widget::{Widget, WidgetRet};
 
@@ -59,7 +60,7 @@ impl MessagingUI {
                 // TODO: Handle ret
                 match self.text_field.keypressed(key) {
                     WidgetRet::KeyIgnored => {
-                        self.show_server_msg("KEY IGNORED", format!("{:?}", key).as_ref());
+                        // self.show_server_msg("KEY IGNORED", format!("{:?}", key).as_ref());
                         WidgetRet::KeyIgnored
                     },
                     ret => ret,
@@ -77,28 +78,8 @@ impl MessagingUI {
     }
 
     #[inline]
-    pub fn show_server_msg(&mut self, ty : &str, msg : &str) {
-        self.msg_area.add_server_msg(format!("[{}] {}", ty, msg).as_ref());
-    }
-
-    #[inline]
-    pub fn show_incoming_msg(&mut self, ty : &str, msg : &str) {
-        self.msg_area.add_msg_str(msg);
-    }
-
-    #[inline]
-    pub fn show_outgoing_msg(&mut self, msg : &str) {
-        self.msg_area.add_msg_str(msg);
-    }
-
-    #[inline]
-    pub fn show_user_error(&mut self, msg : &str) {
-        self.msg_area.add_err_msg_str(msg);
-    }
-
-    #[inline]
-    pub fn show_conn_error(&mut self, msg : &str) {
-        self.msg_area.add_err_msg_str(msg);
+    pub fn add_msg(&mut self, msg : &str, style : Style) {
+        self.msg_area.add_msg_str(msg, style)
     }
 }
 

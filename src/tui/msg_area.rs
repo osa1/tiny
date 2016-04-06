@@ -4,7 +4,8 @@ use std::io::Write;
 use std::io;
 use std::mem;
 
-use rustbox::{RustBox, Style, Color, Key};
+use rustbox::{RustBox, Key};
+use tui::style::Style;
 use tui::widget::{Widget, WidgetRet};
 
 static LINEBREAK : char = '\\';
@@ -40,8 +41,6 @@ struct Line {
     line_idx : i32,
 
     style : Style,
-    fg : Color,
-    bg : Color,
 }
 
 impl MsgArea {
@@ -121,9 +120,7 @@ impl MsgArea {
 
             // Finally add the combined line to the fresh buffer
             self.add_msg_(new_line.chars().collect::<Vec<char>>().borrow(),
-                          old_lines[line_idx].style,
-                          old_lines[line_idx].fg,
-                          old_lines[line_idx].bg);
+                          old_lines[line_idx].style);
 
 
             line_idx = cont_idx;
@@ -134,9 +131,9 @@ impl MsgArea {
 
     /// Find index of given line in 'self.lines'.
     fn find_line_idx(&self, line_idx : i32) -> Option<usize> {
-        for (line_idx, line) in self.lines.iter().enumerate() {
+        for (line_idx_in_vec, line) in self.lines.iter().enumerate() {
             if line.line_idx == line_idx as i32 {
-                return Some(line_idx)
+                return Some(line_idx_in_vec)
             }
         }
         None
@@ -145,31 +142,14 @@ impl MsgArea {
     ////////////////////////////////////////////////////////////////////////////
 
     #[inline]
-    pub fn add_msg_str(&mut self, msg_str : &str) {
+    pub fn add_msg_str(&mut self, msg_str : &str, style : Style) {
         writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str).unwrap();
-        self.add_msg_str_(msg_str, Style::empty(), Color::Default, Color::Default);
+        self.add_msg_str_(msg_str, style)
     }
 
     #[inline]
-    pub fn add_server_msg(&mut self, msg_str : &str) {
-        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str).unwrap();
-        self.add_msg_str_(msg_str, Style::empty(), Color::Yellow, Color::Default);
-    }
-
-    #[inline]
-    pub fn add_err_msg_str(&mut self, msg_str : &str) {
-        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str).unwrap();
-        self.add_msg_str_(msg_str, Style::empty(), Color::White, Color::Red);
-    }
-
-    #[inline]
-    pub fn add_msg(&mut self, msg : &[char]) {
-        self.add_msg_(msg, Style::empty(), Color::Default, Color::Default);
-    }
-
-    #[inline]
-    pub fn add_err_msg(&mut self, msg : &[char]) {
-        self.add_msg_(msg, Style::empty(), Color::White, Color::Red);
+    pub fn add_msg(&mut self, msg : &[char], style : Style) {
+        self.add_msg_(msg, style)
     }
 
     fn draw_(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
@@ -180,13 +160,13 @@ impl MsgArea {
 
             if line.continuation {
                 rustbox.print_char(pos_x as usize, (pos_y + row) as usize,
-                                   line.style, line.fg, line.bg, LINEBREAK);
+                                   line.style.style, line.style.fg, line.style.bg, LINEBREAK);
             }
 
             let pos_x = if line.continuation { pos_x + 1 } else { pos_x };
 
             rustbox.print(pos_x as usize, (pos_y + row) as usize,
-                          line.style, line.fg, line.bg, &line.msg);
+                          line.style.style, line.style.fg, line.style.bg, &line.msg);
 
             row -= 1;
             line_idx -= 1;
@@ -196,7 +176,7 @@ impl MsgArea {
     ////////////////////////////////////////////////////////////////////////////
     // Adding new messages
 
-    fn add_msg_str_(&mut self, msg : &str, style : Style, fg : Color, bg : Color) {
+    fn add_msg_str_(&mut self, msg : &str, style : Style) {
         // Take the fast path when number of bytes (which gives the max number
         // of characters possibly be in the string) is smaller than the width.
         if msg.len() <= self.width as usize {
@@ -209,19 +189,17 @@ impl MsgArea {
                 continuation: false,
                 line_idx: self.total_lines,
                 style: style,
-                fg: fg,
-                bg: bg,
             });
 
             self.total_lines += 1;
         } else {
             // Need to split the lines, taking the slow path that uses an
             // intermediate vector.
-            self.add_msg_(&msg.chars().collect::<Vec<char>>().borrow(), style, fg, bg);
+            self.add_msg_(&msg.chars().collect::<Vec<char>>().borrow(), style);
         }
     }
 
-    fn add_msg_(&mut self, mut msg : &[char], style : Style, fg : Color, bg : Color) {
+    fn add_msg_(&mut self, mut msg : &[char], style : Style) {
         let mut lines : Vec<Line> = Vec::with_capacity(1);
         while msg.len() != 0 {
             let first_line = lines.len() == 0;
@@ -235,8 +213,6 @@ impl MsgArea {
                 continuation: !first_line,
                 line_idx: self.total_lines,
                 style: style,
-                fg: fg,
-                bg: bg,
             });
         }
 
@@ -285,7 +261,7 @@ impl Widget for MsgArea {
         self.draw_(rustbox, pos_x, pos_y)
     }
 
-    fn keypressed(&mut self, key : Key) -> WidgetRet {
+    fn keypressed(&mut self, _ : Key) -> WidgetRet {
         WidgetRet::KeyIgnored
     }
 

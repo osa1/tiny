@@ -1,20 +1,17 @@
 pub mod messaging;
 pub mod msg_area;
+pub mod style;
 pub mod tabbed;
 pub mod text_field;
 pub mod widget;
 
-use std::cmp::max;
 use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
 use msg::Pfx;
-use self::messaging::MessagingUI;
-use self::msg_area::MsgArea;
 use self::tabbed::{Tabbed, TabbedRet};
-use self::text_field::TextField;
-use self::widget::{Widget, WidgetRet};
+use self::widget::{Widget};
 
 pub struct TUI {
     /// Termbox instance
@@ -36,7 +33,7 @@ pub enum TUIRet {
     // https://users.rust-lang.org/t/borrow-checker-bug/5165
     Input {
         serv_name : String,
-        pfx       : Pfx,
+        pfx       : Option<Pfx>,
         msg       : Vec<char>,
     },
 }
@@ -54,8 +51,14 @@ impl TUI {
         }
     }
 
-    pub fn new_server_tab(&mut self, serv_name : String) {
+    #[inline]
+    pub fn new_tab(&mut self, serv_name : String, pfx : Pfx) {
+        self.ui.new_tab(serv_name, pfx)
+    }
 
+    #[inline]
+    pub fn new_server_tab(&mut self, serv_name : String) {
+        self.ui.new_server_tab(serv_name)
     }
 
     /// Should be called when stdin is ready.
@@ -79,10 +82,10 @@ impl TUI {
                 match self.ui.keypressed(key) {
                     TabbedRet::KeyHandled => TUIRet::KeyHandled,
                     TabbedRet::KeyIgnored => TUIRet::KeyIgnored(key),
-                    TabbedRet::Input{ serv_name, pfx, msg } => {
+                    TabbedRet::Input { serv_name, pfx, msg } => {
                         TUIRet::Input {
                             serv_name: serv_name.to_owned(),
-                            pfx: pfx.clone(),
+                            pfx: pfx.map(|p| p.clone()),
                             msg: msg,
                         }
                     }
@@ -127,27 +130,27 @@ impl TUI {
     ////////////////////////////////////////////////////////////////////////////
 
     #[inline]
-    pub fn show_incoming_msg(&mut self, serv_name : &str, pfx : &Pfx, ty : &str, msg : &str) {
-        self.ui.show_incoming_msg(serv_name, pfx, ty, msg);
+    pub fn show_msg(&mut self, msg : &str, serv_name : &str, pfx : Option<&Pfx>) {
+        self.ui.add_msg(msg, serv_name, pfx, style::USER_MSG);
     }
 
     #[inline]
-    pub fn show_conn_error(&mut self, err : &str) {
-
+    pub fn show_error(&mut self, err : &str, serv_name : &str, pfx : Option<&Pfx>) {
+        self.ui.add_msg(err, serv_name, pfx, style::ERR_MSG);
     }
 
     #[inline]
-    pub fn show_cmd_error(&mut self, err : &str) {
-
+    pub fn show_error_all_tabs(&mut self, err : &str) {
+        self.ui.add_msg_all_tabs(err, style::ERR_MSG);
     }
 
     #[inline]
-    pub fn show_server_msg(&mut self, serv_name : &str, msg : &str) {
-
+    pub fn show_msg_current_tab(&mut self, msg : &str) {
+        self.ui.add_msg_current_tab(msg, style::USER_MSG);
     }
 
     #[inline]
-    pub fn show_server_err(&mut self, serv_name : &str, msg : &str) {
-
+    pub fn show_error_current_tab(&mut self, err : &str) {
+        self.ui.add_msg_current_tab(err, style::ERR_MSG);
     }
 }

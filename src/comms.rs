@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
+use std::fmt::Arguments;
 use std::io::Read;
 use std::io::Write;
 use std::io;
-use std::mem;
 use std::net::TcpStream;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
@@ -13,17 +13,25 @@ use utils::find_byte;
 
 pub struct Comms {
     /// The TCP connection to the server.
-    stream    : TcpStream,
+    stream        : TcpStream,
 
-    serv_name : String,
+    pub serv_name : String,
+    serv_addr     : String,
 
     /// _Partial_ messages collected here until they make a complete message.
-    msg_buf   : Vec<u8>,
+    msg_buf       : Vec<u8>,
 }
 
+#[derive(Debug)]
 pub enum CommsRet<'a> {
-    Disconnected,
-    Err(String),
+    Disconnected {
+        fd        : RawFd,
+    },
+
+    Err {
+        serv_name : &'a str,
+        err_msg   : String,
+    },
 
     IncomingMsg {
         serv_name : &'a str,
@@ -36,22 +44,25 @@ pub enum CommsRet<'a> {
     /// > If the prefix is missing from the message, it is assumed to have
     /// > originated from the connection from which it was received from.
     SentMsg {
-        serv_name : &'a str,
-        ty        : String,
-        msg       : String,
+        serv_name   : &'a str,
+        ty          : String,
+        msg         : String,
     }
 }
 
 impl Comms {
-    pub fn try_connect(server : &str, nick : &str, hostname : &str, realname : &str)
+    pub fn try_connect(serv_addr : &str, serv_name : &str,
+                       nick : &str, hostname : &str, realname : &str)
                        -> io::Result<Comms> {
-        let stream = try!(TcpStream::connect(server));
+        let stream = try!(TcpStream::connect(serv_addr));
         try!(stream.set_read_timeout(Some(Duration::from_millis(10))));
         try!(stream.set_write_timeout(None));
+        try!(stream.set_nonblocking(true));
 
         let mut comms = Comms {
             stream:     stream,
-            serv_name:  server.to_owned(),
+            serv_name:  serv_name.to_owned(),
+            serv_addr:  serv_addr.to_owned(),
             msg_buf:    Vec::new(),
         };
         try!(comms.introduce(nick, hostname, realname));
@@ -71,10 +82,6 @@ impl Comms {
         Msg::nick(nick, &mut self.stream)
     }
 
-    pub fn send_raw(&mut self, bytes : &[u8]) -> io::Result<()> {
-        self.stream.write_all(bytes)
-    }
-
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
@@ -91,7 +98,7 @@ impl Comms {
             },
             Ok(bytes_read) => {
                 if bytes_read == 0 {
-                    return vec![CommsRet::Disconnected];
+                    return vec![CommsRet::Disconnected { fd: self.get_raw_fd() }];
                 }
             }
         }
@@ -144,7 +151,7 @@ impl Comms {
                       ret : &mut Vec<CommsRet<'a>>) {
         match msg {
             Err(err_msg) => {
-                ret.push(CommsRet::Err(err_msg));
+                ret.push(CommsRet::Err { serv_name: serv_name, err_msg: err_msg });
             },
             Ok(Msg { pfx, command, params }) => {
                 match command {
@@ -160,7 +167,7 @@ impl Comms {
     fn handle_str_command<'a>(serv_name : &'a str,
                               stream : &mut TcpStream,
                               ret : &mut Vec<CommsRet<'a>>,
-                              pfx : Option<Pfx>, cmd : String, mut params : Vec<Vec<u8>>) {
+                              pfx : Option<Pfx>, cmd : String, params : Vec<Vec<u8>>) {
         if cmd == "PING" {
             debug_assert!(params.len() == 1);
             Msg::pong(unsafe {
@@ -197,5 +204,32 @@ impl Comms {
                               prefix : Option<Pfx>, num : u16, params : Vec<Vec<u8>>) {
         // TODO
         Comms::handle_str_command(serv_name, stream, ret, prefix, "UNKNOWN".to_owned(), params)
+    }
+}
+
+impl Write for Comms {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.stream.write(buf)
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        self.stream.flush()
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.stream.write_all(buf)
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
+        self.stream.write_fmt(fmt)
+    }
+
+    #[inline]
+    fn by_ref(&mut self) -> &mut Comms {
+        self
     }
 }
