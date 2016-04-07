@@ -98,13 +98,13 @@ impl Comms {
             },
             Ok(bytes_read) => {
                 if bytes_read == 0 {
-                    return vec![CommsRet::Disconnected { fd: self.get_raw_fd() }];
+                    vec![CommsRet::Disconnected { fd: self.get_raw_fd() }]
+                } else {
+                    self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
+                    self.handle_msgs()
                 }
             }
         }
-
-        self.add_to_msg_buf(&read_buf);
-        self.handle_msgs()
     }
 
     #[inline]
