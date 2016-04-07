@@ -4,7 +4,7 @@ use std::str;
 
 use utils::{find_byte, log_stderr_bytes};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Msg {
     pub pfx     : Option<Pfx>,
     pub command : Command,
@@ -141,29 +141,28 @@ fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
         return Err("parse_params: Empty slice of chars".to_owned());
     }
 
-    if chrs[0] == b':' {
-        let start_idx = 1; // drop the colon
-        Ok(vec![
-           (&chrs[ start_idx .. ]).to_owned()
-        ])
-    } else {
         let mut ret : Vec<Vec<u8>> = Vec::new();
 
-        loop {
-            match find_byte(chrs, b' ') {
-                None => {
-                    ret.push(chrs.to_owned());
-                    break;
-                },
-                Some(end_idx) => {
-                    ret.push((&chrs[ 0 .. end_idx ]).to_owned());
-                    chrs = &chrs[ end_idx + 1 .. ]; // +1 to drop the space
-                }
+    let mut current_param = Vec::new();
+    for byte_idx in 0 .. chrs.len() {
+        let byte = *unsafe { chrs.get_unchecked(byte_idx) };
+        if byte == b':' {
+            current_param.extend_from_slice(&chrs[ byte_idx + 1 .. ]);
+            ret.push(current_param);
+            return Ok(ret);
+        } else if byte == b' ' {
+            ret.push(current_param);
+            current_param = Vec::new();
+        } else {
+            current_param.push(byte);
             }
         }
 
-        Ok(ret)
+    if current_param.len() > 0 {
+        ret.push(current_param);
     }
+
+        Ok(ret)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -172,4 +171,32 @@ fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
 fn parse_error_1() {
     let msg = b"ERROR :Closing Link: 127.0.0.1 (Client Quit)";
     assert!(Msg::parse(msg).is_ok());
+}
+
+#[test]
+fn parse_error_2() {
+    let msg = b":tiny_test!~tiny@213.153.193.52 JOIN #haskell";
+    assert_eq!(Msg::parse(msg), Ok(Msg {
+        pfx: Some(Pfx::User {
+            nick: "tiny_test".to_string(),
+            user: "~tiny@213.153.193.52".to_string(),
+        }),
+        command: Command::Str("JOIN".to_string()),
+        params: vec![
+            (Box::new(*b"#haskell") as Box<[u8]>).into_vec()
+        ]
+    }));
+}
+
+#[test]
+fn parse_error_3() {
+    let msg = b":verne.freenode.net NOTICE * :*** Couldn\'t look up your hostname";
+    assert_eq!(Msg::parse(msg), Ok(Msg {
+        pfx: Some(Pfx::Server("verne.freenode.net".to_owned())),
+        command: Command::Str("NOTICE".to_owned()),
+        params: vec![
+            (Box::new(*b"*") as Box<[u8]>).into_vec(),
+            (Box::new(*b"*** Couldn\'t look up your hostname") as Box<[u8]>).into_vec()
+        ]
+    }));
 }
