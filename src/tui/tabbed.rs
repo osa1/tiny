@@ -23,6 +23,17 @@ struct Tab {
     widget    : MessagingUI,
 }
 
+impl Tab {
+    pub fn visible_name<'a>(&'a self) -> &'a str {
+        match &self.pfx {
+            &None => &self.serv_name,
+            &Some(Pfx::Server(ref serv_name)) => serv_name,
+            &Some(Pfx::User { ref nick, .. }) => nick,
+            &Some(Pfx::Chan { ref chan_name }) => chan_name,
+        }
+    }
+}
+
 pub enum TabbedRet<'t> {
     KeyHandled,
     KeyIgnored,
@@ -64,7 +75,7 @@ impl Tabbed {
                 self.tabs.insert(idx, Tab {
                     serv_name: serv_name,
                     pfx: Some(pfx),
-                    widget: MessagingUI::new(self.width, self.height)
+                    widget: MessagingUI::new(self.width, self.height - 1)
                 });
                 self.active_idx = Some(idx);
             }
@@ -116,12 +127,13 @@ impl Tabbed {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             if self.active_idx == Some(tab_idx) {
                 rustbox.print(tab_name_col, (self.height as usize) - 1,
-                              rustbox::RB_BOLD, Color::White, Color::Blue, &tab.serv_name);
+                              rustbox::RB_BOLD, Color::White, Color::Blue, tab.visible_name());
             } else {
                 rustbox.print(tab_name_col, (self.height as usize) - 1,
-                              rustbox::RB_BOLD, Color::White, Color::Default, &tab.serv_name);
+                              rustbox::RB_BOLD, Color::White, Color::Default, tab.visible_name());
             }
-            tab_name_col += tab.serv_name.len();
+            // len() is OK since nick and chan names are ascii
+            tab_name_col += tab.visible_name().len();
         }
     }
 
@@ -205,7 +217,7 @@ impl Tabbed {
 
     /// Returns a position to insert() new tabs for the given serv_name.
     fn find_serv_last_tab_idx(&self, serv_name : &str) -> Option<usize> {
-        for (tab_idx, tab) in self.tabs.iter().rev().enumerate() {
+        for (tab_idx, tab) in self.tabs.iter().enumerate().rev() {
             if tab.serv_name == serv_name {
                 return Some(tab_idx + 1);
             }
