@@ -119,15 +119,25 @@ impl Tiny {
                 }
 
                 let mut abort = false;
+                let mut reset_fds = false;
                 for comm_idx in comm_idxs {
-                    // TODO: Handle disconnects
-                    if self.handle_socket(comm_idx) == LoopRet::Abort {
-                        abort = true;
+                    match self.handle_socket(comm_idx) {
+                        LoopRet::Abort => { abort = true; },
+                        LoopRet::Disconnected { .. } => {
+                            let comm = self.comms.remove(comm_idx);
+                            self.tui.add_err_msg("Disconnected.", &MsgTarget::AllServTabs {
+                                serv_name: &comm.serv_name,
+                            });
+                            reset_fds = true;
+                        },
+                        _ => {}
                     }
                 }
 
                 if abort {
                     return LoopRet::Abort;
+                } else if reset_fds {
+                    return LoopRet::Continue;
                 }
             }
         }
