@@ -7,11 +7,12 @@ use tiny::tui::{TUI, TUIRet};
 
 fn loop_() -> Option<String> {
     let mut tui = TUI::new();
+    tui.new_server_tab("debug".to_string());
 
     loop {
         match tui.idle_loop() {
-            TUIRet::SendMsg(cmd) => {
-                tui.show_outgoing_msg(cmd.into_iter().collect::<String>().borrow());
+            TUIRet::Input { serv_name, pfx, msg } => {
+                tui.show_msg(&msg.into_iter().collect::<String>(), &serv_name, pfx.as_ref());
             },
             TUIRet::Abort => {
                 return None;

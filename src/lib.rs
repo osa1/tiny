@@ -10,11 +10,14 @@ pub mod msg;
 pub mod tui;
 
 use std::cmp::max;
+use std::io::Write;
+use std::io;
 use std::mem;
 
 use comms::{Comms, CommsRet};
 use msg::{Pfx, Msg};
-use tui::{TUI, TUIRet};
+use tui::tabbed::MsgSource;
+use tui::{TUI, TUIRet, MsgTarget};
 
 pub struct Tiny {
     /// A connection to a server is maintained by 'Comms'.
@@ -32,6 +35,7 @@ enum LoopRet {
     Abort,
     Continue,
     Disconnected { fd : libc::c_int },
+    UpdateFds,
 }
 
 impl Tiny {
@@ -46,7 +50,7 @@ impl Tiny {
     }
 
     pub fn mainloop(&mut self) {
-        self.tui.new_server_tab("local".to_string());
+        self.tui.new_server_tab("debug".to_string());
 
         loop {
             // Set up the descriptors for select()
@@ -94,21 +98,36 @@ impl Tiny {
             //
             // See also https://github.com/nsf/termbox/issues/71.
             if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-                if self.handle_stdin() == LoopRet::Abort { return LoopRet::Abort; }
+                match self.handle_stdin() {
+                    LoopRet::Abort => { return LoopRet::Abort; },
+                    LoopRet::UpdateFds => { return LoopRet::UpdateFds; }
+                    _ => {}
+                }
             }
 
             // A socket is ready
             // TODO: Can multiple sockets be set in single select() call? I
             // assume yes for now.
             else {
-                for comm in self.comms.iter_mut() {
+                // Collecting comms to read in this Vec becuase Rust sucs.
+                let mut comm_idxs = Vec::with_capacity(1);
+                for (comm_idx, comm) in self.comms.iter_mut().enumerate() {
                     let fd = comm.get_raw_fd();
                     if unsafe { libc::FD_ISSET(fd, &mut fd_set_) } {
-                        // TODO: Handle disconnects
-                        if Tiny::handle_socket(&mut self.tui, comm) == LoopRet::Abort {
-                            return LoopRet::Abort;
-                        }
+                        comm_idxs.push(comm_idx);
                     }
+                }
+
+                let mut abort = false;
+                for comm_idx in comm_idxs {
+                    // TODO: Handle disconnects
+                    if self.handle_socket(comm_idx) == LoopRet::Abort {
+                        abort = true;
+                    }
+                }
+
+                if abort {
+                    return LoopRet::Abort;
                 }
             }
         }
@@ -117,19 +136,23 @@ impl Tiny {
     ////////////////////////////////////////////////////////////////////////////
 
     fn handle_stdin(&mut self) -> LoopRet {
-        match self.tui.keypressed() {
+        match self.tui.keypressed_peek() {
             TUIRet::Abort => LoopRet::Abort,
-            TUIRet::Input { serv_name, pfx, msg } => {
-                self.tui.show_msg_current_tab(&format!("Input serv_name: {}, pfx: {:?}, msg: {}",
-                                                       serv_name, pfx,
-                                                       msg.iter().cloned().collect::<String>()));
+            TUIRet::Input { msg, from } => {
+                writeln!(self.tui,
+                         "Input source: {:#?}, msg: {}",
+                         from, msg.iter().cloned().collect::<String>()).unwrap();
+
+                writeln!(io::stderr(),
+                         "Input source: {:#?}, msg: {}",
+                         from, msg.iter().cloned().collect::<String>()).unwrap();
+
                 // We know msg has at least one character as the TUI won't
                 // accept it otherwise.
                 if msg[0] == '/' {
-                    self.handle_command(serv_name, pfx,
-                                        (&msg[ 1 .. ]).into_iter().cloned().collect())
+                    self.handle_command(from, (&msg[ 1 .. ]).into_iter().cloned().collect())
                 } else {
-                    self.send_msg(&serv_name, pfx.as_ref(), msg);
+                    self.send_msg(from, msg);
                     LoopRet::Continue
                 }
             },
@@ -137,62 +160,78 @@ impl Tiny {
         }
     }
 
-    fn handle_command(&mut self, serv_name : String, pfx : Option<Pfx>, msg : String) -> LoopRet {
+    fn handle_command(&mut self, src : MsgSource, msg : String) -> LoopRet {
         let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
         if words[0] == "connect" {
             self.connect(words[1]);
+            LoopRet::UpdateFds
+        } else if words[0] == "join" {
+            self.join(src, words[1]);
             LoopRet::Continue
         } else if words[0] == "quit" {
             LoopRet::Abort
         } else {
-            self.tui.show_error(
-                &format!("Unsupported command: {}", words[0]), &serv_name, pfx.as_ref());
+            self.tui.add_err_msg(
+                &format!("Unsupported command: {}", words[0]), &MsgTarget::CurrentTab);
             LoopRet::Continue
         }
     }
 
-    fn connect(&mut self, serv_name : &str) {
-        match utils::drop_port(serv_name) {
+    fn connect(&mut self, serv_addr : &str) {
+        match utils::drop_port(serv_addr) {
             None => {
-                self.tui.show_error_all_tabs("connect: Need a <host>:<port>");
+                self.tui.add_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
             },
-            Some(host) => {
-                self.tui.new_server_tab(host.to_owned());
-                self.tui.show_msg_current_tab(&format!("Created tab: {}", host));
-                self.tui.show_msg("Connecting...", host, None);
+            Some(serv_name) => {
+                self.tui.new_server_tab(serv_name.to_owned());
+                writeln!(self.tui, "Created tab: {}", serv_name).unwrap();
+                self.tui.add_msg("Connecting...", &MsgTarget::Server { serv_name: serv_name });
 
-                match Comms::try_connect(serv_name, host, &self.nick, &self.hostname, &self.realname) {
+                match Comms::try_connect(serv_addr, serv_name,
+                                         &self.nick, &self.hostname, &self.realname) {
                     Ok(comms) => {
                         self.comms.push(comms);
                     },
                     Err(err) => {
-                        self.tui.show_error(&format!("Error: {}", err), host, None);
+                        self.tui.add_err_msg(&format!("Error: {}", err),
+                                             &MsgTarget::Server { serv_name: serv_name });
                     }
                 }
             }
         }
     }
 
-    fn send_msg(&mut self, serv_name : &str, pfx : Option<&Pfx>, msg : Vec<char>) {
-        if let Some(comm) = self.find_comm(serv_name) {
-            let msg_target = match pfx {
-                None => serv_name,
-                Some(&Pfx::Server(ref serv_name)) => serv_name.as_ref(),
-                Some(&Pfx::User { ref nick, .. }) => nick.as_ref(),
-            };
+    fn join(&mut self, src : MsgSource, chan : &str) {
+        Msg::join(chan, &mut self.tui).unwrap(); // debug
+        let comm = self.find_comm(src.serv_name()).unwrap();
+        Msg::join(chan, comm).unwrap();
+    }
 
-            Msg::privmsg(msg_target, msg.into_iter().collect::<String>().as_ref(), comm).unwrap();
-            return;
+    fn send_msg(&mut self, from : MsgSource, msg : Vec<char>) {
+        let msg_string = msg.iter().cloned().collect::<String>();
+
+        match from {
+            MsgSource::Serv { .. } => {
+                self.tui.add_err_msg("Can't send PRIVMSG to a server.", &MsgTarget::CurrentTab);
+            },
+
+            MsgSource::Chan { serv_name, chan_name } => {
+                {
+                    let comm = self.find_comm(&serv_name).unwrap();
+                    Msg::privmsg(&chan_name, &msg_string, comm).unwrap();
+                }
+                self.tui.add_msg(&msg_string, &MsgTarget::Chan { serv_name: &serv_name,
+                                                                 chan_name: &chan_name });
+            },
+
+            MsgSource::User { serv_name, nick } => {
+                {
+                    let comm = self.find_comm(&serv_name).unwrap();
+                    Msg::privmsg(&nick, &msg_string, comm).unwrap();
+                }
+                self.tui.add_msg(&msg_string, &MsgTarget::User { serv_name: &serv_name, nick: &nick });
+            }
         }
-
-        // OMG Rust seriously sucks. If I move this code to the else{} block I
-        // get a compile error because None borrows self. So we need to make
-        // sure previous blocks returns something.
-
-        self.tui.show_error_current_tab(
-            &format!("send_msg(): Can't find serv {:?} in {:?}",
-                     serv_name,
-                     self.comms.iter().map(|c| c.serv_name.clone()).collect::<Vec<String>>()));
     }
 
     fn find_comm(&mut self, serv_name : &str) -> Option<&mut Comms> {
@@ -206,20 +245,28 @@ impl Tiny {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_socket(tui : &mut TUI, comm : &mut Comms) -> LoopRet {
+    fn handle_socket(&mut self, comm_idx : usize) -> LoopRet {
         let mut disconnect : Option<libc::c_int> = None;
 
-        for ret in comm.read_incoming_msg() {
-            tui.show_msg_current_tab(&format!("{:?}", ret));
+        let rets = {
+            let mut comm = unsafe { self.comms.get_unchecked_mut(comm_idx) };
+            comm.read_incoming_msg()
+        };
+
+        for ret in rets {
+            // tui.show_msg_current_tab(&format!("{:?}", ret));
+            writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
             match ret {
                 CommsRet::Disconnected { fd } => {
                     disconnect = Some(fd);
                 },
-                CommsRet::Err { serv_name, err_msg } => {
-                    tui.show_error(&err_msg, &serv_name, None);
+                CommsRet::Err { err_msg } => {
+                    self.tui.add_err_msg(&err_msg, &MsgTarget::Server {
+                        serv_name: & unsafe { self.comms.get_unchecked(comm_idx) }.serv_name
+                    });
                 },
-                CommsRet::IncomingMsg { serv_name, pfx, ty, msg } => {
-                    tui.show_msg(&msg, serv_name, Some(&pfx));
+                CommsRet::IncomingMsg { pfx, ty, args } => {
+                    self.handle_incoming_msg(comm_idx, &pfx, &ty, args);
                 },
                 CommsRet::SentMsg { .. } => {
                     // TODO: Probably just ignore this?
@@ -232,5 +279,60 @@ impl Tiny {
         } else {
             LoopRet::Continue
         }
+    }
+
+    fn handle_incoming_msg(&mut self, comm_idx : usize,
+                           pfx : &Pfx, ty : &str, args : Vec<String>) {
+        if ty == "JOIN" {
+            let chan = &args[0];
+            let serv_name = & unsafe { &self.comms.get_unchecked(comm_idx) }.serv_name;
+            match pfx {
+                &Pfx::Server(ref serv) => {
+                    // This doesn't make any sense, log it.
+                    writeln!(self.tui, "Weird JOIN message with server prefix {}", serv).unwrap();
+                },
+                &Pfx::User { ref nick, .. } => {
+                    if *nick == self.nick {
+                        self.tui.new_chan_tab(serv_name.to_owned(), chan.to_owned());
+                    } else {
+                        // TODO
+                    }
+                }
+            }
+        }
+
+        else if ty == "PRIVMSG" {
+            debug_assert!(args.len() == 2);
+            let target = &args[0];
+            let msg = &args[1];
+
+            let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
+
+            if target.as_bytes()[0] == b'#' {
+                self.tui.add_msg(&msg, &MsgTarget::Chan {
+                    serv_name: &comm.serv_name,
+                    chan_name: &target,
+                });
+            }
+
+            else if target == &self.nick {
+                let msg_target = pfx_to_target(pfx, &comm.serv_name);
+                self.tui.add_msg(msg, &msg_target);
+            }
+        }
+
+        else {
+            // Just log for now
+            writeln!(self.tui,
+                     "Ignoring incoming msg:\npfx: {:?}\nty: {}\nargs: {:?}",
+                     pfx, ty, args).unwrap();
+        }
+    }
+}
+
+fn pfx_to_target<'a>(pfx : &'a Pfx, curr_serv : &'a str) -> MsgTarget<'a> {
+    match pfx {
+        &Pfx::Server(ref serv_name) => MsgTarget::Server { serv_name: serv_name },
+        &Pfx::User { ref nick, .. } => MsgTarget::User { serv_name: curr_serv, nick: nick },
     }
 }

@@ -2,8 +2,8 @@ use rustbox::keyboard::Key;
 use rustbox::{RustBox, Color};
 use rustbox;
 
-use msg::Pfx;
 use tui::messaging::MessagingUI;
+use tui::MsgTarget;
 use tui::style::Style;
 use tui::widget::{Widget, WidgetRet};
 
@@ -18,18 +18,39 @@ pub struct Tabbed {
 }
 
 struct Tab {
-    serv_name : String,
-    pfx       : Option<Pfx>,
-    widget    : MessagingUI,
+    widget : MessagingUI,
+    src    : MsgSource,
+}
+
+/// TUI source of a message from the user.
+#[derive(Debug, Clone)]
+pub enum MsgSource {
+    /// Message sent to a server tab.
+    Serv { serv_name : String },
+
+    /// Message sent to a channel tab.
+    Chan { serv_name : String, chan_name : String },
+
+    /// Message sent to a privmsg tab.
+    User { serv_name : String, nick : String },
+}
+
+impl MsgSource {
+    pub fn serv_name<'a>(&'a self) -> &'a str {
+        match self {
+            &MsgSource::Serv { ref serv_name } => serv_name,
+            &MsgSource::Chan { ref serv_name, .. } => serv_name,
+            &MsgSource::User { ref serv_name, .. } => serv_name,
+        }
+    }
 }
 
 impl Tab {
     pub fn visible_name<'a>(&'a self) -> &'a str {
-        match &self.pfx {
-            &None => &self.serv_name,
-            &Some(Pfx::Server(ref serv_name)) => serv_name,
-            &Some(Pfx::User { ref nick, .. }) => nick,
-            &Some(Pfx::Chan { ref chan_name }) => chan_name,
+        match &self.src {
+            &MsgSource::Serv { ref serv_name, .. } => serv_name,
+            &MsgSource::Chan { ref chan_name, .. } => chan_name,
+            &MsgSource::User { ref nick, .. } => nick,
         }
     }
 }
@@ -39,9 +60,8 @@ pub enum TabbedRet<'t> {
     KeyIgnored,
 
     Input {
-        serv_name : &'t str,
-        pfx       : Option<&'t Pfx>,
-        msg       : Vec<char>
+        msg  : Vec<char>,
+        from : &'t MsgSource,
     },
 }
 
@@ -55,65 +75,49 @@ impl Tabbed {
         }
     }
 
-    /// Create a tab if it doesn't exist, and make it current.
-    pub fn new_tab(&mut self, serv_name : String, pfx : Pfx) {
-        for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if tab.serv_name == serv_name && tab.pfx.as_ref() == Some(&pfx) {
-                self.active_idx = Some(tab_idx);
-                return;
-            }
-        }
-
-        // Do we have a tab for this server?
-        match self.find_serv_last_tab_idx(&serv_name) {
-            None => {
-                // Well, we need a server tab too.
-                self.new_server_tab(serv_name.clone());
-                self.new_tab(serv_name, pfx)
-            },
-            Some(idx) => {
-                self.tabs.insert(idx, Tab {
-                    serv_name: serv_name,
-                    pfx: Some(pfx),
-                    widget: MessagingUI::new(self.width, self.height - 1)
-                });
-                self.active_idx = Some(idx);
-            }
-        }
-    }
-
-    /// Create a tab if it doesn't exist, and make it current.
     pub fn new_server_tab(&mut self, serv_name : String) {
         match self.find_serv_tab_idx(&serv_name) {
             None => {
                 self.tabs.push(Tab {
-                    serv_name: serv_name,
-                    pfx: None,
-                    widget: MessagingUI::new(self.width, self.height - 1)
+                    widget: MessagingUI::new(self.width, self.height - 1),
+                    src: MsgSource::Serv { serv_name: serv_name },
                 });
                 self.active_idx = Some(self.tabs.len() - 1);
             },
-            Some(idx) => {
-                self.active_idx = Some(idx);
+            Some(tab_idx) => {
+                self.active_idx = Some(tab_idx);
             }
         }
     }
 
-    pub fn close_tab(&mut self, serv_name : &str, pfx : &Pfx) {
-        if let Some(idx) = self.find_msg_tab_idx(serv_name, pfx) {
-            self.tabs.remove(idx);
-        } else {
-            panic!("Tabbed.close_tab(): Trying to close a non-existent tab.")
+    pub fn new_chan_tab(&mut self, serv_name : String, chan_name : String) {
+        match self.find_last_serv_tab_idx(&serv_name) {
+            None => {
+                self.new_server_tab(serv_name.clone());
+                self.new_chan_tab(serv_name, chan_name);
+            },
+            Some(tab_idx) => {
+                self.tabs.insert(tab_idx + 1, Tab {
+                    widget: MessagingUI::new(self.width, self.height - 1),
+                    src: MsgSource::Chan { serv_name: serv_name, chan_name: chan_name },
+                });
+                self.active_idx = Some(self.tabs.len() - 1);
+            }
         }
     }
 
-    /// Closes all tabs with the given serv_name!
-    pub fn close_serv_tab(&mut self, serv_name : &str) {
-        if let Some(idx) = self.find_serv_tab_idx(serv_name) {
-            let ends = self.find_serv_last_tab_idx(serv_name).unwrap();
-            self.tabs.drain(idx .. ends);
-        } else {
-            panic!("Tabbed.close_tab(): Trying to close a non-existent tab.")
+    pub fn new_user_tab(&mut self, serv_name : String, nick : String) {
+        match self.find_last_serv_tab_idx(&serv_name) {
+            None => {
+                self.new_server_tab(serv_name.clone());
+                self.new_user_tab(serv_name, nick);
+            },
+            Some(tab_idx) => {
+                self.tabs.insert(tab_idx + 1, Tab {
+                    widget: MessagingUI::new(self.width, self.height - 1),
+                    src: MsgSource::User { serv_name: serv_name, nick: nick },
+                });
+            }
         }
     }
 
@@ -132,7 +136,7 @@ impl Tabbed {
                 rustbox.print(tab_name_col, (self.height as usize) - 1,
                               rustbox::RB_BOLD, Color::White, Color::Default, tab.visible_name());
             }
-            // len() is OK since nick and chan names are ascii
+            // len() is OK since sever, chan and nick names are ascii
             tab_name_col += tab.visible_name().len();
         }
     }
@@ -152,11 +156,9 @@ impl Tabbed {
                     WidgetRet::KeyHandled => TabbedRet::KeyHandled,
                     WidgetRet::KeyIgnored => TabbedRet::KeyIgnored,
                     WidgetRet::Input(input) => {
-                        let tab = &self.tabs[idx as usize];
                         TabbedRet::Input {
-                            serv_name: &tab.serv_name,
-                            pfx: tab.pfx.as_ref(),
                             msg: input,
+                            from: &self.tabs[idx as usize].src
                         }
                     },
                 }
@@ -175,24 +177,72 @@ impl Tabbed {
     // Interfacing with tabs
 
     #[inline]
-    pub fn add_msg(&mut self, msg : &str, serv_name : &str, pfx : Option<&Pfx>, style : Style) {
-        match pfx {
-            None => {
-                let serv_tab_idx = self.find_serv_tab_idx(serv_name).unwrap();
-                self.tabs[serv_tab_idx].widget.add_msg(msg, style);
+    pub fn add_msg(&mut self, msg : &str, target : &MsgTarget, style : Style) {
+        match target {
+            &MsgTarget::Server { serv_name } =>  {
+                for tab in self.tabs.iter_mut() {
+                    match &tab.src {
+                        &MsgSource::Serv { serv_name: ref serv_name_ } => {
+                            if serv_name == serv_name_ {
+                                tab.widget.add_msg(msg, style);
+                                break;
+                            }
+                        },
+                        _ => {}
+                    }
+                }
             },
-            Some(ref pfx) => {
-                let msg_tab_idx = self.find_msg_tab_idx(serv_name, pfx).unwrap();
-                self.tabs[msg_tab_idx].widget.add_msg(msg, style);
-            }
-        }
-    }
 
-    /// Add a message to all tabs of a server.
-    pub fn add_msg_all_serv_tabs(&mut self, msg : &str, serv_name : &str, style : Style) {
-        for tab in self.tabs.iter_mut() {
-            if tab.serv_name.as_str() == serv_name {
-                tab.widget.add_msg(msg, style);
+            &MsgTarget::Chan { serv_name, chan_name } => {
+                for tab in self.tabs.iter_mut() {
+                    match &tab.src {
+                        &MsgSource::Chan { serv_name: ref serv_name_, chan_name: ref chan_name_ } => {
+                            if serv_name == serv_name_ && chan_name == chan_name_ {
+                                tab.widget.add_msg(msg, style);
+                                break;
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+            },
+
+            &MsgTarget::User { serv_name, nick } => {
+                for tab in self.tabs.iter_mut() {
+                    match &tab.src {
+                        &MsgSource::User { serv_name: ref serv_name_, nick: ref nick_ } => {
+                            if serv_name == serv_name_ && nick == nick_ {
+                                tab.widget.add_msg(msg, style);
+                                break;
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+            },
+
+            &MsgTarget::AllServTabs { serv_name } => {
+                for tab in self.tabs.iter_mut() {
+                    if tab.src.serv_name() == serv_name {
+                        tab.widget.add_msg(msg, style);
+                    }
+                }
+            },
+
+            &MsgTarget::AllTabs => {
+                for tab in self.tabs.iter_mut() {
+                    tab.widget.add_msg(msg, style);
+                }
+            },
+
+            &MsgTarget::CurrentTab => {
+                self.tabs[self.active_idx.unwrap()].widget.add_msg(msg, style);
+            },
+
+            &MsgTarget::MultipleTabs(ref targets) => {
+                for target in targets.iter() {
+                    self.add_msg(msg, target, style);
+                }
             }
         }
     }
@@ -210,29 +260,52 @@ impl Tabbed {
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
 
-    #[inline]
-    fn find_serv_tab_idx(&self, serv_name : &str) -> Option<usize> {
-        self.find_tab_idx(serv_name, None)
-    }
-
-    /// Returns a position to insert() new tabs for the given serv_name.
-    fn find_serv_last_tab_idx(&self, serv_name : &str) -> Option<usize> {
-        for (tab_idx, tab) in self.tabs.iter().enumerate().rev() {
-            if tab.serv_name == serv_name {
-                return Some(tab_idx + 1);
+    fn find_serv_tab_idx(&self, serv_name_ : &str) -> Option<usize> {
+        for (tab_idx, tab) in self.tabs.iter().enumerate() {
+            match &tab.src {
+                &MsgSource::Serv { ref serv_name } => {
+                    if serv_name_ == serv_name {
+                        return Some(tab_idx);
+                    }
+                },
+                _ => {},
             }
         }
         None
     }
 
-    #[inline]
-    fn find_msg_tab_idx(&self, serv_name : &str, pfx : &Pfx) -> Option<usize> {
-        self.find_tab_idx(serv_name, Some(pfx))
+    fn find_chan_tab_idx(&self, serv_name_ : &str, chan_name_ : &str) -> Option<usize> {
+        for (tab_idx, tab) in self.tabs.iter().enumerate() {
+            match &tab.src {
+                &MsgSource::Chan { ref serv_name, ref chan_name } => {
+                    if serv_name_ == serv_name && chan_name_ == chan_name {
+                        return Some(tab_idx);
+                    }
+                },
+                _ => {},
+            }
+        }
+        None
     }
 
-    fn find_tab_idx(&self, serv_name : &str, pfx : Option<&Pfx>) -> Option<usize> {
+    fn find_user_tab_idx(&self, serv_name_ : &str, nick_ : &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if tab.serv_name == serv_name && tab.pfx.as_ref() == pfx {
+            match &tab.src {
+                &MsgSource::User { ref serv_name, ref nick } => {
+                    if serv_name_ == serv_name && nick_ == nick {
+                        return Some(tab_idx);
+                    }
+                },
+                _ => {},
+            }
+        }
+        None
+    }
+
+    /// Index of the last tab with the given server name.
+    fn find_last_serv_tab_idx(&self, serv_name : &str) -> Option<usize> {
+        for (tab_idx, tab) in self.tabs.iter().enumerate().rev() {
+            if tab.src.serv_name() == serv_name {
                 return Some(tab_idx);
             }
         }

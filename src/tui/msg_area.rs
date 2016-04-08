@@ -184,6 +184,7 @@ impl MsgArea {
                 self.scroll += 1;
             }
 
+            writeln!(&mut io::stderr(), "msg_area adding msg: {}", msg).unwrap();
             self.lines.push(Line {
                 msg: msg.to_owned(),
                 continuation: false,

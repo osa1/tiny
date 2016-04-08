@@ -14,6 +14,7 @@ pub struct Msg {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pfx {
     Server(String),
+
     User {
         nick : String,
         /// user@host
@@ -21,7 +22,17 @@ pub enum Pfx {
     },
 }
 
-#[derive(Debug)]
+impl Pfx {
+    #[inline]
+    pub fn is_server_pfx(&self) -> bool {
+        match self {
+            &Pfx::Server(_) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Str(String),
     Num(u16),
@@ -30,6 +41,9 @@ pub enum Command {
 impl Msg {
     /// Parse a complete IRC message. NOTE: The string should NOT have CR-NL.
     pub fn parse(msg : &[u8]) -> Result<Msg, String> {
+
+        writeln!(&mut io::stderr(), "parsing msg: {:?}", String::from_utf8(msg.to_owned())).unwrap();
+
         if msg.len() == 0 {
             return Err("Empty msg".to_owned());
         }
@@ -46,7 +60,7 @@ impl Msg {
                 slice = &slice_[ 1 .. ]; // drop the space
                 Some(parse_pfx(&pfx))
             } else {
-                log_stderr_bytes("Can't parse msg prefix:", msg);
+                // log_stderr_bytes("Can't parse msg prefix:", msg);
                 None
             }
         };
@@ -136,12 +150,12 @@ fn parse_pfx(pfx : &[u8]) -> Pfx {
     }
 }
 
-fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
+fn parse_params(chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
     if chrs.len() == 0 {
         return Err("parse_params: Empty slice of chars".to_owned());
     }
 
-        let mut ret : Vec<Vec<u8>> = Vec::new();
+    let mut ret : Vec<Vec<u8>> = Vec::new();
 
     let mut current_param = Vec::new();
     for byte_idx in 0 .. chrs.len() {
@@ -155,14 +169,14 @@ fn parse_params(mut chrs : &[u8]) -> Result<Vec<Vec<u8>>, String> {
             current_param = Vec::new();
         } else {
             current_param.push(byte);
-            }
         }
+    }
 
     if current_param.len() > 0 {
         ret.push(current_param);
     }
 
-        Ok(ret)
+    Ok(ret)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

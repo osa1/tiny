@@ -16,37 +16,33 @@ pub struct Comms {
     stream        : TcpStream,
 
     pub serv_name : String,
-    serv_addr     : String,
 
     /// _Partial_ messages collected here until they make a complete message.
     msg_buf       : Vec<u8>,
 }
 
 #[derive(Debug)]
-pub enum CommsRet<'a> {
+pub enum CommsRet {
     Disconnected {
         fd        : RawFd,
     },
 
     Err {
-        serv_name : &'a str,
         err_msg   : String,
     },
 
     IncomingMsg {
-        serv_name : &'a str,
         pfx       : Pfx,
         ty        : String,
-        msg       : String,
+        args      : Vec<String>,
     },
 
     /// A message without prefix. From RFC 2812:
     /// > If the prefix is missing from the message, it is assumed to have
     /// > originated from the connection from which it was received from.
     SentMsg {
-        serv_name   : &'a str,
-        ty          : String,
-        msg         : String,
+        ty        : String,
+        msg       : String,
     }
 }
 
@@ -57,12 +53,11 @@ impl Comms {
         let stream = try!(TcpStream::connect(serv_addr));
         try!(stream.set_read_timeout(Some(Duration::from_millis(10))));
         try!(stream.set_write_timeout(None));
-        try!(stream.set_nonblocking(true));
+        // try!(stream.set_nonblocking(true));
 
         let mut comms = Comms {
             stream:     stream,
             serv_name:  serv_name.to_owned(),
-            serv_addr:  serv_addr.to_owned(),
             msg_buf:    Vec::new(),
         };
         try!(comms.introduce(nick, hostname, realname));
@@ -85,7 +80,7 @@ impl Comms {
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
-    pub fn read_incoming_msg<'a>(&'a mut self) -> Vec<CommsRet<'a>> {
+    pub fn read_incoming_msg(&mut self) -> Vec<CommsRet> {
         let mut read_buf : [u8; 512] = [0; 512];
 
         // Handle disconnects
@@ -111,10 +106,13 @@ impl Comms {
     fn add_to_msg_buf(&mut self, slice : &[u8]) {
         // Some invisible ASCII characters causing glitches on some terminals,
         // we filter those out here.
-        self.msg_buf.extend(slice.iter().filter(|c| **c != 0x1 /* SOH */ || **c != 0x2 /* STX */));
+        self.msg_buf.extend(slice.iter().filter(|c| **c != 0x1 /* SOH */ ||
+                                                    **c != 0x2 /* STX */ ||
+                                                    **c != 0x0 /* NUL */ ||
+                                                    **c != 0x4 /* EOT */));
     }
 
-    fn handle_msgs<'a>(&'a mut self) -> Vec<CommsRet<'a>> {
+    fn handle_msgs(&mut self) -> Vec<CommsRet> {
         let mut ret = Vec::with_capacity(1);
 
         // Have we read any CRLFs? In that case just process the message and
@@ -134,7 +132,7 @@ impl Comms {
                         assert!(self.msg_buf[cr_idx + 1] == b'\n');
                         // Don't include CRLF
                         let msg = Msg::parse(&self.msg_buf[ 0 .. cr_idx ]);
-                        Comms::handle_msg(self.serv_name.borrow(), &mut self.stream, msg, &mut ret);
+                        Comms::handle_msg(&mut self.stream, msg, &mut ret);
                         // Update the buffer (drop CRLF)
                         self.msg_buf.drain(0 .. cr_idx + 2);
                     }
@@ -145,29 +143,25 @@ impl Comms {
         ret
     }
 
-    fn handle_msg<'a>(serv_name : &'a str,
-                      stream : &mut TcpStream,
-                      msg : Result<Msg, String>,
-                      ret : &mut Vec<CommsRet<'a>>) {
+    fn handle_msg(stream : &mut TcpStream, msg : Result<Msg, String>,
+                  ret : &mut Vec<CommsRet>) {
         match msg {
             Err(err_msg) => {
-                ret.push(CommsRet::Err { serv_name: serv_name, err_msg: err_msg });
+                ret.push(CommsRet::Err { err_msg: err_msg });
             },
             Ok(Msg { pfx, command, params }) => {
                 match command {
                     Command::Str(str) =>
-                        Comms::handle_str_command(serv_name, stream, ret, pfx, str, params),
+                        Comms::handle_str_command(stream, ret, pfx, str, params),
                     Command::Num(num) =>
-                        Comms::handle_num_command(serv_name, stream, ret, pfx, num, params),
+                        Comms::handle_num_command(stream, ret, pfx, num, params),
                 }
             }
         }
     }
 
-    fn handle_str_command<'a>(serv_name : &'a str,
-                              stream : &mut TcpStream,
-                              ret : &mut Vec<CommsRet<'a>>,
-                              pfx : Option<Pfx>, cmd : String, params : Vec<Vec<u8>>) {
+    fn handle_str_command(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
+                          pfx : Option<Pfx>, cmd : String, params : Vec<Vec<u8>>) {
         if cmd == "PING" {
             debug_assert!(params.len() == 1);
             Msg::pong(unsafe {
@@ -177,7 +171,6 @@ impl Comms {
             match pfx {
                 None => {
                     ret.push(CommsRet::SentMsg {
-                        serv_name: serv_name,
                         ty: cmd,
                         msg: params.into_iter().map(|s| unsafe {
                             String::from_utf8_unchecked(s)
@@ -186,24 +179,22 @@ impl Comms {
                 },
                 Some(pfx) => {
                     ret.push(CommsRet::IncomingMsg {
-                        serv_name: serv_name.borrow(),
                         pfx: pfx,
                         ty: cmd,
-                        msg: params.into_iter().map(|s| unsafe {
+                        args: params.into_iter().map(|s| unsafe {
                             String::from_utf8_unchecked(s)
-                        }).collect::<Vec<_>>().join(" "), // FIXME: intermediate vector
+                        }).collect(),
                     });
                 }
             }
         }
     }
 
-    fn handle_num_command<'a>(serv_name : &'a str,
-                              stream : &mut TcpStream,
-                              ret : &mut Vec<CommsRet<'a>>,
-                              prefix : Option<Pfx>, num : u16, params : Vec<Vec<u8>>) {
+    fn handle_num_command(stream : &mut TcpStream,
+                          ret : &mut Vec<CommsRet>,
+                          prefix : Option<Pfx>, num : u16, params : Vec<Vec<u8>>) {
         // TODO
-        Comms::handle_str_command(serv_name, stream, ret, prefix, "UNKNOWN".to_owned(), params)
+        Comms::handle_str_command(stream, ret, prefix, "UNKNOWN".to_owned(), params)
     }
 }
 

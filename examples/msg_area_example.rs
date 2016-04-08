@@ -41,7 +41,7 @@ fn loop_() -> Option<String> {
         // }
 
         if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-            match tui.keypressed() {
+            match tui.keypressed_peek() {
                 TUIRet::Input { serv_name, pfx, msg } => {
                     tui.show_msg(msg.into_iter().collect::<String>().as_ref(),
                                  &serv_name, pfx.as_ref());
