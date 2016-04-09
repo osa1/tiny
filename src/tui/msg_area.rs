@@ -95,8 +95,6 @@ impl MsgArea {
             mem::replace(&mut self.lines, Vec::with_capacity(total_lines))
         };
 
-        writeln!(&mut io::stderr(), "old lines: {:?}", old_lines).unwrap();
-
         let mut line_idx = 0;
         while line_idx < old_lines.len() {
             // How many bytes combined string needs?
@@ -125,8 +123,6 @@ impl MsgArea {
 
             line_idx = cont_idx;
         }
-
-        writeln!(&mut io::stderr(), "new lines: {:?}", self.lines).unwrap();
     }
 
     /// Find index of given line in 'self.lines'.
@@ -143,7 +139,6 @@ impl MsgArea {
 
     #[inline]
     pub fn add_msg_str(&mut self, msg_str : &str, style : Style) {
-        writeln!(&mut io::stderr(), "adding msg: {:?}", msg_str).unwrap();
         self.add_msg_str_(msg_str, style)
     }
 
@@ -184,7 +179,6 @@ impl MsgArea {
                 self.scroll += 1;
             }
 
-            writeln!(&mut io::stderr(), "msg_area adding msg: {}", msg).unwrap();
             self.lines.push(Line {
                 msg: msg.to_owned(),
                 continuation: false,
