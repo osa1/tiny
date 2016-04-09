@@ -329,6 +329,24 @@ impl Tiny {
                 let msg_target = pfx_to_target(pfx, &comm.serv_name);
                 self.tui.add_msg(msg, &msg_target);
             }
+
+            else {
+                writeln!(self.tui, "Weird PRIVMSG target: {}", target);
+            }
+        }
+
+        else if ty == "NOTICE" {
+            debug_assert!(args.len() == 2);
+            let target = &args[0];
+            let msg = &args[1];
+
+            let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
+
+            if target == "*" || target == &self.nick {
+                self.tui.add_msg(&msg, &pfx_to_target(pfx, &comm.serv_name));
+            } else {
+                writeln!(self.tui, "Weird NOTICE target: {}", target);
+            }
         }
 
         else {
@@ -342,7 +360,7 @@ impl Tiny {
 
 fn pfx_to_target<'a>(pfx : &'a Pfx, curr_serv : &'a str) -> MsgTarget<'a> {
     match pfx {
-        &Pfx::Server(ref serv_name) => MsgTarget::Server { serv_name: serv_name },
+        &Pfx::Server(_) => MsgTarget::Server { serv_name: curr_serv },
         &Pfx::User { ref nick, .. } => MsgTarget::User { serv_name: curr_serv, nick: nick },
     }
 }
