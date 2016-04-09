@@ -118,7 +118,6 @@ impl MsgArea {
             self.add_msg_(new_line.chars().collect::<Vec<char>>().borrow(),
                           old_lines[line_idx].style);
 
-
             line_idx = cont_idx;
         }
     }

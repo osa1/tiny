@@ -176,86 +176,111 @@ impl Tabbed {
     ////////////////////////////////////////////////////////////////////////////
     // Interfacing with tabs
 
-    #[inline]
-    pub fn add_msg(&mut self, msg : &str, target : &MsgTarget, style : Style) {
+    fn apply_to_target<F>(&mut self, target : &MsgTarget, f : &F)
+            where F : Fn(&mut Tab) -> () {
+
+        // Creating a vector just to make borrow checker happy. Borrow checker
+        // sucks once more. Here it sucks 2x, I can't even create a Vec<&mut Tab>,
+        // I need a Vec<usize>.
+        //
+        // (I could use an array on stack but whatever)
+        let mut target_idxs : Vec<usize> = Vec::with_capacity(self.tabs.len());
+
         match target {
             &MsgTarget::Server { serv_name } =>  {
-                for tab in self.tabs.iter_mut() {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     match &tab.src {
                         &MsgSource::Serv { serv_name: ref serv_name_ } => {
                             if serv_name == serv_name_ {
-                                tab.widget.add_msg(msg, style);
-                                return;
+                                target_idxs.push(tab_idx);
+                                break;
                             }
                         },
                         _ => {}
                     }
                 }
-                panic!("Can't add msg {} to {:?}", msg, target);
             },
 
             &MsgTarget::Chan { serv_name, chan_name } => {
-                for tab in self.tabs.iter_mut() {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     match &tab.src {
                         &MsgSource::Chan { serv_name: ref serv_name_, chan_name: ref chan_name_ } => {
                             if serv_name == serv_name_ && chan_name == chan_name_ {
-                                tab.widget.add_msg(msg, style);
-                                return;
+                                target_idxs.push(tab_idx);
+                                break;
                             }
                         },
                         _ => {}
                     }
                 }
-                panic!("Can't add msg {} to {:?}", msg, target);
             },
 
             &MsgTarget::User { serv_name, nick } => {
-                for tab in self.tabs.iter_mut() {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     match &tab.src {
                         &MsgSource::User { serv_name: ref serv_name_, nick: ref nick_ } => {
                             if serv_name == serv_name_ && nick == nick_ {
-                                tab.widget.add_msg(msg, style);
-                                return;
+                                target_idxs.push(tab_idx);
+                                break;
                             }
                         },
                         _ => {}
                     }
                 }
-                panic!("Can't add msg {} to {:?}", msg, target);
             },
 
             &MsgTarget::AllServTabs { serv_name } => {
-                for tab in self.tabs.iter_mut() {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if tab.src.serv_name() == serv_name {
-                        tab.widget.add_msg(msg, style);
+                        target_idxs.push(tab_idx);
                     }
                 }
             },
 
             &MsgTarget::AllTabs => {
-                for tab in self.tabs.iter_mut() {
-                    tab.widget.add_msg(msg, style);
+                for tab_idx in 0 .. self.tabs.len() {
+                    target_idxs.push(tab_idx);
                 }
             },
 
             &MsgTarget::CurrentTab => {
-                self.tabs[self.active_idx.unwrap()].widget.add_msg(msg, style);
+                target_idxs.push(self.active_idx.unwrap());
             },
 
             &MsgTarget::MultipleTabs(ref targets) => {
                 for target in targets.iter() {
-                    self.add_msg(msg, target, style);
+                    self.apply_to_target(target, f);
                 }
             }
         }
+
+        for tab_idx in target_idxs {
+            f(unsafe { self.tabs.get_unchecked_mut(tab_idx) });
+        }
     }
 
+    #[inline]
+    pub fn add_msg(&mut self, msg : &str, target : &MsgTarget, style : Style) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.add_msg(msg, style);
+        });
+    }
+
+    #[inline]
+    pub fn set_topic(&mut self, title : &str, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.set_topic(title.to_owned());
+        });
+    }
+
+    #[inline]
     pub fn add_msg_all_tabs(&mut self, msg : &str, style : Style) {
         for tab in self.tabs.iter_mut() {
             tab.widget.add_msg(msg, style);
         }
     }
 
+    #[inline]
     pub fn add_msg_current_tab(&mut self, msg : &str, style : Style) {
         self.tabs[self.active_idx.unwrap()].widget.add_msg(msg, style);
     }

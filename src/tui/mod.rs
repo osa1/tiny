@@ -201,6 +201,10 @@ impl TUI {
     pub fn add_err_msg(&mut self, err : &str, target : &MsgTarget) {
         self.ui.add_msg(err, target, style::ERR_MSG);
     }
+
+    pub fn set_topic(&mut self, msg : &str, target : &MsgTarget) {
+        self.ui.set_topic(msg, target);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

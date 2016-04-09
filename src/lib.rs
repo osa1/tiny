@@ -310,6 +310,7 @@ impl Tiny {
                     });
                 } else if target == &self.nick {
                     let msg_target = pfx_to_target(&pfx, &comm.serv_name);
+                    // TODO: Set the topic if a new tab is created.
                     self.tui.add_msg(msg, &msg_target);
                 } else {
                     writeln!(self.tui, "Weird PRIVMSG target: {}", target).unwrap();
@@ -389,6 +390,20 @@ impl Tiny {
                 let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
                 let msg  = &args[args.len() - 1];
                 self.tui.add_msg(msg, &MsgTarget::Server { serv_name: &comm.serv_name });
+            }
+
+            // RPL_TOPIC
+            Cmd::Num(332) => {
+                // FIXME: RFC 2812 says this will have 2 arguments, but freenode
+                // sends 3 arguments (extra one being our nick).
+                debug_assert!(args.len() == 3 || args.len() == 2);
+                let comm  = unsafe { &self.comms.get_unchecked(comm_idx) };
+                let chan  = unsafe { args.get_unchecked(args.len() - 2) };
+                let topic = unsafe { args.get_unchecked(args.len() - 1) };
+                self.tui.set_topic(topic, &MsgTarget::Chan {
+                    serv_name: &comm.serv_name,
+                    chan_name: chan,
+                });
             }
 
             ////////////////////////////////////////////////////////////////////

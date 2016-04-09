@@ -25,3 +25,9 @@ pub static ERR_MSG : Style = Style {
     fg: Color::White,
     bg: Color::Red,
 };
+
+pub static TOPIC : Style = Style {
+    style: rustbox::RB_NORMAL,
+    fg: Color::Black,
+    bg: Color::Green,
+};
