@@ -7,7 +7,7 @@ use utils::{find_byte, log_stderr_bytes};
 #[derive(Debug, PartialEq, Eq)]
 pub struct Msg {
     pub pfx     : Option<Pfx>,
-    pub command : Command,
+    pub cmd     : Cmd,
     pub params  : Vec<Vec<u8>>,
 }
 
@@ -33,7 +33,7 @@ impl Pfx {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Command {
+pub enum Cmd {
     Str(String),
     Num(u16),
 }
@@ -65,17 +65,17 @@ impl Msg {
             }
         };
 
-        let command : Command = {
+        let cmd : Cmd = {
             let ws_idx = find_byte(slice, b' ').unwrap();
-            let (command, slice_) = slice.split_at(ws_idx);
+            let (cmd, slice_) = slice.split_at(ws_idx);
             slice = &slice_[ 1 .. ]; // drop the space
-            match reply_num(command) {
-                None => Command::Str(unsafe {
-                    // Command strings are added by the server and they're
-                    // always ASCII strings, so this is safe and O(1).
-                    String::from_utf8_unchecked(command.to_owned())
+            match reply_num(cmd) {
+                None => Cmd::Str(unsafe {
+                    // Cmd strings are added by the server and they're always
+                    // ASCII strings, so this is safe and O(1).
+                    String::from_utf8_unchecked(cmd.to_owned())
                 }),
-                Some(num) => Command::Num(num)
+                Some(num) => Cmd::Num(num)
             }
         };
 
@@ -83,7 +83,7 @@ impl Msg {
 
         Ok(Msg {
             pfx: pfx,
-            command: command,
+            cmd: cmd,
             params: params,
         })
     }
@@ -195,7 +195,7 @@ fn parse_error_2() {
             nick: "tiny_test".to_string(),
             user: "~tiny@213.153.193.52".to_string(),
         }),
-        command: Command::Str("JOIN".to_string()),
+        cmd: Cmd::Str("JOIN".to_string()),
         params: vec![
             (Box::new(*b"#haskell") as Box<[u8]>).into_vec()
         ]
@@ -207,7 +207,7 @@ fn parse_error_3() {
     let msg = b":verne.freenode.net NOTICE * :*** Couldn\'t look up your hostname";
     assert_eq!(Msg::parse(msg), Ok(Msg {
         pfx: Some(Pfx::Server("verne.freenode.net".to_owned())),
-        command: Command::Str("NOTICE".to_owned()),
+        cmd: Cmd::Str("NOTICE".to_owned()),
         params: vec![
             (Box::new(*b"*") as Box<[u8]>).into_vec(),
             (Box::new(*b"*** Couldn\'t look up your hostname") as Box<[u8]>).into_vec()

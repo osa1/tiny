@@ -5,6 +5,8 @@ pub mod tabbed;
 pub mod text_field;
 pub mod widget;
 
+use std::fs::File;
+use std::fs;
 use std::io::Write;
 use std::io;
 use std::mem;
@@ -18,14 +20,17 @@ use self::widget::{Widget};
 
 pub struct TUI {
     /// Termbox instance
-    rustbox : RustBox,
+    rustbox  : RustBox,
 
     /// A tab for every server + channel
-    ui      : Tabbed,
+    ui       : Tabbed,
 
     /// For debugging only - `write()` method is called with incomplete lines,
     /// we collect those here. Messages are only shown with `flush()`.
-    buffer  : Vec<u8>,
+    buffer   : Vec<u8>,
+
+    /// For debugging only - `write()` also logs to a file.
+    log_file : File,
 }
 
 #[derive(Debug)]
@@ -51,10 +56,13 @@ impl TUI {
             buffer_stderr: false,
         }).unwrap();
 
+        fs::create_dir("logs");
+
         TUI {
             ui: Tabbed::new(tui.width() as i32, tui.height() as i32),
             rustbox: tui,
             buffer: Vec::with_capacity(100),
+            log_file: File::create("logs/debug.txt").unwrap(),
         }
     }
 }
@@ -222,10 +230,10 @@ impl Write for TUI {
         }
 
         self.buffer.extend_from_slice(&buf[ line_start .. ]);
-        Result::Ok(buf.len())
+        self.log_file.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        self.log_file.flush()
     }
 }

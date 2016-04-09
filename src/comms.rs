@@ -10,7 +10,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
 use std::time::Duration;
 
-use msg::{Msg, Pfx, Command};
+use msg::{Pfx, Cmd, Msg};
 use utils::find_byte;
 
 pub struct Comms {
@@ -39,7 +39,7 @@ pub enum CommsRet {
 
     IncomingMsg {
         pfx       : Pfx,
-        ty        : String,
+        cmd       : Cmd,
         args      : Vec<String>,
     },
 
@@ -47,8 +47,8 @@ pub enum CommsRet {
     /// > If the prefix is missing from the message, it is assumed to have
     /// > originated from the connection from which it was received from.
     SentMsg {
-        ty        : String,
-        msg       : String,
+        cmd       : Cmd,
+        args      : Vec<String>,
     }
 }
 
@@ -170,58 +170,49 @@ impl Comms {
         ret
     }
 
-    fn handle_msg(stream : &mut TcpStream, msg : Result<Msg, String>,
-                  ret : &mut Vec<CommsRet>) {
+    fn handle_msg(stream : &mut TcpStream, msg : Result<Msg, String>, ret : &mut Vec<CommsRet>) {
         match msg {
             Err(err_msg) => {
                 ret.push(CommsRet::Err { err_msg: err_msg });
             },
-            Ok(Msg { pfx, command, params }) => {
-                match command {
-                    Command::Str(str) =>
-                        Comms::handle_str_command(stream, ret, pfx, str, params),
-                    Command::Num(num) =>
-                        Comms::handle_num_command(stream, ret, pfx, num, params),
-                }
+            Ok(Msg { pfx, cmd, params }) => {
+                Comms::handle_cmd(stream, ret, pfx, cmd, params);
             }
         }
     }
 
-    fn handle_str_command(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
-                          pfx : Option<Pfx>, cmd : String, params : Vec<Vec<u8>>) {
-        if cmd == "PING" {
-            debug_assert!(params.len() == 1);
-            Msg::pong(unsafe {
-                        str::from_utf8_unchecked(params.into_iter().nth(0).unwrap().as_ref())
-                      }, stream).unwrap();
-        } else {
-            match pfx {
-                None => {
-                    ret.push(CommsRet::SentMsg {
-                        ty: cmd,
-                        msg: params.into_iter().map(|s| unsafe {
-                            String::from_utf8_unchecked(s)
-                        }).collect::<Vec<_>>().join(" "), // FIXME: intermediate vector
-                    });
-                },
-                Some(pfx) => {
-                    ret.push(CommsRet::IncomingMsg {
-                        pfx: pfx,
-                        ty: cmd,
-                        args: params.into_iter().map(|s| unsafe {
-                            String::from_utf8_unchecked(s)
-                        }).collect(),
-                    });
-                }
+    fn handle_cmd(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
+                  pfx : Option<Pfx>, cmd : Cmd, params : Vec<Vec<u8>>) {
+        match &cmd {
+            &Cmd::Str(ref str) if str == "PING" => {
+                debug_assert!(params.len() == 1);
+                Msg::pong(unsafe {
+                            str::from_utf8_unchecked(params.into_iter().nth(0).unwrap().as_ref())
+                          }, stream).unwrap();
+                return;
+            }
+            _ => {}
+        }
+
+        match pfx {
+            None => {
+                ret.push(CommsRet::SentMsg {
+                    cmd: cmd,
+                    args: params.into_iter().map(|s| unsafe {
+                        String::from_utf8_unchecked(s)
+                    }).collect(),
+                });
+            },
+            Some(pfx) => {
+                ret.push(CommsRet::IncomingMsg {
+                    pfx: pfx,
+                    cmd: cmd,
+                    args: params.into_iter().map(|s| unsafe {
+                        String::from_utf8_unchecked(s)
+                    }).collect(),
+                });
             }
         }
-    }
-
-    fn handle_num_command(stream : &mut TcpStream,
-                          ret : &mut Vec<CommsRet>,
-                          prefix : Option<Pfx>, num : u16, params : Vec<Vec<u8>>) {
-        // TODO
-        Comms::handle_str_command(stream, ret, prefix, "UNKNOWN".to_owned(), params)
     }
 }
 

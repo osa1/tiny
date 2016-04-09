@@ -15,7 +15,7 @@ use std::io;
 use std::mem;
 
 use comms::{Comms, CommsRet};
-use msg::{Pfx, Msg};
+use msg::{Pfx, Cmd, Msg};
 use tui::tabbed::MsgSource;
 use tui::{TUI, TUIRet, MsgTarget};
 
@@ -275,8 +275,8 @@ impl Tiny {
                         serv_name: & unsafe { self.comms.get_unchecked(comm_idx) }.serv_name
                     });
                 },
-                CommsRet::IncomingMsg { pfx, ty, args } => {
-                    self.handle_incoming_msg(comm_idx, &pfx, &ty, args);
+                CommsRet::IncomingMsg { pfx, cmd, args } => {
+                    self.handle_incoming_msg(comm_idx, pfx, cmd, args);
                 },
                 CommsRet::SentMsg { .. } => {
                     // TODO: Probably just ignore this?
@@ -291,69 +291,113 @@ impl Tiny {
         }
     }
 
-    fn handle_incoming_msg(&mut self, comm_idx : usize,
-                           pfx : &Pfx, ty : &str, args : Vec<String>) {
-        if ty == "JOIN" {
-            let chan = &args[0];
-            let serv_name = & unsafe { &self.comms.get_unchecked(comm_idx) }.serv_name;
-            match pfx {
-                &Pfx::Server(ref serv) => {
-                    // This doesn't make any sense, log it.
-                    writeln!(self.tui, "Weird JOIN message with server prefix {}", serv).unwrap();
-                },
-                &Pfx::User { ref nick, .. } => {
-                    if *nick == self.nick {
-                        self.tui.new_chan_tab(serv_name.to_owned(), chan.to_owned());
-                    } else {
-                        // TODO
+    fn handle_incoming_msg(&mut self, comm_idx : usize, pfx : Pfx, cmd : Cmd, mut args : Vec<String>) {
+        match cmd {
+
+            ////////////////////////////////////////////////////////////////////
+            // Commands, messages
+
+            Cmd::Str(ref s) if s == "PRIVMSG" => {
+                debug_assert!(args.len() == 2);
+                let target = unsafe { args.get_unchecked(0) };
+                let msg    = unsafe { args.get_unchecked(1) };
+                let comm   = unsafe { &self.comms.get_unchecked(comm_idx) };
+
+                if target.as_bytes()[0] == b'#' {
+                    self.tui.add_msg(&msg, &MsgTarget::Chan {
+                        serv_name: &comm.serv_name,
+                        chan_name: &target,
+                    });
+                } else if target == &self.nick {
+                    let msg_target = pfx_to_target(&pfx, &comm.serv_name);
+                    self.tui.add_msg(msg, &msg_target);
+                } else {
+                    writeln!(self.tui, "Weird PRIVMSG target: {}", target).unwrap();
+                }
+            },
+
+            Cmd::Str(ref s) if s == "JOIN" => {
+                debug_assert!(args.len() == 1);
+                let chan = args.swap_remove(0);
+                let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
+                match pfx {
+                    Pfx::Server(serv) => {
+                        // This doesn't make any sense, log it.
+                        writeln!(self.tui, "Weird JOIN message with server prefix {}", serv).unwrap();
+                    },
+                    Pfx::User { nick, .. } => {
+                        if nick == self.nick {
+                            self.tui.new_chan_tab(serv_name.to_owned(), chan);
+                        } else {
+                            // TODO
+                        }
                     }
                 }
+            },
+
+            Cmd::Str(ref s) if s == "NOTICE" => {
+                debug_assert!(args.len() == 2);
+                let target = unsafe { args.get_unchecked(0) };
+                let msg    = unsafe { args.get_unchecked(1) };
+                let comm   = unsafe { &self.comms.get_unchecked(comm_idx) };
+
+                if target == "*" || target == &self.nick {
+                    self.tui.add_msg(&msg, &pfx_to_target(&pfx, &comm.serv_name));
+                } else {
+                    writeln!(self.tui, "Weird NOTICE target: {}", target).unwrap();
+                }
+            },
+
+            ////////////////////////////////////////////////////////////////////
+            // Numeric replies
+
+            Cmd::Num(n) if n <= 003 // RPL_WELCOME, RPL_YOURHOST, RPL_CREATED
+                        || n == 251 // RPL_LUSERCLIENT
+                        || n == 255 // RPL_LUSERME
+                        || n == 372 // RPL_MOTD
+                        || n == 375 // RPL_MOTDSTART
+                        || n == 376 // RPL_ENDOFMOTD
+                        => {
+                debug_assert!(args.len() == 2);
+
+                // Logging just to understand more about these replies.
+                // writeln!(self.tui,
+                //          "Got some message:\nPfx: {:?}, Cmd: {:?}, args: {:?}",
+                //          pfx, cmd, args).unwrap();
+
+                let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
+                let msg  = unsafe { args.get_unchecked(1) };
+
+                self.tui.add_msg(&msg, &MsgTarget::Server { serv_name: &comm.serv_name });
+            },
+
+            Cmd::Num(n) if n == 4 // RPL_MYINFO
+                        || n == 5 // RPL_BOUNCE
+                        || (n >= 252 && n <= 254)
+                                  // RPL_LUSEROP, RPL_LUSERUNKNOWN,
+                                  // RPL_LUSERCHANNELS
+                        => {
+                let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
+                let msg  = args.into_iter().collect::<Vec<String>>().join(" ");
+                self.tui.add_msg(&msg, &MsgTarget::Server { serv_name: &comm.serv_name });
             }
-        }
 
-        else if ty == "PRIVMSG" {
-            debug_assert!(args.len() == 2);
-            let target = &args[0];
-            let msg = &args[1];
-
-            let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
-
-            if target.as_bytes()[0] == b'#' {
-                self.tui.add_msg(&msg, &MsgTarget::Chan {
-                    serv_name: &comm.serv_name,
-                    chan_name: &target,
-                });
+            Cmd::Num(n) if n == 265
+                        || n == 266
+                        || n == 250
+                        => {
+                let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
+                let msg  = &args[args.len() - 1];
+                self.tui.add_msg(msg, &MsgTarget::Server { serv_name: &comm.serv_name });
             }
 
-            else if target == &self.nick {
-                let msg_target = pfx_to_target(pfx, &comm.serv_name);
-                self.tui.add_msg(msg, &msg_target);
+            ////////////////////////////////////////////////////////////////////
+
+            _ => {
+                writeln!(self.tui,
+                         "Ignoring incoming msg:\nPfx: {:?}, Cmd: {:?}, args: {:?}",
+                         pfx, cmd, args).unwrap();
             }
-
-            else {
-                writeln!(self.tui, "Weird PRIVMSG target: {}", target);
-            }
-        }
-
-        else if ty == "NOTICE" {
-            debug_assert!(args.len() == 2);
-            let target = &args[0];
-            let msg = &args[1];
-
-            let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
-
-            if target == "*" || target == &self.nick {
-                self.tui.add_msg(&msg, &pfx_to_target(pfx, &comm.serv_name));
-            } else {
-                writeln!(self.tui, "Weird NOTICE target: {}", target);
-            }
-        }
-
-        else {
-            // Just log for now
-            writeln!(self.tui,
-                     "Ignoring incoming msg:\npfx: {:?}\nty: {}\nargs: {:?}",
-                     pfx, ty, args).unwrap();
         }
     }
 }
