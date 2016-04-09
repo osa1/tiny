@@ -1,7 +1,5 @@
 use std::borrow::Borrow;
 use std::cmp::{max, min};
-use std::io::Write;
-use std::io;
 use std::mem;
 
 use rustbox::{RustBox, Key};
