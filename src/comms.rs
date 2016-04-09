@@ -1,5 +1,7 @@
 use std::borrow::Borrow;
 use std::fmt::Arguments;
+use std::fs::File;
+use std::fs;
 use std::io::Read;
 use std::io::Write;
 use std::io;
@@ -19,6 +21,10 @@ pub struct Comms {
 
     /// _Partial_ messages collected here until they make a complete message.
     msg_buf       : Vec<u8>,
+
+    /// A file to log incoming messages for debugging purposes. Only available
+    /// when `debug_assertions` is available.
+    log_file      : Option<File>,
 }
 
 #[derive(Debug)]
@@ -55,11 +61,22 @@ impl Comms {
         try!(stream.set_write_timeout(None));
         // try!(stream.set_nonblocking(true));
 
+        let log_file = {
+            if cfg!(debug_assertions) {
+                fs::create_dir("logs");
+                Some(File::create(format!("logs/{}.txt", serv_addr)).unwrap())
+            } else {
+                None
+            }
+        };
+
         let mut comms = Comms {
             stream:     stream,
             serv_name:  serv_name.to_owned(),
             msg_buf:    Vec::new(),
+            log_file:   log_file,
         };
+
         try!(comms.introduce(nick, hostname, realname));
         Ok(comms)
     }
@@ -130,10 +147,20 @@ impl Comms {
                         break;
                     } else {
                         assert!(self.msg_buf[cr_idx + 1] == b'\n');
-                        // Don't include CRLF
-                        let msg = Msg::parse(&self.msg_buf[ 0 .. cr_idx ]);
+
+                        let msg = {
+                            // Don't include CRLF
+                            let msg_slice = &self.msg_buf[ 0 .. cr_idx ];
+                            // Log the message in debug mode
+                            if cfg!(debug_assertions) {
+                                writeln!(self.log_file.as_ref().unwrap(), "{}",
+                                         unsafe { str::from_utf8_unchecked(msg_slice) });
+                            }
+                            Msg::parse(msg_slice)
+                        };
+
                         Comms::handle_msg(&mut self.stream, msg, &mut ret);
-                        // Update the buffer (drop CRLF)
+                        // Update the buffer (drop CRLF too)
                         self.msg_buf.drain(0 .. cr_idx + 2);
                     }
                 }
