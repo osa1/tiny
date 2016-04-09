@@ -50,7 +50,7 @@ impl Tiny {
     }
 
     pub fn mainloop(&mut self) {
-        self.tui.new_server_tab("debug".to_string());
+        self.tui.new_server_tab("debug");
 
         loop {
             // Set up the descriptors for select()
@@ -193,7 +193,7 @@ impl Tiny {
                 self.tui.add_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
             },
             Some(serv_name) => {
-                self.tui.new_server_tab(serv_name.to_owned());
+                self.tui.new_server_tab(serv_name);
                 writeln!(self.tui, "Created tab: {}", serv_name).unwrap();
                 self.tui.add_msg("Connecting...", &MsgTarget::Server { serv_name: serv_name });
 
@@ -291,7 +291,7 @@ impl Tiny {
         }
     }
 
-    fn handle_incoming_msg(&mut self, comm_idx : usize, pfx : Pfx, cmd : Cmd, mut args : Vec<String>) {
+    fn handle_incoming_msg(&mut self, comm_idx : usize, pfx : Pfx, cmd : Cmd, args : Vec<String>) {
         match cmd {
 
             ////////////////////////////////////////////////////////////////////
@@ -319,7 +319,7 @@ impl Tiny {
 
             Cmd::Str(ref s) if s == "JOIN" => {
                 debug_assert!(args.len() == 1);
-                let chan = args.swap_remove(0);
+                let chan = unsafe { args.get_unchecked(0) };
                 let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                 match pfx {
                     Pfx::Server(serv) => {
@@ -328,7 +328,7 @@ impl Tiny {
                     },
                     Pfx::User { nick, .. } => {
                         if nick == self.nick {
-                            self.tui.new_chan_tab(serv_name.to_owned(), chan);
+                            self.tui.new_chan_tab(serv_name, chan);
                         } else {
                             // TODO
                         }

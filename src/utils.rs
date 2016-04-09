@@ -25,3 +25,11 @@ pub fn log_stderr_bytes(msg : &str, bytes : &[u8]) {
 pub fn drop_port(s : &str) -> Option<&str> {
     s.find(':').map(|split| &s[ 0 .. split ])
 }
+
+#[inline]
+pub fn opt_to_vec<T>(opt : Option<T>) -> Vec<T> {
+    match opt {
+        None => vec![],
+        Some(t) => vec![t],
+    }
+}

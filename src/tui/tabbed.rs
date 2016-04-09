@@ -7,6 +7,8 @@ use tui::MsgTarget;
 use tui::style::Style;
 use tui::widget::{Widget, WidgetRet};
 
+use utils::opt_to_vec;
+
 // TODO: How to reorder tabs?
 // TODO: How to report errors?
 
@@ -75,48 +77,74 @@ impl Tabbed {
         }
     }
 
-    pub fn new_server_tab(&mut self, serv_name : String) {
+    /// Returns index of the new tab if a new tab is created.
+    pub fn new_server_tab(&mut self, serv_name : &str) -> Option<usize> {
         match self.find_serv_tab_idx(&serv_name) {
             None => {
                 self.tabs.push(Tab {
                     widget: MessagingUI::new(self.width, self.height - 1),
-                    src: MsgSource::Serv { serv_name: serv_name },
+                    src: MsgSource::Serv { serv_name: serv_name.to_owned() },
                 });
                 self.active_idx = Some(self.tabs.len() - 1);
+                Some(self.tabs.len() - 1)
             },
             Some(tab_idx) => {
                 self.active_idx = Some(tab_idx);
+                None
             }
         }
     }
 
-    pub fn new_chan_tab(&mut self, serv_name : String, chan_name : String) {
-        match self.find_last_serv_tab_idx(&serv_name) {
+    /// Returns index of the new tab if a new tab is created.
+    pub fn new_chan_tab(&mut self, serv_name : &str, chan_name : &str) -> Option<usize> {
+        match self.find_chan_tab_idx(&serv_name, &chan_name) {
             None => {
-                self.new_server_tab(serv_name.clone());
-                self.new_chan_tab(serv_name, chan_name);
+                match self.find_last_serv_tab_idx(&serv_name) {
+                    None => {
+                        self.new_server_tab(serv_name);
+                        self.new_chan_tab(serv_name, chan_name)
+                    },
+                    Some(tab_idx) => {
+                        self.tabs.insert(tab_idx + 1, Tab {
+                            widget: MessagingUI::new(self.width, self.height - 1),
+                            src: MsgSource::Chan { serv_name: serv_name.to_owned(),
+                                                   chan_name: chan_name.to_owned() },
+                        });
+                        self.active_idx = Some(tab_idx + 1);
+                        Some(tab_idx + 1)
+                    }
+                }
             },
             Some(tab_idx) => {
-                self.tabs.insert(tab_idx + 1, Tab {
-                    widget: MessagingUI::new(self.width, self.height - 1),
-                    src: MsgSource::Chan { serv_name: serv_name, chan_name: chan_name },
-                });
-                self.active_idx = Some(self.tabs.len() - 1);
+                self.active_idx = Some(tab_idx);
+                None
             }
         }
     }
 
-    pub fn new_user_tab(&mut self, serv_name : String, nick : String) {
-        match self.find_last_serv_tab_idx(&serv_name) {
+    /// Returns index of the new tab if a new tab is created.
+    pub fn new_user_tab(&mut self, serv_name : &str, nick : &str) -> Option<usize> {
+        match self.find_user_tab_idx(serv_name, nick) {
             None => {
-                self.new_server_tab(serv_name.clone());
-                self.new_user_tab(serv_name, nick);
+                match self.find_last_serv_tab_idx(&serv_name) {
+                    None => {
+                        self.new_server_tab(serv_name);
+                        self.new_user_tab(serv_name, nick)
+                    },
+                    Some(tab_idx) => {
+                        self.tabs.insert(tab_idx + 1, Tab {
+                            widget: MessagingUI::new(self.width, self.height - 1),
+                            src: MsgSource::User { serv_name: serv_name.to_owned(),
+                                                   nick: nick.to_owned() },
+                        });
+                        self.active_idx = Some(tab_idx + 1);
+                        Some(tab_idx + 1)
+                    }
+                }
             },
             Some(tab_idx) => {
-                self.tabs.insert(tab_idx + 1, Tab {
-                    widget: MessagingUI::new(self.width, self.height - 1),
-                    src: MsgSource::User { serv_name: serv_name, nick: nick },
-                });
+                self.active_idx = Some(tab_idx);
+                None
             }
         }
     }
@@ -187,7 +215,7 @@ impl Tabbed {
         let mut target_idxs : Vec<usize> = Vec::with_capacity(self.tabs.len());
 
         match target {
-            &MsgTarget::Server { serv_name } =>  {
+            &MsgTarget::Server { serv_name } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     match &tab.src {
                         &MsgSource::Serv { serv_name: ref serv_name_ } => {
@@ -254,8 +282,37 @@ impl Tabbed {
             }
         }
 
+        // Create server/chan/user tab when necessary
+        if target_idxs.len() == 0 {
+            for idx in self.maybe_create_tab(target) {
+                target_idxs.push(idx);
+            }
+        }
+
         for tab_idx in target_idxs {
             f(unsafe { self.tabs.get_unchecked_mut(tab_idx) });
+        }
+    }
+
+    fn maybe_create_tab(&mut self, target : &MsgTarget) -> Vec<usize> {
+        match target {
+            &MsgTarget::Server { serv_name } => {
+                opt_to_vec(self.new_server_tab(serv_name))
+            },
+
+            &MsgTarget::Chan { serv_name, chan_name } => {
+                opt_to_vec(self.new_chan_tab(serv_name, chan_name))
+            },
+
+            &MsgTarget::User { serv_name, nick } => {
+                opt_to_vec(self.new_user_tab(serv_name, nick))
+            },
+
+            &MsgTarget::MultipleTabs(ref targets) => {
+                targets.iter().flat_map(|t : &Box<MsgTarget>| self.maybe_create_tab(&*t)).collect()
+            }
+
+            _ => vec![]
         }
     }
 

@@ -71,16 +71,16 @@ impl TUI {
 // Tab stuff
 
 impl TUI {
-    pub fn new_server_tab(&mut self, serv_name : String) {
-        self.ui.new_server_tab(serv_name)
+    pub fn new_server_tab(&mut self, serv_name : &str) {
+        self.ui.new_server_tab(serv_name);
     }
 
-    pub fn new_chan_tab(&mut self, serv_name : String, chan_name : String) {
-        self.ui.new_chan_tab(serv_name, chan_name)
+    pub fn new_chan_tab(&mut self, serv_name : &str, chan_name : &str) {
+        self.ui.new_chan_tab(serv_name, chan_name);
     }
 
-    pub fn new_user_tab(&mut self, serv_name : String, nick : String) {
-        self.ui.new_user_tab(serv_name, nick)
+    pub fn new_user_tab(&mut self, serv_name : &str, nick : &str) {
+        self.ui.new_user_tab(serv_name, nick);
     }
 }
 
@@ -202,6 +202,7 @@ impl TUI {
         self.ui.add_msg(err, target, style::ERR_MSG);
     }
 
+    #[inline]
     pub fn set_topic(&mut self, msg : &str, target : &MsgTarget) {
         self.ui.set_topic(msg, target);
     }
