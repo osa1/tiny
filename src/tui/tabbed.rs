@@ -185,12 +185,13 @@ impl Tabbed {
                         &MsgSource::Serv { serv_name: ref serv_name_ } => {
                             if serv_name == serv_name_ {
                                 tab.widget.add_msg(msg, style);
-                                break;
+                                return;
                             }
                         },
                         _ => {}
                     }
                 }
+                panic!("Can't add msg {} to {:?}", msg, target);
             },
 
             &MsgTarget::Chan { serv_name, chan_name } => {
@@ -199,12 +200,13 @@ impl Tabbed {
                         &MsgSource::Chan { serv_name: ref serv_name_, chan_name: ref chan_name_ } => {
                             if serv_name == serv_name_ && chan_name == chan_name_ {
                                 tab.widget.add_msg(msg, style);
-                                break;
+                                return;
                             }
                         },
                         _ => {}
                     }
                 }
+                panic!("Can't add msg {} to {:?}", msg, target);
             },
 
             &MsgTarget::User { serv_name, nick } => {
@@ -213,12 +215,13 @@ impl Tabbed {
                         &MsgSource::User { serv_name: ref serv_name_, nick: ref nick_ } => {
                             if serv_name == serv_name_ && nick == nick_ {
                                 tab.widget.add_msg(msg, style);
-                                break;
+                                return;
                             }
                         },
                         _ => {}
                     }
                 }
+                panic!("Can't add msg {} to {:?}", msg, target);
             },
 
             &MsgTarget::AllServTabs { serv_name } => {

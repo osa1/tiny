@@ -165,6 +165,7 @@ impl TUI {
 // Showing messages
 
 /// Target of a message coming from an IRC server.
+#[derive(Debug)]
 pub enum MsgTarget<'a> {
     Server { serv_name: &'a str },
     Chan { serv_name: &'a str, chan_name: &'a str },
