@@ -1,2 +1,5 @@
 .gdb_history
 target
+logs
+stderr
+stdout
