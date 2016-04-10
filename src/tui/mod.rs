@@ -56,7 +56,7 @@ impl TUI {
             buffer_stderr: false,
         }).unwrap();
 
-        fs::create_dir("logs");
+        let _ = fs::create_dir("logs");
 
         TUI {
             ui: Tabbed::new(tui.width() as i32, tui.height() as i32),

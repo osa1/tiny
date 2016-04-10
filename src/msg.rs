@@ -2,7 +2,7 @@ use std::io::Write;
 use std::io;
 use std::str;
 
-use utils::{find_byte, log_stderr_bytes};
+use utils::{find_byte};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Msg {

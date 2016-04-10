@@ -63,7 +63,7 @@ impl Comms {
 
         let log_file = {
             if cfg!(debug_assertions) {
-                fs::create_dir("logs");
+                let _ = fs::create_dir("logs");
                 Some(File::create(format!("logs/{}.txt", serv_addr)).unwrap())
             } else {
                 None
@@ -154,7 +154,7 @@ impl Comms {
                             // Log the message in debug mode
                             if cfg!(debug_assertions) {
                                 writeln!(self.log_file.as_ref().unwrap(), "{}",
-                                         unsafe { str::from_utf8_unchecked(msg_slice) });
+                                         unsafe { str::from_utf8_unchecked(msg_slice) }).unwrap();
                             }
                             Msg::parse(msg_slice)
                         };
