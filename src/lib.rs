@@ -1,5 +1,4 @@
 #![feature(alloc_system)]
-#![feature(iter_arith)]
 #![feature(test)]
 
 extern crate alloc_system;
@@ -130,9 +129,11 @@ impl Tiny {
                         LoopRet::Abort => { abort = true; },
                         LoopRet::Disconnected { .. } => {
                             let comm = self.comms.remove(comm_idx);
-                            self.tui.add_err_msg("Disconnected.", &MsgTarget::AllServTabs {
-                                serv_name: &comm.serv_name,
-                            });
+                            self.tui.add_err_msg(
+                                "Disconnected.", &time::now(),
+                                &MsgTarget::AllServTabs {
+                                    serv_name: &comm.serv_name,
+                                });
                             reset_fds = true;
                         },
                         _ => {}
@@ -186,7 +187,7 @@ impl Tiny {
         } else if words[0] == "quit" {
             LoopRet::Abort
         } else {
-            self.tui.add_err_msg(
+            self.tui.add_client_err_msg(
                 &format!("Unsupported command: {}", words[0]), &MsgTarget::CurrentTab);
             LoopRet::Continue
         }
@@ -195,12 +196,14 @@ impl Tiny {
     fn connect(&mut self, serv_addr : &str) {
         match utils::drop_port(serv_addr) {
             None => {
-                self.tui.add_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
+                self.tui.add_client_err_msg("connect: Need a <host>:<port>",
+                                            &MsgTarget::CurrentTab);
             },
             Some(serv_name) => {
                 self.tui.new_server_tab(serv_name);
                 writeln!(self.tui, "Created tab: {}", serv_name).unwrap();
-                self.tui.add_msg("Connecting...", &MsgTarget::Server { serv_name: serv_name });
+                self.tui.add_client_msg("Connecting...",
+                                        &MsgTarget::Server { serv_name: serv_name });
 
                 match Comms::try_connect(serv_addr, serv_name,
                                          &self.nick, &self.hostname, &self.realname) {
@@ -208,8 +211,8 @@ impl Tiny {
                         self.comms.push(comms);
                     },
                     Err(err) => {
-                        self.tui.add_err_msg(&format!("Error: {}", err),
-                                             &MsgTarget::Server { serv_name: serv_name });
+                        self.tui.add_client_err_msg(&format!("Error: {}", err),
+                                                    &MsgTarget::Server { serv_name: serv_name });
                     }
                 }
             }
@@ -227,7 +230,8 @@ impl Tiny {
 
         match from {
             MsgSource::Serv { .. } => {
-                self.tui.add_err_msg("Can't send PRIVMSG to a server.", &MsgTarget::CurrentTab);
+                self.tui.add_client_err_msg("Can't send PRIVMSG to a server.",
+                                            &MsgTarget::CurrentTab);
             },
 
             MsgSource::Chan { serv_name, chan_name } => {
@@ -235,8 +239,10 @@ impl Tiny {
                     let comm = self.find_comm(&serv_name).unwrap();
                     Msg::privmsg(&chan_name, &msg_string, comm).unwrap();
                 }
-                self.tui.add_msg(&msg_string, &MsgTarget::Chan { serv_name: &serv_name,
-                                                                 chan_name: &chan_name });
+                self.tui.add_privmsg(&self.nick, &msg_string,
+                                     &time::now(),
+                                     &MsgTarget::Chan { serv_name: &serv_name,
+                                                        chan_name: &chan_name });
             },
 
             MsgSource::User { serv_name, nick } => {
@@ -244,7 +250,9 @@ impl Tiny {
                     let comm = self.find_comm(&serv_name).unwrap();
                     Msg::privmsg(&nick, &msg_string, comm).unwrap();
                 }
-                self.tui.add_msg(&msg_string, &MsgTarget::User { serv_name: &serv_name, nick: &nick });
+                self.tui.add_privmsg(&self.nick, &msg_string,
+                                     &time::now(),
+                                     &MsgTarget::User { serv_name: &serv_name, nick: &nick });
             }
         }
     }
@@ -276,12 +284,12 @@ impl Tiny {
                     disconnect = Some(fd);
                 },
                 CommsRet::Err { err_msg } => {
-                    self.tui.add_err_msg(&err_msg, &MsgTarget::Server {
-                        serv_name: & unsafe { self.comms.get_unchecked(comm_idx) }.serv_name
-                    });
+                    let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
+                    self.tui.add_err_msg(&err_msg, &time::now(),
+                                         &MsgTarget::Server { serv_name: serv_name });
                 },
                 CommsRet::IncomingMsg { pfx, cmd, args } => {
-                    self.handle_incoming_msg(comm_idx, pfx, cmd, args);
+                    self.handle_incoming_msg(comm_idx, pfx, cmd, args, time::now());
                 },
                 CommsRet::SentMsg { .. } => {
                     // TODO: Probably just ignore this?
@@ -296,7 +304,8 @@ impl Tiny {
         }
     }
 
-    fn handle_incoming_msg(&mut self, comm_idx : usize, pfx : Pfx, cmd : Cmd, args : Vec<String>) {
+    fn handle_incoming_msg(&mut self, comm_idx : usize, pfx : Pfx, cmd : Cmd, args : Vec<String>,
+                           tm : time::Tm) {
         match cmd {
 
             ////////////////////////////////////////////////////////////////////
@@ -308,16 +317,25 @@ impl Tiny {
                 let msg    = unsafe { args.get_unchecked(1) };
                 let comm   = unsafe { &self.comms.get_unchecked(comm_idx) };
 
+                let sender = match &pfx {
+                    &Pfx::Server(_) => &comm.serv_name,
+                    &Pfx::User { ref nick, .. } => nick,
+                };
+
                 if target.as_bytes()[0] == b'#' {
-                    self.tui.add_msg(&msg, &MsgTarget::Chan {
+                    self.tui.add_privmsg(sender, &msg, &tm, &MsgTarget::Chan {
                         serv_name: &comm.serv_name,
                         chan_name: &target,
                     });
-                } else if target == &self.nick {
+                }
+
+                else if target == &self.nick {
                     let msg_target = pfx_to_target(&pfx, &comm.serv_name);
                     // TODO: Set the topic if a new tab is created.
-                    self.tui.add_msg(msg, &msg_target);
-                } else {
+                    self.tui.add_privmsg(sender, msg, &tm, &msg_target);
+                }
+
+                else {
                     writeln!(self.tui, "Weird PRIVMSG target: {}", target).unwrap();
                 }
             },
@@ -348,7 +366,7 @@ impl Tiny {
                 let comm   = unsafe { &self.comms.get_unchecked(comm_idx) };
 
                 if target == "*" || target == &self.nick {
-                    self.tui.add_msg(&msg, &pfx_to_target(&pfx, &comm.serv_name));
+                    self.tui.add_msg(&msg, &time::now(), &pfx_to_target(&pfx, &comm.serv_name));
                 } else {
                     writeln!(self.tui, "Weird NOTICE target: {}", target).unwrap();
                 }
@@ -374,7 +392,8 @@ impl Tiny {
                 let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
                 let msg  = unsafe { args.get_unchecked(1) };
 
-                self.tui.add_msg(&msg, &MsgTarget::Server { serv_name: &comm.serv_name });
+                self.tui.add_msg(
+                    &msg, &time::now(), &MsgTarget::Server { serv_name: &comm.serv_name });
             },
 
             Cmd::Num(n) if n == 4 // RPL_MYINFO
@@ -385,7 +404,8 @@ impl Tiny {
                         => {
                 let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
                 let msg  = args.into_iter().collect::<Vec<String>>().join(" ");
-                self.tui.add_msg(&msg, &MsgTarget::Server { serv_name: &comm.serv_name });
+                self.tui.add_msg(
+                    &msg, &time::now(), &MsgTarget::Server { serv_name: &comm.serv_name });
             }
 
             Cmd::Num(n) if n == 265
@@ -394,7 +414,8 @@ impl Tiny {
                         => {
                 let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
                 let msg  = &args[args.len() - 1];
-                self.tui.add_msg(msg, &MsgTarget::Server { serv_name: &comm.serv_name });
+                self.tui.add_msg(
+                    msg, &time::now(), &MsgTarget::Server { serv_name: &comm.serv_name });
             }
 
             // RPL_TOPIC

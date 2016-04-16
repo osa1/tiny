@@ -1,11 +1,10 @@
-use std::io;
-use std::io::Write;
+// use std::io;
+// use std::io::Write;
 
 use rustbox::{RustBox};
-use rustbox;
 use termbox_sys::tb_change_cell;
 
-use tui::style::{Style, StyleRef};
+use tui::style::{StyleRef};
 use tui::style;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
@@ -98,12 +97,11 @@ impl Line {
         lines
     }
 
-    pub fn draw(&mut self, rustbox : &RustBox, pos_x : i32, pos_y : i32, width : i32) {
+    pub fn draw(&self, _ : &RustBox, pos_x : i32, pos_y : i32, width : i32) {
         let mut col = pos_x;
         let mut row = pos_y;
 
         let mut next_split_idx : usize = 0;
-        let mut next_split     : &i32  = self.splits.get(next_split_idx).unwrap_or(&self.len_chars);
 
         let mut char_idx : i32 = 0;
 
@@ -121,7 +119,7 @@ impl Line {
             else if char.is_whitespace() {
                 // We may want to move to the next line
                 next_split_idx += 1;
-                next_split = self.splits.get(next_split_idx).unwrap_or(&self.len_chars);
+                let next_split = self.splits.get(next_split_idx).unwrap_or(&self.len_chars);
 
                 // How many more chars can we render in this line?
                 let slots_in_line = width - (col - pos_x);
@@ -131,8 +129,8 @@ impl Line {
                 assert!(*next_split > char_idx);
                 let chars_until_next_split : i32 = *next_split - char_idx;
 
-                writeln!(io::stderr(), "chars_until_next_split: {}, slots_in_line: {}",
-                         chars_until_next_split, slots_in_line);
+                // writeln!(io::stderr(), "chars_until_next_split: {}, slots_in_line: {}",
+                //          chars_until_next_split, slots_in_line);
 
                 if (chars_until_next_split as i32) <= slots_in_line {
                     // keep rendering chars

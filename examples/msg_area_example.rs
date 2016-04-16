@@ -1,16 +1,17 @@
 extern crate libc;
 extern crate rustbox;
+extern crate time;
 extern crate tiny;
 
 use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::mem;
 
-use tiny::tui::{TUI, TUIRet};
+use tiny::tui::{TUI, TUIRet, MsgTarget};
 
 fn loop_() -> Option<String> {
     let mut tui = TUI::new();
-    tui.new_server_tab("local".to_string());
+    tui.new_server_tab("debug");
 
     // I'm using select() here to test for signals/interrupts. Namely, SIGWINCH
     // needs to be handled somehow for resizing.
@@ -42,9 +43,10 @@ fn loop_() -> Option<String> {
 
         if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
             match tui.keypressed_peek() {
-                TUIRet::Input { serv_name, pfx, msg } => {
-                    tui.show_msg(msg.into_iter().collect::<String>().as_ref(),
-                                 &serv_name, pfx.as_ref());
+                TUIRet::Input { msg, from } => {
+                    tui.add_msg(&msg.into_iter().collect::<String>(),
+                                &time::now(),
+                                &MsgTarget::Server { serv_name: "debug" });
                 },
                 TUIRet::Abort => {
                     return None;

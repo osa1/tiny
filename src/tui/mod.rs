@@ -14,6 +14,9 @@ use std::str;
 use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
+use termbox_sys;
+use time::Tm;
+use time;
 
 use self::tabbed::{Tabbed, TabbedRet, MsgSource};
 use self::widget::{Widget};
@@ -55,6 +58,11 @@ impl TUI {
             input_mode: InputMode::Esc,
             buffer_stderr: false,
         }).unwrap();
+
+        unsafe {
+            let style = style::get_style(style::CLEAR);
+            termbox_sys::tb_set_clear_attributes(style.fg, style.bg);
+        }
 
         let _ = fs::create_dir("logs");
 
@@ -192,17 +200,41 @@ pub enum MsgTarget<'a> {
 }
 
 impl TUI {
+    /// An error message coming from Tiny, probably because of a command error
+    /// etc. Those are not timestamped and not logged.
     #[inline]
-    pub fn add_msg(&mut self, msg : &str, target : &MsgTarget) {
-        self.ui.add_msg(msg, target, style::USER_MSG);
+    pub fn add_client_err_msg(&mut self, msg : &str, target : &MsgTarget) {
+        self.ui.add_client_err_msg(msg, target);
     }
 
+    /// A message from client, usually just to indidate progress, e.g.
+    /// "Connecting...". Not timestamed and not logged.
     #[inline]
-    pub fn add_err_msg(&mut self, err : &str, target : &MsgTarget) {
-        self.ui.add_msg(err, target, style::ERR_MSG);
+    pub fn add_client_msg(&mut self, msg : &str, target : &MsgTarget) {
+        self.ui.add_client_msg(msg, target);
     }
 
+    /// privmsg is a message coming from a server or client. Shown with sender's
+    /// nick/name and receive time and logged.
     #[inline]
+    pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm, target : &MsgTarget) {
+        self.ui.add_privmsg(sender, msg, tm, target);
+    }
+
+    /// A message without any explicit sender info. Useful for e.g. in server
+    /// and debug log tabs. Timestamped and logged.
+    #[inline]
+    pub fn add_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
+        self.ui.add_msg(msg, tm, target);
+    }
+
+    /// Error messages related with the protocol - e.g. can't join a channel,
+    /// nickname is in use etc. Timestamped and logged.
+    #[inline]
+    pub fn add_err_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
+        self.ui.add_err_msg(msg, tm, target);
+    }
+
     pub fn set_topic(&mut self, msg : &str, target : &MsgTarget) {
         self.ui.set_topic(msg, target);
     }
@@ -224,9 +256,11 @@ impl Write for TUI {
                     let mut msg : Vec<u8> = Vec::with_capacity(100);
                     mem::swap(&mut msg, &mut self.buffer);
                     self.add_msg(&unsafe { String::from_utf8_unchecked(msg) },
+                                 &time::now(),
                                  &MsgTarget::Server { serv_name: "debug" });
                 } else {
                     self.add_msg(unsafe { str::from_utf8_unchecked(&buf[ line_start .. byte_idx ]) },
+                                 &time::now(),
                                  &MsgTarget::Server { serv_name: "debug" });
                 }
 

@@ -1,6 +1,4 @@
 use termbox_sys;
-use rustbox;
-use rustbox::Color;
 
 #[derive(Debug)]
 pub struct Style {
@@ -35,8 +33,8 @@ pub static STYLES : [Style; 5] =
 
       // CLEAR
       Style {
-          fg: termbox_sys::TB_BLACK,
-          bg: termbox_sys::TB_WHITE,
+          fg: termbox_sys::TB_WHITE,
+          bg: termbox_sys::TB_BLACK,
       }
     ];
 
@@ -52,4 +50,8 @@ pub const CLEAR      : StyleRef = 4;
 
 pub fn get_style(sref : StyleRef) -> &'static Style {
     unsafe { STYLES.get_unchecked(sref as usize) }
+}
+
+pub fn char_encoding(sref : StyleRef) -> char {
+    sref as char
 }

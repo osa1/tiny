@@ -1,21 +1,22 @@
 extern crate rustbox;
+extern crate time;
 extern crate tiny;
 
-use std::borrow::Borrow;
+use tiny::tui::{TUI, TUIRet, MsgTarget};
 
-use tiny::tui::{TUI, TUIRet};
-
-fn loop_() -> Option<String> {
+fn loop_()  {
     let mut tui = TUI::new();
-    tui.new_server_tab("debug".to_string());
+    tui.new_server_tab("debug");
 
     loop {
         match tui.idle_loop() {
-            TUIRet::Input { serv_name, pfx, msg } => {
-                tui.show_msg(&msg.into_iter().collect::<String>(), &serv_name, pfx.as_ref());
+            TUIRet::Input { msg, from } => {
+                tui.add_msg(&msg.into_iter().collect::<String>(),
+                            &time::now(),
+                            &MsgTarget::Server { serv_name: "debug" });
             },
             TUIRet::Abort => {
-                return None;
+                break;
             },
             _ => {}
         }
@@ -23,5 +24,5 @@ fn loop_() -> Option<String> {
 }
 
 fn main() {
-    loop_().map(|err| println!("{}", err));
+    loop_();
 }

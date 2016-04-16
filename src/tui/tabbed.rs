@@ -1,10 +1,10 @@
 use rustbox::keyboard::Key;
 use rustbox::{RustBox, Color};
 use rustbox;
+use time::Tm;
 
 use tui::messaging::MessagingUI;
 use tui::MsgTarget;
-use tui::style::Style;
 use tui::widget::{Widget, WidgetRet};
 
 use utils::opt_to_vec;
@@ -196,8 +196,7 @@ impl Tabbed {
 
     pub fn resize(&mut self, width : i32, height : i32) {
         for tab in self.tabs.iter_mut() {
-            // TODO: Widgets should resize themselves lazily
-            tab.widget.resize(width, height);
+            tab.widget.resize(width, height - 1);
         }
     }
 
@@ -317,9 +316,37 @@ impl Tabbed {
     }
 
     #[inline]
-    pub fn add_msg(&mut self, msg : &str, target : &MsgTarget, style : Style) {
+    pub fn add_client_err_msg(&mut self, msg : &str, target : &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.add_msg(msg, style);
+            tab.widget.add_client_err_msg(msg);
+        });
+    }
+
+    #[inline]
+    pub fn add_client_msg(&mut self, msg : &str, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.add_client_msg(msg);
+        });
+    }
+
+    #[inline]
+    pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.add_privmsg(sender, msg, tm);
+        });
+    }
+
+    #[inline]
+    pub fn add_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.add_msg(msg, tm);
+        });
+    }
+
+    #[inline]
+    pub fn add_err_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.add_err_msg(msg, tm);
         });
     }
 
@@ -328,18 +355,6 @@ impl Tabbed {
         self.apply_to_target(target, &|tab : &mut Tab| {
             tab.widget.set_topic(title.to_owned());
         });
-    }
-
-    #[inline]
-    pub fn add_msg_all_tabs(&mut self, msg : &str, style : Style) {
-        for tab in self.tabs.iter_mut() {
-            tab.widget.add_msg(msg, style);
-        }
-    }
-
-    #[inline]
-    pub fn add_msg_current_tab(&mut self, msg : &str, style : Style) {
-        self.tabs[self.active_idx.unwrap()].widget.add_msg(msg, style);
     }
 
     ////////////////////////////////////////////////////////////////////////////
