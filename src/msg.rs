@@ -108,7 +108,7 @@ impl Msg {
     }
 
     pub fn privmsg<W : Write>(msgtarget : &str, msg : &str, mut sink : W) -> io::Result<()> {
-        write!(sink, "PRIVMSG {} {}\r\n", msgtarget, msg)
+        write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
     }
 
     pub fn quit<W : Write>(msg : Option<&str>, mut sink : W) -> io::Result<()> {
