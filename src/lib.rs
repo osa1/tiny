@@ -1,8 +1,13 @@
 #![feature(alloc_system)]
+#![feature(iter_arith)]
+#![feature(test)]
 
 extern crate alloc_system;
 extern crate libc;
 extern crate rustbox;
+extern crate termbox_sys;
+extern crate test;
+extern crate time;
 
 mod comms;
 mod utils;

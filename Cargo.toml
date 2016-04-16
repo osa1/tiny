@@ -14,3 +14,5 @@ path = "bin/main.rs"
 [dependencies]
 libc = "0.2.8"
 rustbox = { git = "https://github.com/gchp/rustbox.git" }
+termbox-sys = "0.2.9"
+time = "0.1"
