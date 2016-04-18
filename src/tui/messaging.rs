@@ -24,7 +24,6 @@ pub struct MessagingUI {
 
 impl MessagingUI {
     pub fn new(width : i32, height : i32) -> MessagingUI {
-        assert!(height >= 2);
         MessagingUI {
             topic: None,
             msg_area: MsgArea::new(width, height - 1),
@@ -106,13 +105,13 @@ impl MessagingUI {
 impl MessagingUI {
     #[inline]
     pub fn add_client_err_msg(&mut self, msg : &str) {
-        self.msg_area.add_text(msg, style::ERR_MSG);
+        self.msg_area.add_text(msg, &style::ERR_MSG_SS);
         self.msg_area.flush_line();
     }
 
     #[inline]
     pub fn add_client_msg(&mut self, msg : &str) {
-        self.msg_area.add_text(msg, style::USER_MSG);
+        self.msg_area.add_text(msg, &style::USER_MSG_SS);
         self.msg_area.flush_line();
     }
 
@@ -120,7 +119,7 @@ impl MessagingUI {
     pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm) {
         self.msg_area.add_text(
             &format!("[{}] <{}> {}", tm.strftime("%H:%M").unwrap(), sender, msg),
-            style::USER_MSG);
+            &style::USER_MSG_SS);
         self.msg_area.flush_line();
     }
 
@@ -128,7 +127,7 @@ impl MessagingUI {
     pub fn add_msg(&mut self, msg : &str, tm : &Tm) {
         self.msg_area.add_text(
             &format!("[{}] {}", tm.strftime("%H:%M").unwrap(), msg),
-            style::USER_MSG);
+            &style::USER_MSG_SS);
         self.msg_area.flush_line();
     }
 
@@ -136,8 +135,8 @@ impl MessagingUI {
     pub fn add_err_msg(&mut self, msg : &str, tm : &Tm) {
         self.msg_area.add_text(
             &format!("[{}] ", tm.strftime("%H:%M").unwrap()),
-            style::USER_MSG);
-        self.msg_area.add_text(msg, style::ERR_MSG);
+            &style::USER_MSG_SS);
+        self.msg_area.add_text(msg, &style::ERR_MSG_SS);
         self.msg_area.flush_line();
     }
 }

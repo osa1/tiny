@@ -2,56 +2,91 @@ use termbox_sys;
 
 #[derive(Debug)]
 pub struct Style {
-    pub fg : u16,
-    pub bg : u16,
+    /// Termbox fg.
+    pub fg  : u16,
+
+    /// Termbox bg.
+    pub bg  : u16,
+
+    /// String representation to be used in MsgArea etc. this is how the color
+    /// is encoded in (hopefully) most IRC clients.
+    pub str : &'static StyleStr<'static>,
 }
 
-pub static STYLES : [Style; 5] =
-    [ // USER_MSG
-      Style {
+pub static USER_MSG : Style =
+    Style {
         fg: termbox_sys::TB_WHITE,
         bg: termbox_sys::TB_DEFAULT,
-      },
+        str: &USER_MSG_SS,
+    };
 
-      // SERVER_MSG
-      Style {
+pub static SERVER_MSG : Style =
+    Style {
         fg: termbox_sys::TB_BLUE | termbox_sys::TB_BOLD,
         bg: termbox_sys::TB_DEFAULT,
-      },
+        str: &SERVER_MSG_SS,
+    };
 
-      // ERR_MSG
-      Style {
-          fg: termbox_sys::TB_WHITE | termbox_sys::TB_BOLD,
-          bg: termbox_sys::TB_RED,
-      },
+pub static ERR_MSG : Style =
+    Style {
+        fg: termbox_sys::TB_WHITE | termbox_sys::TB_BOLD,
+        bg: termbox_sys::TB_RED,
+        str: &ERR_MSG_SS,
+    };
 
-      // TOPIC
-      Style {
-          fg: termbox_sys::TB_BLACK,
-          bg: termbox_sys::TB_GREEN,
-      },
 
-      // CLEAR
-      Style {
-          fg: termbox_sys::TB_WHITE,
-          bg: termbox_sys::TB_BLACK,
-      }
-    ];
+pub static TOPIC : Style =
+    Style {
+        fg: termbox_sys::TB_BLACK,
+        bg: termbox_sys::TB_GREEN,
+        str: &TOPIC_SS,
+    };
 
-pub const NUM_STYLES : usize = 5;
+pub static CLEAR : Style =
+    Style {
+        fg: termbox_sys::TB_WHITE,
+        bg: termbox_sys::TB_BLACK,
+        str: &CLEAR_SS,
+    };
 
-pub type StyleRef = u8;
+// Colors described in http://en.wikichip.org/wiki/irc/colors
+// These need to be macros because it's not possible to concatenate const string
+// variables in compile time to get other const strings.
+macro_rules! white   { () => { "00" } }
+macro_rules! black   { () => { "01" } }
+macro_rules! navy    { () => { "02" } }
+macro_rules! green   { () => { "03" } }
+macro_rules! red     { () => { "04" } }
+macro_rules! marron  { () => { "05" } }
+macro_rules! purple  { () => { "06" } }
+macro_rules! olive   { () => { "07" } }
+macro_rules! yellow  { () => { "08" } }
+macro_rules! lgreen  { () => { "09" } }
+macro_rules! tea     { () => { "10" } }
+macro_rules! cyan    { () => { "11" } }
+macro_rules! blue    { () => { "12" } }
+macro_rules! magenta { () => { "13" } }
+macro_rules! gray    { () => { "14" } }
+macro_rules! lgray   { () => { "15" } }
 
-pub const USER_MSG   : StyleRef = 0;
-pub const SERVER_MSG : StyleRef = 1;
-pub const ERR_MSG    : StyleRef = 2;
-pub const TOPIC      : StyleRef = 3;
-pub const CLEAR      : StyleRef = 4;
+macro_rules! reset_prefix { () => { "\x0F" } }
+macro_rules! bold_prefix  { () => { "\x02" } }
+macro_rules! color_prefix { () => { "\x03" } }
 
-pub fn get_style(sref : StyleRef) -> &'static Style {
-    unsafe { STYLES.get_unchecked(sref as usize) }
-}
+pub const RESET_PREFIX : char = '\x0F';
+pub const BOLD_PREFIX  : char = '\x02';
+pub const COLOR_PREFIX : char = '\x03';
 
-pub fn char_encoding(sref : StyleRef) -> char {
-    sref as char
-}
+#[derive(Debug)]
+pub struct StyleStr<'a>(pub &'a str);
+
+pub static USER_MSG_SS   : StyleStr<'static> =
+    StyleStr(concat!(color_prefix!(), white!()));
+pub static SERVER_MSG_SS : StyleStr<'static> =
+    StyleStr(concat!(bold_prefix!(), color_prefix!(), blue!()));
+pub static ERR_MSG_SS    : StyleStr<'static> =
+    StyleStr(concat!(bold_prefix!(), color_prefix!(), white!(), ",", red!()));
+pub static TOPIC_SS      : StyleStr<'static> =
+    StyleStr(concat!(color_prefix!(), black!(), ",", green!()));
+pub static CLEAR_SS      : StyleStr<'static> =
+    StyleStr(concat!(color_prefix!(), white!(), ",", black!()));

@@ -1,6 +1,8 @@
+#[macro_use]
+pub mod style;
+
 pub mod messaging;
 pub mod msg_area;
-pub mod style;
 pub mod tabbed;
 pub mod text_field;
 pub mod widget;
@@ -60,8 +62,7 @@ impl TUI {
         }).unwrap();
 
         unsafe {
-            let style = style::get_style(style::CLEAR);
-            termbox_sys::tb_set_clear_attributes(style.fg, style.bg);
+            termbox_sys::tb_set_clear_attributes(style::CLEAR.fg, style::CLEAR.bg);
         }
 
         let _ = fs::create_dir("logs");

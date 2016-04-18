@@ -4,7 +4,6 @@
 use rustbox::{RustBox};
 use termbox_sys::tb_change_cell;
 
-use tui::style::{StyleRef};
 use tui::style;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
@@ -28,8 +27,6 @@ pub struct Line {
     splits    : Vec<i32>,
 }
 
-const COLOR_PREFIX : char = '\x03';
-
 impl Line {
     pub fn new() -> Line {
         Line {
@@ -45,7 +42,7 @@ impl Line {
         let mut iter = str.chars();
         while let Some(char) = iter.next() {
             self.str.push(char);
-            if char == COLOR_PREFIX {
+            if char == style::COLOR_PREFIX {
                 // read fg
                 self.str.push(iter.next().unwrap());
                 self.str.push(iter.next().unwrap());
@@ -67,7 +64,7 @@ impl Line {
     }
 
     pub fn add_char(&mut self, char : char) {
-        assert!(char != COLOR_PREFIX);
+        assert!(char != style::COLOR_PREFIX);
         if char.is_whitespace() {
             self.splits.push(self.len_chars);
         }
@@ -126,7 +123,7 @@ impl Line {
 
         let mut iter = self.str.chars();
         while let Some(mut char) = iter.next() {
-            if char == COLOR_PREFIX {
+            if char == style::COLOR_PREFIX {
                 let fg_1 = to_dec(iter.next().unwrap()) as u16;
                 let fg_2 = to_dec(iter.next().unwrap()) as u16;
                 fg = fg_1 * 10 + fg_2;

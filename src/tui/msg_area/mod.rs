@@ -7,7 +7,7 @@ use std::str;
 use rustbox::{RustBox};
 
 use self::line::Line;
-use tui::style::StyleRef;
+use tui::style::StyleStr;
 
 pub struct MsgArea {
     lines       : Vec<Line>,
@@ -95,7 +95,8 @@ impl MsgArea {
 // Adding text
 
 impl MsgArea {
-    pub fn add_text(&mut self, str : &str, style : StyleRef) {
+    pub fn add_text(&mut self, str : &str, style : &StyleStr) {
+        self.line_buf.add_text(style.0);
         self.line_buf.add_text(str);
     }
 
