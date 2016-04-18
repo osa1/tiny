@@ -211,7 +211,7 @@ impl Tabbed {
         // I need a Vec<usize>.
         //
         // (I could use an array on stack but whatever)
-        let mut target_idxs : Vec<usize> = Vec::with_capacity(self.tabs.len());
+        let mut target_idxs : Vec<usize> = Vec::with_capacity(1);
 
         match target {
             &MsgTarget::Server { serv_name } => {
