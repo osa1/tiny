@@ -96,7 +96,7 @@ impl MsgArea {
 
 impl MsgArea {
     pub fn add_text(&mut self, str : &str, style : StyleRef) {
-        self.line_buf.add_text(str, style);
+        self.line_buf.add_text(str);
     }
 
     pub fn flush_line(&mut self) {

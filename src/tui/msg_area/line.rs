@@ -14,15 +14,21 @@ pub struct Line {
     /// Note that this String may not be directly renderable - TODO: explain.
     str       : String,
 
-    /// Number of _visible_ (e.g. excludes StyleRef encodings) characters in the
+    /// Number of _visible_ (i.e. excludes color encodings) characters in the
     /// line.
     len_chars : i32,
 
-    /// Char indexes (not counting StyleRefs) of split positions of the string -
-    /// when the line doesn't fit into the screen we split it into multiple
-    /// lines using these.
+    /// Visible char indexes (not counting color encodings) of split positions
+    /// of the string - when the line doesn't fit into the screen we split it
+    /// into multiple lines using these.
+    ///
+    /// It's important that these are really indices ignoring invisible chars,
+    /// as we use difference between two indices in this vector as length of
+    /// substrings.
     splits    : Vec<i32>,
 }
+
+const COLOR_PREFIX : char = '\x03';
 
 impl Line {
     pub fn new() -> Line {
@@ -33,25 +39,35 @@ impl Line {
         }
     }
 
-    pub fn add_text(&mut self, str : &str, style : StyleRef) {
-        self.str.reserve(str.len() + 1); // +1 for the StyleRef
-        // first 32 ascii chars are never rendered, we use those to encode Style
-        unsafe { self.str.as_mut_vec() }.push(style);
+    pub fn add_text(&mut self, str : &str) {
+        self.str.reserve(str.len());
 
-        let mut chars_added = 0;
-        for (char_idx, char) in str.chars().enumerate() {
+        let mut iter = str.chars();
+        while let Some(char) = iter.next() {
             self.str.push(char);
-            if char.is_whitespace() {
-                self.splits.push(self.len_chars + char_idx as i32);
+            if char == COLOR_PREFIX {
+                // read fg
+                self.str.push(iter.next().unwrap());
+                self.str.push(iter.next().unwrap());
+                if let Some(mb_comma) = iter.next() {
+                    self.str.push(mb_comma);
+                    if mb_comma == ',' {
+                        // read bg
+                        self.str.push(iter.next().unwrap());
+                        self.str.push(iter.next().unwrap());
+                    }
+                }
+            } else {
+                if char.is_whitespace() {
+                    self.splits.push(self.len_chars);
+                }
+                self.len_chars += 1;
             }
-            chars_added += 1;
         }
-
-        self.len_chars += chars_added;
-        // no need to reset the style as the next string will set it again
     }
 
     pub fn add_char(&mut self, char : char) {
+        assert!(char != COLOR_PREFIX);
         if char.is_whitespace() {
             self.splits.push(self.len_chars);
         }
@@ -105,18 +121,29 @@ impl Line {
 
         let mut char_idx : i32 = 0;
 
-        let mut fg  = style::get_style(style::USER_MSG).fg;
-        let mut bg  = style::get_style(style::USER_MSG).bg;
+        let mut fg : u16 = 0;
+        let mut bg : u16 = 0;
 
-        for char in self.str.chars() {
-            if (char as i32) < 32 {
-                let style = style::get_style(char as u8);
-                fg = style.fg;
-                bg = style.bg;
-                continue;
+        let mut iter = self.str.chars();
+        while let Some(mut char) = iter.next() {
+            if char == COLOR_PREFIX {
+                let fg_1 = to_dec(iter.next().unwrap()) as u16;
+                let fg_2 = to_dec(iter.next().unwrap()) as u16;
+                fg = fg_1 * 10 + fg_2;
+
+                if let Some(char_) = iter.next() {
+                    if char_ == ',' {
+                        let bg_1 = to_dec(iter.next().unwrap()) as u16;
+                        let bg_2 = to_dec(iter.next().unwrap()) as u16;
+                        bg = bg_1 * 10 + bg_2;
+                        continue;
+                    } else {
+                        char = char_;
+                    }
+                }
             }
 
-            else if char.is_whitespace() {
+            if char.is_whitespace() {
                 // We may want to move to the next line
                 next_split_idx += 1;
                 let next_split = self.splits.get(next_split_idx).unwrap_or(&self.len_chars);
@@ -157,6 +184,11 @@ impl Line {
             }
         }
     }
+}
+
+#[inline]
+pub fn to_dec(ch : char) -> i8 {
+    ((ch as u32) - ('0' as u32)) as i8
 }
 
 ////////////////////////////////////////////////////////////////////////////////
