@@ -9,27 +9,32 @@ use std::mem;
 use std::time::Duration;
 
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
-use termbox_sys::{tb_change_cell, tb_width};
 
-use tiny::tui::msg_area::line::Line;
+use tiny::tui::msg_area::MsgArea;
 use tiny::tui::style;
 
-const WIDTH : i32 = 10;
-const HEIGHT : i32 = 10;
-
 fn loop_() -> Option<String> {
-    let mut line = Line::new();
-    {
-        let mut text = String::new();
-        let mut file = File::open("test/lipsum.txt").unwrap();
-        file.read_to_string(&mut text);
-        line.add_text(&text, style::USER_MSG);
-    }
-
     let rustbox = RustBox::init(InitOptions {
         input_mode: InputMode::Esc,
         buffer_stderr: false,
     }).unwrap();
+
+    let mut msg_area = MsgArea::new(rustbox.width() as i32, rustbox.height() as i32);
+
+    {
+        let mut text = String::new();
+        let mut file = File::open("test/lipsum.txt").unwrap();
+        file.read_to_string(&mut text).unwrap();
+        msg_area.add_text(&text.lines().collect::<Vec<&str>>().join(""), &style::USER_MSG_SS);
+        msg_area.flush_line();
+
+        for line in text.lines() {
+            msg_area.add_text(">>>", &style::TOPIC_SS);
+            msg_area.add_text("  ", &style::SERVER_MSG_SS);
+            msg_area.add_text(line, &style::SERVER_MSG_SS);
+            msg_area.flush_line();
+        }
+    }
 
     // I'm using select() here to test for signals/interrupts. Namely, SIGWINCH
     // needs to be handled somehow for resizing.
@@ -40,7 +45,7 @@ fn loop_() -> Option<String> {
 
     loop {
         rustbox.clear();
-        line.draw(&rustbox, 0, 0, unsafe { tb_width() });
+        msg_area.draw(&rustbox, 0, 0);
         rustbox.present();
 
         let mut fd_set_ = fd_set.clone();
@@ -58,12 +63,19 @@ fn loop_() -> Option<String> {
                     break;
                 },
 
-                Ok(Event::KeyEvent(Key::Char(ch))) => {
-                    line.add_char(ch);
-                }
+                Ok(Event::KeyEvent(Key::Ctrl('p'))) => {
+                    msg_area.scroll_up();
+                },
+
+                Ok(Event::KeyEvent(Key::Ctrl('n'))) => {
+                    msg_area.scroll_down();
+                },
+
+                // Ok(Event::KeyEvent(Key::Char(ch))) => {
+                // }
 
                 Ok(Event::ResizeEvent(width, height)) => {
-
+                    msg_area.resize(width, height);
                 }
 
                 _ => {}
