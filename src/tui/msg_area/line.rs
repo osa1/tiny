@@ -228,8 +228,6 @@ use std::fs::File;
 use std::io::Read;
 use super::*;
 
-use tui::style;
-
 #[test]
 fn height_test_1() {
     let mut line = Line::new();
@@ -301,7 +299,7 @@ fn bench_rendered_height(b : &mut Bencher) {
     let mut text = String::new();
     {
         let mut file = File::open("test/lipsum.txt").unwrap();
-        file.read_to_string(&mut text);
+        file.read_to_string(&mut text).unwrap();
     }
 
     let mut line = Line::new();
