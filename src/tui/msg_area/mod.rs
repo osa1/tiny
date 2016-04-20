@@ -53,15 +53,17 @@ impl MsgArea {
             let line_row = row - line_height + 1;
 
             // Do we have enough space to render this line?
-            if line_row < pos_y {
+            if line_row >= pos_y {
+                // Render it
+                line.draw(rustbox, pos_x, line_row, self.width);
+                row = line_row - 1;
+                line_idx -= 1;
+            } else {
+                // Maybe we can still render some part of it
+                let render_from = pos_y - line_row;
+                line.draw_from(rustbox, pos_x, line_row, render_from, self.width);
                 break;
             }
-
-            // Render it
-            line.draw(rustbox, pos_x, line_row, self.width);
-
-            row = line_row - 1;
-            line_idx -= 1;
         }
     }
 }

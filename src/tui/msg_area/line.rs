@@ -3,6 +3,7 @@
 
 use rustbox::{RustBox};
 use termbox_sys::tb_change_cell;
+use termbox_sys;
 
 use tui::style;
 
@@ -41,8 +42,8 @@ impl Line {
 
         let mut iter = str.chars();
         while let Some(char) = iter.next() {
-            self.str.push(char);
             if char == style::COLOR_PREFIX {
+                self.str.push(char);
                 // read fg
                 self.str.push(iter.next().unwrap());
                 self.str.push(iter.next().unwrap());
@@ -54,7 +55,16 @@ impl Line {
                         self.str.push(iter.next().unwrap());
                     }
                 }
-            } else {
+            }
+
+            else if char == style::RESET_PREFIX || char == style::BOLD_PREFIX {
+                self.str.push(char);
+            }
+
+            // Ignore some chars that break the rendering. These are used by the
+            // protocol.
+            else if char > '\x07' {
+                self.str.push(char);
                 if char.is_whitespace() {
                     self.splits.push(self.len_chars);
                 }
@@ -110,9 +120,14 @@ impl Line {
         lines
     }
 
-    pub fn draw(&self, _ : &RustBox, pos_x : i32, pos_y : i32, width : i32) {
+    #[inline]
+    pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32, width : i32) {
+        self.draw_from(rustbox, pos_x, pos_y, 0, width);
+    }
+
+    pub fn draw_from(&self, _ : &RustBox, pos_x : i32, pos_y : i32, first_line : i32, width : i32) {
         let mut col = pos_x;
-        let mut row = pos_y;
+        let mut line = 0;
 
         let mut next_split_idx : usize = 0;
 
@@ -126,7 +141,8 @@ impl Line {
             if char == style::COLOR_PREFIX {
                 let fg_1 = to_dec(iter.next().unwrap()) as u16;
                 let fg_2 = to_dec(iter.next().unwrap()) as u16;
-                fg = fg_1 * 10 + fg_2;
+                // We 'or' here as 'fg' can have 'bold' value
+                fg |= fg_1 * 10 + fg_2;
 
                 if let Some(char_) = iter.next() {
                     if char_ == ',' {
@@ -135,9 +151,17 @@ impl Line {
                         bg = bg_1 * 10 + bg_2;
                         continue;
                     } else {
+                        bg = 0;
                         char = char_;
                     }
                 }
+            } else if char == style::BOLD_PREFIX {
+                fg |= termbox_sys::TB_BOLD;
+                continue;
+            } else if char == style::RESET_PREFIX {
+                fg = 0;
+                bg = 0;
+                continue;
             }
 
             if char.is_whitespace() {
@@ -158,11 +182,13 @@ impl Line {
 
                 if (chars_until_next_split as i32) <= slots_in_line {
                     // keep rendering chars
-                    unsafe { tb_change_cell(col, row, char as u32, fg, bg); }
+                    if line >= first_line {
+                        unsafe { tb_change_cell(col, pos_y + line, char as u32, fg, bg); }
+                    }
                     col += 1;
                 } else {
                     // need to split here. ignore whitespace char.
-                    row += 1;
+                    line += 1;
                     col = pos_x;
                 }
 
@@ -173,7 +199,9 @@ impl Line {
                 // Not possible to split. Need to make sure we don't render out
                 // of bounds.
                 if col - pos_x < width {
-                    unsafe { tb_change_cell(col, row, char as u32, fg, bg); }
+                    if line >= first_line {
+                        unsafe { tb_change_cell(col, pos_y + line, char as u32, fg, bg); }
+                    }
                     col += 1;
                 }
 
@@ -205,7 +233,7 @@ use tui::style;
 #[test]
 fn height_test_1() {
     let mut line = Line::new();
-    line.add_text("a b c d e", style::USER_MSG);
+    line.add_text("a b c d e");
     assert_eq!(line.rendered_height(1), 5);
     assert_eq!(line.rendered_height(2), 5);
     assert_eq!(line.rendered_height(3), 3);
@@ -220,7 +248,7 @@ fn height_test_1() {
 #[test]
 fn height_test_2() {
     let mut line = Line::new();
-    line.add_text("ab c d e", style::USER_MSG);
+    line.add_text("ab c d e");
     assert_eq!(line.rendered_height(1), 4);
     assert_eq!(line.rendered_height(2), 4);
     assert_eq!(line.rendered_height(3), 3);
@@ -234,7 +262,7 @@ fn height_test_2() {
 #[test]
 fn height_test_3() {
     let mut line = Line::new();
-    line.add_text("ab cd e", style::USER_MSG);
+    line.add_text("ab cd e");
     assert_eq!(line.rendered_height(1), 3);
     assert_eq!(line.rendered_height(2), 3);
     assert_eq!(line.rendered_height(3), 3);
@@ -247,7 +275,7 @@ fn height_test_3() {
 #[test]
 fn height_test_4() {
     let mut line = Line::new();
-    line.add_text("ab cde", style::USER_MSG);
+    line.add_text("ab cde");
     assert_eq!(line.rendered_height(1), 2);
     assert_eq!(line.rendered_height(2), 2);
     assert_eq!(line.rendered_height(3), 2);
@@ -259,7 +287,7 @@ fn height_test_4() {
 #[test]
 fn height_test_5() {
     let mut line = Line::new();
-    line.add_text("abcde", style::USER_MSG);
+    line.add_text("abcde");
     for i in 0 .. 6 {
         assert_eq!(line.rendered_height(i), 1);
     }
@@ -277,7 +305,7 @@ fn bench_rendered_height(b : &mut Bencher) {
     }
 
     let mut line = Line::new();
-    line.add_text(&text, style::USER_MSG);
+    line.add_text(&text);
     b.iter(|| {
         line.rendered_height(1)
     });

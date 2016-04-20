@@ -25,7 +25,8 @@ fn loop_() -> Option<String> {
         let mut text = String::new();
         let mut file = File::open("test/lipsum.txt").unwrap();
         file.read_to_string(&mut text).unwrap();
-        msg_area.add_text(&text.lines().collect::<Vec<&str>>().join(""), &style::USER_MSG_SS);
+        let single_line_text = text.lines().collect::<Vec<&str>>().join("");
+        msg_area.add_text(&single_line_text, &style::USER_MSG_SS);
         msg_area.flush_line();
 
         for line in text.lines() {
