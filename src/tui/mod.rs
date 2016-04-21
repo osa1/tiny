@@ -4,6 +4,7 @@ pub mod style;
 pub mod messaging;
 pub mod msg_area;
 pub mod tabbed;
+pub mod termbox;
 pub mod text_field;
 pub mod widget;
 
@@ -62,6 +63,7 @@ impl TUI {
         }).unwrap();
 
         unsafe {
+            termbox_sys::tb_select_output_mode(termbox_sys::TB_OUTPUT_256);
             termbox_sys::tb_set_clear_attributes(style::CLEAR.fg, style::CLEAR.bg);
         }
 

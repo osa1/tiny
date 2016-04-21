@@ -1,10 +1,11 @@
 use rustbox::keyboard::Key;
-use rustbox::{RustBox, Color};
-use rustbox;
+use rustbox::{RustBox};
 use time::Tm;
 
 use tui::messaging::MessagingUI;
 use tui::MsgTarget;
+use tui::style;
+use tui::termbox;
 use tui::widget::{Widget, WidgetRet};
 
 use utils::opt_to_vec;
@@ -158,14 +159,16 @@ impl Tabbed {
         let mut tab_name_col = 0;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             if self.active_idx == Some(tab_idx) {
-                rustbox.print(tab_name_col, (self.height as usize) - 1,
-                              rustbox::RB_BOLD, Color::White, Color::Blue, tab.visible_name());
+                termbox::print(tab_name_col, self.height - 1,
+                               style::TAB_ACTIVE.fg, style::TAB_ACTIVE.bg,
+                               tab.visible_name());
             } else {
-                rustbox.print(tab_name_col, (self.height as usize) - 1,
-                              rustbox::RB_BOLD, Color::White, Color::Default, tab.visible_name());
+                termbox::print(tab_name_col, self.height - 1,
+                               style::TAB_PASSIVE.fg, style::TAB_PASSIVE.bg,
+                               tab.visible_name());
             }
             // len() is OK since sever, chan and nick names are ascii
-            tab_name_col += tab.visible_name().len();
+            tab_name_col += tab.visible_name().len() as i32;
         }
     }
 

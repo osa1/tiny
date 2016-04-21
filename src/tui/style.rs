@@ -15,7 +15,9 @@ pub struct Style {
 
 pub static USER_MSG : Style =
     Style {
-        fg: termbox_sys::TB_WHITE,
+        fg: 15, // duh, 15 is "whiter" than TB_WHITE. Terminals render first 8
+                // colors (TB_ prefixed ones) differently depending on the color
+                // scheme.
         bg: termbox_sys::TB_DEFAULT,
         str: &USER_MSG_SS,
     };
@@ -44,9 +46,30 @@ pub static TOPIC : Style =
 
 pub static CLEAR : Style =
     Style {
-        fg: termbox_sys::TB_WHITE,
-        bg: termbox_sys::TB_BLACK,
+        fg: termbox_sys::TB_DEFAULT,
+        bg: termbox_sys::TB_DEFAULT,
         str: &CLEAR_SS,
+    };
+
+pub static CURSOR : Style =
+    Style {
+        fg: 39,
+        bg: 39,
+        str: &CURSOR_SS,
+    };
+
+pub static TAB_ACTIVE : Style =
+    Style {
+        fg: 0,
+        bg: 49,
+        str: &TAB_ACTIVE_SS,
+    };
+
+pub static TAB_PASSIVE : Style =
+    Style {
+        fg: 0,
+        bg: 7,
+        str: &TAB_PASSIVE_SS,
     };
 
 // Colors described in http://en.wikichip.org/wiki/irc/colors
@@ -82,11 +105,24 @@ pub struct StyleStr<'a>(pub &'a str);
 
 pub static USER_MSG_SS   : StyleStr<'static> =
     StyleStr(concat!(color_prefix!(), white!()));
+
 pub static SERVER_MSG_SS : StyleStr<'static> =
     StyleStr(concat!(bold_prefix!(), color_prefix!(), blue!()));
+
 pub static ERR_MSG_SS    : StyleStr<'static> =
     StyleStr(concat!(bold_prefix!(), color_prefix!(), white!(), ",", red!()));
+
 pub static TOPIC_SS      : StyleStr<'static> =
     StyleStr(concat!(color_prefix!(), black!(), ",", green!()));
+
 pub static CLEAR_SS      : StyleStr<'static> =
     StyleStr(concat!(color_prefix!(), white!(), ",", black!()));
+
+pub static CURSOR_SS     : StyleStr<'static> =
+    StyleStr(concat!(color_prefix!(), tea!(), ",", tea!()));
+
+pub static TAB_ACTIVE_SS : StyleStr<'static> =
+    StyleStr(concat!(color_prefix!(), black!(), ",", tea!()));
+
+pub static TAB_PASSIVE_SS : StyleStr<'static> =
+    StyleStr(concat!(color_prefix!(), black!(), ",", lgray!()));

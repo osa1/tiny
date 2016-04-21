@@ -103,7 +103,7 @@ impl Line {
             // How many chars do we need to render if until the next split
             // point?
             let chars_until_next_split : i32 =
-                // -1 becuase we don't need to render the space or EOL.
+                // -1 because we don't need to render the space or EOL.
                 *self.splits.get(split_idx + 1).unwrap_or(&self.len_chars) - 1 - char_idx;
 
             // writeln!(io::stderr(),
@@ -142,13 +142,13 @@ impl Line {
                 let fg_1 = to_dec(iter.next().unwrap()) as u16;
                 let fg_2 = to_dec(iter.next().unwrap()) as u16;
                 // We 'or' here as 'fg' can have 'bold' value
-                fg |= fg_1 * 10 + fg_2;
+                fg |= irc_color_to_termbox(fg_1 * 10 + fg_2);
 
                 if let Some(char_) = iter.next() {
                     if char_ == ',' {
                         let bg_1 = to_dec(iter.next().unwrap()) as u16;
                         let bg_2 = to_dec(iter.next().unwrap()) as u16;
-                        bg = bg_1 * 10 + bg_2;
+                        bg = irc_color_to_termbox(bg_1 * 10 + bg_2);
                         continue;
                     } else {
                         bg = 0;
@@ -214,6 +214,30 @@ impl Line {
 #[inline]
 pub fn to_dec(ch : char) -> i8 {
     ((ch as u32) - ('0' as u32)) as i8
+}
+
+// IRC colors: http://en.wikichip.org/wiki/irc/colors
+// Termbox colors: http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
+fn irc_color_to_termbox(irc_color : u16) -> u16 {
+    match irc_color {
+         0 => 15,  // white
+         1 => 0,   // black
+         2 => 17,  // navy
+         3 => 2,   // green
+         4 => 9,   // red
+         5 => 88,  // maroon
+         6 => 5,   // purple
+         7 => 130, // olive
+         8 => 11,  // yellow
+         9 => 10,  // light green
+        10 => 6,   // teal
+        11 => 14,  // cyan
+        12 => 12,  // awful blue
+        13 => 13,  // magenta
+        14 => 8,   // gray
+        15 => 7,   // light gray
+        _  => panic!("No such IRC color: {}", irc_color),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

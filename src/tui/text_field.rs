@@ -2,9 +2,11 @@ use std::borrow::Borrow;
 use std::cmp::{max, min};
 use std::mem;
 
-use rustbox::{RustBox, Style, Color};
 use rustbox::keyboard::Key;
+use rustbox::{RustBox};
 
+use tui::style;
+use tui::termbox;
 use tui::widget::{Widget, WidgetRet};
 
 // TODO: Make this a setting
@@ -45,7 +47,7 @@ impl TextField {
         self.move_cursor(0);
     }
 
-    fn draw_(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+    fn draw_(&self, _ : &RustBox, pos_x : i32, pos_y : i32) {
         // draw text
         let buffer_borrow : &[char] = self.buffer.borrow();
 
@@ -55,13 +57,12 @@ impl TextField {
 
         let string : String = slice.iter().cloned().collect();
 
-        rustbox.print(pos_x as usize, pos_y as usize,
-                      Style::empty(), Color::White, Color::Default, string.borrow());
+        termbox::print(pos_x, pos_y, style::USER_MSG.fg, style::USER_MSG.bg, &string);
 
         // draw cursor
         // TODO: render the char under the cursor
-        rustbox.print_char((pos_x + self.cursor - self.scroll) as usize, pos_y as usize,
-                           Style::empty(), Color::Blue, Color::Blue, ' ');
+        termbox::print_char(pos_x + self.cursor - self.scroll, pos_y,
+                            style::CURSOR.fg, style::CURSOR.bg, 'x');
     }
 
     fn keypressed_(&mut self, key : Key) -> WidgetRet {
