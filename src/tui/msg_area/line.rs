@@ -41,20 +41,33 @@ impl Line {
         self.str.reserve(str.len());
 
         let mut iter = str.chars();
-        while let Some(char) = iter.next() {
+        while let Some(mut char) = iter.next() {
             if char == style::COLOR_PREFIX {
                 self.str.push(char);
                 // read fg
                 self.str.push(iter.next().unwrap());
                 self.str.push(iter.next().unwrap());
                 if let Some(mb_comma) = iter.next() {
-                    self.str.push(mb_comma);
                     if mb_comma == ',' {
+                        self.str.push(mb_comma);
                         // read bg
                         self.str.push(iter.next().unwrap());
                         self.str.push(iter.next().unwrap());
+                        continue;
+                    } else {
+                        char = mb_comma;
                     }
+                } else {
+                    break;
                 }
+            }
+
+            if char == style::TERMBOX_COLOR_PREFIX {
+                self.str.push(char);
+                // read fg
+                self.str.push(iter.next().unwrap());
+                // read bg
+                self.str.push(iter.next().unwrap());
             }
 
             else if char == style::RESET_PREFIX || char == style::BOLD_PREFIX {
@@ -155,6 +168,10 @@ impl Line {
                         char = char_;
                     }
                 }
+            } else if char == style::TERMBOX_COLOR_PREFIX {
+                fg = iter.next().unwrap() as u16;
+                bg = iter.next().unwrap() as u16;
+                continue;
             } else if char == style::BOLD_PREFIX {
                 fg |= termbox_sys::TB_BOLD;
                 continue;
@@ -236,7 +253,9 @@ fn irc_color_to_termbox(irc_color : u16) -> u16 {
         13 => 13,  // magenta
         14 => 8,   // gray
         15 => 7,   // light gray
-        _  => panic!("No such IRC color: {}", irc_color),
+
+        // The rest is directly mapped to termbox colors.
+        _  => irc_color,
     }
 }
 

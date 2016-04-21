@@ -3,6 +3,7 @@
 
 extern crate alloc_system;
 extern crate libc;
+extern crate rand;
 extern crate rustbox;
 extern crate termbox_sys;
 extern crate test;

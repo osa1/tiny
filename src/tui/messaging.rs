@@ -1,6 +1,12 @@
 use rustbox::{RustBox, Key};
 use time::Tm;
 
+use std::collections::HashMap;
+use std::collections::HashSet;
+
+use rand;
+use rand::Rng;
+
 use tui::msg_area::MsgArea;
 use tui::style;
 use tui::text_field::TextField;
@@ -20,6 +26,10 @@ pub struct MessagingUI {
 
     width      : i32,
     height     : i32,
+
+    // NOTE: Color is encoded in Termbox's 216 colors. (in 256-color mode)
+    nick_colors      : HashMap<String, u8>,
+    available_colors : HashSet<u8>,
 }
 
 impl MessagingUI {
@@ -30,12 +40,15 @@ impl MessagingUI {
             text_field: TextField::new(width),
             width: width,
             height: height,
+            nick_colors: HashMap::new(),
+            available_colors: HashSet::new(),
         }
     }
 
     pub fn set_topic(&mut self, topic : String) {
         self.topic = Some(topic);
-        self.msg_area.resize(self.width, self.height - 2);
+        // FIXME: Disabling this - need to decide when/how to draw channel topics
+        // self.msg_area.resize(self.width, self.height - 2);
     }
 
     fn draw_(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
@@ -117,9 +130,21 @@ impl MessagingUI {
 
     #[inline]
     pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm) {
-        self.msg_area.add_text(
-            &format!("[{}] <{}> {}", tm.strftime("%H:%M").unwrap(), sender, msg),
-            &style::USER_MSG_SS);
+        let fg = self.get_nick_color(sender);
+        self.msg_area.add_text(&format!("[{}] <", tm.strftime("%H:%M").unwrap()),
+                               &style::USER_MSG_SS);
+
+        let mut sender_style = String::with_capacity(3);
+        sender_style.push(style::TERMBOX_COLOR_PREFIX);
+        sender_style.push(fg as char);
+        sender_style.push('\x00');
+        self.msg_area.add_text(sender, &style::StyleStr(&sender_style));
+
+        // Need to write this to clear fg/bg. Otherwise we end up ORing old
+        // fg/bg with new ones.
+        self.msg_area.add_char(style::RESET_PREFIX);
+
+        self.msg_area.add_text(&format!("> {}", msg), &style::USER_MSG_SS);
         self.msg_area.flush_line();
     }
 
@@ -138,6 +163,28 @@ impl MessagingUI {
             &style::USER_MSG_SS);
         self.msg_area.add_text(msg, &style::ERR_MSG_SS);
         self.msg_area.flush_line();
+    }
+
+    fn get_nick_color(&mut self, sender : &str) -> u8 {
+        match self.nick_colors.get(sender) {
+            Some(color) => {
+                return *color;
+            }
+            None => {},
+        }
+
+        let mut rng = rand::thread_rng();
+        let ret = {
+            if self.available_colors.len() != 0 {
+                let available_colors = self.available_colors.iter().cloned().collect::<Vec<u8>>();
+                *rng.choose(&available_colors).unwrap()
+            } else {
+                rng.gen_range(16, 232)
+            }
+        };
+
+        self.nick_colors.insert(sender.to_owned(), ret);
+        ret
     }
 }
 

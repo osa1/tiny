@@ -102,6 +102,10 @@ impl MsgArea {
         self.line_buf.add_text(str);
     }
 
+    pub fn add_char(&mut self, char : char) {
+        self.line_buf.add_char(char);
+    }
+
     pub fn flush_line(&mut self) {
         self.lines.push(mem::replace(&mut self.line_buf, Line::new()));
     }

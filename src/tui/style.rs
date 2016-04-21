@@ -99,6 +99,7 @@ macro_rules! color_prefix { () => { "\x03" } }
 pub const RESET_PREFIX : char = '\x0F';
 pub const BOLD_PREFIX  : char = '\x02';
 pub const COLOR_PREFIX : char = '\x03';
+pub const TERMBOX_COLOR_PREFIX : char = '\x00';
 
 #[derive(Debug)]
 pub struct StyleStr<'a>(pub &'a str);
