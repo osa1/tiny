@@ -22,7 +22,6 @@ use time::Tm;
 use time;
 
 use self::tabbed::{Tabbed, TabbedRet, MsgSource};
-use self::widget::{Widget};
 
 pub struct TUI {
     /// Termbox instance

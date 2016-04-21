@@ -6,7 +6,7 @@ use tui::messaging::MessagingUI;
 use tui::MsgTarget;
 use tui::style;
 use tui::termbox;
-use tui::widget::{Widget, WidgetRet};
+use tui::widget::{WidgetRet};
 
 use utils::opt_to_vec;
 

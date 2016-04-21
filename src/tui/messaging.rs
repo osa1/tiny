@@ -10,7 +10,7 @@ use rand::Rng;
 use tui::msg_area::MsgArea;
 use tui::style;
 use tui::text_field::TextField;
-use tui::widget::{Widget, WidgetRet};
+use tui::widget::{WidgetRet};
 
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.
@@ -51,7 +51,7 @@ impl MessagingUI {
         // self.msg_area.resize(self.width, self.height - 2);
     }
 
-    fn draw_(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+    pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
         // TODO: Most channels have long topics that don't fit into single line.
         // if let Some(ref topic) = self.topic {
         //     // rustbox.print(pos_x as usize, pos_y as usize,
@@ -68,7 +68,7 @@ impl MessagingUI {
         self.text_field.draw(rustbox, pos_x, pos_y + self.height - 1);
     }
 
-    fn keypressed_(&mut self, key : Key) -> WidgetRet {
+    pub fn keypressed(&mut self, key : Key) -> WidgetRet {
         match key {
             Key::Ctrl('p') => {
                 self.msg_area.scroll_up();
@@ -103,7 +103,7 @@ impl MessagingUI {
         }
     }
 
-    fn resize_(&mut self, width : i32, height : i32) {
+    pub fn resize(&mut self, width : i32, height : i32) {
         self.width = width;
         self.height = height;
         self.msg_area.resize(width, height - 1);
@@ -185,21 +185,5 @@ impl MessagingUI {
 
         self.nick_colors.insert(sender.to_owned(), ret);
         ret
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-impl Widget for MessagingUI {
-    fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
-        self.draw_(rustbox, pos_x, pos_y)
-    }
-
-    fn keypressed(&mut self, key : Key) -> WidgetRet {
-        self.keypressed_(key)
-    }
-
-    fn resize(&mut self, width : i32, height : i32) {
-        self.resize_(width, height)
     }
 }
