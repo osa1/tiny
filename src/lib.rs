@@ -222,8 +222,20 @@ impl Tiny {
 
     fn join(&mut self, src : MsgSource, chan : &str) {
         Msg::join(chan, &mut self.tui).unwrap(); // debug
-        let comm = self.find_comm(src.serv_name()).unwrap();
-        Msg::join(chan, comm).unwrap();
+        match self.find_comm(src.serv_name()) {
+            Some(comm) => {
+                Msg::join(chan, comm).unwrap();
+                return;
+            }
+            None => {
+                // drop the borrowed self and run next statement
+                // rustc is too dumb to figure that None can't borrow.
+            },
+        }
+
+        self.tui.add_client_err_msg(
+            &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
+            &MsgTarget::CurrentTab);
     }
 
     fn send_msg(&mut self, from : MsgSource, msg : Vec<char>) {
