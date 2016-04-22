@@ -156,14 +156,14 @@ impl Tabbed {
             Some(idx) => self.tabs[idx as usize].widget.draw(rustbox, pos_x, pos_y),
         }
 
-        let mut tab_name_col = 0;
+        let mut tab_name_col = pos_x;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             if self.active_idx == Some(tab_idx) {
-                termbox::print(tab_name_col, self.height - 1,
+                termbox::print(tab_name_col, pos_y + self.height - 1,
                                style::TAB_ACTIVE.fg, style::TAB_ACTIVE.bg,
                                tab.visible_name());
             } else {
-                termbox::print(tab_name_col, self.height - 1,
+                termbox::print(tab_name_col, pos_y + self.height - 1,
                                style::TAB_PASSIVE.fg, style::TAB_PASSIVE.bg,
                                tab.visible_name());
             }
@@ -198,6 +198,8 @@ impl Tabbed {
     }
 
     pub fn resize(&mut self, width : i32, height : i32) {
+        self.width = width;
+        self.height = height;
         for tab in self.tabs.iter_mut() {
             tab.widget.resize(width, height - 1);
         }
