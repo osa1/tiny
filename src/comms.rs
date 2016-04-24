@@ -102,11 +102,12 @@ impl Comms {
 
         // Handle disconnects
         match self.stream.read(&mut read_buf) {
-            Err(_) => {
+            Err(err) => {
                 // TODO: I don't understand why this happens. I'm ``randomly''
                 // getting "temporarily unavailable" errors.
-                // return vec![CommsRet::ShowErr(format!("error in read(): {:?}", err))];
-                return vec![];
+                return vec![CommsRet::Err {
+                    err_msg: format!("Error in read(): {:?}", err)
+                }];
             },
             Ok(bytes_read) => {
                 if bytes_read == 0 {
