@@ -184,8 +184,8 @@ impl Comms {
 
     fn handle_cmd(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
                   pfx : Option<Pfx>, cmd : Cmd, params : Vec<Vec<u8>>) {
-        match &cmd {
-            &Cmd::Str(ref str) if str == "PING" => {
+        match cmd {
+            Cmd::Str(ref str) if str == "PING" => {
                 debug_assert!(params.len() == 1);
                 Msg::pong(unsafe {
                             str::from_utf8_unchecked(params.into_iter().nth(0).unwrap().as_ref())

@@ -330,9 +330,9 @@ impl Tiny {
                 let msg    = unsafe { args.get_unchecked(1) };
                 let comm   = unsafe { &self.comms.get_unchecked(comm_idx) };
 
-                let sender = match &pfx {
-                    &Pfx::Server(_) => &comm.serv_name,
-                    &Pfx::User { ref nick, .. } => nick,
+                let sender = match pfx {
+                    Pfx::Server(_) => &comm.serv_name,
+                    Pfx::User { ref nick, .. } => nick,
                 };
 
                 if target.as_bytes()[0] == b'#' {
@@ -457,8 +457,8 @@ impl Tiny {
 }
 
 fn pfx_to_target<'a>(pfx : &'a Pfx, curr_serv : &'a str) -> MsgTarget<'a> {
-    match pfx {
-        &Pfx::Server(_) => MsgTarget::Server { serv_name: curr_serv },
-        &Pfx::User { ref nick, .. } => MsgTarget::User { serv_name: curr_serv, nick: nick },
+    match *pfx {
+        Pfx::Server(_) => MsgTarget::Server { serv_name: curr_serv },
+        Pfx::User { ref nick, .. } => MsgTarget::User { serv_name: curr_serv, nick: nick },
     }
 }

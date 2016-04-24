@@ -175,7 +175,7 @@ impl MessagingUI {
 
         let mut rng = rand::thread_rng();
         let ret = {
-            if self.available_colors.len() != 0 {
+            if self.available_colors.is_empty() {
                 let available_colors = self.available_colors.iter().cloned().collect::<Vec<u8>>();
                 *rng.choose(&available_colors).unwrap()
             } else {

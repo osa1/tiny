@@ -39,21 +39,21 @@ pub enum MsgSource {
 }
 
 impl MsgSource {
-    pub fn serv_name<'a>(&'a self) -> &'a str {
-        match self {
-            &MsgSource::Serv { ref serv_name } => serv_name,
-            &MsgSource::Chan { ref serv_name, .. } => serv_name,
-            &MsgSource::User { ref serv_name, .. } => serv_name,
+    pub fn serv_name(&self) -> &str {
+        match *self {
+            MsgSource::Serv { ref serv_name } => serv_name,
+            MsgSource::Chan { ref serv_name, .. } => serv_name,
+            MsgSource::User { ref serv_name, .. } => serv_name,
         }
     }
 }
 
 impl Tab {
-    pub fn visible_name<'a>(&'a self) -> &'a str {
-        match &self.src {
-            &MsgSource::Serv { ref serv_name, .. } => serv_name,
-            &MsgSource::Chan { ref chan_name, .. } => chan_name,
-            &MsgSource::User { ref nick, .. } => nick,
+    pub fn visible_name(&self) -> &str {
+        match self.src {
+            MsgSource::Serv { ref serv_name, .. } => serv_name,
+            MsgSource::Chan { ref chan_name, .. } => chan_name,
+            MsgSource::User { ref nick, .. } => nick,
         }
     }
 }
@@ -218,11 +218,11 @@ impl Tabbed {
         // (I could use an array on stack but whatever)
         let mut target_idxs : Vec<usize> = Vec::with_capacity(1);
 
-        match target {
-            &MsgTarget::Server { serv_name } => {
+        match *target {
+            MsgTarget::Server { serv_name } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    match &tab.src {
-                        &MsgSource::Serv { serv_name: ref serv_name_ } => {
+                    match tab.src {
+                        MsgSource::Serv { serv_name: ref serv_name_ } => {
                             if serv_name == serv_name_ {
                                 target_idxs.push(tab_idx);
                                 break;
@@ -233,10 +233,10 @@ impl Tabbed {
                 }
             },
 
-            &MsgTarget::Chan { serv_name, chan_name } => {
+            MsgTarget::Chan { serv_name, chan_name } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    match &tab.src {
-                        &MsgSource::Chan { serv_name: ref serv_name_, chan_name: ref chan_name_ } => {
+                    match tab.src {
+                        MsgSource::Chan { serv_name: ref serv_name_, chan_name: ref chan_name_ } => {
                             if serv_name == serv_name_ && chan_name == chan_name_ {
                                 target_idxs.push(tab_idx);
                                 break;
@@ -247,10 +247,10 @@ impl Tabbed {
                 }
             },
 
-            &MsgTarget::User { serv_name, nick } => {
+            MsgTarget::User { serv_name, nick } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    match &tab.src {
-                        &MsgSource::User { serv_name: ref serv_name_, nick: ref nick_ } => {
+                    match tab.src {
+                        MsgSource::User { serv_name: ref serv_name_, nick: ref nick_ } => {
                             if serv_name == serv_name_ && nick == nick_ {
                                 target_idxs.push(tab_idx);
                                 break;
@@ -261,7 +261,7 @@ impl Tabbed {
                 }
             },
 
-            &MsgTarget::AllServTabs { serv_name } => {
+            MsgTarget::AllServTabs { serv_name } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if tab.src.serv_name() == serv_name {
                         target_idxs.push(tab_idx);
@@ -269,17 +269,17 @@ impl Tabbed {
                 }
             },
 
-            &MsgTarget::AllTabs => {
+            MsgTarget::AllTabs => {
                 for tab_idx in 0 .. self.tabs.len() {
                     target_idxs.push(tab_idx);
                 }
             },
 
-            &MsgTarget::CurrentTab => {
+            MsgTarget::CurrentTab => {
                 target_idxs.push(self.active_idx.unwrap());
             },
 
-            &MsgTarget::MultipleTabs(ref targets) => {
+            MsgTarget::MultipleTabs(ref targets) => {
                 for target in targets.iter() {
                     self.apply_to_target(target, f);
                 }
@@ -299,20 +299,20 @@ impl Tabbed {
     }
 
     fn maybe_create_tab(&mut self, target : &MsgTarget) -> Vec<usize> {
-        match target {
-            &MsgTarget::Server { serv_name } => {
+        match *target {
+            MsgTarget::Server { serv_name } => {
                 opt_to_vec(self.new_server_tab(serv_name))
             },
 
-            &MsgTarget::Chan { serv_name, chan_name } => {
+            MsgTarget::Chan { serv_name, chan_name } => {
                 opt_to_vec(self.new_chan_tab(serv_name, chan_name))
             },
 
-            &MsgTarget::User { serv_name, nick } => {
+            MsgTarget::User { serv_name, nick } => {
                 opt_to_vec(self.new_user_tab(serv_name, nick))
             },
 
-            &MsgTarget::MultipleTabs(ref targets) => {
+            MsgTarget::MultipleTabs(ref targets) => {
                 targets.iter().flat_map(|t : &Box<MsgTarget>| self.maybe_create_tab(&*t)).collect()
             }
 
@@ -367,8 +367,8 @@ impl Tabbed {
 
     fn find_serv_tab_idx(&self, serv_name_ : &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            match &tab.src {
-                &MsgSource::Serv { ref serv_name } => {
+            match tab.src {
+                MsgSource::Serv { ref serv_name } => {
                     if serv_name_ == serv_name {
                         return Some(tab_idx);
                     }
@@ -381,8 +381,8 @@ impl Tabbed {
 
     fn find_chan_tab_idx(&self, serv_name_ : &str, chan_name_ : &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            match &tab.src {
-                &MsgSource::Chan { ref serv_name, ref chan_name } => {
+            match tab.src {
+                MsgSource::Chan { ref serv_name, ref chan_name } => {
                     if serv_name_ == serv_name && chan_name_ == chan_name {
                         return Some(tab_idx);
                     }
@@ -395,8 +395,8 @@ impl Tabbed {
 
     fn find_user_tab_idx(&self, serv_name_ : &str, nick_ : &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            match &tab.src {
-                &MsgSource::User { ref serv_name, ref nick } => {
+            match tab.src {
+                MsgSource::User { ref serv_name, ref nick } => {
                     if serv_name_ == serv_name && nick_ == nick {
                         return Some(tab_idx);
                     }

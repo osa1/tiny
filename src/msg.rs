@@ -25,8 +25,8 @@ pub enum Pfx {
 impl Pfx {
     #[inline]
     pub fn is_server_pfx(&self) -> bool {
-        match self {
-            &Pfx::Server(_) => true,
+        match *self {
+            Pfx::Server(_) => true,
             _ => false,
         }
     }
@@ -44,7 +44,7 @@ impl Msg {
 
         writeln!(&mut io::stderr(), "parsing msg: {:?}", String::from_utf8(msg.to_owned())).unwrap();
 
-        if msg.len() == 0 {
+        if msg.is_empty() {
             return Err("Empty msg".to_owned());
         }
 
