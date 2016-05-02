@@ -362,6 +362,20 @@ impl Tabbed {
         });
     }
 
+    #[inline]
+    pub fn add_nick(&mut self, nick : &str, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.join(nick);
+        });
+    }
+
+    #[inline]
+    pub fn remove_nick(&mut self, nick : &str, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.part(nick);
+        });
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
 

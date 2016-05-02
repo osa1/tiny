@@ -104,6 +104,9 @@ pub const TERMBOX_COLOR_PREFIX : char = '\x00';
 #[derive(Debug)]
 pub struct StyleStr<'a>(pub &'a str);
 
+// TODO: This encoding is causing too much problem. Translate these to termbox
+// colors and use termbox encoding.
+
 pub static USER_MSG_SS   : StyleStr<'static> =
     StyleStr(concat!(color_prefix!(), white!()));
 

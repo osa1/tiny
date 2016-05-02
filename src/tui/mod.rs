@@ -240,6 +240,16 @@ impl TUI {
     pub fn set_topic(&mut self, msg : &str, target : &MsgTarget) {
         self.ui.set_topic(msg, target);
     }
+
+    #[inline]
+    pub fn add_nick(&mut self, nick : &str, target : &MsgTarget) {
+        self.ui.add_nick(nick, target);
+    }
+
+    #[inline]
+    pub fn remove(&mut self, nick : &str, target : &MsgTarget) {
+        self.ui.remove_nick(nick, target);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

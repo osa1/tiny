@@ -445,6 +445,32 @@ impl Tiny {
                 });
             }
 
+            // RPL_NAMREPLY: List of users in a channel
+            Cmd::Num(353) => {
+                let comm  = unsafe { &self.comms.get_unchecked(comm_idx) };
+                let chan  = &args[2];
+                let chan_target = MsgTarget::Chan {
+                    serv_name: &comm.serv_name,
+                    chan_name: chan,
+                };
+
+
+                for nick in args[3].split_whitespace() {
+                    // Apparently some nicks have a '@' prefix (indicating ops)
+                    // TODO: Not sure where this is documented
+                    let nick = if nick.chars().nth(0) == Some('@') {
+                        &nick[1 .. ]
+                    } else {
+                        nick
+                    };
+                    writeln!(self.tui, "adding nick {} to {:?}", nick, chan_target).unwrap();
+                    self.tui.add_nick(nick, &chan_target);
+                }
+            }
+
+            // RPL_ENDOFNAMES: End of NAMES list
+            Cmd::Num(366) => {}
+
             ////////////////////////////////////////////////////////////////////
 
             _ => {

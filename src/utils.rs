@@ -20,3 +20,13 @@ pub fn opt_to_vec<T>(opt : Option<T>) -> Vec<T> {
         Some(t) => vec![t],
     }
 }
+
+#[inline]
+pub fn in_slice<E : Eq>(e : E, slice : &[E]) -> bool {
+    for e_ in slice.iter() {
+        if e == *e_ {
+            return true;
+        }
+    }
+    false
+}
