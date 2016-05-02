@@ -167,8 +167,12 @@ impl Line {
                         bg = 0;
                         char = char_;
                     }
+                } else {
+                    break;
                 }
-            } else if char == style::TERMBOX_COLOR_PREFIX {
+            }
+
+            if char == style::TERMBOX_COLOR_PREFIX {
                 fg = iter.next().unwrap() as u16;
                 bg = iter.next().unwrap() as u16;
                 continue;
