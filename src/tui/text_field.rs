@@ -73,7 +73,8 @@ impl TextField {
         // draw cursor
         // TODO: render the char under the cursor
         termbox::print_char(pos_x + self.cursor - self.scroll, pos_y,
-                            style::CURSOR.fg, style::CURSOR.bg, 'x');
+                            style::CURSOR.fg, style::CURSOR.bg,
+                            *line_borrow.get(self.cursor as usize).unwrap_or(&' '));
     }
 
     pub fn keypressed(&mut self, key : Key) -> WidgetRet {

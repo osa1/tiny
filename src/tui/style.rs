@@ -53,7 +53,7 @@ pub static CLEAR : Style =
 
 pub static CURSOR : Style =
     Style {
-        fg: 39,
+        fg: termbox_sys::TB_BLACK,
         bg: 39,
         str: &CURSOR_SS,
     };
