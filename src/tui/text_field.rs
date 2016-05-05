@@ -66,7 +66,7 @@ impl TextField {
 
         let slice : &[char] =
             &line_borrow[ self.scroll as usize ..
-                          min(self.line_len() as usize, (self.scroll + self.width) as usize) ];
+                          min(line_borrow.len(), (self.scroll + self.width) as usize) ];
 
         termbox::print_chars(pos_x, pos_y, style::USER_MSG.fg, style::USER_MSG.bg, slice);
 
