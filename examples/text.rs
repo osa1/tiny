@@ -8,6 +8,9 @@ use std::io::Read;
 use std::mem;
 use std::time::Duration;
 
+use std::io;
+use std::io::Write;
+
 use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
 
 use tiny::tui::msg_area::MsgArea;
@@ -26,13 +29,17 @@ fn loop_() -> Option<String> {
         let mut file = File::open("test/lipsum.txt").unwrap();
         file.read_to_string(&mut text).unwrap();
         let single_line_text = text.lines().collect::<Vec<&str>>().join("");
-        msg_area.add_text(&single_line_text, &style::USER_MSG_SS);
+        msg_area.set_style(&style::ERR_MSG);
+        msg_area.add_text(&single_line_text);
+        writeln!(io::stderr(), "full text added: {}", single_line_text).unwrap();
         msg_area.flush_line();
 
         for line in text.lines() {
-            msg_area.add_text(">>>", &style::TOPIC_SS);
-            msg_area.add_text("  ", &style::SERVER_MSG_SS);
-            msg_area.add_text(line, &style::SERVER_MSG_SS);
+            msg_area.set_style(&style::TOPIC);
+            msg_area.add_text(">>>");
+            msg_area.set_style(&style::SERVER_MSG);
+            msg_area.add_text("  ");
+            msg_area.add_text(line);
             msg_area.flush_line();
         }
     }
@@ -70,6 +77,14 @@ fn loop_() -> Option<String> {
 
                 Ok(Event::KeyEvent(Key::Ctrl('n'))) => {
                     msg_area.scroll_down();
+                },
+
+                Ok(Event::KeyEvent(Key::PageUp)) => {
+                    msg_area.page_up();
+                },
+
+                Ok(Event::KeyEvent(Key::PageDown)) => {
+                    msg_area.page_down();
                 },
 
                 // Ok(Event::KeyEvent(Key::Char(ch))) => {
