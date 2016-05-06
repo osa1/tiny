@@ -276,6 +276,19 @@ fn height_test_5() {
     }
 }
 
+#[test]
+fn height_test_6() {
+    let mut text = String::new();
+    {
+        let mut file = File::open("test/lipsum.txt").unwrap();
+        file.read_to_string(&mut text).unwrap();
+    }
+
+    let mut line = Line::new();
+    line.add_text(&text);
+    assert!(line.rendered_height(1) >= 1160);
+}
+
 #[bench]
 fn bench_rendered_height(b : &mut Bencher) {
 
