@@ -380,8 +380,11 @@ impl<'s> Iterator for WordIdxs<'s> {
     }
 }
 
-static LEFT_SEPS  : [char; 5] = [ '(', '{', '[', '|', '<' ];
-static RIGHT_SEPS : [char; 8] = [ ')', '}', ']', '|', '>', ',', ';', '.' ];
+/// A word may start with these characters, in addition to alphanumerics.
+static LEFT_SEPS  : [char; 8]  = [ '(', '{', '[', '|', '<', '\'', '`', '"' ];
+
+/// A word may end with these characters, in addition to whitespace.
+static RIGHT_SEPS : [char; 11] = [ ')', '}', ']', '|', '>', ',', ';', '.', '\'', '`', '"' ];
 
 #[inline]
 fn is_left_sep(char : char) -> bool {
@@ -473,4 +476,6 @@ fn test_word_idxs() {
                vec![(0, 3), (5, 8), (10, 14), (15, 19)]);
     assert_eq!(WordIdxs::new("tiny_test, hey").into_iter().collect::<Vec<(usize, usize)>>(),
                vec![(0, 9), (11, 14)]);
+    assert_eq!(WordIdxs::new("foo's bar`s \"baz\"").into_iter().collect::<Vec<(usize, usize)>>(),
+               vec![(0, 3), (4, 5), (6, 9), (10, 11), (13, 16)]);
 }
