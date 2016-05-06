@@ -123,34 +123,40 @@ impl MessagingUI {
 impl MessagingUI {
     #[inline]
     pub fn add_client_err_msg(&mut self, msg : &str) {
-        self.msg_area.add_text(msg, &style::ERR_MSG_SS);
+        self.msg_area.set_style(&style::ERR_MSG);
+        self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
     #[inline]
     pub fn add_client_msg(&mut self, msg : &str) {
-        self.msg_area.add_text(msg, &style::USER_MSG_SS);
+        self.msg_area.set_style(&style::USER_MSG);
+        self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
     #[inline]
     pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm) {
-        self.msg_area.add_text(&format!("[{}] <", tm.strftime("%H:%M").unwrap()),
-                               &style::USER_MSG_SS);
+        let translated = translate_irc_colors(msg);
+        let msg = {
+            match translated {
+                Some(ref str) => &str,
+                None => msg,
+            }
+        };
+
+        self.msg_area.set_style(&style::USER_MSG);
+        self.msg_area.add_text(&format!("[{}] <", tm.strftime("%H:%M").unwrap()));
 
         {
-            let fg = self.get_nick_color(sender);
-            let mut sender_style = String::with_capacity(3);
-            sender_style.push(style::TERMBOX_COLOR_PREFIX);
-            sender_style.push(fg as char);
-            sender_style.push('\x00'); // termbox bg (default)
-            self.msg_area.add_text(sender, &style::StyleStr(&sender_style));
+            let nick_color = self.get_nick_color(sender);
+            let style = style::Style { fg: nick_color as u16, bg: style::USER_MSG.bg };
+            self.msg_area.set_style(&style);
+            self.msg_area.add_text(sender);
         }
 
-        // Need to write this to clear fg/bg. Otherwise we end up ORing old
-        // fg/bg with new ones.
-        self.msg_area.add_char(style::RESET_PREFIX);
-        self.msg_area.add_text("> ", &style::USER_MSG_SS);
+        self.msg_area.set_style(&style::USER_MSG);
+        self.msg_area.add_text("> ");
 
         // Highlight nicks
         {
@@ -166,25 +172,23 @@ impl MessagingUI {
 
             let mut last_idx = 0;
             for (nick_start, nick_end) in nick_idxs.into_iter() {
-                self.msg_area.add_text(&msg[ last_idx .. nick_start ], &style::USER_MSG_SS);
+                self.msg_area.set_style(&style::USER_MSG);
+                self.msg_area.add_text(&msg[ last_idx .. nick_start ]);
 
                 {
                     let nick = unsafe { msg.slice_unchecked(nick_start, nick_end) };
                     let nick_color = self.get_nick_color(nick);
-                    let mut nick_style = String::with_capacity(3);
-                    nick_style.push(style::TERMBOX_COLOR_PREFIX);
-                    nick_style.push(nick_color as char);
-                    nick_style.push('\x00'); // default bg
-                    self.msg_area.add_text(nick, &style::StyleStr(&nick_style));
+                    let style = style::Style { fg: nick_color as u16, bg: style::USER_MSG.bg };
+                    self.msg_area.set_style(&style);
+                    self.msg_area.add_text(nick);
                 }
-
-                self.msg_area.add_char(style::RESET_PREFIX);
 
                 last_idx = nick_end;
             }
 
             if last_idx != msg.len() {
-                self.msg_area.add_text(&msg[ last_idx .. ], &style::USER_MSG_SS);
+                self.msg_area.set_style(&style::USER_MSG);
+                self.msg_area.add_text(&msg[ last_idx .. ]);
             }
         }
 
@@ -193,18 +197,17 @@ impl MessagingUI {
 
     #[inline]
     pub fn add_msg(&mut self, msg : &str, tm : &Tm) {
-        self.msg_area.add_text(
-            &format!("[{}] {}", tm.strftime("%H:%M").unwrap(), msg),
-            &style::USER_MSG_SS);
+        self.msg_area.set_style(&style::USER_MSG);
+        self.msg_area.add_text(&format!("[{}] {}", tm.strftime("%H:%M").unwrap(), msg));
         self.msg_area.flush_line();
     }
 
     #[inline]
     pub fn add_err_msg(&mut self, msg : &str, tm : &Tm) {
-        self.msg_area.add_text(
-            &format!("[{}] ", tm.strftime("%H:%M").unwrap()),
-            &style::USER_MSG_SS);
-        self.msg_area.add_text(msg, &style::ERR_MSG_SS);
+        self.msg_area.set_style(&style::USER_MSG);
+        self.msg_area.add_text(&format!("[{}] ", tm.strftime("%H:%M").unwrap()));
+        self.msg_area.set_style(&style::ERR_MSG);
+        self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
@@ -244,6 +247,83 @@ impl MessagingUI {
 
     pub fn part(&mut self, nick : &str) {
         self.nicks.remove(nick);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+fn translate_irc_colors(str : &str) -> Option<String> {
+    // Most messages won't have any colors, so we have this fast path here
+    if str.find(style::IRC_COLOR_PREFIX).is_none() {
+        return None;
+    }
+
+    let mut ret = String::with_capacity(str.len());
+
+    let mut iter = str.chars();
+    while let Some(mut char) = iter.next() {
+        if char == style::IRC_COLOR_PREFIX {
+            let fg1 = to_dec(iter.next().unwrap());
+            let fg2 = to_dec(iter.next().unwrap());
+            let fg  = fg1 * 10 + fg2;
+            if let Some(char_) = iter.next() {
+                if char_ == ',' {
+                    let bg1 = to_dec(iter.next().unwrap());
+                    let bg2 = to_dec(iter.next().unwrap());
+                    let bg  = bg1 * 10 + bg2;
+                    ret.push(style::TERMBOX_COLOR_PREFIX);
+                    ret.push(0 as char); // style
+                    ret.push(irc_color_to_termbox(fg) as char);
+                    ret.push(irc_color_to_termbox(bg) as char);
+                    continue;
+                } else {
+                    ret.push(style::TERMBOX_COLOR_PREFIX);
+                    ret.push(0 as char); // style
+                    ret.push(irc_color_to_termbox(fg) as char);
+                    ret.push(irc_color_to_termbox(style::USER_MSG.bg as u8) as char);
+                    char = char_;
+                }
+            } else {
+                ret.push(style::TERMBOX_COLOR_PREFIX);
+                ret.push(0 as char); // style
+                ret.push(irc_color_to_termbox(fg) as char);
+                ret.push(irc_color_to_termbox(style::USER_MSG.bg as u8) as char);
+                break;
+            }
+        }
+
+        ret.push(char);
+    }
+
+    Some(ret)
+}
+
+#[inline]
+fn to_dec(ch : char) -> u8 {
+    ((ch as u32) - ('0' as u32)) as u8
+}
+
+// IRC colors: http://en.wikichip.org/wiki/irc/colors
+// Termbox colors: http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
+fn irc_color_to_termbox(irc_color : u8) -> u8 {
+    match irc_color {
+         0 => 15,  // white
+         1 => 0,   // black
+         2 => 17,  // navy
+         3 => 2,   // green
+         4 => 9,   // red
+         5 => 88,  // maroon
+         6 => 5,   // purple
+         7 => 130, // olive
+         8 => 11,  // yellow
+         9 => 10,  // light green
+        10 => 6,   // teal
+        11 => 14,  // cyan
+        12 => 12,  // awful blue
+        13 => 13,  // magenta
+        14 => 8,   // gray
+        15 => 7,   // light gray
+         _ => panic!("Unknown irc color: {}", irc_color)
     }
 }
 

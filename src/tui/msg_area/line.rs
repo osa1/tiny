@@ -3,7 +3,7 @@ use std::io::Write;
 
 use rustbox::{RustBox};
 use termbox_sys::tb_change_cell;
-use termbox_sys;
+// use termbox_sys;
 
 use tui::style;
 
@@ -11,7 +11,8 @@ use tui::style;
 /// screen.
 #[derive(Debug)]
 pub struct Line {
-    /// Note that this String may not be directly renderable - TODO: explain.
+    /// Note that this String may not be directly renderable because of color
+    /// encodings.
     str       : String,
 
     /// Number of _visible_ (i.e. excludes color encodings) characters in the
@@ -37,46 +38,33 @@ impl Line {
         }
     }
 
+    pub fn set_style(&mut self, style : &style::Style) {
+        self.str.push(style::TERMBOX_COLOR_PREFIX);
+        self.str.push(((style.fg >> 8) as u8) as char);
+        self.str.push((style.fg as u8) as char);
+        self.str.push((style.bg as u8) as char);
+    }
+
     pub fn add_text(&mut self, str : &str) {
         self.str.reserve(str.len());
 
         let mut iter = str.chars();
-        while let Some(mut char) = iter.next() {
-            if char == style::COLOR_PREFIX {
-                self.str.push(char);
-                // read fg
-                self.str.push(iter.next().unwrap());
-                self.str.push(iter.next().unwrap());
-                if let Some(mb_comma) = iter.next() {
-                    if mb_comma == ',' {
-                        self.str.push(mb_comma);
-                        // read bg
-                        self.str.push(iter.next().unwrap());
-                        self.str.push(iter.next().unwrap());
-                        continue;
-                    } else {
-                        char = mb_comma;
-                    }
-                } else {
-                    break;
-                }
-            }
-
+        while let Some(char) = iter.next() {
             if char == style::TERMBOX_COLOR_PREFIX {
                 self.str.push(char);
+                // read style (bold, underline etc.)
+                self.str.push(iter.next().unwrap());
                 // read fg
                 self.str.push(iter.next().unwrap());
                 // read bg
                 self.str.push(iter.next().unwrap());
             }
 
-            else if char == style::RESET_PREFIX || char == style::BOLD_PREFIX {
+            else if char == style::COLOR_RESET_PREFIX {
                 self.str.push(char);
             }
 
-            // Ignore some chars that break the rendering. These are used by the
-            // protocol.
-            else if char > '\x07' {
+            else if char > '\x08' {
                 self.str.push(char);
                 if char.is_whitespace() {
                     self.splits.push(self.len_chars);
@@ -87,7 +75,7 @@ impl Line {
     }
 
     pub fn add_char(&mut self, char : char) {
-        assert!(char != style::COLOR_PREFIX);
+        assert!(char != style::TERMBOX_COLOR_PREFIX);
         if char.is_whitespace() {
             self.splits.push(self.len_chars);
         }
@@ -152,42 +140,21 @@ impl Line {
         let mut bg : u16 = 0;
 
         let mut iter = self.str.chars();
-        while let Some(mut char) = iter.next() {
-            if char == style::COLOR_PREFIX {
-                let fg_1 = to_dec(iter.next().unwrap()) as u16;
-                let fg_2 = to_dec(iter.next().unwrap()) as u16;
-                // We 'or' here as 'fg' can have 'bold' value
-                fg |= irc_color_to_termbox(fg_1 * 10 + fg_2);
-
-                if let Some(char_) = iter.next() {
-                    if char_ == ',' {
-                        let bg_1 = to_dec(iter.next().unwrap()) as u16;
-                        let bg_2 = to_dec(iter.next().unwrap()) as u16;
-                        bg = irc_color_to_termbox(bg_1 * 10 + bg_2);
-                        continue;
-                    } else {
-                        bg = 0;
-                        char = char_;
-                    }
-                } else {
-                    break;
-                }
-            }
-
+        while let Some(char) = iter.next() {
             if char == style::TERMBOX_COLOR_PREFIX {
-                fg = iter.next().unwrap() as u16;
-                bg = iter.next().unwrap() as u16;
-                continue;
-            } else if char == style::BOLD_PREFIX {
-                fg |= termbox_sys::TB_BOLD;
-                continue;
-            } else if char == style::RESET_PREFIX {
-                fg = 0;
-                bg = 0;
-                continue;
+                let b1 = iter.next().unwrap() as u8;
+                let b2 = iter.next().unwrap() as u8;
+                let b3 = iter.next().unwrap() as u8;
+                fg = ((b1 as u16) << 8) | (b2 as u16);
+                bg = b3 as u16;
             }
 
-            if char.is_whitespace() {
+            else if char == style::COLOR_RESET_PREFIX {
+                fg = style::CLEAR.fg;
+                bg = style::CLEAR.bg;
+            }
+
+            else if char.is_whitespace() {
                 // We may want to move to the next line
                 next_split_idx += 1;
                 let next_split = self.splits.get(next_split_idx).unwrap_or(&self.len_chars);
@@ -231,37 +198,6 @@ impl Line {
                 char_idx += 1;
             }
         }
-    }
-}
-
-#[inline]
-pub fn to_dec(ch : char) -> i8 {
-    ((ch as u32) - ('0' as u32)) as i8
-}
-
-// IRC colors: http://en.wikichip.org/wiki/irc/colors
-// Termbox colors: http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
-fn irc_color_to_termbox(irc_color : u16) -> u16 {
-    match irc_color {
-         0 => 15,  // white
-         1 => 0,   // black
-         2 => 17,  // navy
-         3 => 2,   // green
-         4 => 9,   // red
-         5 => 88,  // maroon
-         6 => 5,   // purple
-         7 => 130, // olive
-         8 => 11,  // yellow
-         9 => 10,  // light green
-        10 => 6,   // teal
-        11 => 14,  // cyan
-        12 => 12,  // awful blue
-        13 => 13,  // magenta
-        14 => 8,   // gray
-        15 => 7,   // light gray
-
-        // The rest is directly mapped to termbox colors.
-        _  => irc_color,
     }
 }
 
