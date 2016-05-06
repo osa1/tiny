@@ -71,7 +71,6 @@ impl TextField {
         termbox::print_chars(pos_x, pos_y, style::USER_MSG.fg, style::USER_MSG.bg, slice);
 
         // draw cursor
-        // TODO: render the char under the cursor
         termbox::print_char(pos_x + self.cursor - self.scroll, pos_y,
                             style::CURSOR.fg, style::CURSOR.bg,
                             *line_borrow.get(self.cursor as usize).unwrap_or(&' '));
