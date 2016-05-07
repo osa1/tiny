@@ -109,7 +109,13 @@ impl MsgArea {
         self.line_buf.add_char(char);
     }
 
-    pub fn flush_line(&mut self) {
+    pub fn flush_line(&mut self) -> usize {
         self.lines.push(mem::replace(&mut self.line_buf, Line::new()));
+        self.lines.len() - 1
+    }
+
+    #[inline]
+    pub fn modify_line<F>(&mut self, idx : usize, f : F) where F : Fn(&mut Line) {
+        f(&mut self.lines[idx]);
     }
 }

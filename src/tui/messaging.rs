@@ -35,6 +35,17 @@ pub struct MessagingUI {
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
     nicks : HashSet<String>,
+
+    last_activity_line : Option<Box<ActivityLine>>,
+}
+
+/// An activity line is just a line that we update on joins / leaves /
+/// disconnects. We group activities that happen in the same minute to avoid
+/// redundantly showing lines.
+struct ActivityLine {
+    tm_hour  : i32,
+    tm_min   : i32,
+    line_idx : usize,
 }
 
 impl MessagingUI {
@@ -48,6 +59,7 @@ impl MessagingUI {
             nick_colors: HashMap::new(),
             available_colors: (16 .. 232).into_iter().collect(),
             nicks: HashSet::new(),
+            last_activity_line: None,
         }
     }
 
@@ -118,25 +130,29 @@ impl MessagingUI {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Methods delegeted to the msg_area
+// Adding new messages
 
 impl MessagingUI {
-    #[inline]
     pub fn add_client_err_msg(&mut self, msg : &str) {
+        self.reset_activity_line();
+
         self.msg_area.set_style(&style::ERR_MSG);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
-    #[inline]
     pub fn add_client_msg(&mut self, msg : &str) {
+        self.reset_activity_line();
+
         self.msg_area.set_style(&style::USER_MSG);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
+        self.reset_activity_line();
     }
 
-    #[inline]
     pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm) {
+        self.reset_activity_line();
+
         let translated = translate_irc_colors(msg);
         let msg = {
             match translated {
@@ -195,15 +211,17 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    #[inline]
     pub fn add_msg(&mut self, msg : &str, tm : &Tm) {
+        self.reset_activity_line();
+
         self.msg_area.set_style(&style::USER_MSG);
         self.msg_area.add_text(&format!("[{}] {}", tm.strftime("%H:%M").unwrap(), msg));
         self.msg_area.flush_line();
     }
 
-    #[inline]
     pub fn add_err_msg(&mut self, msg : &str, tm : &Tm) {
+        self.reset_activity_line();
+
         self.msg_area.set_style(&style::USER_MSG);
         self.msg_area.add_text(&format!("[{}] ", tm.strftime("%H:%M").unwrap()));
         self.msg_area.set_style(&style::ERR_MSG);
@@ -241,12 +259,67 @@ impl MessagingUI {
 // Keeping nick list up-to-date
 
 impl MessagingUI {
-    pub fn join(&mut self, nick : &str) {
+    pub fn join(&mut self, nick : &str, tm : Option<&Tm>) {
         self.nicks.insert(nick.to_owned());
+
+        if let Some(tm) = tm {
+            let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
+            self.msg_area.modify_line(line_idx, |line| {
+                line.set_style(&style::JOIN);
+                line.add_text(nick);
+                line.add_char(' ');
+            });
+        }
     }
 
-    pub fn part(&mut self, nick : &str) {
+    pub fn part(&mut self, nick : &str, tm : Option<&Tm>) {
         self.nicks.remove(nick);
+
+        if let Some(tm) = tm {
+            let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
+            self.msg_area.modify_line(line_idx, |line| {
+                line.set_style(&style::LEAVE);
+                line.add_text(nick);
+                line.add_char(' ');
+            });
+        }
+    }
+
+    pub fn has_nick(&self, nick : &str) -> bool {
+        self.nicks.contains(nick)
+    }
+
+    fn reset_activity_line(&mut self) {
+        self.last_activity_line = None;
+    }
+
+    fn get_activity_line_idx(&mut self, hour : i32, min : i32) -> usize {
+        if let Some(ref mut l) = self.last_activity_line {
+            if l.tm_hour == hour && l.tm_min == min {
+                l.line_idx
+            } else {
+                // FIXME: This part is weird. Maybe msg_area should have a
+                // `add_line(Line)` method instead of weird `add_text()`, `set_style()`
+                // etc.
+                self.msg_area.set_style(&style::USER_MSG);
+                self.msg_area.add_text(&format!("[{:02}:{:02}] ", hour, min));
+                let line_idx = self.msg_area.flush_line();
+                l.tm_hour = hour;
+                l.tm_min = min;
+                l.line_idx = line_idx;
+                line_idx
+            }
+        } else {
+            self.msg_area.set_style(&style::USER_MSG);
+            self.msg_area.add_text(&format!("[{:02}:{:02}] ", hour, min));
+            let line_idx = self.msg_area.flush_line();
+            self.last_activity_line = Some(Box::new(ActivityLine {
+                tm_hour: hour,
+                tm_min: min,
+                line_idx: line_idx,
+            }));
+            line_idx
+        }
     }
 }
 

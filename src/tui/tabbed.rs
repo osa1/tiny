@@ -269,6 +269,14 @@ impl Tabbed {
                 }
             },
 
+            MsgTarget::AllUserTabs { serv_name, nick } => {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
+                    if tab.src.serv_name() == serv_name && tab.widget.has_nick(nick) {
+                        target_idxs.push(tab_idx);
+                    }
+                }
+            },
+
             MsgTarget::AllTabs => {
                 for tab_idx in 0 .. self.tabs.len() {
                     target_idxs.push(tab_idx);
@@ -363,16 +371,16 @@ impl Tabbed {
     }
 
     #[inline]
-    pub fn add_nick(&mut self, nick : &str, target : &MsgTarget) {
+    pub fn add_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.join(nick);
+            tab.widget.join(nick, tm);
         });
     }
 
     #[inline]
-    pub fn remove_nick(&mut self, nick : &str, target : &MsgTarget) {
+    pub fn remove_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.part(nick);
+            tab.widget.part(nick, tm);
         });
     }
 

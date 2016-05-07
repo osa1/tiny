@@ -60,6 +60,18 @@ pub static TAB_PASSIVE : Style =
         bg: 7,
     };
 
+pub static JOIN : Style =
+    Style {
+        fg: 34,
+        bg: termbox_sys::TB_DEFAULT,
+    };
+
+pub static LEAVE : Style =
+    Style {
+        fg: 196,
+        bg: termbox_sys::TB_DEFAULT,
+    };
+
 pub const TERMBOX_COLOR_PREFIX : char = '\x00';
 pub const COLOR_RESET_PREFIX   : char = '\x01';
 pub const IRC_COLOR_PREFIX     : char = '\x03';

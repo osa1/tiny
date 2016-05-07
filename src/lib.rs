@@ -358,16 +358,33 @@ impl Tiny {
                 let chan = unsafe { args.get_unchecked(0) };
                 let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                 match pfx {
-                    Pfx::Server(serv) => {
-                        // This doesn't make any sense, log it.
-                        writeln!(self.tui, "Weird JOIN message with server prefix {}", serv).unwrap();
+                    Pfx::Server(_) => {
+                        writeln!(self.tui, "Weird JOIN message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick, .. } => {
                         if nick == self.nick {
                             self.tui.new_chan_tab(serv_name, chan);
                         } else {
-                            // TODO
+                            self.tui.add_nick(
+                                &nick,
+                                Some(&time::now()),
+                                &MsgTarget::Chan { serv_name: serv_name, chan_name: chan });
                         }
+                    }
+                }
+            },
+
+            Cmd::Str(ref s) if s == "QUIT" => {
+                let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
+                match pfx {
+                    Pfx::Server(_) => {
+                        writeln!(self.tui, "Weird QUIT message pfx {:?}", pfx).unwrap();
+                    },
+                    Pfx::User { nick, .. } => {
+                        self.tui.remove_nick(
+                            &nick,
+                            Some(&time::now()),
+                            &MsgTarget::AllUserTabs { serv_name: serv_name, nick: &nick });
                     }
                 }
             },
@@ -464,7 +481,7 @@ impl Tiny {
                         nick
                     };
                     writeln!(self.tui, "adding nick {} to {:?}", nick, chan_target).unwrap();
-                    self.tui.add_nick(nick, &chan_target);
+                    self.tui.add_nick(nick, None, &chan_target);
                 }
             }
 

@@ -192,6 +192,10 @@ pub enum MsgTarget<'a> {
     /// Show the message in all tabs of a server.
     AllServTabs { serv_name: &'a str },
 
+    /// Show the message all server tabs that have the user. (i.e. channels,
+    /// privmsg tabs)
+    AllUserTabs { serv_name: &'a str, nick: &'a str },
+
     /// Show the message in all tabs.
     AllTabs,
 
@@ -242,13 +246,13 @@ impl TUI {
     }
 
     #[inline]
-    pub fn add_nick(&mut self, nick : &str, target : &MsgTarget) {
-        self.ui.add_nick(nick, target);
+    pub fn add_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
+        self.ui.add_nick(nick, tm, target);
     }
 
     #[inline]
-    pub fn remove(&mut self, nick : &str, target : &MsgTarget) {
-        self.ui.remove_nick(nick, target);
+    pub fn remove_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
+        self.ui.remove_nick(nick, tm, target);
     }
 }
 
