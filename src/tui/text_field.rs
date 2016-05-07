@@ -98,27 +98,26 @@ impl TextField {
                 if ch == 'a' {
                     self.move_cursor(0);
                     WidgetRet::KeyHandled
-                } else if ch == 'e' {
+                }
+
+                else if ch == 'e' {
                     let cur = self.line_len();
                     self.move_cursor(cur);
                     WidgetRet::KeyHandled
-                } else if ch == 'k' {
+                }
+
+                else if ch == 'k' {
                     self.modify();
                     self.buffer.drain(self.cursor as usize ..);
                     WidgetRet::KeyHandled
-                } else if ch == 'w' {
-                    self.modify();
-                    // TODO: First consume whitespace under the cursor
-                    let end_range = self.cursor as usize;
-                    let mut begin_range = max(0, self.cursor - 1) as usize;
-                    while begin_range > 0
-                            && !self.buffer[begin_range].is_whitespace() {
-                        begin_range -= 1;
-                    }
-                    self.buffer.drain(begin_range .. end_range);
-                    self.move_cursor(begin_range as i32);
+                }
+
+                else if ch == 'w' {
+                    self.consume_word_before_curs();
                     WidgetRet::KeyHandled
-                } else {
+                }
+
+                else {
                     WidgetRet::KeyIgnored
                 }
             },
@@ -195,6 +194,40 @@ impl TextField {
 
             _ => WidgetRet::KeyIgnored,
         }
+    }
+
+    fn consume_word_before_curs(&mut self) {
+        // No modifications can happen if the scroll is at the beginning
+        if self.cursor == 0 {
+            return;
+        }
+
+        self.modify();
+
+        let char = self.buffer[(self.cursor - 1) as usize];
+
+        // Try to imitate vim's behaviour here.
+        if char.is_whitespace() {
+            self.consume_before(|c| c.is_whitespace());
+        }
+
+        else if char.is_alphanumeric() {
+            self.consume_before(|c| c.is_alphanumeric());
+        }
+
+        else {
+            self.consume_before(|c| !c.is_alphanumeric());
+        }
+    }
+
+    fn consume_before<F>(&mut self, f : F) where F : Fn(char) -> bool {
+        let end_range = self.cursor as usize;
+        let mut begin_range = self.cursor - 1;
+        while begin_range >= 0 && f(self.buffer[begin_range as usize]) {
+            begin_range -= 1;
+        }
+        self.buffer.drain(((begin_range + 1) as usize) .. end_range);
+        self.move_cursor(begin_range + 1);
     }
 
     #[inline]
