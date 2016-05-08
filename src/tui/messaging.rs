@@ -7,26 +7,27 @@ use std::collections::HashSet;
 use rand;
 use rand::Rng;
 
+use tui::exit_dialogue::ExitDialogue;
 use tui::msg_area::MsgArea;
 use tui::style;
 use tui::text_field::TextField;
-use tui::widget::{WidgetRet};
+use tui::widget::{WidgetRet, Widget};
 use utils::in_slice;
 
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.
 pub struct MessagingUI {
     /// Channel topic, user info etc.
-    topic      : Option<String>,
+    topic : Option<String>,
 
     /// Incoming and sent messages appear
-    msg_area   : MsgArea,
+    msg_area : MsgArea,
 
-    /// User input field
-    text_field : TextField,
+    /// Stacked user input fields. Topmost one handles keypresses.
+    input_field : Vec<Box<Widget>>,
 
-    width      : i32,
-    height     : i32,
+    width  : i32,
+    height : i32,
 
     // NOTE: Color is encoded in Termbox's 216 colors. (in 256-color mode)
     nick_colors      : HashMap<String, u8>,
@@ -53,7 +54,7 @@ impl MessagingUI {
         MessagingUI {
             topic: None,
             msg_area: MsgArea::new(width, height - 1),
-            text_field: TextField::new(width),
+            input_field: vec![Box::new(TextField::new(width))],
             width: width,
             height: height,
             nick_colors: HashMap::new(),
@@ -83,11 +84,16 @@ impl MessagingUI {
         // }
 
         self.msg_area.draw(rustbox, pos_x, pos_y);
-        self.text_field.draw(rustbox, pos_x, pos_y + self.height - 1);
+        self.input_field.draw(rustbox, pos_x, pos_y + self.height - 1);
     }
 
     pub fn keypressed(&mut self, key : Key) -> WidgetRet {
         match key {
+            Key::Ctrl('q') => {
+                self.toggle_exit_dialogue();
+                WidgetRet::KeyHandled
+            },
+
             Key::Ctrl('p') => {
                 self.msg_area.scroll_up();
                 WidgetRet::KeyHandled
@@ -109,11 +115,15 @@ impl MessagingUI {
             },
 
             key => {
-                // TODO: Handle ret
-                match self.text_field.keypressed(key) {
+                match self.input_field.keypressed(key) {
                     WidgetRet::KeyIgnored => {
                         // self.show_server_msg("KEY IGNORED", format!("{:?}", key).as_ref());
                         WidgetRet::KeyIgnored
+                    },
+                    WidgetRet::Remove => {
+                        self.input_field.pop();
+                        WidgetRet::KeyHandled
+
                     },
                     ret => ret,
                 }
@@ -125,7 +135,19 @@ impl MessagingUI {
         self.width = width;
         self.height = height;
         self.msg_area.resize(width, height - 1);
-        self.text_field.resize(width, 1);
+        self.input_field.resize(width, 1);
+    }
+
+    fn toggle_exit_dialogue(&mut self) {
+        assert!(self.input_field.len() > 0);
+        // FIXME: This is a bit too fragile I think. Since we only stack an exit
+        // dialogue on top of the input field at the moment, checking the len()
+        // is fine. If we decide to stack more stuff it'll break.
+        if self.input_field.len() == 1 {
+            self.input_field.push(Box::new(ExitDialogue::new(self.width)));
+        } else {
+            self.input_field.pop();
+        }
     }
 }
 

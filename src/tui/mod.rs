@@ -1,6 +1,7 @@
 #[macro_use]
 pub mod style;
 
+pub mod exit_dialogue;
 pub mod messaging;
 pub mod msg_area;
 pub mod tabbed;
@@ -124,10 +125,6 @@ impl TUI {
 
     pub fn keypressed(&mut self, ev : Event) -> TUIRet {
         match ev {
-            Event::KeyEvent(Key::Esc) => {
-                TUIRet::Abort
-            },
-
             Event::ResizeEvent(width, height) => {
                 // This never happens, probably because the our select() loop,
                 // termbox can't really get resize signals.
@@ -144,7 +141,8 @@ impl TUI {
                             msg: msg,
                             from: from.clone(),
                         }
-                    }
+                    },
+                    TabbedRet::Abort => TUIRet::Abort,
                 }
             },
 

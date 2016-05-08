@@ -62,14 +62,20 @@ pub static TAB_PASSIVE : Style =
 
 pub static JOIN : Style =
     Style {
-        fg: 34,
+        fg: 64,
         bg: termbox_sys::TB_DEFAULT,
     };
 
 pub static LEAVE : Style =
     Style {
-        fg: 196,
+        fg: 124,
         bg: termbox_sys::TB_DEFAULT,
+    };
+
+pub static YELLOW : Style =
+    Style {
+        fg: 0,
+        bg: 11,
     };
 
 pub const TERMBOX_COLOR_PREFIX : char = '\x00';

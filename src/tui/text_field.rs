@@ -7,7 +7,7 @@ use rustbox::{RustBox};
 
 use tui::style;
 use tui::termbox;
-use tui::widget::{WidgetRet};
+use tui::widget::{WidgetRet, Widget};
 
 // TODO: Make these settings
 const SCROLLOFF : i32 = 5;
@@ -48,13 +48,13 @@ impl TextField {
         }
     }
 
-    pub fn resize(&mut self, width : i32, _ : i32) {
+    pub fn resize_(&mut self, width : i32, _ : i32) {
         self.width = width;
         let cursor = self.cursor;
         self.move_cursor(cursor);
     }
 
-    pub fn draw(&self, _ : &RustBox, pos_x : i32, pos_y : i32) {
+    pub fn draw_(&self, _ : &RustBox, pos_x : i32, pos_y : i32) {
         // draw text
         let line_borrow : &[char] = {
             if let Some(hist_curs) = self.hist_curs {
@@ -76,7 +76,7 @@ impl TextField {
                             *line_borrow.get(self.cursor as usize).unwrap_or(&' '));
     }
 
-    pub fn keypressed(&mut self, key : Key) -> WidgetRet {
+    pub fn keypressed_(&mut self, key : Key) -> WidgetRet {
         match key {
             Key::Char(ch) => {
                 self.modify();
@@ -289,5 +289,19 @@ impl TextField {
                                   max(0, self.line_len() + 1 - self.width));
             }
         }
+    }
+}
+
+impl Widget for TextField {
+    fn resize(&mut self, width : i32, height : i32) {
+        self.resize_(width, height);
+    }
+
+    fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+        self.draw_(rustbox, pos_x, pos_y);
+    }
+
+    fn keypressed(&mut self, key : Key) -> WidgetRet {
+        self.keypressed_(key)
     }
 }

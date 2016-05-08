@@ -66,6 +66,8 @@ pub enum TabbedRet<'t> {
         msg  : Vec<char>,
         from : &'t MsgSource,
     },
+
+    Abort,
 }
 
 impl Tabbed {
@@ -181,7 +183,7 @@ impl Tabbed {
         }
 
         match self.active_idx {
-            None => TabbedRet::KeyIgnored,
+            None => panic!("tabbed: No tabs exist to handle the keypress"),
             Some(idx) => {
                 match self.tabs[idx as usize].widget.keypressed(key) {
                     WidgetRet::KeyHandled => TabbedRet::KeyHandled,
@@ -192,6 +194,8 @@ impl Tabbed {
                             from: &self.tabs[idx as usize].src
                         }
                     },
+                    WidgetRet::Remove => unimplemented!(),
+                    WidgetRet::Abort => TabbedRet::Abort,
                 }
             }
         }
