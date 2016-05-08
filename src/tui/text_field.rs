@@ -133,6 +133,12 @@ impl TextField {
             },
 
             Key::Enter => {
+                if let Some(hist_curs) = self.hist_curs {
+                    self.buffer.clear();
+                    self.buffer.extend_from_slice(&self.history[hist_curs as usize]);
+                }
+
+                // FIXME: There's a bug here when hist_cursor is not None
                 let ret = mem::replace(&mut self.buffer, Vec::new());
                 if self.history.len() == HIST_SIZE {
                     let mut reuse = self.history.remove(0);
@@ -142,7 +148,10 @@ impl TextField {
                 } else {
                     self.history.push(ret.clone());
                 }
+
                 self.move_cursor(0);
+                self.hist_curs = None;
+
                 if ret.len() == 0 {
                     WidgetRet::KeyHandled
                 } else {
