@@ -29,7 +29,6 @@ pub static ERR_MSG : Style =
         bg: termbox_sys::TB_RED,
     };
 
-
 pub static TOPIC : Style =
     Style {
         fg: termbox_sys::TB_BLACK,
@@ -68,7 +67,7 @@ pub static JOIN : Style =
 
 pub static LEAVE : Style =
     Style {
-        fg: 124,
+        fg: 160,
         bg: termbox_sys::TB_DEFAULT,
     };
 
@@ -76,6 +75,18 @@ pub static YELLOW : Style =
     Style {
         fg: 0,
         bg: 11,
+    };
+
+pub static GRAY : Style =
+    Style {
+        fg: 242,
+        bg: termbox_sys::TB_DEFAULT,
+    };
+
+pub static HIGHLIGHT : Style =
+    Style {
+        fg: 220,
+        bg: termbox_sys::TB_DEFAULT,
     };
 
 pub const TERMBOX_COLOR_PREFIX : char = '\x00';

@@ -278,6 +278,7 @@ impl MessagingUI {
             let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
             self.msg_area.modify_line(line_idx, |line| {
                 line.set_style(&style::JOIN);
+                line.add_char('+');
                 line.add_text(nick);
                 line.add_char(' ');
             });
@@ -291,6 +292,7 @@ impl MessagingUI {
             let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
             self.msg_area.modify_line(line_idx, |line| {
                 line.set_style(&style::LEAVE);
+                line.add_char('-');
                 line.add_text(nick);
                 line.add_char(' ');
             });
@@ -313,7 +315,7 @@ impl MessagingUI {
                 // FIXME: This part is weird. Maybe msg_area should have a
                 // `add_line(Line)` method instead of weird `add_text()`, `set_style()`
                 // etc.
-                self.msg_area.set_style(&style::USER_MSG);
+                self.msg_area.set_style(&style::GRAY);
                 self.msg_area.add_text(&format!("[{:02}:{:02}] ", hour, min));
                 let line_idx = self.msg_area.flush_line();
                 l.tm_hour = hour;
@@ -322,7 +324,7 @@ impl MessagingUI {
                 line_idx
             }
         } else {
-            self.msg_area.set_style(&style::USER_MSG);
+            self.msg_area.set_style(&style::GRAY);
             self.msg_area.add_text(&format!("[{:02}:{:02}] ", hour, min));
             let line_idx = self.msg_area.flush_line();
             self.last_activity_line = Some(Box::new(ActivityLine {
