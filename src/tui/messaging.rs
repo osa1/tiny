@@ -94,16 +94,6 @@ impl MessagingUI {
                 WidgetRet::KeyHandled
             },
 
-            Key::Ctrl('p') => {
-                self.msg_area.scroll_up();
-                WidgetRet::KeyHandled
-            },
-
-            Key::Ctrl('n') => {
-                self.msg_area.scroll_down();
-                WidgetRet::KeyHandled
-            },
-
             Key::PageUp => {
                 self.msg_area.page_up();
                 WidgetRet::KeyHandled

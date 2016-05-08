@@ -15,7 +15,7 @@ use utils::opt_to_vec;
 
 pub struct Tabbed {
     tabs       : Vec<Tab>,
-    active_idx : Option<usize>,
+    active_idx : usize,
     width      : i32,
     height     : i32,
 }
@@ -74,7 +74,7 @@ impl Tabbed {
     pub fn new(width : i32, height : i32) -> Tabbed {
         Tabbed {
             tabs: Vec::new(),
-            active_idx: None,
+            active_idx: 0,
             width: width,
             height: height,
         }
@@ -88,11 +88,11 @@ impl Tabbed {
                     widget: MessagingUI::new(self.width, self.height - 1),
                     src: MsgSource::Serv { serv_name: serv_name.to_owned() },
                 });
-                self.active_idx = Some(self.tabs.len() - 1);
+                self.active_idx = self.tabs.len() - 1;
                 Some(self.tabs.len() - 1)
             },
             Some(tab_idx) => {
-                self.active_idx = Some(tab_idx);
+                self.active_idx = tab_idx;
                 None
             }
         }
@@ -113,13 +113,13 @@ impl Tabbed {
                             src: MsgSource::Chan { serv_name: serv_name.to_owned(),
                                                    chan_name: chan_name.to_owned() },
                         });
-                        self.active_idx = Some(tab_idx + 1);
+                        self.active_idx = tab_idx + 1;
                         Some(tab_idx + 1)
                     }
                 }
             },
             Some(tab_idx) => {
-                self.active_idx = Some(tab_idx);
+                self.active_idx = tab_idx;
                 None
             }
         }
@@ -140,27 +140,24 @@ impl Tabbed {
                             src: MsgSource::User { serv_name: serv_name.to_owned(),
                                                    nick: nick.to_owned() },
                         });
-                        self.active_idx = Some(tab_idx + 1);
+                        self.active_idx = tab_idx + 1;
                         Some(tab_idx + 1)
                     }
                 }
             },
             Some(tab_idx) => {
-                self.active_idx = Some(tab_idx);
+                self.active_idx = tab_idx;
                 None
             }
         }
     }
 
     pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
-        match self.active_idx {
-            None => {},
-            Some(idx) => self.tabs[idx as usize].widget.draw(rustbox, pos_x, pos_y),
-        }
+        self.tabs[self.active_idx].widget.draw(rustbox, pos_x, pos_y);
 
         let mut tab_name_col = pos_x;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if self.active_idx == Some(tab_idx) {
+            if self.active_idx == tab_idx {
                 termbox::print(tab_name_col, pos_y + self.height - 1,
                                style::TAB_ACTIVE.fg, style::TAB_ACTIVE.bg,
                                tab.visible_name());
@@ -175,29 +172,37 @@ impl Tabbed {
     }
 
     pub fn keypressed(&mut self, key : Key) -> TabbedRet {
-        if key == Key::Tab {
-            if self.tabs.len() > 0 {
-                self.active_idx = Some((self.active_idx.unwrap() + 1) % self.tabs.len());
-            }
-            return TabbedRet::KeyHandled;
-        }
-
-        match self.active_idx {
-            None => panic!("tabbed: No tabs exist to handle the keypress"),
-            Some(idx) => {
-                match self.tabs[idx as usize].widget.keypressed(key) {
-                    WidgetRet::KeyHandled => TabbedRet::KeyHandled,
-                    WidgetRet::KeyIgnored => TabbedRet::KeyIgnored,
-                    WidgetRet::Input(input) => {
-                        TabbedRet::Input {
-                            msg: input,
-                            from: &self.tabs[idx as usize].src
-                        }
-                    },
-                    WidgetRet::Remove => unimplemented!(),
-                    WidgetRet::Abort => TabbedRet::Abort,
+        match self.tabs[self.active_idx].widget.keypressed(key) {
+            WidgetRet::KeyHandled => TabbedRet::KeyHandled,
+            WidgetRet::KeyIgnored => self.handle_keypress(key),
+            WidgetRet::Input(input) => {
+                TabbedRet::Input {
+                    msg: input,
+                    from: &self.tabs[self.active_idx].src
                 }
-            }
+            },
+            WidgetRet::Remove => unimplemented!(),
+            WidgetRet::Abort => TabbedRet::Abort,
+        }
+    }
+
+    fn handle_keypress(&mut self, key : Key) -> TabbedRet {
+        match key {
+            Key::Ctrl('n') => {
+                self.active_idx = (self.active_idx + 1) % self.tabs.len();
+                TabbedRet::KeyHandled
+            },
+
+            Key::Ctrl('p') => {
+                if self.active_idx == 0 {
+                    self.active_idx = self.tabs.len() - 1;
+                } else {
+                    self.active_idx -= 1;
+                }
+                TabbedRet::KeyHandled
+            },
+
+            _ => TabbedRet::KeyIgnored,
         }
     }
 
@@ -288,7 +293,7 @@ impl Tabbed {
             },
 
             MsgTarget::CurrentTab => {
-                target_idxs.push(self.active_idx.unwrap());
+                target_idxs.push(self.active_idx);
             },
 
             MsgTarget::MultipleTabs(ref targets) => {
