@@ -1,5 +1,5 @@
-use std::io;
-use std::io::Write;
+// use std::io;
+// use std::io::Write;
 
 use rustbox::{RustBox};
 use termbox_sys::tb_change_cell;
@@ -127,8 +127,6 @@ impl Line {
     }
 
     pub fn draw_from(&self, _ : &RustBox, pos_x : i32, pos_y : i32, first_line : i32, width : i32) {
-        writeln!(io::stderr(), "drawing {:?}", self.str).unwrap();
-
         let mut col = pos_x;
         let mut line = 0;
 
