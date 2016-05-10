@@ -374,6 +374,23 @@ impl Tiny {
                 }
             },
 
+            Cmd::Str(ref s) if s == "PART" => {
+                let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
+                match pfx {
+                    Pfx::Server(_) => {
+                        writeln!(self.tui, "Weird PART message pfx {:?}", pfx).unwrap();
+                    },
+                    Pfx::User { nick, .. } => {
+                        for chan in args {
+                            self.tui.remove_nick(
+                                &nick,
+                                Some(&time::now()),
+                                &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
+                        }
+                    }
+                }
+            },
+
             Cmd::Str(ref s) if s == "QUIT" => {
                 let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                 match pfx {
