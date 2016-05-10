@@ -379,11 +379,11 @@ impl Tiny {
                     Pfx::Server(_) => {
                         writeln!(self.tui, "Weird PART message pfx {:?}", pfx).unwrap();
                     },
-                    Pfx::User { nick, .. } => {
+                    Pfx::User { ref nick, .. } => {
                         let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                         for chan in args {
                             self.tui.remove_nick(
-                                &nick,
+                                nick,
                                 Some(&time::now()),
                                 &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
                         }
@@ -396,12 +396,12 @@ impl Tiny {
                     Pfx::Server(_) => {
                         writeln!(self.tui, "Weird QUIT message pfx {:?}", pfx).unwrap();
                     },
-                    Pfx::User { nick, .. } => {
+                    Pfx::User { ref nick, .. } => {
                         let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                         self.tui.remove_nick(
-                            &nick,
+                            nick,
                             Some(&time::now()),
-                            &MsgTarget::AllUserTabs { serv_name: serv_name, nick: &nick });
+                            &MsgTarget::AllUserTabs { serv_name: serv_name, nick: nick });
                     }
                 }
             },
