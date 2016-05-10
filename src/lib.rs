@@ -381,12 +381,11 @@ impl Tiny {
                     },
                     Pfx::User { ref nick, .. } => {
                         let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
-                        for chan in args {
-                            self.tui.remove_nick(
-                                nick,
-                                Some(&time::now()),
-                                &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
-                        }
+                        let chan = &args[0];
+                        self.tui.remove_nick(
+                            nick,
+                            Some(&time::now()),
+                            &MsgTarget::Chan { serv_name: serv_name, chan_name: chan });
                     }
                 }
             },
