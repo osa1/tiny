@@ -61,13 +61,13 @@ pub static TAB_PASSIVE : Style =
 
 pub static JOIN : Style =
     Style {
-        fg: 64,
+        fg: 242,
         bg: termbox_sys::TB_DEFAULT,
     };
 
 pub static LEAVE : Style =
     Style {
-        fg: 160,
+        fg: 242,
         bg: termbox_sys::TB_DEFAULT,
     };
 
@@ -84,6 +84,12 @@ pub static GRAY : Style =
     };
 
 pub static HIGHLIGHT : Style =
+    Style {
+        fg: 161,
+        bg: termbox_sys::TB_DEFAULT,
+    };
+
+pub static MENTION : Style =
     Style {
         fg: 220,
         bg: termbox_sys::TB_DEFAULT,
