@@ -356,12 +356,12 @@ impl Tiny {
             Cmd::Str(ref s) if s == "JOIN" => {
                 debug_assert!(args.len() == 1);
                 let chan = unsafe { args.get_unchecked(0) };
-                let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                 match pfx {
                     Pfx::Server(_) => {
                         writeln!(self.tui, "Weird JOIN message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick, .. } => {
+                        let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                         if nick == self.nick {
                             self.tui.new_chan_tab(serv_name, chan);
                         } else {
@@ -375,12 +375,12 @@ impl Tiny {
             },
 
             Cmd::Str(ref s) if s == "PART" => {
-                let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                 match pfx {
                     Pfx::Server(_) => {
                         writeln!(self.tui, "Weird PART message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick, .. } => {
+                        let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                         for chan in args {
                             self.tui.remove_nick(
                                 &nick,
@@ -392,12 +392,12 @@ impl Tiny {
             },
 
             Cmd::Str(ref s) if s == "QUIT" => {
-                let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                 match pfx {
                     Pfx::Server(_) => {
                         writeln!(self.tui, "Weird QUIT message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick, .. } => {
+                        let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
                         self.tui.remove_nick(
                             &nick,
                             Some(&time::now()),
