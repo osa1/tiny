@@ -277,6 +277,24 @@ impl MessagingUI {
         }
     }
 
+    pub fn nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm) {
+        self.nicks.remove(old_nick);
+        self.nicks.insert(new_nick.to_owned());
+        let color = self.nick_colors.remove(old_nick);
+        if let Some(color_) = color {
+            self.nick_colors.insert(new_nick.to_owned(), color_);
+        }
+
+        let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
+        self.msg_area.modify_line(line_idx, |line| {
+            line.set_style(&style::NICK);
+            line.add_text(old_nick);
+            line.add_text("->");
+            line.add_text(new_nick);
+            line.add_char(' ');
+        });
+    }
+
     pub fn has_nick(&self, nick : &str) -> bool {
         self.nicks.contains(nick)
     }

@@ -252,6 +252,11 @@ impl TUI {
     pub fn remove_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
         self.ui.remove_nick(nick, tm, target);
     }
+
+    #[inline]
+    pub fn rename_nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm, target : &MsgTarget) {
+        self.ui.rename_nick(old_nick, new_nick, tm, target);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

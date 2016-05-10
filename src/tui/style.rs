@@ -71,6 +71,12 @@ pub static LEAVE : Style =
         bg: termbox_sys::TB_DEFAULT,
     };
 
+pub static NICK : Style =
+    Style {
+        fg: 242,
+        bg: termbox_sys::TB_DEFAULT,
+    };
+
 pub static YELLOW : Style =
     Style {
         fg: 0,

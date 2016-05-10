@@ -419,6 +419,23 @@ impl Tiny {
                 }
             },
 
+            Cmd::Str(ref s) if s == "NICK" => {
+                match pfx {
+                    Pfx::Server(_) => {
+                        writeln!(self.tui, "Weird NICK message pfx {:?}", pfx).unwrap();
+                    },
+                    Pfx::User { nick: ref old_nick, .. } => {
+                        let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
+                        let new_nick = &args[0];
+                        self.tui.rename_nick(old_nick, new_nick, &time::now(),
+                                             &MsgTarget::AllUserTabs {
+                                                 serv_name: serv_name,
+                                                 nick: old_nick,
+                                             });
+                    }
+                }
+            },
+
             ////////////////////////////////////////////////////////////////////
             // Numeric replies
 

@@ -393,6 +393,13 @@ impl Tabbed {
         });
     }
 
+    #[inline]
+    pub fn rename_nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm, target : &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.nick(old_nick, new_nick, tm);
+        });
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
 
