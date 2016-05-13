@@ -70,10 +70,14 @@ impl TextField {
 
         termbox::print_chars(pos_x, pos_y, style::USER_MSG.fg, style::USER_MSG.bg, slice);
 
-        // draw cursor
-        termbox::print_char(pos_x + self.cursor - self.scroll, pos_y,
-                            style::CURSOR.fg, style::CURSOR.bg,
-                            *line_borrow.get(self.cursor as usize).unwrap_or(&' '));
+        // On my terminal the cursor is only shown when there's a character
+        // under it.
+        if self.cursor as usize >= line_borrow.len() {
+            termbox::print_char(pos_x + self.cursor - self.scroll, pos_y,
+                                style::USER_MSG.fg, style::USER_MSG.bg,
+                                ' ');
+        }
+        termbox::set_cursor(pos_x + self.cursor - self.scroll, pos_y);
     }
 
     pub fn keypressed_(&mut self, key : Key) -> WidgetRet {

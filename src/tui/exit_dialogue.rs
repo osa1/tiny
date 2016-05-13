@@ -24,6 +24,8 @@ impl Widget for ExitDialogue {
     }
 
     fn draw(&self, _ : &RustBox, pos_x : i32, pos_y : i32) {
+        termbox::hide_cursor();
+
         let mut col = 0;
         for char in MSG.chars() {
             termbox::print_char(pos_x + col, pos_y, style::YELLOW.fg, style::YELLOW.bg, char);

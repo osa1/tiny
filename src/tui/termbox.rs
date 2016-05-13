@@ -24,3 +24,13 @@ pub fn print_chars(mut pos_x : i32, pos_y : i32, fg : u16, bg : u16, chars : &[c
         pos_x += 1;
     }
 }
+
+#[inline]
+pub fn set_cursor(pos_x : i32, pos_y : i32) {
+    unsafe { termbox_sys::tb_set_cursor(pos_x, pos_y); }
+}
+
+#[inline]
+pub fn hide_cursor() {
+    set_cursor(-1, -1);
+}
