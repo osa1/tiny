@@ -482,7 +482,8 @@ impl Widget for TextField {
                 if cursor_left == cursor_right {
                     &[]
                 } else {
-                    &line[ ((cursor_left + 1) as usize) .. (cursor_right as usize) ]
+                    cursor_left += 1;
+                    &line[ (cursor_left as usize) .. (cursor_right as usize) ]
                 }
             };
 
@@ -494,7 +495,7 @@ impl Widget for TextField {
             self.mode = Mode::Autocomplete {
                 original_buffer: self.shown_line().to_owned(),
                 insertion_point: self.cursor as usize,
-                word_starts: (cursor_left + 1) as usize,
+                word_starts: cursor_left as usize,
                 completions: completions,
                 current_completion: 0,
             };
