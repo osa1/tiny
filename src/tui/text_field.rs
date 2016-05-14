@@ -467,8 +467,8 @@ impl Widget for TextField {
             return;
         }
 
-        let cursor_right = max(0, self.cursor - 1);
-        let mut cursor_left = cursor_right;
+        let cursor_right = self.cursor;
+        let mut cursor_left = max(0, cursor_right - 1);
 
         let completions = {
             let line = self.shown_line();
