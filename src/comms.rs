@@ -133,37 +133,24 @@ impl Comms {
     fn handle_msgs(&mut self) -> Vec<CommsRet> {
         let mut ret = Vec::with_capacity(1);
 
-        // Have we read any CRLFs? In that case just process the message and
-        // update buffers. Otherwise just leave the partial message in the
-        // buffer.
         loop {
-            match find_byte(self.msg_buf.borrow(), b'\r') {
+            match find_byte(self.msg_buf.borrow(), b'\n') {
                 None => { break; },
-                Some(cr_idx) => {
-                    // We have a CR, however, we don't have any guarantees that
-                    // a single read() will read both CR and LF. So if we have a
-                    // CR, but that's the last byte, we should just wait until
-                    // we read NL too.
-                    if cr_idx == self.msg_buf.len() - 1 {
-                        break;
-                    } else {
-                        assert!(self.msg_buf[cr_idx + 1] == b'\n');
+                Some(nl_idx) => {
+                    assert!(self.msg_buf[nl_idx - 1] == b'\r');
+                    let msg = {
+                        let msg_slice = &self.msg_buf[ 0 .. nl_idx - 1 ];
+                        // Log the message in debug mode
+                        if cfg!(debug_assertions) {
+                            writeln!(self.log_file.as_ref().unwrap(), "{}",
+                                     unsafe { str::from_utf8_unchecked(msg_slice) }).unwrap();
+                        }
+                        Msg::parse(msg_slice)
+                    };
 
-                        let msg = {
-                            // Don't include CRLF
-                            let msg_slice = &self.msg_buf[ 0 .. cr_idx ];
-                            // Log the message in debug mode
-                            if cfg!(debug_assertions) {
-                                writeln!(self.log_file.as_ref().unwrap(), "{}",
-                                         unsafe { str::from_utf8_unchecked(msg_slice) }).unwrap();
-                            }
-                            Msg::parse(msg_slice)
-                        };
-
-                        Comms::handle_msg(&mut self.stream, msg, &mut ret);
-                        // Update the buffer (drop CRLF too)
-                        self.msg_buf.drain(0 .. cr_idx + 2);
-                    }
+                    Comms::handle_msg(&mut self.stream, msg, &mut ret);
+                    // Update the buffer (drop CRLF too)
+                    self.msg_buf.drain(0 .. nl_idx + 1);
                 }
             }
         }
