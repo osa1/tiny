@@ -25,8 +25,8 @@ pub static SERVER_MSG : Style =
 
 pub static ERR_MSG : Style =
     Style {
-        fg: termbox_sys::TB_WHITE | termbox_sys::TB_BOLD,
-        bg: termbox_sys::TB_RED,
+        fg: 15 | termbox_sys::TB_BOLD,
+        bg: 1,
     };
 
 pub static TOPIC : Style =
