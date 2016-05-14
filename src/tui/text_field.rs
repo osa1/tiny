@@ -206,13 +206,15 @@ impl TextField {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit => {},
-                    Mode::History(hist_curs) => {
-                        if hist_curs != (self.history.len() - 1) as i32 {
-                            self.mode = Mode::History(hist_curs + 1);
-                        } else {
-                            self.mode = Mode::Edit;
+                    Mode::Edit => {
+                        if !self.history.is_empty() {
+                            self.mode = Mode::History((self.history.len() as i32) - 1);
+                            self.move_cursor_to_end();
                         }
+                    },
+                    Mode::History(hist_curs) => {
+                        self.mode = Mode::History(
+                            if hist_curs > 0 { hist_curs - 1 } else { hist_curs });
                         self.move_cursor_to_end();
                     },
                     Mode::Autocomplete {
@@ -247,15 +249,13 @@ impl TextField {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit => {
-                        if !self.history.is_empty() {
-                            self.mode = Mode::History((self.history.len() as i32) - 1);
-                            self.move_cursor_to_end();
-                        }
-                    },
+                    Mode::Edit => {},
                     Mode::History(hist_curs) => {
-                        self.mode = Mode::History(
-                            if hist_curs > 0 { hist_curs - 1 } else { hist_curs });
+                        if hist_curs != (self.history.len() - 1) as i32 {
+                            self.mode = Mode::History(hist_curs + 1);
+                        } else {
+                            self.mode = Mode::Edit;
+                        }
                         self.move_cursor_to_end();
                     },
                     Mode::Autocomplete {
