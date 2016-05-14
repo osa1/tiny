@@ -3,8 +3,6 @@ extern crate rustbox;
 extern crate time;
 extern crate tiny;
 
-use std::borrow::Borrow;
-use std::ffi::CStr;
 use std::mem;
 
 use tiny::tui::{TUI, TUIRet, MsgTarget};
@@ -32,18 +30,9 @@ fn loop_() -> Option<String> {
                          std::ptr::null_mut())   // timeval
         };
 
-        // if ret == -1 {
-        //     let err_c_msg =
-        //         unsafe { CStr::from_ptr(libc::strerror(*libc::__errno_location())) }
-        //             .to_string_lossy();
-
-        //     tui.show_conn_error(
-        //         format!("Internal error: select() failed: {}", err_c_msg).borrow());
-        // }
-
         if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
             match tui.keypressed_peek() {
-                TUIRet::Input { msg, from } => {
+                TUIRet::Input { msg, .. } => {
                     tui.add_msg(&msg.into_iter().collect::<String>(),
                                 &time::now(),
                                 &MsgTarget::Server { serv_name: "debug" });

@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::fmt::Arguments;
 use std::fs::File;
 use std::fs;
@@ -149,7 +148,7 @@ impl Comms {
         let mut ret = Vec::with_capacity(1);
 
         loop {
-            match find_byte(self.msg_buf.borrow(), b'\n') {
+            match find_byte(&self.msg_buf, b'\n') {
                 None => { break; },
                 Some(nl_idx) => {
                     assert!(self.msg_buf[nl_idx - 1] == b'\r');
