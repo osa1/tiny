@@ -206,15 +206,13 @@ impl TextField {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit => {
-                        if !self.history.is_empty() {
-                            self.mode = Mode::History((self.history.len() as i32) - 1);
-                            self.move_cursor_to_end();
-                        }
-                    },
+                    Mode::Edit => {},
                     Mode::History(hist_curs) => {
-                        self.mode = Mode::History(
-                            if hist_curs > 0 { hist_curs - 1 } else { hist_curs });
+                        if hist_curs != (self.history.len() - 1) as i32 {
+                            self.mode = Mode::History(hist_curs + 1);
+                        } else {
+                            self.mode = Mode::Edit;
+                        }
                         self.move_cursor_to_end();
                     },
                     Mode::Autocomplete {
@@ -222,8 +220,8 @@ impl TextField {
                         word_starts, completions, current_completion, ..
                     } => {
                         let current_completion =
-                            if current_completion > 0 {
-                                current_completion - 1
+                            if current_completion != completions.len() - 1 {
+                                current_completion + 1
                             } else {
                                 current_completion
                             };
@@ -249,13 +247,15 @@ impl TextField {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit => {},
-                    Mode::History(hist_curs) => {
-                        if hist_curs != (self.history.len() - 1) as i32 {
-                            self.mode = Mode::History(hist_curs + 1);
-                        } else {
-                            self.mode = Mode::Edit;
+                    Mode::Edit => {
+                        if !self.history.is_empty() {
+                            self.mode = Mode::History((self.history.len() as i32) - 1);
+                            self.move_cursor_to_end();
                         }
+                    },
+                    Mode::History(hist_curs) => {
+                        self.mode = Mode::History(
+                            if hist_curs > 0 { hist_curs - 1 } else { hist_curs });
                         self.move_cursor_to_end();
                     },
                     Mode::Autocomplete {
@@ -263,8 +263,8 @@ impl TextField {
                         word_starts, completions, current_completion, ..
                     } => {
                         let current_completion =
-                            if current_completion != completions.len() {
-                                current_completion + 1
+                            if current_completion > 0 {
+                                current_completion - 1
                             } else {
                                 current_completion
                             };
@@ -490,13 +490,16 @@ impl Widget for TextField {
         };
 
         if !completions.is_empty() {
+            let completion_len = completions[0].len();
             self.mode = Mode::Autocomplete {
                 original_buffer: self.shown_line().to_owned(),
                 insertion_point: self.cursor as usize,
-                word_starts: cursor_left as usize,
+                word_starts: (cursor_left + 1) as usize,
                 completions: completions,
                 current_completion: 0,
             };
+            let cursor = self.cursor;
+            self.move_cursor(cursor + completion_len as i32);
         }
     }
 }
