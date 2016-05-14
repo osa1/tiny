@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use rand;
 use rand::Rng;
 
+use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
 use tui::msg_area::MsgArea;
 use tui::style;
@@ -34,7 +35,7 @@ pub struct MessagingUI {
 
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
-    nicks : HashSet<String>,
+    nicks : Trie,
 
     last_activity_line : Option<Box<ActivityLine>>,
 }
@@ -58,7 +59,7 @@ impl MessagingUI {
             height: height,
             nick_colors: HashMap::new(),
             available_colors: (16 .. 232).into_iter().collect(),
-            nicks: HashSet::new(),
+            nicks: Trie::new(),
             last_activity_line: None,
         }
     }
@@ -100,6 +101,11 @@ impl MessagingUI {
 
             Key::PageDown => {
                 self.msg_area.page_down();
+                WidgetRet::KeyHandled
+            },
+
+            Key::Tab => {
+                self.input_field.autocomplete(&self.nicks);
                 WidgetRet::KeyHandled
             },
 
@@ -250,7 +256,7 @@ impl MessagingUI {
 
 impl MessagingUI {
     pub fn join(&mut self, nick : &str, tm : Option<&Tm>) {
-        self.nicks.insert(nick.to_owned());
+        self.nicks.insert(nick);
 
         if let Some(tm) = tm {
             let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
@@ -279,7 +285,7 @@ impl MessagingUI {
 
     pub fn nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm) {
         self.nicks.remove(old_nick);
-        self.nicks.insert(new_nick.to_owned());
+        self.nicks.insert(new_nick);
         let color = self.nick_colors.remove(old_nick);
         if let Some(color_) = color {
             self.nick_colors.insert(new_nick.to_owned(), color_);

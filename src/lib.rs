@@ -12,6 +12,7 @@ extern crate time;
 mod comms;
 mod utils;
 pub mod msg;
+pub mod trie;
 pub mod tui;
 
 use std::cmp::max;

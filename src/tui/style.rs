@@ -101,6 +101,12 @@ pub static MENTION : Style =
         bg: termbox_sys::TB_DEFAULT,
     };
 
+pub static COMPLETION : Style =
+    Style {
+        fg: 84,
+        bg: termbox_sys::TB_DEFAULT,
+    };
+
 pub const TERMBOX_COLOR_PREFIX : char = '\x00';
 pub const COLOR_RESET_PREFIX   : char = '\x01';
 pub const IRC_COLOR_PREFIX     : char = '\x03';

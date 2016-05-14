@@ -1,5 +1,6 @@
 use rustbox::{RustBox, Key};
 
+use trie::Trie;
 use tui::style;
 use tui::termbox;
 use tui::widget::{WidgetRet, Widget};
@@ -44,4 +45,6 @@ impl Widget for ExitDialogue {
             _ => WidgetRet::Remove,
         }
     }
+
+    fn autocomplete(&mut self, _ : &Trie) {}
 }
