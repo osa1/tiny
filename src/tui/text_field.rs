@@ -82,6 +82,11 @@ impl TextField {
                 ref original_buffer, insertion_point, word_starts,
                 ref completions, current_completion
             } => {
+                // draw a placeholder for the cursor
+                termbox::print_char(pos_x + self.cursor - self.scroll, pos_y,
+                                    style::USER_MSG.fg, style::USER_MSG.bg,
+                                    ' ');
+
                 let completion : &str = &completions[current_completion];
 
                 let mut orig_buf_iter = original_buffer.iter().cloned();
@@ -110,7 +115,7 @@ impl TextField {
                     }
                 }
 
-                // TODO: cursor
+                termbox::set_cursor(pos_x + self.cursor - self.scroll, pos_y);
             },
         }
     }
