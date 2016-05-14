@@ -13,7 +13,8 @@ path = "bin/main.rs"
 
 [dependencies]
 libc = "0.2.8"
+net2 = "0.2.23"
+rand = "0.3.14"
 rustbox = { git = "https://github.com/gchp/rustbox.git" }
 termbox-sys = "0.2.9"
 time = "0.1"
-rand = "0.3.14"

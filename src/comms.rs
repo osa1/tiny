@@ -5,10 +5,14 @@ use std::fs;
 use std::io::Read;
 use std::io::Write;
 use std::io;
+use std::mem;
 use std::net::TcpStream;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
-use std::time::Duration;
+// use std::time::Duration;
+
+use net2::TcpBuilder;
+use net2::TcpStreamExt;
 
 use msg::{Pfx, Cmd, Msg};
 use utils::find_byte;
@@ -16,6 +20,8 @@ use utils::find_byte;
 pub struct Comms {
     /// The TCP connection to the server.
     stream        : TcpStream,
+
+    status        : CommStatus,
 
     pub serv_name : String,
 
@@ -25,6 +31,13 @@ pub struct Comms {
     /// A file to log incoming messages for debugging purposes. Only available
     /// when `debug_assertions` is available.
     log_file      : Option<File>,
+}
+
+enum CommStatus {
+    /// Need to introduce self
+    Introduce { nick : String, hostname : String, realname : String },
+
+    PingPong,
 }
 
 #[derive(Debug)]
@@ -56,10 +69,10 @@ impl Comms {
     pub fn try_connect(serv_addr : &str, serv_name : &str,
                        nick : &str, hostname : &str, realname : &str)
                        -> io::Result<Comms> {
-        let stream = try!(TcpStream::connect(serv_addr));
-        try!(stream.set_read_timeout(Some(Duration::from_millis(10))));
-        try!(stream.set_write_timeout(None));
-        // try!(stream.set_nonblocking(true));
+        let stream = TcpBuilder::new_v4()?.to_tcp_stream()?;
+        stream.set_nonblocking(true)?;
+        // This will fail with EINPROGRESS
+        stream.connect(serv_addr);
 
         let log_file = {
             if cfg!(debug_assertions) {
@@ -70,15 +83,17 @@ impl Comms {
             }
         };
 
-        let mut comms = Comms {
+        Ok(Comms {
             stream:     stream,
+            status:     CommStatus::Introduce {
+                nick: nick.to_owned(),
+                hostname: hostname.to_owned(),
+                realname: realname.to_owned()
+            },
             serv_name:  serv_name.to_owned(),
             msg_buf:    Vec::new(),
             log_file:   log_file,
-        };
-
-        try!(comms.introduce(nick, hostname, realname));
-        Ok(comms)
+        })
     }
 
     /// Get the RawFd, to be used with select() or other I/O multiplexer.
@@ -148,7 +163,7 @@ impl Comms {
                         Msg::parse(msg_slice)
                     };
 
-                    Comms::handle_msg(&mut self.stream, msg, &mut ret);
+                    self.handle_msg(msg, &mut ret);
                     // Update the buffer (drop CRLF too)
                     self.msg_buf.drain(0 .. nl_idx + 1);
                 }
@@ -158,28 +173,36 @@ impl Comms {
         ret
     }
 
-    fn handle_msg(stream : &mut TcpStream, msg : Result<Msg, String>, ret : &mut Vec<CommsRet>) {
+    fn handle_msg(&mut self, msg : Result<Msg, String>, ret : &mut Vec<CommsRet>) {
         match msg {
             Err(err_msg) => {
                 ret.push(CommsRet::Err { err_msg: err_msg });
             },
             Ok(Msg { pfx, cmd, params }) => {
-                Comms::handle_cmd(stream, ret, pfx, cmd, params);
+                self.handle_cmd(ret, pfx, cmd, params);
             }
         }
     }
 
-    fn handle_cmd(stream : &mut TcpStream, ret : &mut Vec<CommsRet>,
+    fn handle_cmd(&mut self, ret : &mut Vec<CommsRet>,
                   pfx : Option<Pfx>, cmd : Cmd, params : Vec<Vec<u8>>) {
-        match cmd {
-            Cmd::Str(ref str) if str == "PING" => {
+        if let Cmd::Str(ref str) = cmd {
+            if str == "PING" {
                 debug_assert!(params.len() == 1);
                 Msg::pong(unsafe {
                             str::from_utf8_unchecked(params.into_iter().nth(0).unwrap().as_ref())
-                          }, stream).unwrap();
+                          }, &mut self.stream).unwrap();
                 return;
             }
-            _ => {}
+        }
+
+        let status = mem::replace(&mut self.status, CommStatus::PingPong);
+        if let CommStatus::Introduce { ref nick, ref hostname, ref realname } = status {
+            if let Err(err) = self.introduce(&nick, &hostname, &realname) {
+                ret.push(CommsRet::Err {
+                    err_msg: format!("Error: {:?}", err)
+                });
+            }
         }
 
         match pfx {
