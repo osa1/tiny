@@ -17,16 +17,17 @@ use std::mem;
 use std::str;
 use std::time::Duration;
 
-use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
-use termbox_sys;
 use time::Tm;
 use time;
 
 use self::tabbed::{Tabbed, TabbedRet, MsgSource};
 
+use term_input::{Event, Key};
+use termbox_simple::{Termbox, OutputMode};
+
 pub struct TUI {
     /// Termbox instance
-    rustbox  : RustBox,
+    termbox  : Termbox,
 
     /// A tab for every server + channel
     ui       : Tabbed,
@@ -57,21 +58,15 @@ pub enum TUIRet {
 
 impl TUI {
     pub fn new() -> TUI {
-        let tui = RustBox::init(InitOptions {
-            input_mode: InputMode::Esc,
-            buffer_stderr: false,
-        }).unwrap();
-
-        unsafe {
-            termbox_sys::tb_select_output_mode(termbox_sys::TB_OUTPUT_256);
-            termbox_sys::tb_set_clear_attributes(style::CLEAR.fg, style::CLEAR.bg);
-        }
+        let mut tui = Termbox::init().unwrap(); // TODO: check errors
+        tui.set_output_mode(OutputMode::Output256);
+        tui.set_clear_attributes(style::CLEAR.fg, style::CLEAR.bg);
 
         let _ = fs::create_dir("logs");
 
         TUI {
             ui: Tabbed::new(tui.width() as i32, tui.height() as i32),
-            rustbox: tui,
+            termbox: tui,
             buffer: Vec::with_capacity(100),
             log_file: File::create("logs/debug.txt").unwrap(),
         }
@@ -99,40 +94,19 @@ impl TUI {
 // Event handling
 
 impl TUI {
-    /// Should be called when stdin is ready.
-    pub fn keypressed_peek(&mut self) -> TUIRet {
-        match self.rustbox.peek_event(Duration::new(0, 0), false) {
-            Ok(ev) => self.keypressed(ev),
-
-            Err(err) => {
-                writeln!(self, "Error during poll_event(): {}", err).unwrap();
-                TUIRet::KeyHandled
-            }
-        }
-    }
-
-    /// Blocks until an event is read.
-    pub fn keypressed_poll(&mut self) -> TUIRet {
-        match self.rustbox.poll_event(false) {
-            Ok(ev) => self.keypressed(ev),
-
-            Err(err) => {
-                writeln!(self, "Error during poll_event(): {}", err).unwrap();
-                TUIRet::KeyHandled
-            }
-        }
-    }
-
-    pub fn keypressed(&mut self, ev : Event) -> TUIRet {
+    pub fn handle_input_event(&mut self, ev : Event) -> TUIRet {
         match ev {
-            Event::ResizeEvent(width, height) => {
+            Event::Resize => {
                 // This never happens, probably because the our select() loop,
                 // termbox can't really get resize signals.
-                self.resize(width, height);
+                self.termbox.resize();
+                let w = self.termbox.width();
+                let h = self.termbox.height();
+                self.resize(w, h);
                 TUIRet::KeyHandled
             },
 
-            Event::KeyEvent(key) => {
+            Event::Key(key) => {
                 match self.ui.keypressed(key) {
                     TabbedRet::KeyHandled => TUIRet::KeyHandled,
                     TabbedRet::KeyIgnored => TUIRet::KeyIgnored(key),
@@ -156,6 +130,7 @@ impl TUI {
         self.ui.resize(width, height);
     }
 
+/*
     /// Loop until something's entered to the user input field. Useful for
     /// waiting for a command when there's no connection yet.
     pub fn idle_loop(&mut self) -> TUIRet {
@@ -169,11 +144,12 @@ impl TUI {
             }
         }
     }
+*/
 
-    pub fn draw(&self) {
-        self.rustbox.clear();
-        self.ui.draw(&self.rustbox, 0, 0);
-        self.rustbox.present();
+    pub fn draw(&mut self) {
+        self.termbox.clear();
+        self.ui.draw(&mut self.termbox, 0, 0);
+        self.termbox.present();
     }
 }
 

@@ -1,11 +1,12 @@
-use rustbox::{RustBox, Key};
-use time::Tm;
+use termbox_simple::Termbox;
+use term_input::Key;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use rand;
 use rand::Rng;
+use rand;
+use time::Tm;
 
 use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
@@ -70,7 +71,7 @@ impl MessagingUI {
         // self.msg_area.resize(self.width, self.height - 2);
     }
 
-    pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+    pub fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
         // TODO: Most channels have long topics that don't fit into single line.
         // if let Some(ref topic) = self.topic {
         //     // rustbox.print(pos_x as usize, pos_y as usize,
@@ -83,13 +84,13 @@ impl MessagingUI {
         //     self.msg_area.draw(rustbox, pos_x, pos_y);
         // }
 
-        self.msg_area.draw(rustbox, pos_x, pos_y);
-        self.input_field.draw(rustbox, pos_x, pos_y + self.height - 1);
+        self.msg_area.draw(tb, pos_x, pos_y);
+        self.input_field.draw(tb, pos_x, pos_y + self.height - 1);
     }
 
     pub fn keypressed(&mut self, key : Key) -> WidgetRet {
         match key {
-            Key::Ctrl('q') => {
+            Key::Ctrl('c') => {
                 self.toggle_exit_dialogue();
                 WidgetRet::KeyHandled
             },

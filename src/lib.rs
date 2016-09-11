@@ -6,10 +6,11 @@ extern crate alloc_system;
 extern crate libc;
 extern crate net2;
 extern crate rand;
-extern crate rustbox;
-extern crate termbox_sys;
 extern crate test;
 extern crate time;
+
+extern crate term_input;
+extern crate termbox_simple;
 
 mod comms;
 mod utils;
@@ -24,18 +25,18 @@ use std::mem;
 
 use comms::{Comms, CommsRet};
 use msg::{Pfx, Cmd, Msg};
+use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
 use tui::{TUI, TUIRet, MsgTarget};
 
 pub struct Tiny {
     /// A connection to a server is maintained by 'Comms'.
-    comms    : Vec<Comms>,
-
-    tui      : TUI,
-
-    nick     : String,
-    hostname : String,
-    realname : String,
+    comms: Vec<Comms>,
+    tui: TUI,
+    input_ev_handler: Input,
+    nick: String,
+    hostname: String,
+    realname: String,
 }
 
 #[derive(PartialEq, Eq)]
@@ -51,6 +52,7 @@ impl Tiny {
         Tiny {
             comms: Vec::with_capacity(1),
             tui: TUI::new(),
+            input_ev_handler: Input::new(),
             nick: nick,
             hostname: hostname,
             realname: realname,
@@ -59,6 +61,8 @@ impl Tiny {
 
     pub fn mainloop(&mut self) {
         self.tui.new_server_tab("debug");
+        // we maintain this separately as otherwise we're having borrow checker problems
+        let mut ev_buffer = vec![];
 
         loop {
             // Set up the descriptors for select()
@@ -77,13 +81,13 @@ impl Tiny {
             let nfds = max_fd + 1;
 
             // Start the loop
-            if self.mainloop_(fd_set, nfds) == LoopRet::Abort {
+            if self.mainloop_(&mut ev_buffer, fd_set, nfds) == LoopRet::Abort {
                 break;
             }
         }
     }
 
-    fn mainloop_(&mut self, fd_set : libc::fd_set, nfds : libc::c_int) -> LoopRet {
+    fn mainloop_(&mut self, ev_buffer: &mut Vec<Event>, fd_set : libc::fd_set, nfds : libc::c_int) -> LoopRet {
         loop {
             self.tui.draw();
 
@@ -106,10 +110,10 @@ impl Tiny {
             //
             // See also https://github.com/nsf/termbox/issues/71.
             if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-                match self.handle_stdin() {
-                    LoopRet::Abort => { return LoopRet::Abort; },
-                    LoopRet::UpdateFds => { return LoopRet::UpdateFds; }
-                    _ => {}
+                for ret in self.handle_stdin(ev_buffer) {
+                    // FIXME: This part is broken
+                    if ret == LoopRet::Abort { return LoopRet::Abort; }
+                    else if ret == LoopRet::UpdateFds { return LoopRet::UpdateFds; }
                 }
             }
 
@@ -155,29 +159,38 @@ impl Tiny {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_stdin(&mut self) -> LoopRet {
-        match self.tui.keypressed_peek() {
-            TUIRet::Abort => LoopRet::Abort,
-            TUIRet::Input { msg, from } => {
-                writeln!(self.tui,
-                         "Input source: {:#?}, msg: {}",
-                         from, msg.iter().cloned().collect::<String>()).unwrap();
+    fn handle_stdin(&mut self, ev_buffer: &mut Vec<Event>) -> Vec<LoopRet> {
+        let mut ret = Vec::new();
 
-                writeln!(io::stderr(),
-                         "Input source: {:#?}, msg: {}",
-                         from, msg.iter().cloned().collect::<String>()).unwrap();
+        self.input_ev_handler.read_input_events(ev_buffer);
+        for ev in ev_buffer.iter().cloned() {
+            match self.tui.handle_input_event(ev) {
+                TUIRet::Abort => { ret.push(LoopRet::Abort); break; },
+                TUIRet::Input { msg, from } => {
+                    writeln!(self.tui,
+                             "Input source: {:#?}, msg: {}",
+                             from, msg.iter().cloned().collect::<String>()).unwrap();
 
-                // We know msg has at least one character as the TUI won't
-                // accept it otherwise.
-                if msg[0] == '/' {
-                    self.handle_command(from, (&msg[ 1 .. ]).into_iter().cloned().collect())
-                } else {
-                    self.send_msg(from, msg);
-                    LoopRet::Continue
-                }
-            },
-            _ => LoopRet::Continue
+                    writeln!(io::stderr(),
+                             "Input source: {:#?}, msg: {}",
+                             from, msg.iter().cloned().collect::<String>()).unwrap();
+
+                    // We know msg has at least one character as the TUI won't
+                    // accept it otherwise.
+                    if msg[0] == '/' {
+                        let cmd_ret =  self.handle_command(from, (&msg[ 1 .. ]).into_iter().cloned().collect());
+                        if cmd_ret != LoopRet::Continue {
+                            ret.push(cmd_ret);
+                        }
+                    } else {
+                        self.send_msg(from, msg);
+                    }
+                },
+                _ => {},
+            }
         }
+
+        ret
     }
 
     fn handle_command(&mut self, src : MsgSource, msg : String) -> LoopRet {

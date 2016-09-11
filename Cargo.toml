@@ -15,6 +15,6 @@ path = "bin/main.rs"
 libc = "0.2.8"
 net2 = "0.2.23"
 rand = "0.3.14"
-rustbox = { git = "https://github.com/gchp/rustbox.git" }
-termbox-sys = "0.2.9"
+term_input = { path = "term_input/" }
+termbox_simple = { path = "termbox/" }
 time = "0.1"

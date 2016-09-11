@@ -1,4 +1,5 @@
-use rustbox::{RustBox, Key};
+use termbox_simple::Termbox;
+use term_input::Key;
 
 use trie::Trie;
 
@@ -21,7 +22,7 @@ pub enum WidgetRet {
 
 pub trait Widget {
     fn resize(&mut self, width : i32, height : i32);
-    fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32);
+    fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32);
     fn keypressed(&mut self, key : Key) -> WidgetRet;
 
     // FIXME: Remove this
@@ -36,9 +37,9 @@ impl Widget for Vec<Box<Widget>> {
         }
     }
 
-    fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
+    fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
         for widget in self {
-            widget.draw(rustbox, pos_x, pos_y);
+            widget.draw(tb, pos_x, pos_y);
         }
     }
 

@@ -1,5 +1,6 @@
-use rustbox::keyboard::Key;
-use rustbox::{RustBox};
+use term_input::Key;
+use termbox_simple::Termbox;
+
 use time::Tm;
 
 use tui::messaging::MessagingUI;
@@ -152,17 +153,17 @@ impl Tabbed {
         }
     }
 
-    pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
-        self.tabs[self.active_idx].widget.draw(rustbox, pos_x, pos_y);
+    pub fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
+        self.tabs[self.active_idx].widget.draw(tb, pos_x, pos_y);
 
         let mut tab_name_col = pos_x;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             if self.active_idx == tab_idx {
-                termbox::print(tab_name_col, pos_y + self.height - 1,
+                termbox::print(tb, tab_name_col, pos_y + self.height - 1,
                                style::TAB_ACTIVE.fg, style::TAB_ACTIVE.bg,
                                tab.visible_name());
             } else {
-                termbox::print(tab_name_col, pos_y + self.height - 1,
+                termbox::print(tb, tab_name_col, pos_y + self.height - 1,
                                style::TAB_PASSIVE.fg, style::TAB_PASSIVE.bg,
                                tab.visible_name());
             }

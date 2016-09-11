@@ -1,9 +1,7 @@
 // use std::io;
 // use std::io::Write;
 
-use rustbox::{RustBox};
-use termbox_sys::tb_change_cell;
-// use termbox_sys;
+use termbox_simple::Termbox;
 
 use tui::style;
 
@@ -122,11 +120,11 @@ impl Line {
     }
 
     #[inline]
-    pub fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32, width : i32) {
-        self.draw_from(rustbox, pos_x, pos_y, 0, width);
+    pub fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32, width : i32) {
+        self.draw_from(tb, pos_x, pos_y, 0, width);
     }
 
-    pub fn draw_from(&self, _ : &RustBox, pos_x : i32, pos_y : i32, first_line : i32, width : i32) {
+    pub fn draw_from(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32, first_line : i32, width : i32) {
         let mut col = pos_x;
         let mut line = 0;
 
@@ -171,7 +169,7 @@ impl Line {
                 if (chars_until_next_split as i32) <= slots_in_line {
                     // keep rendering chars
                     if line >= first_line {
-                        unsafe { tb_change_cell(col, pos_y + line, char as u32, fg, bg); }
+                        tb.change_cell(col, pos_y + line, char, fg, bg);
                     }
                     col += 1;
                 } else {
@@ -188,7 +186,7 @@ impl Line {
                 // of bounds.
                 if col - pos_x < width {
                     if line >= first_line {
-                        unsafe { tb_change_cell(col, pos_y + line, char as u32, fg, bg); }
+                        tb.change_cell(col, pos_y + line, char, fg, bg);
                     }
                     col += 1;
                 }

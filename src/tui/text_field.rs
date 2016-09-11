@@ -1,8 +1,8 @@
 use std::cmp::{max, min};
 use std::mem;
 
-use rustbox::keyboard::Key;
-use rustbox::{RustBox};
+use term_input::{Key, Arrow};
+use termbox_simple::Termbox;
 
 use trie::Trie;
 use tui::style;
@@ -69,13 +69,14 @@ impl TextField {
         self.move_cursor_to_end();
     }
 
-    pub fn draw_(&self, _ : &RustBox, pos_x : i32, pos_y : i32) {
+    pub fn draw_(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
         match self.mode {
             Mode::Edit => {
-                draw_line(&self.buffer, pos_x, pos_y, self.scroll, self.width, self.cursor);
+                draw_line(tb, &self.buffer, pos_x, pos_y, self.scroll, self.width, self.cursor);
             },
             Mode::History(hist_curs) => {
-                draw_line(&self.history[hist_curs as usize],
+                draw_line(tb,
+                          &self.history[hist_curs as usize],
                           pos_x, pos_y, self.scroll, self.width, self.cursor);
             },
             Mode::Autocomplete {
@@ -83,9 +84,9 @@ impl TextField {
                 ref completions, current_completion
             } => {
                 // draw a placeholder for the cursor
-                termbox::print_char(pos_x + self.cursor - self.scroll, pos_y,
-                                    style::USER_MSG.fg, style::USER_MSG.bg,
-                                    ' ');
+                tb.change_cell(pos_x + self.cursor - self.scroll, pos_y,
+                               ' ',
+                               style::USER_MSG.fg, style::USER_MSG.bg);
 
                 let completion : &str = &completions[current_completion];
 
@@ -103,19 +104,19 @@ impl TextField {
                     if char_idx >= self.scroll as usize {
                         if char_idx >= word_starts &&
                                 char_idx < insertion_point + completion.len() {
-                            termbox::print_char(pos_x + (char_idx as i32) - self.scroll, pos_y,
-                                                style::COMPLETION.fg, style::COMPLETION.bg,
-                                                char);
+                            tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
+                                           char,
+                                           style::COMPLETION.fg, style::COMPLETION.bg);
                         } else {
-                            termbox::print_char(pos_x + (char_idx as i32) - self.scroll, pos_y,
-                                                style::USER_MSG.fg, style::USER_MSG.bg,
-                                                char);
+                            tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
+                                           char,
+                                           style::USER_MSG.fg, style::USER_MSG.bg);
                         }
 
                     }
                 }
 
-                termbox::set_cursor(pos_x + self.cursor - self.scroll, pos_y);
+                tb.set_cursor(pos_x + self.cursor - self.scroll, pos_y);
             },
         }
     }
@@ -167,12 +168,12 @@ impl TextField {
                 }
             },
 
-            Key::Left => {
+            Key::Arrow(Arrow::Left) => {
                 self.dec_cursor();
                 WidgetRet::KeyHandled
             },
 
-            Key::Right => {
+            Key::Arrow(Arrow::Right) => {
                 self.inc_cursor();
                 WidgetRet::KeyHandled
             },
@@ -202,7 +203,7 @@ impl TextField {
             ////////////////////////////////////////////////////////////////////
             // Scrolling in history or autocompletion list
 
-            Key::Up => {
+            Key::Arrow(Arrow::Up) => {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
@@ -245,7 +246,7 @@ impl TextField {
                 WidgetRet::KeyHandled
             },
 
-            Key::Down => {
+            Key::Arrow(Arrow::Down) => {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
@@ -432,19 +433,19 @@ impl TextField {
     }
 }
 
-fn draw_line(line : &[char], pos_x : i32, pos_y : i32, scroll : i32, width : i32, cursor : i32) {
+fn draw_line(tb: &mut Termbox, line : &[char], pos_x : i32, pos_y : i32, scroll : i32, width : i32, cursor : i32) {
     let slice : &[char] = &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
 
-    termbox::print_chars(pos_x, pos_y, style::USER_MSG.fg, style::USER_MSG.bg, slice);
+    termbox::print_chars(tb, pos_x, pos_y, style::USER_MSG.fg, style::USER_MSG.bg, slice);
 
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
-        termbox::print_char(pos_x + cursor - scroll, pos_y,
-                            style::USER_MSG.fg, style::USER_MSG.bg,
-                            ' ');
+        tb.change_cell(pos_x + cursor - scroll, pos_y,
+                       ' ',
+                       style::USER_MSG.fg, style::USER_MSG.bg);
     }
-    termbox::set_cursor(pos_x + cursor - scroll, pos_y);
+    tb.set_cursor(pos_x + cursor - scroll, pos_y);
 }
 
 impl Widget for TextField {
@@ -452,8 +453,8 @@ impl Widget for TextField {
         self.resize_(width, height);
     }
 
-    fn draw(&self, rustbox : &RustBox, pos_x : i32, pos_y : i32) {
-        self.draw_(rustbox, pos_x, pos_y);
+    fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
+        self.draw_(tb, pos_x, pos_y);
     }
 
     fn keypressed(&mut self, key : Key) -> WidgetRet {
@@ -463,7 +464,7 @@ impl Widget for TextField {
     fn autocomplete(&mut self, dict : &Trie) {
         if self.in_autocomplete() {
             // AWFUL CODE YO
-            self.keypressed(Key::Up);
+            self.keypressed(Key::Arrow(Arrow::Up));
             return;
         }
 
