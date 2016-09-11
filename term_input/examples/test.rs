@@ -9,7 +9,9 @@ fn main() {
     unsafe { libc::tcgetattr(libc::STDIN_FILENO, &mut old_term); }
 
     let mut new_term : libc::termios = old_term.clone();
-    new_term.c_lflag &= !(libc::ICANON | libc::ECHO);
+    new_term.c_iflag &= !(libc::IGNBRK | libc::BRKINT | libc::PARMRK | libc::ISTRIP | libc::INLCR |
+                          libc::IGNCR | libc::ICRNL | libc::IXON);
+    new_term.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG | libc::IEXTEN);
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &new_term) };
 
     // Set up the descriptors for select()

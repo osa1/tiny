@@ -24,16 +24,21 @@ use std::sync::atomic::Ordering;
 // Public types
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
     AltArrow(Arrow),
     Arrow(Arrow),
     Ctrl(char),
     Char(char),
     Esc,
+    Enter,
+    PageUp,
+    PageDown,
+    Tab,
+    Backspace,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Arrow { Left, Right, Up, Down }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -79,8 +84,10 @@ static XTERM_ARROW_LEFT      : [u8; 3] = [27, 91, 68];
 static XTERM_ARROW_RIGHT     : [u8; 3] = [27, 91, 67];
 static XTERM_ARROW_UP        : [u8; 3] = [27, 91, 65];
 static XTERM_ARROW_DOWN      : [u8; 3] = [27, 91, 66];
+static XTERM_PAGE_UP         : [u8; 4] = [27, 91, 53, 126];
+static XTERM_PAGE_DOWN       : [u8; 4] = [27, 91, 54, 126];
 
-static XTERM_KEY_SEQS : [(&'static [u8], Event); 8] =
+static XTERM_KEY_SEQS : [(&'static [u8], Event); 10] =
     [ (&XTERM_ALT_ARROW_LEFT,  Event::Key(Key::AltArrow(Arrow::Left))),
       (&XTERM_ALT_ARROW_RIGHT, Event::Key(Key::AltArrow(Arrow::Right))),
       (&XTERM_ALT_ARROW_UP,    Event::Key(Key::AltArrow(Arrow::Up))),
@@ -89,16 +96,22 @@ static XTERM_KEY_SEQS : [(&'static [u8], Event); 8] =
       (&XTERM_ARROW_RIGHT,     Event::Key(Key::Arrow(Arrow::Right))),
       (&XTERM_ARROW_UP,        Event::Key(Key::Arrow(Arrow::Up))),
       (&XTERM_ARROW_DOWN,      Event::Key(Key::Arrow(Arrow::Down))),
+      (&XTERM_PAGE_UP,         Event::Key(Key::PageUp)),
+      (&XTERM_PAGE_DOWN,       Event::Key(Key::PageDown)),
     ];
 
-
 // Make sure not to use 27 (ESC) because it's used as a prefix in many combinations.
-static XTERM_SINGLE_BYTES : [(u8, Event); 5] =
-    [ (1,  Event::Key(Key::Ctrl('a'))),
-      (5,  Event::Key(Key::Ctrl('e'))),
-      (23, Event::Key(Key::Ctrl('w'))),
-      (11, Event::Key(Key::Ctrl('k'))),
-      (4,  Event::Key(Key::Ctrl('d'))),
+static XTERM_SINGLE_BYTES : [(u8, Event); 10] =
+    [ (13,  Event::Key(Key::Enter)),
+      (9,   Event::Key(Key::Tab)),
+      (127, Event::Key(Key::Backspace)),
+      (1,   Event::Key(Key::Ctrl('a'))),
+      (5,   Event::Key(Key::Ctrl('e'))),
+      (23,  Event::Key(Key::Ctrl('w'))),
+      (11,  Event::Key(Key::Ctrl('k'))),
+      (4,   Event::Key(Key::Ctrl('d'))),
+      (3,   Event::Key(Key::Ctrl('c'))),
+      (17,  Event::Key(Key::Ctrl('q'))),
     ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,7 +145,8 @@ impl Input {
             debug_assert!(!buf_slice.is_empty());
 
             while !buf_slice.is_empty() {
-                let read_fn = if buf_slice[0] <= 27 {
+                // Special treatment for 127 (backspace)
+                let read_fn = if buf_slice[0] < 32 || buf_slice[0] == 127 {
                     read_key_comb
                 } else {
                     read_chars
