@@ -5,8 +5,8 @@
 //!
 //! Resize events are handled by registering a signal handler for SIGWINCH.
 //!
-//! Keyboard are events are read from stdin. We look for byte strings for key combinations that we
-//! care about. E.g. Alt-arrow keys, C-w etc.
+//! Keyboard events are read from stdin. We look for byte strings of key combinations that we care
+//! about. E.g. Alt-arrow keys, C-w etc.
 
 #![feature(const_fn)]
 

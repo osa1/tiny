@@ -42,7 +42,5 @@ fn main() {
     }
 
     // restore the old settings
-    // (FIXME: This is not going to work as we have no way of exiting the loop
-    // above)
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &old_term) };
 }
