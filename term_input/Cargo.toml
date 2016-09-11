@@ -1,0 +1,8 @@
+[package]
+name = "term_input"
+version = "0.1.0"
+authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+
+[dependencies]
+libc = "0.2"
+nix = "0.7"
