@@ -80,7 +80,7 @@ static XTERM_ARROW_RIGHT     : [u8; 3] = [27, 91, 67];
 static XTERM_ARROW_UP        : [u8; 3] = [27, 91, 65];
 static XTERM_ARROW_DOWN      : [u8; 3] = [27, 91, 66];
 
-static XTERM_KEY_SEQS : [(&[u8], Event); 8] =
+static XTERM_KEY_SEQS : [(&'static [u8], Event); 8] =
     [ (&XTERM_ALT_ARROW_LEFT,  Event::Key(Key::AltArrow(Arrow::Left))),
       (&XTERM_ALT_ARROW_RIGHT, Event::Key(Key::AltArrow(Arrow::Right))),
       (&XTERM_ALT_ARROW_UP,    Event::Key(Key::AltArrow(Arrow::Up))),
@@ -133,7 +133,6 @@ impl Input {
 
             while !buf_slice.is_empty() {
                 let read_fn = if buf_slice[0] <= 27 {
-                    println!("key comb");
                     read_key_comb
                 } else {
                     read_chars
