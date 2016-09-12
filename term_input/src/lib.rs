@@ -84,10 +84,14 @@ static XTERM_ARROW_LEFT      : [u8; 3] = [27, 91, 68];
 static XTERM_ARROW_RIGHT     : [u8; 3] = [27, 91, 67];
 static XTERM_ARROW_UP        : [u8; 3] = [27, 91, 65];
 static XTERM_ARROW_DOWN      : [u8; 3] = [27, 91, 66];
+static XTERM_ARROW_LEFT_2    : [u8; 3] = [27, 79, 68];
+static XTERM_ARROW_RIGHT_2   : [u8; 3] = [27, 79, 67];
+static XTERM_ARROW_UP_2      : [u8; 3] = [27, 79, 65];
+static XTERM_ARROW_DOWN_2    : [u8; 3] = [27, 79, 66];
 static XTERM_PAGE_UP         : [u8; 4] = [27, 91, 53, 126];
 static XTERM_PAGE_DOWN       : [u8; 4] = [27, 91, 54, 126];
 
-static XTERM_KEY_SEQS : [(&'static [u8], Event); 10] =
+static XTERM_KEY_SEQS : [(&'static [u8], Event); 14] =
     [ (&XTERM_ALT_ARROW_LEFT,  Event::Key(Key::AltArrow(Arrow::Left))),
       (&XTERM_ALT_ARROW_RIGHT, Event::Key(Key::AltArrow(Arrow::Right))),
       (&XTERM_ALT_ARROW_UP,    Event::Key(Key::AltArrow(Arrow::Up))),
@@ -96,12 +100,16 @@ static XTERM_KEY_SEQS : [(&'static [u8], Event); 10] =
       (&XTERM_ARROW_RIGHT,     Event::Key(Key::Arrow(Arrow::Right))),
       (&XTERM_ARROW_UP,        Event::Key(Key::Arrow(Arrow::Up))),
       (&XTERM_ARROW_DOWN,      Event::Key(Key::Arrow(Arrow::Down))),
+      (&XTERM_ARROW_LEFT_2,    Event::Key(Key::Arrow(Arrow::Left))),
+      (&XTERM_ARROW_RIGHT_2,   Event::Key(Key::Arrow(Arrow::Right))),
+      (&XTERM_ARROW_UP_2,      Event::Key(Key::Arrow(Arrow::Up))),
+      (&XTERM_ARROW_DOWN_2,    Event::Key(Key::Arrow(Arrow::Down))),
       (&XTERM_PAGE_UP,         Event::Key(Key::PageUp)),
       (&XTERM_PAGE_DOWN,       Event::Key(Key::PageDown)),
     ];
 
 // Make sure not to use 27 (ESC) because it's used as a prefix in many combinations.
-static XTERM_SINGLE_BYTES : [(u8, Event); 10] =
+static XTERM_SINGLE_BYTES : [(u8, Event); 12] =
     [ (13,  Event::Key(Key::Enter)),
       (9,   Event::Key(Key::Tab)),
       (127, Event::Key(Key::Backspace)),
@@ -112,6 +120,8 @@ static XTERM_SINGLE_BYTES : [(u8, Event); 10] =
       (4,   Event::Key(Key::Ctrl('d'))),
       (3,   Event::Key(Key::Ctrl('c'))),
       (17,  Event::Key(Key::Ctrl('q'))),
+      (16,  Event::Key(Key::Ctrl('p'))),
+      (14,  Event::Key(Key::Ctrl('n'))),
     ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
