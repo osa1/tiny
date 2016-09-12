@@ -306,14 +306,9 @@ impl TextField {
         // Try to imitate vim's behaviour here.
         if char.is_whitespace() {
             self.consume_before(|c| c.is_whitespace());
-        }
-
-        else if char.is_alphanumeric() {
             self.consume_before(|c| c.is_alphanumeric());
-        }
-
-        else {
-            self.consume_before(|c| !c.is_alphanumeric());
+        } else {
+            self.consume_before(|c| c.is_alphanumeric());
         }
     }
 
