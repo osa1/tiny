@@ -1,28 +1,27 @@
 extern crate libc;
-extern crate rustbox;
-extern crate termbox_sys;
+extern crate term_input;
+extern crate termbox_simple;
 extern crate tiny;
 
 use std::fs::File;
 use std::io::Read;
 use std::mem;
-use std::time::Duration;
 
 use std::io;
 use std::io::Write;
 
-use rustbox::{RustBox, InitOptions, InputMode, Event, Key};
+use term_input::{Input, Event, Key};
+use termbox_simple::*;
 
 use tiny::tui::msg_area::MsgArea;
 use tiny::tui::style;
 
 fn loop_() -> Option<String> {
-    let rustbox = RustBox::init(InitOptions {
-        input_mode: InputMode::Esc,
-        buffer_stderr: false,
-    }).unwrap();
+    let mut tui = Termbox::init().unwrap();
+    tui.set_output_mode(OutputMode::Output256);
+    tui.set_clear_attributes(0, 0);
 
-    let mut msg_area = MsgArea::new(rustbox.width() as i32, rustbox.height() as i32);
+    let mut msg_area = MsgArea::new(tui.width(), tui.height());
 
     {
         let mut text = String::new();
@@ -48,13 +47,17 @@ fn loop_() -> Option<String> {
     // needs to be handled somehow for resizing.
 
     let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
-    unsafe { libc::FD_SET(0, &mut fd_set); }
-    let nfds = 1; // stdin + 1
+    unsafe { libc::FD_SET(libc::STDIN_FILENO, &mut fd_set); }
+    let nfds = libc::STDIN_FILENO + 1;
 
+    let mut input = Input::new();
+    let mut ev_buffer : Vec<Event> = Vec::new();
+
+    'mainloop:
     loop {
-        rustbox.clear();
-        msg_area.draw(&rustbox, 0, 0);
-        rustbox.present();
+        tui.clear();
+        msg_area.draw(&mut tui, 0, 0);
+        tui.present();
 
         let mut fd_set_ = fd_set.clone();
         let ret = unsafe {
@@ -66,35 +69,39 @@ fn loop_() -> Option<String> {
         };
 
         if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-            match rustbox.peek_event(Duration::new(0, 0), false) {
-                Ok(Event::KeyEvent(Key::Esc)) => {
-                    break;
-                },
+            input.read_input_events(&mut ev_buffer);
+            for ev in ev_buffer.drain(0 ..) {
+                match ev {
+                    Event::Key(Key::Esc) => {
+                        break 'mainloop;
+                    },
 
-                Ok(Event::KeyEvent(Key::Ctrl('p'))) => {
-                    msg_area.scroll_up();
-                },
+                    Event::Key(Key::Ctrl('p')) => {
+                        msg_area.scroll_up();
+                    },
 
-                Ok(Event::KeyEvent(Key::Ctrl('n'))) => {
-                    msg_area.scroll_down();
-                },
+                    Event::Key(Key::Ctrl('n')) => {
+                        msg_area.scroll_down();
+                    },
 
-                Ok(Event::KeyEvent(Key::PageUp)) => {
-                    msg_area.page_up();
-                },
+                    Event::Key(Key::PageUp) => {
+                        msg_area.page_up();
+                    },
 
-                Ok(Event::KeyEvent(Key::PageDown)) => {
-                    msg_area.page_down();
-                },
+                    Event::Key(Key::PageDown) => {
+                        msg_area.page_down();
+                    },
 
-                // Ok(Event::KeyEvent(Key::Char(ch))) => {
-                // }
+                    // Ok(Event::KeyEvent(Key::Char(ch))) => {
+                    // }
 
-                Ok(Event::ResizeEvent(width, height)) => {
-                    msg_area.resize(width, height);
+                    Event::Resize => {
+                        tui.resize();
+                        msg_area.resize(tui.width(), tui.height());
+                    }
+
+                    _ => {}
                 }
-
-                _ => {}
             }
         }
     }

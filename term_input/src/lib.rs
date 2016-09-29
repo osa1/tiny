@@ -140,6 +140,7 @@ impl Input {
         }
     }
 
+    /// Fill the event buffer with pending events. Does not block.
     pub fn read_input_events(&mut self, evs: &mut Vec<Event>) {
         evs.clear();
 

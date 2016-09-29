@@ -1,7 +1,10 @@
 extern crate libc;
-extern crate rustbox;
+extern crate term_input;
+extern crate termbox_simple;
 extern crate time;
 extern crate tiny;
+
+use term_input::{Input, Event};
 
 use std::mem;
 
@@ -11,12 +14,12 @@ fn loop_() -> Option<String> {
     let mut tui = TUI::new();
     tui.new_server_tab("debug");
 
-    // I'm using select() here to test for signals/interrupts. Namely, SIGWINCH
-    // needs to be handled somehow for resizing.
-
     let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
-    unsafe { libc::FD_SET(0, &mut fd_set); }
-    let nfds = 1; // stdin + 1
+    unsafe { libc::FD_SET(libc::STDIN_FILENO, &mut fd_set); }
+    let nfds = libc::STDIN_FILENO + 1;
+
+    let mut input = Input::new();
+    let mut ev_buffer : Vec<Event> = Vec::new();
 
     loop {
         tui.draw();
@@ -31,16 +34,19 @@ fn loop_() -> Option<String> {
         };
 
         if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-            match tui.keypressed_peek() {
-                TUIRet::Input { msg, .. } => {
-                    tui.add_msg(&msg.into_iter().collect::<String>(),
-                                &time::now(),
-                                &MsgTarget::Server { serv_name: "debug" });
-                },
-                TUIRet::Abort => {
-                    return None;
-                },
-                _ => {}
+            input.read_input_events(&mut ev_buffer);
+            for ev in ev_buffer.drain(0..) {
+                match tui.handle_input_event(ev) {
+                    TUIRet::Input { msg, .. } => {
+                        tui.add_msg(&msg.into_iter().collect::<String>(),
+                                    &time::now(),
+                                    &MsgTarget::Server { serv_name: "debug" });
+                    },
+                    TUIRet::Abort => {
+                        return None;
+                    },
+                    _ => {}
+                }
             }
         }
     }
