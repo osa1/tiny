@@ -1,0 +1,7 @@
+[package]
+name = "chan-ev"
+version = "0.1.0"
+authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+
+[dependencies]
+libc = "0.2.8"
