@@ -49,7 +49,12 @@ int main()
     for (;;)
     {
         poll_fds[0].revents = 0;
-        poll(poll_fds, 1, -1);
+        if (poll(poll_fds, 1, 5000) == 0)
+        {
+            printf("poll() timed out. Aborting.\n");
+            break;
+        }
+
         printf("Reading from socket.\n");
         msg_buf_append_filedes(&buf, sock);
         printf("Extracting messages...\n");
@@ -64,8 +69,7 @@ int main()
             irc_msg_free(msgs0);
     }
 
+    msg_buf_destroy(&buf);
     close(sock);
     freeaddrinfo(servinfo);
 }
-
-
