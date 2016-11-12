@@ -11,7 +11,7 @@ typedef struct deque_
     int    size;
 } deque;
 
-int find_back(deque*);
+static int find_back(deque*);
 
 /*
 void deque_print(deque* d)
@@ -79,7 +79,7 @@ void deque_reserve(deque* d)
 }
 
 // Find back of the queue.
-int find_back(deque* d)
+static int find_back(deque* d)
 {
     int back = (d->front - d->size - 1) % d->cap;
     if (back < 0) back += d->cap;
