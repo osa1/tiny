@@ -37,6 +37,13 @@ void bytebuf_push_int(bytebuf* buf, int i)
     buf->len += sizeof(int);
 }
 
+void bytebuf_push_bytes(bytebuf* buf, uint8_t* str, int amt)
+{
+    bytebuf_reserve(buf, amt);
+    memcpy(buf->buf + buf->len, str, amt);
+    buf->len += amt;
+}
+
 void bytebuf_drop(bytebuf* buf, int amt)
 {
     assert(amt <= buf->len);
@@ -57,7 +64,7 @@ void msg_buf_destroy(msg_buf* buf)
     bytebuf_destroy(&buf->msg_idxs);
 }
 
-void msg_buf_append_filedes(msg_buf* buf, int filedes)
+int msg_buf_append_filedes(msg_buf* buf, int filedes)
 {
     bytebuf_reserve(&buf->msg_buf, 4096);
     int read_ret = read(filedes, buf->msg_buf.buf + buf->msg_buf.len, 4096);
@@ -79,6 +86,8 @@ void msg_buf_append_filedes(msg_buf* buf, int filedes)
         else
             last_msg_idx += 1;
     }
+    
+    return read_ret;
 }
 
 irc_msg* msg_buf_extract_msgs(msg_buf* buf)
