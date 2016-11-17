@@ -1,6 +1,7 @@
 /// Experimenting with the main loop. This version doesn't use threads, relies
 /// on poll() to stay responsive.
 
+#include <assert.h>
 #include <errno.h>
 #include <netdb.h>
 #include <poll.h>
@@ -12,6 +13,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "src/message.h"
 #include "src/msg_buf.h"
 #include "src/mt_deque.h"
 
@@ -183,6 +185,12 @@ void handle_incoming_msgs(msg_buf* msg_buf)
     while (msgs != NULL)
     {
         printf("msg: %s\n", msgs->contents);
+
+        // message* msg = message_parse((char*)msgs->contents, msgs->len);
+        // assert(msg);
+        // message_print(msg);
+        // message_free(msg);
+
         msgs = msgs->next;
     }
     if (msgs0 != NULL)

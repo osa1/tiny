@@ -1,0 +1,53 @@
+:leguin.freenode.net NOTICE * :*** Looking up your hostname...
+:leguin.freenode.net NOTICE * :*** Checking Ident
+:leguin.freenode.net NOTICE * :*** Couldn't look up your hostname
+:leguin.freenode.net NOTICE * :*** No Ident response
+:leguin.freenode.net 001 tiny_test :Welcome to the freenode Internet Relay Chat Network tiny_test
+:leguin.freenode.net 002 tiny_test :Your host is leguin.freenode.net[2001:6b0:e:2a18::118/8001], running version ircd-seven-1.1.4
+:leguin.freenode.net 003 tiny_test :This server was created Thu Sep 22 2016 at 20:50:41 UTC
+:leguin.freenode.net 004 tiny_test leguin.freenode.net ircd-seven-1.1.4 DOQRSZaghilopswz CFILMPQSbcefgijklmnopqrstvz bkloveqjfI
+:leguin.freenode.net 005 tiny_test CHANTYPES=# EXCEPTS INVEX CHANMODES=eIbq,k,flj,CFLMPQScgimnprstz CHANLIMIT=#:120 PREFIX=(ov)@+ MAXLIST=bqeI:100 MODES=4 NETWORK=freenode KNOCK STATUSMSG=@+ CALLERID=g :are supported by this server
+:leguin.freenode.net 005 tiny_test CASEMAPPING=rfc1459 CHARSET=ascii NICKLEN=16 CHANNELLEN=50 TOPICLEN=390 ETRACE CPRIVMSG CNOTICE DEAF=D MONITOR=100 FNC TARGMAX=NAMES:1,LIST:1,KICK:1,WHOIS:1,PRIVMSG:4,NOTICE:4,ACCEPT:,MONITOR: :are supported by this server
+:leguin.freenode.net 005 tiny_test EXTBAN=$,ajrxz WHOX CLIENTVER=3.0 SAFELIST ELIST=CTU :are supported by this server
+:leguin.freenode.net 251 tiny_test :There are 144 users and 88238 invisible on 29 servers
+:leguin.freenode.net 252 tiny_test 34 :IRC Operators online
+:leguin.freenode.net 253 tiny_test 16 :unknown connection(s)
+:leguin.freenode.net 254 tiny_test 52491 :channels formed
+:leguin.freenode.net 255 tiny_test :I have 4212 clients and 1 servers
+:leguin.freenode.net 265 tiny_test 4212 10229 :Current local users 4212, max 10229
+:leguin.freenode.net 266 tiny_test 88382 91150 :Current global users 88382, max 91150
+:leguin.freenode.net 250 tiny_test :Highest connection count: 10230 (10229 clients) (432474 connections received)
+:leguin.freenode.net 375 tiny_test :- leguin.freenode.net Message of the Day -
+:leguin.freenode.net 372 tiny_test :- Welcome to leguin.freenode.net in Umeå, Sweden, EU! Thanks to
+:leguin.freenode.net 372 tiny_test :- the Academic Computer Club at Umeå University for sponsoring
+:leguin.freenode.net 372 tiny_test :- this server!
+:leguin.freenode.net 372 tiny_test :-
+:leguin.freenode.net 372 tiny_test :- LE GUIN, URSULA K. (1929-) Born in Berkeley, California,
+:leguin.freenode.net 372 tiny_test :- Ursula Le Guin is an american author primarily known for
+:leguin.freenode.net 372 tiny_test :- her Science Fiction and Fantasy. She has been awarded the
+:leguin.freenode.net 372 tiny_test :- Hugo and Nebula awards, and is best known for her Earthsea
+:leguin.freenode.net 372 tiny_test :- and Hainish series.
+:leguin.freenode.net 372 tiny_test :-
+:leguin.freenode.net 372 tiny_test :- Welcome to freenode - supporting the free and open source
+:leguin.freenode.net 372 tiny_test :- software communities since 1998.
+:leguin.freenode.net 372 tiny_test :-
+:leguin.freenode.net 372 tiny_test :- By connecting to freenode you indicate that you have read and
+:leguin.freenode.net 372 tiny_test :- accept our policies as set out on http://www.freenode.net
+:leguin.freenode.net 372 tiny_test :- freenode runs an open proxy scanner. Please join #freenode for
+:leguin.freenode.net 372 tiny_test :- any network-related questions or queries, where a number of
+:leguin.freenode.net 372 tiny_test :- volunteer staff and helpful users will be happy to assist you.
+:leguin.freenode.net 372 tiny_test :-
+:leguin.freenode.net 372 tiny_test :- You can meet us at FOSSCON (http://www.fosscon.org) where we get
+:leguin.freenode.net 372 tiny_test :- together with like-minded FOSS enthusiasts for talks and
+:leguin.freenode.net 372 tiny_test :- real-life collaboration.
+:leguin.freenode.net 372 tiny_test :-
+:leguin.freenode.net 372 tiny_test :- We would like to thank Private Internet Access
+:leguin.freenode.net 372 tiny_test :- (https://www.privateinternetaccess.com/) and the other
+:leguin.freenode.net 372 tiny_test :- organisations that help keep freenode and our other projects
+:leguin.freenode.net 372 tiny_test :- running for their sustained support.
+:leguin.freenode.net 372 tiny_test :-
+:leguin.freenode.net 372 tiny_test :- In particular we would like to thank the sponsor
+:leguin.freenode.net 372 tiny_test :- of this server, details of which can be found above.
+:leguin.freenode.net 372 tiny_test :-
+:leguin.freenode.net 376 tiny_test :End of /MOTD command.
+:tiny_test MODE tiny_test :+i

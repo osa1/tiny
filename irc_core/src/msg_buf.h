@@ -34,7 +34,10 @@ int msg_buf_append_filedes(msg_buf*, int filedes);
 
 typedef struct irc_msg_
 {
-    /// DOES NOT include \r\n. Null-terminated to make debugging easier.
+    /**
+     * A complete IRC message (includes \r\n suffix). Null-terminated to make
+     * debugging easier.
+     */
     uint8_t*            contents;
     int                 len;
     struct irc_msg_*    next;
