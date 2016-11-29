@@ -1,62 +1,57 @@
-#include <poll.h>
-#include <pthread.h>
+#include "irc_core.h"
+#include "irc_core_main.h"
+#include "msg_buf.h"
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "mt_deque.h"
-
-#define MAX_IRC_THREADS 100
-
-static pthread_t threads[MAX_IRC_THREADS];
-
-typedef struct irc_core_
+irc_core* irc_core_start(irc_core_server* server, irc_core_user* user)
 {
-    int sock;
-    mt_deque* msg_queue;
-} irc_core;
+    irc_core* irc = malloc(sizeof(irc_core));
 
-void* irc_core_main(irc_core* core)
-{
-    (void)core;
+    irc->server.server      = strdup(server->server);
+    irc->server.port        = strdup(server->port);
+    irc->user.username      = strdup(user->username);
+    irc->user.hostname      = strdup(user->hostname);
+    irc->user.servername    = strdup(user->servername);
+    irc->user.realname      = strdup(user->realname);
 
-    // - Read from the socket, handle complete messages are '\r\n' delimiters are read.
-    // - Send messages from the outgoing message queue as new messages are added.
-    //
-    // So we need to poll():
-    //
-    // - Input socket.
-    // - Output socket.
-    // - Outgoing message queue.
+    irc->user.num_nicks = user->num_nicks;
+    irc->user.nicks     = malloc(sizeof(char*) * user->num_nicks);
+    for (int i = 0; i < user->num_nicks; ++i)
+        *(irc->user.nicks + i) = strdup(*(user->nicks + i));
 
-    struct pollfd fds[2] =
-        { { .fd = core->sock, .events = POLLIN | POLLOUT }
-        , { .fd = mt_deque_get_push_eventfd(core->msg_queue), .events = POLLIN }
-        };
+    irc->api_q = mt_queue_new(10);
+    irc->incoming_msg_q = mt_queue_new(10);
 
-    // main loop
-    for (;;)
-    {
-        poll(fds, 2, -1);
+    pthread_create(&irc->thr, 0, irc_core_main, irc);
 
-    }
-
-    return NULL;
+    return irc;
 }
 
-// sock: Non-blocking socket connected to an IRC server.
-irc_core* irc_core_start(int sock)
+void irc_core_free(irc_core* irc)
 {
-    // Find empty spot in 'threads'
-    int thread_slot = 0;
-    while (thread_slot < MAX_IRC_THREADS && threads[thread_slot])
-        ++thread_slot;
+    (void)irc;
+}
 
-    irc_core* core = malloc(sizeof(irc_core));
-    core->sock = sock;
-    core->msg_queue = mt_deque_new(10);
+message* irc_core_get_incoming_msg(irc_core* irc)
+{
+    return mt_queue_pop(irc->incoming_msg_q);
+}
 
-    pthread_create(&threads[thread_slot], NULL, (void*(*)(void*))irc_core_main, core);
+int irc_core_get_incoming_msg_eventfd(irc_core* irc)
+{
+    return mt_queue_get_eventfd(irc->incoming_msg_q);
+}
 
-    return core;
+/*
+ * IRC messages
+ */
+
+void ping(irc_core* irc, char* server)
+{
+    message* msg = malloc(sizeof(message));
+    // TODO: fill in the msg
+    mt_queue_push(irc->api_q, msg);
 }

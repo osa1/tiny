@@ -206,7 +206,7 @@ int test_msg_buf()
     pipe(pipefd);
 
     write(pipefd[1], "msg1\r\nmsg2\r\n", 12);
-    msg_buf_append_filedes(&buf, pipefd[0]);
+    msg_buf_append_fd(&buf, pipefd[0]);
 
     irc_msg* msgs = msg_buf_extract_msgs(&buf);
     assert(msgs != NULL, "msg_buf_extract_msgs() returned something");

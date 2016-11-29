@@ -26,27 +26,37 @@ int start_conn();
 
 typedef struct mainloop_state_
 {
-    /// Socket connected to a server.
+    /** Socket connected to a server. */
     int         sock;
 
-    /// Channel for API calls. New messages of type 'irc_msg' are added by
-    /// public API calls.
+    /**
+     * Channel for API calls. New messages of type 'irc_msg' are added by
+     * public API calls.
+     */
     mt_deque*   api_q;
 
-    /// Outgoing message buffer.
+    /** Outgoing message buffer. */
     bytebuf     outgoing_buf;
 
-    /// Incoming message buffer.
+    /** Incoming message buffer. */
     msg_buf     incoming_buf;
 
-    /// A 'timerfd' for disconnect events.
+    /** A 'timerfd' for disconnect events. */
     int         disconnect_timer;
 
-    /// true -> PING message was sent after a disconnect timeout.
+    /** true -> PING message was sent after a disconnect timeout. */
     bool        disconnect_ping;
 
-    /// To be used in poll(). { sock, api_q, timerfd }
+    /** To be used in poll(). { sock, api_q, timerfd } */
     struct      pollfd poll_fds[3];
+
+    /**
+     * Nicks to be tried when connecting. When none of these is available we
+     * start adding more underscores.
+     */
+    str_len*    nicks;
+    int         num_nicks;
+    int         current_nick;
 } mainloop_state;
 
 void run(mainloop_state*);
@@ -70,6 +80,12 @@ int main()
     state.poll_fds[1].events = POLLIN;
     state.poll_fds[2].fd = state.disconnect_timer;
     state.poll_fds[2].events = POLLIN;
+
+    state.nicks = malloc(sizeof(str_len));
+    state.nicks->str = "tiny";
+    state.nicks->len = sizeof("tiny");
+    state.num_nicks  = 1;
+    state.current_nick = 0;
 
     // Fill the outgoing msg buffer with registration messages
     {
@@ -110,7 +126,7 @@ void run(mainloop_state* state)
         if (state->poll_fds[0].revents & POLLIN)
         {
             printf("socket input\n");
-            if (msg_buf_append_filedes(&state->incoming_buf, state->sock) == 0)
+            if (msg_buf_append_fd(&state->incoming_buf, state->sock) == 0)
             {
                 printf("Server closed connection.\n");
                 return;

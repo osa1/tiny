@@ -153,3 +153,9 @@ void message_print(message* msg)
     }
     printf("=========================\n");
 }
+
+void message_write(message* msg, uint8_t* buf)
+{
+    printf("message write\n");
+    message_print(msg);
+}

@@ -1,6 +1,8 @@
 #ifndef __IRC_CORE_MESSAGE_H
 #define __IRC_CORE_MESSAGE_H
 
+#include <stdint.h>
+
 /**
  * A string type with length information. The string DOES NOT terminate with a
  * null byte.
@@ -36,5 +38,7 @@ void message_free(message*);
 
 /** For debugging purposes. */
 void message_print(message*);
+
+void message_write(message*, uint8_t*);
 
 #endif

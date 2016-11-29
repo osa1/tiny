@@ -1,10 +1,12 @@
 #ifndef __MT_DEQUE_H
 #define __MT_DEQUE_H
 
-// Single-producer, single-consumer thread-safe deque.
-
-// This can be made multi-producer, multi-consumer by wrapping push and pop
-// ends of the queue with a mutex, but we don't need this in this program.
+/**
+ * Multiple-producer, single-consumer thread-safe deque.
+ *
+ * 'mt_deque_push_*' are safe to use multi-threaded.
+ * 'mt_deque_pop_*' are not safe for multi-threaded use.
+ */
 
 #include <stdbool.h>
 

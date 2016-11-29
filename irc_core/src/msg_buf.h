@@ -16,6 +16,7 @@ void bytebuf_reserve(bytebuf*, int amt);
 void bytebuf_push_int(bytebuf*, int);
 void bytebuf_push_bytes(bytebuf*, uint8_t* str, int amt);
 void bytebuf_drop(bytebuf*, int amt);
+void bytebuf_write_fd(bytebuf*, int fd);
 
 /// A buffer for 0x0D 0x0A ("\r\n") terminated messages.
 typedef struct msg_buf_
@@ -30,7 +31,7 @@ typedef struct msg_buf_
 
 void msg_buf_init(msg_buf*);
 void msg_buf_destroy(msg_buf*);
-int msg_buf_append_filedes(msg_buf*, int filedes);
+int msg_buf_append_fd(msg_buf*, int fd);
 
 typedef struct irc_msg_
 {

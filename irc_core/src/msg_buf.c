@@ -51,6 +51,12 @@ void bytebuf_drop(bytebuf* buf, int amt)
     buf->len -= amt;
 }
 
+void bytebuf_write_fd(bytebuf* buf, int fd)
+{
+    int sent_bytes = write(fd, buf->buf, buf->len);
+    bytebuf_drop(buf, sent_bytes);
+}
+
 void msg_buf_init(msg_buf* buf)
 {
     // buffers big enough to hold 50 IRC messages
@@ -64,10 +70,10 @@ void msg_buf_destroy(msg_buf* buf)
     bytebuf_destroy(&buf->msg_idxs);
 }
 
-int msg_buf_append_filedes(msg_buf* buf, int filedes)
+int msg_buf_append_fd(msg_buf* buf, int fd)
 {
     bytebuf_reserve(&buf->msg_buf, 4096);
-    int read_ret = read(filedes, buf->msg_buf.buf + buf->msg_buf.len, 4096);
+    int read_ret = read(fd, buf->msg_buf.buf + buf->msg_buf.len, 4096);
     assert(read_ret >= 0);
     buf->msg_buf.len += read_ret;
 
@@ -86,7 +92,7 @@ int msg_buf_append_filedes(msg_buf* buf, int filedes)
         else
             last_msg_idx += 1;
     }
-    
+
     return read_ret;
 }
 
@@ -96,6 +102,10 @@ irc_msg* msg_buf_extract_msgs(msg_buf* buf)
     irc_msg** tail = &head;
 
     int last_idx = 0;
+
+    // msg_idxs should have integers
+    assert(buf->msg_idxs.len % sizeof(int) == 0);
+
     for (int i = 0; i < buf->msg_idxs.len / (int)sizeof(int); ++i)
     {
         int idx = ((int*)buf->msg_idxs.buf)[i];
