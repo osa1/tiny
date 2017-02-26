@@ -3,6 +3,8 @@ use term_input::Key;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::any::Any;
+use std::rc::Rc;
 
 use rand::Rng;
 use rand;
@@ -36,7 +38,9 @@ pub struct MessagingUI {
 
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
-    nicks : Trie,
+    //
+    // Rc to be able to share with dynamic messages.
+    nicks : Rc<Trie>,
 
     last_activity_line : Option<Box<ActivityLine>>,
 }
@@ -60,7 +64,7 @@ impl MessagingUI {
             height: height,
             nick_colors: HashMap::new(),
             available_colors: (16 .. 232).into_iter().collect(),
-            nicks: Trie::new(),
+            nicks: Rc::new(Trie::new()),
             last_activity_line: None,
         }
     }
@@ -106,7 +110,7 @@ impl MessagingUI {
             },
 
             Key::Tab => {
-                self.input_field.autocomplete(&self.nicks);
+                self.input_field.event(Box::new(self.nicks.clone()));
                 WidgetRet::KeyHandled
             },
 
@@ -257,7 +261,7 @@ impl MessagingUI {
 
 impl MessagingUI {
     pub fn join(&mut self, nick : &str, tm : Option<&Tm>) {
-        self.nicks.insert(nick);
+        Rc::get_mut(&mut self.nicks).unwrap().insert(nick);
 
         if let Some(tm) = tm {
             let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
@@ -271,7 +275,7 @@ impl MessagingUI {
     }
 
     pub fn part(&mut self, nick : &str, tm : Option<&Tm>) {
-        self.nicks.remove(nick);
+        Rc::get_mut(&mut self.nicks).unwrap().remove(nick);
 
         if let Some(tm) = tm {
             let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
@@ -285,8 +289,8 @@ impl MessagingUI {
     }
 
     pub fn nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm) {
-        self.nicks.remove(old_nick);
-        self.nicks.insert(new_nick);
+        Rc::get_mut(&mut self.nicks).unwrap().remove(old_nick);
+        Rc::get_mut(&mut self.nicks).unwrap().insert(new_nick);
         let color = self.nick_colors.remove(old_nick);
         if let Some(color_) = color {
             self.nick_colors.insert(new_nick.to_owned(), color_);

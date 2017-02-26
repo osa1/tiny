@@ -3,6 +3,9 @@ use term_input::Key;
 
 use trie::Trie;
 
+use std::any::Any;
+use std::rc::Rc;
+
 pub enum WidgetRet {
     /// Key is handled by the widget.
     KeyHandled,
@@ -24,9 +27,7 @@ pub trait Widget {
     fn resize(&mut self, width : i32, height : i32);
     fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32);
     fn keypressed(&mut self, key : Key) -> WidgetRet;
-
-    // FIXME: Remove this
-    fn autocomplete(&mut self, dict : &Trie);
+    fn event(&mut self, ev: Box<Any>) -> WidgetRet;
 }
 
 // Not sure if this Impl is a good idea -- a stack of widgets is a widget.
@@ -52,10 +53,15 @@ impl Widget for Vec<Box<Widget>> {
         }
     }
 
-    fn autocomplete(&mut self, dict : &Trie) {
+    fn event(&mut self, ev: Box<Any>) -> WidgetRet {
         if !self.is_empty() {
             let i = self.len() - 1;
-            self[i].autocomplete(dict);
+            return self[i].event(ev);
         }
+        WidgetRet::KeyIgnored
     }
+}
+
+pub struct AutoComplete {
+    ac_dict: Rc<Trie>,
 }

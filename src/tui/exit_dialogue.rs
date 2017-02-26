@@ -5,6 +5,8 @@ use trie::Trie;
 use tui::style;
 use tui::widget::{WidgetRet, Widget};
 
+use std::any::Any;
+
 pub struct ExitDialogue {
     width : i32,
 }
@@ -46,5 +48,7 @@ impl Widget for ExitDialogue {
         }
     }
 
-    fn autocomplete(&mut self, _ : &Trie) {}
+    fn event(&mut self, _: Box<Any>) -> WidgetRet {
+        WidgetRet::KeyIgnored
+    }
 }

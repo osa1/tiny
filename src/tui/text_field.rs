@@ -1,5 +1,7 @@
+use std::any::Any;
 use std::cmp::{max, min};
 use std::mem;
+use std::rc::Rc;
 
 use term_input::{Key, Arrow};
 use termbox_simple::Termbox;
@@ -456,47 +458,55 @@ impl Widget for TextField {
         self.keypressed_(key)
     }
 
-    fn autocomplete(&mut self, dict : &Trie) {
-        if self.in_autocomplete() {
-            // AWFUL CODE YO
-            self.keypressed(Key::Arrow(Arrow::Up));
-            return;
-        }
-
-        let cursor_right = self.cursor;
-        let mut cursor_left = max(0, cursor_right - 1);
-
-        let completions = {
-            let line = self.shown_line();
-
-            while cursor_left >= 0
-                    && line.get(cursor_left as usize).map(|c| c.is_alphanumeric()).unwrap_or(false) {
-                cursor_left -= 1;
-            }
-
-            let word = {
-                if cursor_left == cursor_right {
-                    &[]
-                } else {
-                    cursor_left += 1;
-                    &line[ (cursor_left as usize) .. (cursor_right as usize) ]
+    // fn autocomplete(&mut self, dict : &Trie) {
+    fn event(&mut self, ev: Box<Any>) -> WidgetRet {
+        match ev.downcast_ref::<Rc<Trie>>() {
+            None => WidgetRet::KeyIgnored,
+            Some(dict) => {
+                if self.in_autocomplete() {
+                    // AWFUL CODE YO
+                    self.keypressed(Key::Arrow(Arrow::Up));
+                    return WidgetRet::KeyHandled;
                 }
-            };
 
-            dict.drop_pfx(&mut word.iter().cloned())
-        };
+                let cursor_right = self.cursor;
+                let mut cursor_left = max(0, cursor_right - 1);
 
-        if !completions.is_empty() {
-            let completion_len = completions[0].len();
-            self.mode = Mode::Autocomplete {
-                original_buffer: self.shown_line().to_owned(),
-                insertion_point: self.cursor as usize,
-                word_starts: cursor_left as usize,
-                completions: completions,
-                current_completion: 0,
-            };
-            let cursor = self.cursor;
-            self.move_cursor(cursor + completion_len as i32);
+                let completions = {
+                    let line = self.shown_line();
+
+                    while cursor_left >= 0
+                        && line.get(cursor_left as usize).map(|c| c.is_alphanumeric()).unwrap_or(false) {
+                            cursor_left -= 1;
+                        }
+
+                    let word = {
+                        if cursor_left == cursor_right {
+                            &[]
+                        } else {
+                            cursor_left += 1;
+                            &line[ (cursor_left as usize) .. (cursor_right as usize) ]
+                        }
+                    };
+
+                    dict.drop_pfx(&mut word.iter().cloned())
+                };
+
+                if !completions.is_empty() {
+                    let completion_len = completions[0].len();
+                    self.mode = Mode::Autocomplete {
+                        original_buffer: self.shown_line().to_owned(),
+                        insertion_point: self.cursor as usize,
+                        word_starts: cursor_left as usize,
+                        completions: completions,
+                        current_completion: 0,
+                    };
+                    let cursor = self.cursor;
+                    self.move_cursor(cursor + completion_len as i32);
+                }
+
+                WidgetRet::KeyHandled
+            }
         }
     }
 }
