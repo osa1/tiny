@@ -310,7 +310,14 @@ impl TextField {
             self.consume_before(|c| c.is_whitespace());
             self.consume_before(|c| c.is_alphanumeric());
         } else {
-            self.consume_before(|c| c.is_alphanumeric());
+            let char = self.buffer[(self.cursor - 1) as usize];
+            if char.is_alphanumeric() {
+                self.consume_before(|c| c.is_alphanumeric());
+            } else if self.cursor != 0 { // consume at least one char
+                let cursor = self.cursor;
+                self.buffer.remove(cursor as usize - 1);
+                self.move_cursor(cursor - 1);
+            }
         }
     }
 
