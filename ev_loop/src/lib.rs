@@ -12,7 +12,7 @@ pub struct EvLoop<Ctx> {
 }
 
 enum Handler<Ctx> {
-    Timer { cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()> },
+    Timer { cb: Box<Fn(&mut EvLoopController, &mut Ctx, u64) -> ()> },
     Signal { cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()> },
     Fd { evs: FdEv, cb: Box<Fn(FdEv, &mut EvLoopController, &mut Ctx) -> ()> },
 }
@@ -99,7 +99,7 @@ impl<Ctx> EvLoop<Ctx> {
 
     /// `timeout` and `period` in milliseconds. `timeout` must be non-zero for this to work. If
     /// `period` is non-zero, timer expires repeatedly after the initial timeout.
-    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()>) -> TimerRef {
+    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<Fn(&mut EvLoopController, &mut Ctx, u64) -> ()>) -> TimerRef {
         let fd = unsafe { timerfd_create(libc::CLOCK_MONOTONIC, libc::EFD_NONBLOCK) };
         assert!(fd != -1);
 
@@ -156,7 +156,12 @@ impl<Ctx> EvLoop<Ctx> {
                         let mut controller = EvLoopController { stop_ref: &mut stop, remove_self: &mut remove_fd };
 
                         match self.fds.get(&pollfd.fd).unwrap() {
-                            &Handler::Timer{ ref cb } | &Handler::Signal{ ref cb } => {
+                            &Handler::Timer{ ref cb } => {
+                                let mut ret: u64 = 0;
+                                assert!(unsafe { libc::read(pollfd.fd, &mut ret as *mut u64 as *mut libc::c_void, 8) } != -1);
+                                cb(&mut controller, &mut ctx, ret);
+                            }
+                            &Handler::Signal{ ref cb } => {
                                 cb(&mut controller, &mut ctx);
                             }
                             &Handler::Fd{ ref cb, .. } => {
@@ -188,7 +193,7 @@ mod tests {
         let mut ev_loop = EvLoop::new();
         {
             let it_worked_clone = it_worked.clone();
-            ev_loop.add_timer(100, 100, Box::new(move |ctrl, _| {
+            ev_loop.add_timer(100, 100, Box::new(move |ctrl, _, _| {
                 *it_worked_clone.borrow_mut() = true;
                 ctrl.stop();
             }));
@@ -201,22 +206,22 @@ mod tests {
     #[test]
     fn it_works_2() {
         struct Ctx {
-            cb1: bool,
-            cb2: bool,
+            cb1: u64,
+            cb2: u64,
             cb3: bool,
         }
 
         let mut ev_loop: EvLoop<Ctx> = EvLoop::new();
 
-        ev_loop.add_timer(100, 100, Box::new(move |ctrl, ctx| {
-            assert!(ctx.cb1 == false);
-            ctx.cb1 = true;
+        ev_loop.add_timer(100, 100, Box::new(move |ctrl, ctx, amt| {
+            assert!(ctx.cb1 == 0);
+            ctx.cb1 = amt;
             ctrl.remove_self();
         }));
 
-        ev_loop.add_timer(100, 100, Box::new(move |ctrl, ctx| {
-            assert!(ctx.cb2 == false);
-            ctx.cb2 = true;
+        ev_loop.add_timer(100, 100, Box::new(move |ctrl, ctx, amt| {
+            assert!(ctx.cb2 == 0);
+            ctx.cb2 = amt;
             ctrl.remove_self();
         }));
 
@@ -237,10 +242,10 @@ mod tests {
             }));
         }
 
-        let ctx = ev_loop.run(Ctx { cb1: false, cb2: false, cb3: false });
+        let ctx = ev_loop.run(Ctx { cb1: 0, cb2: 0, cb3: false });
 
-        assert!(ctx.cb1);
-        assert!(ctx.cb2);
+        assert_eq!(ctx.cb1, 1);
+        assert_eq!(ctx.cb2, 1);
         assert!(ctx.cb3);
     }
 }
