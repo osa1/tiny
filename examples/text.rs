@@ -1,3 +1,4 @@
+extern crate ev_loop;
 extern crate libc;
 extern crate term_input;
 extern crate termbox_simple;
@@ -5,18 +6,18 @@ extern crate tiny;
 
 use std::fs::File;
 use std::io::Read;
-use std::mem;
 
 use std::io;
 use std::io::Write;
 
 use term_input::{Input, Event, Key};
 use termbox_simple::*;
+use ev_loop::{EvLoop, READ_EV};
 
 use tiny::tui::msg_area::MsgArea;
 use tiny::tui::style;
 
-fn loop_() -> Option<String> {
+fn main() {
     let mut tui = Termbox::init().unwrap();
     tui.set_output_mode(OutputMode::Output256);
     tui.set_clear_attributes(0, 0);
@@ -43,72 +44,74 @@ fn loop_() -> Option<String> {
         }
     }
 
-    // I'm using select() here to test for signals/interrupts. Namely, SIGWINCH
-    // needs to be handled somehow for resizing.
+    let mut ev_loop: EvLoop<(Termbox, MsgArea)> = EvLoop::new();
 
-    let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
-    unsafe { libc::FD_SET(libc::STDIN_FILENO, &mut fd_set); }
-    let nfds = libc::STDIN_FILENO + 1;
-
-    let mut input = Input::new();
-    let mut ev_buffer : Vec<Event> = Vec::new();
-
-    'mainloop:
-    loop {
-        tui.clear();
-        msg_area.draw(&mut tui, 0, 0);
-        tui.present();
-
-        let mut fd_set_ = fd_set.clone();
-        let ret = unsafe {
-            libc::select(nfds,
-                         &mut fd_set_,           // read fds
-                         std::ptr::null_mut(),   // write fds
-                         std::ptr::null_mut(),   // error fds
-                         std::ptr::null_mut())   // timeval
+    {
+        let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+        unsafe {
+            libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
+            libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
         };
 
-        if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
+        ev_loop.add_signal(&sig_mask, Box::new(|_, ctx| {
+            ctx.0.resize();
+            ctx.1.resize(ctx.0.width(), ctx.0.height());
+
+            ctx.0.clear();
+            ctx.1.draw(&mut ctx.0, 0, 0);
+            ctx.0.present();
+        }));
+    }
+
+    {
+        let mut ev_buffer: Vec<Event> = Vec::new();
+        let mut input = Input::new();
+        ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, ctx| {
             input.read_input_events(&mut ev_buffer);
             for ev in ev_buffer.drain(0 ..) {
                 match ev {
                     Event::Key(Key::Esc) => {
-                        break 'mainloop;
+                        ctrl.stop();
                     },
 
                     Event::Key(Key::Ctrl('p')) => {
-                        msg_area.scroll_up();
+                        ctx.1.scroll_up();
                     },
 
                     Event::Key(Key::Ctrl('n')) => {
-                        msg_area.scroll_down();
+                        ctx.1.scroll_down();
                     },
 
                     Event::Key(Key::PageUp) => {
-                        msg_area.page_up();
+                        ctx.1.page_up();
                     },
 
                     Event::Key(Key::PageDown) => {
-                        msg_area.page_down();
+                        ctx.1.page_down();
                     },
 
                     // Ok(Event::KeyEvent(Key::Char(ch))) => {
                     // }
 
-                    Event::Resize => {
-                        tui.resize();
-                        msg_area.resize(tui.width(), tui.height());
-                    }
+                    // This does not work anymore: ev_loop handles SIGWINCH signals
+                    // Event::Resize => {
+                    //     ctx.0.resize();
+                    //     ctx.1.resize(ctx.0.width(), ctx.0.height());
+                    // }
 
                     _ => {}
                 }
             }
-        }
+
+            ctx.0.clear();
+            ctx.1.draw(&mut ctx.0, 0, 0);
+            ctx.0.present();
+        }));
     }
 
-    None
-}
+    tui.clear();
+    msg_area.draw(&mut tui, 0, 0);
+    tui.present();
 
-fn main() {
-    loop_().map(|err| println!("{}", err));
+    ev_loop.run((tui, msg_area));
 }

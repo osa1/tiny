@@ -12,9 +12,9 @@ pub struct EvLoop<Ctx> {
 }
 
 enum Handler<Ctx> {
-    Timer { cb: Box<Fn(&mut EvLoopController, &mut Ctx, u64) -> ()> },
-    Signal { cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()> },
-    Fd { evs: FdEv, cb: Box<Fn(FdEv, &mut EvLoopController, &mut Ctx) -> ()> },
+    Timer { cb: Box<FnMut(&mut EvLoopController, &mut Ctx, u64) -> ()> },
+    Signal { cb: Box<FnMut(&mut EvLoopController, &mut Ctx) -> ()> },
+    Fd { evs: FdEv, cb: Box<FnMut(FdEv, &mut EvLoopController, &mut Ctx) -> ()> },
 }
 
 /// File descriptor events. Use bitwise or to combine.
@@ -89,7 +89,7 @@ impl<Ctx> EvLoop<Ctx> {
     }
 
     /// Register a non-blocking socket. Use the same fd for unregister.
-    pub fn add_fd(&mut self, fd: libc::c_int, evs: FdEv, cb: Box<Fn(FdEv, &mut EvLoopController, &mut Ctx) -> ()>) {
+    pub fn add_fd(&mut self, fd: libc::c_int, evs: FdEv, cb: Box<FnMut(FdEv, &mut EvLoopController, &mut Ctx) -> ()>) {
         self.fds.insert(fd, Handler::Fd { evs: evs, cb: cb });
     }
 
@@ -99,7 +99,7 @@ impl<Ctx> EvLoop<Ctx> {
 
     /// `timeout` and `period` in milliseconds. `timeout` must be non-zero for this to work. If
     /// `period` is non-zero, timer expires repeatedly after the initial timeout.
-    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<Fn(&mut EvLoopController, &mut Ctx, u64) -> ()>) -> TimerRef {
+    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<FnMut(&mut EvLoopController, &mut Ctx, u64) -> ()>) -> TimerRef {
         let fd = unsafe { timerfd_create(libc::CLOCK_MONOTONIC, libc::EFD_NONBLOCK) };
         assert!(fd != -1);
 
@@ -117,7 +117,7 @@ impl<Ctx> EvLoop<Ctx> {
         self.fds.remove(&timer_ref.0);
     }
 
-    pub fn add_signal(&mut self, sigs: &libc::sigset_t, cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()>) -> SignalRef {
+    pub fn add_signal(&mut self, sigs: &libc::sigset_t, cb: Box<FnMut(&mut EvLoopController, &mut Ctx) -> ()>) -> SignalRef {
         // Block the signals we handle using signalfd() so they don't cause signal handlers to run
         assert!(unsafe { libc::sigprocmask(libc::SIG_BLOCK, sigs as *const libc::sigset_t, std::ptr::null_mut()) } != -1);
         let fd = unsafe { libc::signalfd(-1, sigs, libc::EFD_NONBLOCK) };
@@ -155,16 +155,23 @@ impl<Ctx> EvLoop<Ctx> {
                     {
                         let mut controller = EvLoopController { stop_ref: &mut stop, remove_self: &mut remove_fd };
 
-                        match self.fds.get(&pollfd.fd).unwrap() {
-                            &Handler::Timer{ ref cb } => {
+                        match self.fds.get_mut(&pollfd.fd).unwrap() {
+                            &mut Handler::Timer{ ref mut cb } => {
                                 let mut ret: u64 = 0;
                                 assert!(unsafe { libc::read(pollfd.fd, &mut ret as *mut u64 as *mut libc::c_void, 8) } != -1);
                                 cb(&mut controller, &mut ctx, ret);
                             }
-                            &Handler::Signal{ ref cb } => {
+                            &mut Handler::Signal{ ref mut cb } => {
+                                let mut siginfo: libc::signalfd_siginfo = unsafe { std::mem::zeroed() };
+                                assert!(unsafe {
+                                    libc::read(
+                                        pollfd.fd,
+                                        &mut siginfo as *mut libc::signalfd_siginfo as *mut libc::c_void,
+                                        std::mem::size_of::<libc::signalfd_siginfo>())
+                                } != -1);
                                 cb(&mut controller, &mut ctx);
                             }
-                            &Handler::Fd{ ref cb, .. } => {
+                            &mut Handler::Fd{ ref mut cb, .. } => {
                                 cb(FdEv(pollfd.revents), &mut controller, &mut ctx);
                             }
                         }
