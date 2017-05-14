@@ -12,9 +12,10 @@ name = "tiny"
 path = "bin/main.rs"
 
 [dependencies]
-libc = "0.2.8"
+libc = "0.2.22"
 net2 = "0.2.23"
 rand = "0.3.14"
 term_input = { path = "term_input/" }
 termbox_simple = { path = "termbox/" }
+ev_loop = { path = "ev_loop/" }
 time = "0.1"
