@@ -331,7 +331,7 @@ impl Tabbed {
             },
 
             MsgTarget::MultipleTabs(ref targets) => {
-                targets.iter().flat_map(|t : &Box<MsgTarget>| self.maybe_create_tab(&*t)).collect()
+                targets.iter().flat_map(|t : &MsgTarget| self.maybe_create_tab(t)).collect()
             }
 
             _ => vec![]
