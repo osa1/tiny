@@ -7,14 +7,14 @@ extern crate libc;
 use std::collections::HashMap;
 use std::ops::BitOr;
 
-pub struct EvLoop {
-    fds: HashMap<libc::c_int, Handler>,
+pub struct EvLoop<Ctx> {
+    fds: HashMap<libc::c_int, Handler<Ctx>>,
 }
 
-enum Handler {
-    Timer { cb: Box<Fn(&mut EvLoopController) -> ()> },
-    Signal { cb: Box<Fn(&mut EvLoopController) -> ()> },
-    Fd { evs: FdEv, cb: Box<Fn(FdEv, &mut EvLoopController) -> ()> },
+enum Handler<Ctx> {
+    Timer { cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()> },
+    Signal { cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()> },
+    Fd { evs: FdEv, cb: Box<Fn(FdEv, &mut EvLoopController, &mut Ctx) -> ()> },
 }
 
 /// File descriptor events. Use bitwise or to combine.
@@ -83,13 +83,13 @@ fn mk_timespec(millis: i64) -> libc::timespec {
     libc::timespec { tv_sec: secs, tv_nsec: nanos }
 }
 
-impl EvLoop {
-    pub fn new() -> EvLoop {
+impl<Ctx> EvLoop<Ctx> {
+    pub fn new() -> EvLoop<Ctx> {
         EvLoop { fds: HashMap::new() }
     }
 
     /// Register a non-blocking socket. Use the same fd for unregister.
-    pub fn add_fd(&mut self, fd: libc::c_int, evs: FdEv, cb: Box<Fn(FdEv, &mut EvLoopController) -> ()>) {
+    pub fn add_fd(&mut self, fd: libc::c_int, evs: FdEv, cb: Box<Fn(FdEv, &mut EvLoopController, &mut Ctx) -> ()>) {
         self.fds.insert(fd, Handler::Fd { evs: evs, cb: cb });
     }
 
@@ -99,7 +99,7 @@ impl EvLoop {
 
     /// `timeout` and `period` in milliseconds. `timeout` must be non-zero for this to work. If
     /// `period` is non-zero, timer expires repeatedly after the initial timeout.
-    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<Fn(&mut EvLoopController) -> ()>) -> TimerRef {
+    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()>) -> TimerRef {
         let fd = unsafe { timerfd_create(libc::CLOCK_MONOTONIC, libc::EFD_NONBLOCK) };
         assert!(fd != -1);
 
@@ -117,7 +117,7 @@ impl EvLoop {
         self.fds.remove(&timer_ref.0);
     }
 
-    pub fn add_signal(&mut self, sigs: &libc::sigset_t, cb: Box<Fn(&mut EvLoopController) -> ()>) -> SignalRef {
+    pub fn add_signal(&mut self, sigs: &libc::sigset_t, cb: Box<Fn(&mut EvLoopController, &mut Ctx) -> ()>) -> SignalRef {
         // Block the signals we handle using signalfd() so they don't cause signal handlers to run
         assert!(unsafe { libc::sigprocmask(libc::SIG_BLOCK, sigs as *const libc::sigset_t, std::ptr::null_mut()) } != -1);
         let fd = unsafe { libc::signalfd(-1, sigs, libc::EFD_NONBLOCK) };
@@ -130,7 +130,7 @@ impl EvLoop {
         self.fds.remove(&signal_ref.0);
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, mut ctx: Ctx) -> Ctx {
         let mut stop = false;
         while !stop {
             let mut fds: Vec<libc::pollfd> = Vec::with_capacity(self.fds.len());
@@ -157,10 +157,10 @@ impl EvLoop {
 
                         match self.fds.get(&pollfd.fd).unwrap() {
                             &Handler::Timer{ ref cb } | &Handler::Signal{ ref cb } => {
-                                cb(&mut controller);
+                                cb(&mut controller, &mut ctx);
                             }
                             &Handler::Fd{ ref cb, .. } => {
-                                cb(FdEv(pollfd.revents), &mut controller);
+                                cb(FdEv(pollfd.revents), &mut controller, &mut ctx);
                             }
                         }
                     }
@@ -171,6 +171,7 @@ impl EvLoop {
                 }
             }
         }
+        ctx
     }
 }
 
@@ -187,41 +188,37 @@ mod tests {
         let mut ev_loop = EvLoop::new();
         {
             let it_worked_clone = it_worked.clone();
-            ev_loop.add_timer(100, 100, Box::new(move |ctrl| {
+            ev_loop.add_timer(100, 100, Box::new(move |ctrl, _| {
                 *it_worked_clone.borrow_mut() = true;
                 ctrl.stop();
             }));
         }
-        ev_loop.run();
+        ev_loop.run(());
 
         assert!(*(*it_worked).borrow());
     }
 
     #[test]
     fn it_works_2() {
-        let cb1: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
-        let cb2: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
-        let cb3: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
-
-        let mut ev_loop = EvLoop::new();
-
-        {
-            let var = cb1.clone();
-            ev_loop.add_timer(100, 100, Box::new(move |ctrl| {
-                assert!(*(*var).borrow() == false);
-                *var.borrow_mut() = true;
-                ctrl.remove_self();
-            }));
+        struct Ctx {
+            cb1: bool,
+            cb2: bool,
+            cb3: bool,
         }
 
-        {
-            let var = cb2.clone();
-            ev_loop.add_timer(100, 100, Box::new(move |ctrl| {
-                assert!(*(*var).borrow() == false);
-                *var.borrow_mut() = true;
-                ctrl.remove_self();
-            }));
-        }
+        let mut ev_loop: EvLoop<Ctx> = EvLoop::new();
+
+        ev_loop.add_timer(100, 100, Box::new(move |ctrl, ctx| {
+            assert!(ctx.cb1 == false);
+            ctx.cb1 = true;
+            ctrl.remove_self();
+        }));
+
+        ev_loop.add_timer(100, 100, Box::new(move |ctrl, ctx| {
+            assert!(ctx.cb2 == false);
+            ctx.cb2 = true;
+            ctrl.remove_self();
+        }));
 
         {
             let fd = unsafe { timerfd_create(libc::CLOCK_MONOTONIC, libc::EFD_NONBLOCK) };
@@ -232,19 +229,18 @@ mod tests {
             let timerspec = itimerspec { it_interval: period_spec, it_value: timeout_spec };
 
             assert!(unsafe { timerfd_settime(fd, 0, &timerspec, std::ptr::null_mut()) } != -1);
-            let var = cb3.clone();
-            ev_loop.add_fd(fd, READ_EV, Box::new(move |_, ctrl| {
-                assert!(*(*var).borrow() == false);
-                *var.borrow_mut() = true;
+            ev_loop.add_fd(fd, READ_EV, Box::new(move |_, ctrl, ctx| {
+                assert!(ctx.cb3 == false);
+                ctx.cb3 = true;
                 ctrl.remove_self();
                 ctrl.stop();
             }));
         }
 
-        ev_loop.run();
+        let ctx = ev_loop.run(Ctx { cb1: false, cb2: false, cb3: false });
 
-        assert!(*(*cb1).borrow());
-        assert!(*(*cb2).borrow());
-        assert!(*(*cb3).borrow());
+        assert!(ctx.cb1);
+        assert!(ctx.cb2);
+        assert!(ctx.cb3);
     }
 }
