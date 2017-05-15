@@ -1,7 +1,9 @@
+extern crate ev_loop;
 extern crate libc;
 extern crate term_input;
 
 use term_input::{Event, Key, Input};
+use ev_loop::{EvLoop, READ_EV};
 
 fn main() {
     // put the terminal in non-buffering, no-enchoing mode
@@ -14,34 +16,19 @@ fn main() {
     new_term.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG | libc::IEXTEN);
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &new_term) };
 
-    // Set up the descriptors for select()
-    let mut fd_set : libc::fd_set = unsafe { std::mem::zeroed() };
-
-    unsafe { libc::FD_SET(libc::STDIN_FILENO, &mut fd_set); }
-
+    let mut ev_loop: EvLoop<()> = EvLoop::new();
     let mut input = Input::new();
     let mut evs = Vec::new();
-
-    'outer:
-    loop {
-        let mut fd_set_ = fd_set.clone();
-        let ret =
-            unsafe {
-                libc::select(1,
-                             &mut fd_set_,           // read fds
-                             std::ptr::null_mut(),   // write fds
-                             std::ptr::null_mut(),   // error fds
-                             std::ptr::null_mut())   // timeval
-            };
-
-        if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-            input.read_input_events(&mut evs);
-            println!("{:?}", evs);
-            for ev in evs.iter() {
-                if ev == &Event::Key(Key::Esc) { break 'outer; }
+    ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, _| {
+        input.read_input_events(&mut evs);
+        println!("{:?}", evs);
+        for ev in evs.iter() {
+            if ev == &Event::Key(Key::Esc) {
+                ctrl.stop();
             }
         }
-    }
+    }));
+    ev_loop.run(());
 
     // restore the old settings
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &old_term) };

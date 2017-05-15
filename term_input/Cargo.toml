@@ -6,3 +6,6 @@ authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 [dependencies]
 libc = "0.2"
 nix = "0.7"
+
+[dev-dependencies]
+ev_loop = { path = "../ev_loop/" }
