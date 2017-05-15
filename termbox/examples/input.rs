@@ -1,42 +1,41 @@
+extern crate ev_loop;
 extern crate libc;
 extern crate termbox_simple;
 
 use termbox_simple::*;
+use ev_loop::{EvLoop, READ_EV};
 
 fn main() {
-    let mut termbox = Termbox::init().unwrap();
+    let mut ev_loop: EvLoop<Termbox> = EvLoop::new();
 
-    // Set up the descriptors for select()
-    let mut fd_set : libc::fd_set = unsafe { std::mem::zeroed() };
-
-    unsafe { libc::FD_SET(libc::STDIN_FILENO, &mut fd_set); }
-
-    loop {
-        let mut fd_set_ = fd_set.clone();
-        let ret =
-            unsafe {
-                libc::select(1,
-                             &mut fd_set_,           // read fds
-                             std::ptr::null_mut(),   // write fds
-                             std::ptr::null_mut(),   // error fds
-                             std::ptr::null_mut())   // timeval
-            };
-
-        if ret == -1 {
-            termbox.resize();
-        } else if unsafe { libc::FD_ISSET(0, &mut fd_set_) } {
-            let mut buf : Vec<u8> = vec![];
-            if read_input_events(&mut buf) {
-                let string = format!("{:?}", buf);
-                termbox.clear();
-                if buf == vec![27] { break; }
-                for (char_idx, char) in string.chars().enumerate() {
-                    termbox.change_cell(char_idx as libc::c_int, 0, char, TB_WHITE, TB_DEFAULT);
-                }
-                termbox.present();
+    ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(|_, ctrl, termbox| {
+        let mut buf : Vec<u8> = vec![];
+        if read_input_events(&mut buf) {
+            let string = format!("{:?}", buf);
+            termbox.clear();
+            if buf == vec![27] {
+                ctrl.stop();
             }
+            for (char_idx, char) in string.chars().enumerate() {
+                termbox.change_cell(char_idx as libc::c_int, 0, char, TB_WHITE, TB_DEFAULT);
+            }
+            termbox.present();
         }
+    }));
+
+    {
+        let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+        unsafe {
+            libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
+            libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
+        };
+
+        ev_loop.add_signal(&sig_mask, Box::new(|_, termbox| {
+            termbox.resize();
+        }));
     }
+
+    ev_loop.run(Termbox::init().unwrap());
 }
 
 /// Read stdin contents if it's ready for reading. Returns true when it was able
