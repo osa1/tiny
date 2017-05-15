@@ -71,7 +71,7 @@ impl Comms {
         let stream = TcpBuilder::new_v4()?.to_tcp_stream()?;
         stream.set_nonblocking(true)?;
         // This will fail with EINPROGRESS
-        stream.connect(serv_addr);
+        let _ = stream.connect(serv_addr);
 
         let log_file = {
             if cfg!(debug_assertions) {

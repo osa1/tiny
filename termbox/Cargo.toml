@@ -10,3 +10,6 @@ libc = "0.2"
 
 [build-dependencies]
 gcc = "0.3.35"
+
+[dev-dependencies]
+ev_loop = { path = "../ev_loop/" }

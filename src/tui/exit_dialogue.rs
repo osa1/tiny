@@ -1,7 +1,6 @@
 use term_input::Key;
 use termbox_simple::Termbox;
 
-use trie::Trie;
 use tui::style;
 use tui::widget::{WidgetRet, Widget};
 

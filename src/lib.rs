@@ -1,5 +1,4 @@
 #![feature(alloc_system)]
-#![feature(question_mark)]
 #![feature(test)]
 
 extern crate alloc_system;

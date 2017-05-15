@@ -1,10 +1,7 @@
 use termbox_simple::Termbox;
 use term_input::Key;
 
-use trie::Trie;
-
 use std::any::Any;
-use std::rc::Rc;
 
 pub enum WidgetRet {
     /// Key is handled by the widget.
@@ -60,8 +57,4 @@ impl Widget for Vec<Box<Widget>> {
         }
         WidgetRet::KeyIgnored
     }
-}
-
-pub struct AutoComplete {
-    ac_dict: Rc<Trie>,
 }

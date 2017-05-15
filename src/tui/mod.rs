@@ -15,7 +15,6 @@ use std::io::Write;
 use std::io;
 use std::mem;
 use std::str;
-use std::time::Duration;
 
 use time::Tm;
 use time;

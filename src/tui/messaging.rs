@@ -3,7 +3,6 @@ use term_input::Key;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::any::Any;
 use std::rc::Rc;
 
 use rand::Rng;
