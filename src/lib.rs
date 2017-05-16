@@ -4,6 +4,7 @@
 extern crate alloc_system;
 extern crate libc;
 extern crate net2;
+extern crate netbuf;
 extern crate rand;
 extern crate test;
 extern crate time;
@@ -13,6 +14,7 @@ extern crate termbox_simple;
 
 mod comms;
 mod utils;
+mod wire;
 pub mod msg;
 pub mod trie;
 pub mod tui;
