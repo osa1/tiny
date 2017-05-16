@@ -119,6 +119,21 @@ impl TUI {
                 }
             },
 
+            Event::String(str) => {
+                // This happens when keys pressed too fast or a text pasted to the terminal
+                if str.len() <= 8 {
+                    // Assume fast key press
+                    let mut ret = TUIRet::KeyHandled;
+                    for ch in str.chars() {
+                        ret = self.handle_input_event(Event::Key(Key::Char(ch)));
+                    }
+                    ret
+                } else {
+                    // Assume paste
+                    TUIRet::EventIgnored(Event::String(str.to_owned()))
+                }
+            },
+
             ev => {
                 TUIRet::EventIgnored(ev)
             },
