@@ -1,12 +1,40 @@
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
-//!
-//! Parsing and message generation are done directly on netbuf buffers to avoid redundant
-//! allocations.
 
-use netbuf::Buf;
+use std::io::Write;
 use std::str;
+use std;
+
+pub fn user<W : Write>(hostname: &str, realname: &str, mut sink: W) -> std::io::Result<()> {
+    write!(sink, "USER {} 0 * :{}\r\n", hostname, realname)
+}
+
+pub fn nick<W : Write>(arg: &str, mut sink: W) -> std::io::Result<()> {
+    write!(sink, "NICK {}\r\n", arg)
+}
+
+pub fn pong<W: Write>(arg: &str, mut sink: W) -> std::io::Result<()> {
+    write!(sink, "PONG {}\r\n", arg)
+}
+
+pub fn join<W: Write>(channel: &str, mut sink: W) -> std::io::Result<()> {
+    write!(sink, "JOIN {}\r\n", channel)
+}
+
+pub fn privmsg<W: Write>(msgtarget: &str, msg: &str, mut sink: W) -> std::io::Result<()> {
+    write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
+}
+
+pub fn quit<W : Write>(msg : Option<&str>, mut sink : W) -> std::io::Result<()> {
+    match msg {
+        None => write!(sink, "QUIT\r\n"),
+        Some(msg) => write!(sink, "QUIT {}\r\n", msg)
+    }
+}
 
 /// <prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
+/// From RFC 2812:
+/// > If the prefix is missing from the message, it is assumed to have originated from the
+/// > connection from which it was received from.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pfx {
     Server(String),
@@ -26,9 +54,14 @@ pub enum Receiver {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Msg {
+pub struct Msg {
+    pub pfx: Option<Pfx>,
+    pub cmd: Cmd,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Cmd {
     PRIVMSG {
-        pfx: Option<Pfx>,
         // TODO: In theory this should be a list of receivers, but in practice I've never
         // encountered that case.
         receivers: Receiver,
@@ -36,7 +69,6 @@ pub enum Msg {
     },
 
     JOIN {
-        pfx: Option<Pfx>,
         // TODO: Same as above, this should be a list ...
         chan: String
         // TODO: key field might be useful when joining restricted channels. In practice I've never
@@ -44,14 +76,13 @@ pub enum Msg {
     },
 
     PART {
-        pfx: Option<Pfx>,
         // TODO: List of channels
-        chan: String
+        chan: String,
+        msg: Option<String>
     },
 
     QUIT {
-        pfx: Option<Pfx>,
-        msg: String,
+        msg: Option<String>,
     },
 
     NOTICE {
@@ -59,11 +90,16 @@ pub enum Msg {
         msg: String,
     },
 
-    NICK(String),
+    NICK {
+        nick: String,
+    },
+
+    PING {
+        server: String,
+    },
 
     /// An IRC message other than the ones listed above.
     Other {
-        pfx: Option<Pfx>,
         cmd: String,
         params: Vec<String>
     },
@@ -71,7 +107,6 @@ pub enum Msg {
     /// Numeric replies are kept generic as there are just too many replies and we probably only
     /// need to handle a small subset of them.
     Reply {
-        pfx: Option<Pfx>,
         num: u16,
         params: Vec<String>,
     }
@@ -86,20 +121,20 @@ enum MsgType<'a> {
 static CRLF: [u8; 2] = [b'\r', b'\n'];
 
 impl Msg {
-    /// Try to read an IRC message off a `netbuf` buffer. Drops the message when parsing is
-    /// successful. Otherwise the buffer is left unchanged.
-    pub fn read(buf: &mut Buf) -> Option<Msg> {
+    /// Try to read an IRC message off buffer. Drops the message when parsing is successful.
+    /// Otherwise the buffer is left unchanged.
+    pub fn read(buf: &mut Vec<u8>) -> Option<Msg> {
         // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
         // using this hacky method instead.
         let crlf_idx = {
-            match buf.as_ref().windows(2).position(|sub| sub == CRLF) {
+            match buf.windows(2).position(|sub| sub == CRLF) {
                 None => return None,
                 Some(i) => i,
             }
         };
 
         let ret = {
-            let mut slice: &[u8] = &buf.as_ref()[ 0 .. crlf_idx ];
+            let mut slice: &[u8] = &buf[ 0 .. crlf_idx ];
 
             let pfx: Option<Pfx> = {
                 if slice[0] == b':' {
@@ -130,36 +165,81 @@ impl Msg {
             };
 
             let params: Vec<&str> = parse_params(unsafe { str::from_utf8_unchecked(slice) });
-            match msg_ty {
-                MsgType::Cmd("PRIVMSG") if params.len() == 2 => {
-                    let target = params[0];
-                    let msg = params[1];
-                    let receiver =
-                        if target.chars().nth(0) == Some('#') {
-                            Receiver::Chan(target.to_owned())
-                        } else {
-                            Receiver::User(target.to_owned())
-                        };
-                    Msg::PRIVMSG {
-                        pfx: pfx,
-                        receivers: receiver,
-                        contents: msg.to_owned(),
+            let cmd =
+                match msg_ty {
+                    MsgType::Cmd("PRIVMSG") if params.len() == 2 => {
+                        let target = params[0];
+                        let msg = params[1];
+                        let receiver =
+                            if target.chars().nth(0) == Some('#') {
+                                Receiver::Chan(target.to_owned())
+                            } else {
+                                Receiver::User(target.to_owned())
+                            };
+                        Cmd::PRIVMSG {
+                            receivers: receiver,
+                            contents: msg.to_owned(),
+                        }
+                    },
+                    MsgType::Cmd("JOIN") if params.len() == 1 => {
+                        let chan = params[0];
+                        Cmd::JOIN {
+                            chan: chan.to_owned(),
+                        }
+                    },
+                    MsgType::Cmd("PART") if params.len() == 1 || params.len() == 2 => {
+                        let mb_msg = if params.len() == 2 { Some(params[1].to_owned()) } else { None };
+                        Cmd::PART {
+                            chan: params[0].to_owned(),
+                            msg: mb_msg,
+                        }
                     }
-                },
-                MsgType::Cmd("JOIN") if params.len() == 1 => {
-                    let chan = params[0];
-                    Msg::JOIN {
-                        pfx: pfx,
-                        chan: chan.to_owned(),
+                    MsgType::Cmd("QUIT") if params.len() == 0 || params.len() == 1 => {
+                        let mb_msg = if params.len() == 1 { Some(params[0].to_owned()) } else { None };
+                        Cmd::QUIT {
+                            msg: mb_msg,
+                        }
                     }
-                },
-                _ => {
-                    unimplemented!()
-                }
+                    MsgType::Cmd("NOTICE") if params.len() == 2 => {
+                        let nick = params[0];
+                        let msg = params[1];
+                        Cmd::NOTICE {
+                            nick: nick.to_owned(),
+                            msg: msg.to_owned(),
+                        }
+                    }
+                    MsgType::Cmd("NICK") if params.len() == 1 => {
+                        let nick = params[0];
+                        Cmd::NICK {
+                            nick: nick.to_owned(),
+                        }
+                    }
+                    MsgType::Cmd("PING") if params.len() == 1 => {
+                        Cmd::PING {
+                            server: params[0].to_owned(),
+                        }
+                    }
+                    MsgType::Num(n) => {
+                        Cmd::Reply {
+                            num: n,
+                            params: params.into_iter().map(|s| s.to_owned()).collect(),
+                        }
+                    }
+                    MsgType::Cmd(cmd) => {
+                        Cmd::Other {
+                            cmd: cmd.to_owned(),
+                            params: params.into_iter().map(|s| s.to_owned()).collect(),
+                        }
+                    }
+                };
+
+            Msg {
+                pfx: pfx,
+                cmd: cmd,
             }
         };
 
-        buf.consume(crlf_idx + 2);
+        buf.drain(0 .. crlf_idx + 2);
         Some(ret)
     }
 }
@@ -243,33 +323,97 @@ mod tests {
 
     #[test]
     fn test_privmsg_parsing() {
-        let mut buf = Buf::new();
+        let mut buf = vec![];
         write!(&mut buf, ":nick!~nick@unaffiliated/nick PRIVMSG tiny :a b c\r\n").unwrap();
         assert_eq!(
             Msg::read(&mut buf),
-            Some(Msg::PRIVMSG {
+            Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "nick".to_owned(),
                     user: "~nick@unaffiliated/nick".to_owned(),
                 }),
-                receivers: Receiver::User("tiny".to_owned()),
-                contents: "a b c".to_owned()
+                cmd: Cmd::PRIVMSG {
+                    receivers: Receiver::User("tiny".to_owned()),
+                    contents: "a b c".to_owned()
+                }
             }));
         assert_eq!(buf.len(), 0);
     }
 
     #[test]
+    fn test_notice_parsing() {
+        let mut buf = vec![];
+        write!(&mut buf, ":barjavel.freenode.net NOTICE * :*** Looking up your hostname...\r\n").unwrap();
+        assert_eq!(
+            Msg::read(&mut buf),
+            Some(Msg {
+                pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
+                cmd: Cmd::NOTICE {
+                    nick: "*".to_owned(),
+                    msg: "*** Looking up your hostname...".to_owned()
+                }
+            }));
+    }
+
+    #[test]
+    fn test_numeric_parsing() {
+        let mut buf = vec![];
+        write!(&mut buf,
+               ":barjavel.freenode.net 001 tiny :Welcome to the freenode Internet Relay Chat Network tiny\r\n")
+            .unwrap();
+        write!(&mut buf,
+               ":barjavel.freenode.net 002 tiny :Your host is barjavel.freenode.net[123.123.123.123/8001], \
+               running version ircd-seven-1.1.4\r\n").unwrap();
+        write!(&mut buf,
+               ":barjavel.freenode.net 004 tiny_test barjavel.freenode.net \
+               ircd-seven-1.1.4 DOQRSZaghilopswz \
+               CFILMPQSbcefgijklmnopqrstvz bkloveqjfI\r\n").unwrap();
+        write!(&mut buf,
+               ":barjavel.freenode.net 005 tiny_test CHANTYPES=# EXCEPTS INVEX \
+               CHANMODES=eIbq,k,flj,CFLMPQScgimnprstz CHANLIMIT=#:120 PREFIX=(ov)@+ \
+               MAXLIST=bqeI:100 MODES=4 NETWORK=freenode STATUSMSG=@+ CALLERID=g \
+               CASEMAPPING=rfc1459 :are supported by this server\r\n").unwrap();
+
+        let mut msgs = vec![];
+        while let Some(msg) = Msg::read(&mut buf) {
+            msgs.push(msg);
+        }
+
+        assert_eq!(msgs.len(), 4);
+    }
+
+    #[test]
+    fn test_part_parsing() {
+        let mut buf = vec![];
+        write!(&mut buf, ":tiny!~tiny@123.123.123.123 PART #haskell\r\n").unwrap();
+        assert_eq!(
+            Msg::read(&mut buf),
+            Some(Msg {
+                pfx: Some(Pfx::User {
+                    nick: "tiny".to_owned(),
+                    user: "~tiny@123.123.123.123".to_owned(),
+                }),
+                cmd: Cmd::PART {
+                    chan: "#haskell".to_owned(),
+                    msg: None
+                },
+            }));
+    }
+
+    #[test]
     fn test_join_parsing() {
-        let mut buf = Buf::new();
+        let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@192.168.0.1 JOIN #haskell\r\n").unwrap();
         assert_eq!(
             Msg::read(&mut buf),
-            Some(Msg::JOIN {
+            Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
                     user: "~tiny@192.168.0.1".to_owned(),
                 }),
-                chan: "#haskell".to_owned(),
+                cmd: Cmd::JOIN {
+                    chan: "#haskell".to_owned(),
+                }
             }));
         assert_eq!(buf.len(), 0);
     }
