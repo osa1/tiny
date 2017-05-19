@@ -15,7 +15,6 @@ path = "bin/main.rs"
 ev_loop = { path = "ev_loop/" }
 libc = "0.2.22"
 net2 = "0.2.23"
-netbuf = "0.4.0"
 rand = "0.3.14"
 term_input = { path = "term_input/" }
 termbox_simple = { path = "termbox/" }
