@@ -2,6 +2,7 @@
 #![feature(test)]
 
 extern crate alloc_system;
+extern crate ev_loop;
 extern crate libc;
 extern crate net2;
 extern crate netbuf;
@@ -18,12 +19,12 @@ mod wire;
 pub mod trie;
 pub mod tui;
 
-use std::cmp::max;
 use std::io::Write;
 use std::io;
-use std::mem;
+use std::os::unix::io::{RawFd};
 
 use conn::{Conn, ConnEv};
+use ev_loop::{EvLoop, EvLoopCtrl, READ_EV};
 use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
 use tui::{TUI, TUIRet, MsgTarget};
@@ -39,183 +40,93 @@ pub struct Tiny {
     realname: String,
 }
 
-#[derive(PartialEq, Eq)]
-enum LoopRet {
-    Abort,
-    Continue,
-    Disconnected { fd : libc::c_int },
-    UpdateFds,
-}
-
 impl Tiny {
-    pub fn new(nick : String, hostname : String, realname : String) -> Tiny {
-        Tiny {
+    pub fn run(nick: String, hostname: String, realname: String) {
+        let mut tiny = Tiny {
             conns: Vec::with_capacity(1),
             tui: TUI::new(),
             input_ev_handler: Input::new(),
             nick: nick,
             hostname: hostname,
             realname: realname,
-        }
-    }
+        };
 
-    pub fn mainloop(&mut self) {
-        self.tui.new_server_tab("debug");
+        tiny.tui.new_server_tab("debug");
+        tiny.tui.draw();
+
+        let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
         // we maintain this separately as otherwise we're having borrow checker problems
         let mut ev_buffer = vec![];
+        ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, tiny| {
+            tiny.handle_stdin(ctrl, &mut ev_buffer);
+            tiny.tui.draw();
+        }));
 
-        loop {
-            // Set up the descriptors for select()
-            let mut fd_set : libc::fd_set = unsafe { mem::zeroed() };
+        {
+            let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+            unsafe {
+                libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
+                libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
+            };
 
-            // 0 is stdin
-            unsafe { libc::FD_SET(0, &mut fd_set); }
+            ev_loop.add_signal(&sig_mask, Box::new(|_, tiny| {
+                tiny.tui.resize();
+                tiny.tui.draw();
+            }));
 
-            let mut max_fd : libc::c_int = 0;
-            for conn in self.conns.iter() {
-                let fd = conn.get_raw_fd();
-                max_fd = max(fd, max_fd);
-                unsafe { libc::FD_SET(fd, &mut fd_set); }
-            }
-
-            let nfds = max_fd + 1;
-
-            // Start the loop
-            if self.mainloop_(&mut ev_buffer, fd_set, nfds) == LoopRet::Abort {
-                break;
-            }
+            tiny.tui.draw();
         }
+
+        ev_loop.run(tiny);
     }
 
-    fn mainloop_(&mut self, ev_buffer: &mut Vec<Event>, fd_set : libc::fd_set, nfds : libc::c_int) -> LoopRet {
-        loop {
-            self.tui.draw();
-
-            let mut fd_set_ = fd_set.clone();
-            let ret =
-                unsafe {
-                    libc::select(nfds,
-                                 &mut fd_set_,           // read fds
-                                 std::ptr::null_mut(),   // write fds
-                                 std::ptr::null_mut(),   // error fds
-                                 std::ptr::null_mut())   // timeval
-                };
-
-            // A resize signal (SIGWINCH) causes select() to fail, but termbox's
-            // signal handler runs and we need to run termbox's poll_event() to
-            // be able to catch the resize event. So, when stdin is ready we
-            // call the TUI event handler, but we also call it when select() is
-            // interrupted for some reason, just to be able to handle resize
-            // events.
-            //
-            // See also https://github.com/nsf/termbox/issues/71.
-            if unsafe { ret == -1 || libc::FD_ISSET(0, &mut fd_set_) } {
-                for ret in self.handle_stdin(ev_buffer) {
-                    // FIXME: This part is broken
-                    if ret == LoopRet::Abort { return LoopRet::Abort; }
-                    else if ret == LoopRet::UpdateFds { return LoopRet::UpdateFds; }
-                }
-            }
-
-            // A socket is ready
-            // TODO: Can multiple sockets be set in single select() call? I
-            // assume yes for now.
-            else {
-                // Collecting conns to read in this Vec becuase Rust sucs.
-                let mut conn_idxs = Vec::with_capacity(1);
-                for (conn_idx, conn) in self.conns.iter_mut().enumerate() {
-                    let fd = conn.get_raw_fd();
-                    if unsafe { libc::FD_ISSET(fd, &mut fd_set_) } {
-                        conn_idxs.push(conn_idx);
-                    }
-                }
-
-                let mut abort = false;
-                let mut reset_fds = false;
-                for conn_idx in conn_idxs {
-                    match self.handle_socket(conn_idx) {
-                        LoopRet::Abort => { abort = true; },
-                        LoopRet::Disconnected { .. } => {
-                            let conn = self.conns.remove(conn_idx);
-                            self.tui.add_err_msg(
-                                "Disconnected.", &time::now(),
-                                &MsgTarget::AllServTabs {
-                                    serv_name: &conn.serv_name,
-                                });
-                            reset_fds = true;
-                        },
-                        _ => {}
-                    }
-                }
-
-                if abort {
-                    return LoopRet::Abort;
-                } else if reset_fds {
-                    return LoopRet::Continue;
-                }
-            }
-        }
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-
-    fn handle_stdin(&mut self, ev_buffer: &mut Vec<Event>) -> Vec<LoopRet> {
-        let mut ret = Vec::new();
-
+    fn handle_stdin(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, ev_buffer: &mut Vec<Event>) {
         self.input_ev_handler.read_input_events(ev_buffer);
-        for ev in ev_buffer.iter().cloned() {
+        for ev in ev_buffer.drain(..) {
             match self.tui.handle_input_event(ev) {
-                TUIRet::Abort => { ret.push(LoopRet::Abort); break; },
+                TUIRet::Abort => {
+                    ctrl.stop();
+                }
                 TUIRet::Input { msg, from } => {
                     writeln!(self.tui,
                              "Input source: {:#?}, msg: {}",
                              from, msg.iter().cloned().collect::<String>()).unwrap();
 
-                    writeln!(io::stderr(),
-                             "Input source: {:#?}, msg: {}",
-                             from, msg.iter().cloned().collect::<String>()).unwrap();
-
-                    // We know msg has at least one character as the TUI won't
-                    // accept it otherwise.
+                    // We know msg has at least one character as the TUI won't accept it otherwise.
                     if msg[0] == '/' {
-                        let cmd_ret =  self.handle_command(from, (&msg[ 1 .. ]).into_iter().cloned().collect());
-                        if cmd_ret != LoopRet::Continue {
-                            ret.push(cmd_ret);
-                        }
+                        self.handle_command(ctrl, from, (&msg[ 1 .. ]).into_iter().cloned().collect());
                     } else {
                         self.send_msg(from, msg);
                     }
-                },
-                _ => {},
+                }
+                TUIRet::KeyHandled => {}
+                // TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
+                ev => {
+                    writeln!(self.tui, "Ignoring event: {:?}", ev).unwrap();
+                }
             }
         }
-
-        ret
     }
 
-    fn handle_command(&mut self, src : MsgSource, msg : String) -> LoopRet {
+    fn handle_command(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: String) {
         let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
         if words[0] == "connect" {
-            self.connect(words[1]);
-            LoopRet::UpdateFds
+            self.connect(ctrl, words[1]);
         } else if words[0] == "join" {
             self.join(src, words[1]);
-            LoopRet::Continue
         } else if words[0] == "quit" {
-            LoopRet::Abort
+            ctrl.stop();
         } else {
             self.tui.add_client_err_msg(
                 &format!("Unsupported command: {}", words[0]), &MsgTarget::CurrentTab);
-            LoopRet::Continue
         }
     }
 
-    fn connect(&mut self, serv_addr : &str) {
+    fn connect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_addr: &str) {
         match utils::drop_port(serv_addr) {
             None => {
-                self.tui.add_client_err_msg("connect: Need a <host>:<port>",
-                                            &MsgTarget::CurrentTab);
-            },
+                self.tui.add_client_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
+            }
             Some(serv_name) => {
                 self.tui.new_server_tab(serv_name);
                 writeln!(self.tui, "Created tab: {}", serv_name).unwrap();
@@ -225,8 +136,14 @@ impl Tiny {
                 match Conn::try_connect(serv_addr, serv_name,
                                         &self.nick, &self.hostname, &self.realname) {
                     Ok(conn) => {
+                        let fd = conn.get_raw_fd();
                         self.conns.push(conn);
-                    },
+                        ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
+                            let conn_idx = tiny.find_fd_conn(fd).unwrap();
+                            tiny.handle_socket(conn_idx, ctrl);
+                            tiny.tui.draw();
+                        }));
+                    }
                     Err(err) => {
                         self.tui.add_client_err_msg(&format!("Error: {}", err),
                                                     &MsgTarget::Server { serv_name: serv_name });
@@ -237,7 +154,7 @@ impl Tiny {
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
-        wire::join(chan, &mut self.tui).unwrap(); // debug
+        wire::join(chan, &mut self.tui).unwrap();
         match self.find_conn(src.serv_name()) {
             Some(conn) => {
                 wire::join(chan, conn).unwrap();
@@ -254,7 +171,7 @@ impl Tiny {
             &MsgTarget::CurrentTab);
     }
 
-    fn send_msg(&mut self, from : MsgSource, msg : Vec<char>) {
+    fn send_msg(&mut self, from: MsgSource, msg: Vec<char>) {
         let msg_string = msg.iter().cloned().collect::<String>();
 
         match from {
@@ -295,13 +212,20 @@ impl Tiny {
         None
     }
 
+    fn find_fd_conn(&mut self, fd: RawFd) -> Option<usize> {
+        for (i, conn) in self.conns.iter().enumerate() {
+            if conn.get_raw_fd() == fd {
+                return Some(i);
+            }
+        }
+        None
+    }
+
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_socket(&mut self, conn_idx: usize) -> LoopRet {
-        let mut disconnect : Option<libc::c_int> = None;
-
+    fn handle_socket(&mut self, conn_idx: usize, ctrl: &mut EvLoopCtrl<Tiny>) {
         let rets = {
-            let mut conn = unsafe { self.conns.get_unchecked_mut(conn_idx) };
+            let mut conn = &mut self.conns[conn_idx];
             conn.read_incoming_msg()
         };
 
@@ -310,7 +234,13 @@ impl Tiny {
             writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
             match ret {
                 ConnEv::Disconnected(fd) => {
-                    disconnect = Some(fd);
+                    let conn = self.conns.remove(conn_idx);
+                    self.tui.add_err_msg(
+                        "Disconnected.", &time::now(),
+                        &MsgTarget::AllServTabs {
+                            serv_name: &conn.serv_name,
+                        });
+                    ctrl.remove_fd(fd);
                 },
                 ConnEv::Err(err_msg) => {
                     let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.serv_name;
@@ -321,12 +251,6 @@ impl Tiny {
                     self.handle_msg(conn_idx, msg, time::now());
                 }
             }
-        }
-
-        if let Some(fd) = disconnect {
-            LoopRet::Disconnected { fd: fd }
-        } else {
-            LoopRet::Continue
         }
     }
 

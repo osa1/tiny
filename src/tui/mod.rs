@@ -98,10 +98,7 @@ impl TUI {
             Event::Resize => {
                 // This never happens, probably because the our select() loop,
                 // termbox can't really get resize signals.
-                self.termbox.resize();
-                let w = self.termbox.width();
-                let h = self.termbox.height();
-                self.resize(w, h);
+                self.resize();
                 TUIRet::KeyHandled
             },
 
@@ -140,8 +137,11 @@ impl TUI {
         }
     }
 
-    pub fn resize(&mut self, width : i32, height : i32) {
-        self.ui.resize(width, height);
+    pub fn resize(&mut self) {
+        self.termbox.resize();
+        let w = self.termbox.width();
+        let h = self.termbox.height();
+        self.ui.resize(w, h);
     }
 
 /*

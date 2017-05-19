@@ -5,6 +5,7 @@
 extern crate libc;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::ops::BitOr;
 
 pub struct EvLoop<Ctx> {
@@ -12,9 +13,9 @@ pub struct EvLoop<Ctx> {
 }
 
 enum Handler<Ctx> {
-    Timer { cb: Box<FnMut(&mut EvLoopController, &mut Ctx, u64) -> ()> },
-    Signal { cb: Box<FnMut(&mut EvLoopController, &mut Ctx) -> ()> },
-    Fd { evs: FdEv, cb: Box<FnMut(FdEv, &mut EvLoopController, &mut Ctx) -> ()> },
+    Timer { cb: Box<FnMut(&mut EvLoopCtrl<Ctx>, &mut Ctx, u64) -> ()> },
+    Signal { cb: Box<FnMut(&mut EvLoopCtrl<Ctx>, &mut Ctx) -> ()> },
+    Fd { evs: FdEv, cb: Box<FnMut(FdEv, &mut EvLoopCtrl<Ctx>, &mut Ctx) -> ()> },
 }
 
 /// File descriptor events. Use bitwise or to combine.
@@ -62,18 +63,30 @@ pub struct itimerspec {
     it_value: libc::timespec,
 }
 
-pub struct EvLoopController<'a> {
+pub struct EvLoopCtrl<'a, Ctx: 'a> {
     stop_ref: &'a mut bool,
     remove_self: &'a mut bool,
+    new_fds: HashMap<libc::c_int, Handler<Ctx>>,
+    removed_fds: HashSet<libc::c_int>,
 }
 
-impl<'a> EvLoopController<'a> {
+impl<'a, Ctx> EvLoopCtrl<'a, Ctx> {
     pub fn stop(&mut self) {
         *self.stop_ref = true;
     }
 
     pub fn remove_self(&mut self) {
         *self.remove_self = true;
+    }
+
+    pub fn add_fd(&mut self, fd: libc::c_int, evs: FdEv, cb: Box<FnMut(FdEv, &mut EvLoopCtrl<Ctx>, &mut Ctx) -> ()>) {
+        self.new_fds.insert(fd, Handler::Fd { evs: evs, cb: cb });
+        self.removed_fds.remove(&fd);
+    }
+
+    pub fn remove_fd(&mut self, fd: libc::c_int) {
+        self.removed_fds.insert(fd);
+        self.new_fds.remove(&fd);
     }
 }
 
@@ -89,7 +102,7 @@ impl<Ctx> EvLoop<Ctx> {
     }
 
     /// Register a non-blocking socket. Use the same fd for unregister.
-    pub fn add_fd(&mut self, fd: libc::c_int, evs: FdEv, cb: Box<FnMut(FdEv, &mut EvLoopController, &mut Ctx) -> ()>) {
+    pub fn add_fd(&mut self, fd: libc::c_int, evs: FdEv, cb: Box<FnMut(FdEv, &mut EvLoopCtrl<Ctx>, &mut Ctx) -> ()>) {
         self.fds.insert(fd, Handler::Fd { evs: evs, cb: cb });
     }
 
@@ -99,7 +112,7 @@ impl<Ctx> EvLoop<Ctx> {
 
     /// `timeout` and `period` in milliseconds. `timeout` must be non-zero for this to work. If
     /// `period` is non-zero, timer expires repeatedly after the initial timeout.
-    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<FnMut(&mut EvLoopController, &mut Ctx, u64) -> ()>) -> TimerRef {
+    pub fn add_timer(&mut self, timeout: i64, period: i64, cb: Box<FnMut(&mut EvLoopCtrl<Ctx>, &mut Ctx, u64) -> ()>) -> TimerRef {
         let fd = unsafe { timerfd_create(libc::CLOCK_MONOTONIC, libc::EFD_NONBLOCK) };
         assert!(fd != -1);
 
@@ -117,7 +130,7 @@ impl<Ctx> EvLoop<Ctx> {
         self.fds.remove(&timer_ref.0);
     }
 
-    pub fn add_signal(&mut self, sigs: &libc::sigset_t, cb: Box<FnMut(&mut EvLoopController, &mut Ctx) -> ()>) -> SignalRef {
+    pub fn add_signal(&mut self, sigs: &libc::sigset_t, cb: Box<FnMut(&mut EvLoopCtrl<Ctx>, &mut Ctx) -> ()>) -> SignalRef {
         // Block the signals we handle using signalfd() so they don't cause signal handlers to run
         assert!(unsafe { libc::sigprocmask(libc::SIG_BLOCK, sigs as *const libc::sigset_t, std::ptr::null_mut()) } != -1);
         let fd = unsafe { libc::signalfd(-1, sigs, libc::EFD_NONBLOCK) };
@@ -153,7 +166,12 @@ impl<Ctx> EvLoop<Ctx> {
 
                     let mut remove_fd = false;
                     {
-                        let mut controller = EvLoopController { stop_ref: &mut stop, remove_self: &mut remove_fd };
+                        let mut controller = EvLoopCtrl {
+                            stop_ref: &mut stop,
+                            remove_self: &mut remove_fd,
+                            new_fds: HashMap::with_capacity(0),
+                            removed_fds: HashSet::with_capacity(0),
+                        };
 
                         match self.fds.get_mut(&pollfd.fd).unwrap() {
                             &mut Handler::Timer{ ref mut cb } => {
@@ -174,6 +192,14 @@ impl<Ctx> EvLoop<Ctx> {
                             &mut Handler::Fd{ ref mut cb, .. } => {
                                 cb(FdEv(pollfd.revents), &mut controller, &mut ctx);
                             }
+                        }
+
+                        for (fd, h) in controller.new_fds.into_iter() {
+                            self.fds.insert(fd, h);
+                        }
+
+                        for fd in controller.removed_fds.into_iter() {
+                            self.fds.remove(&fd);
                         }
                     }
 
