@@ -392,7 +392,7 @@ impl Tiny {
                 }
             }
 
-            Cmd::QUIT { msg } => {
+            Cmd::QUIT { .. } => {
                 match pfx {
                     Pfx::Server(_) => {
                         writeln!(self.tui, "Weird QUIT message pfx {:?}", pfx).unwrap();

@@ -1,5 +1,6 @@
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
 
+use std::fs::File;
 use std::io::Write;
 use std::str;
 use std;
@@ -24,7 +25,7 @@ pub fn privmsg<W: Write>(msgtarget: &str, msg: &str, mut sink: W) -> std::io::Re
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
-pub fn quit<W : Write>(msg : Option<&str>, mut sink : W) -> std::io::Result<()> {
+pub fn quit<W : Write>(msg : Option<&str>, mut sink: W) -> std::io::Result<()> {
     match msg {
         None => write!(sink, "QUIT\r\n"),
         Some(msg) => write!(sink, "QUIT {}\r\n", msg)
@@ -123,7 +124,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 impl Msg {
     /// Try to read an IRC message off buffer. Drops the message when parsing is successful.
     /// Otherwise the buffer is left unchanged.
-    pub fn read(buf: &mut Vec<u8>) -> Option<Msg> {
+    pub fn read(buf: &mut Vec<u8>, log_file: &Option<File>) -> Option<Msg> {
         // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
         // using this hacky method instead.
         let crlf_idx = {
@@ -135,6 +136,12 @@ impl Msg {
 
         let ret = {
             let mut slice: &[u8] = &buf[ 0 .. crlf_idx ];
+
+            // Log the message in debug mode
+            if cfg!(debug_assertions) {
+                writeln!(log_file.as_ref().unwrap(), "{}",
+                unsafe { str::from_utf8_unchecked(slice) }).unwrap();
+            }
 
             let pfx: Option<Pfx> = {
                 if slice[0] == b':' {
@@ -298,7 +305,7 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     ret
 }
 
-pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
+fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
     for (byte_idx, byte) in buf.iter().enumerate() {
         if *byte == byte0 {
             return Some(byte_idx);

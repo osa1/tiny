@@ -11,7 +11,6 @@ use std::net::TcpStream;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
 
-use utils::find_byte;
 use wire::{Cmd, Msg};
 use wire;
 
@@ -128,7 +127,7 @@ impl Comms {
 
     fn handle_msgs(&mut self) -> Vec<CommsRet> {
         let mut ret = Vec::with_capacity(1);
-        while let Some(msg) = Msg::read(&mut self.buf) {
+        while let Some(msg) = Msg::read(&mut self.buf, &self.log_file) {
             self.handle_msg(msg, &mut ret);
         }
         ret
@@ -136,7 +135,7 @@ impl Comms {
 
     fn handle_msg(&mut self, msg: Msg, ret: &mut Vec<CommsRet>) {
         match &msg {
-            &Msg { cmd: Cmd::PING { server: ref server }, .. } => {
+            &Msg { cmd: Cmd::PING { ref server }, .. } => {
                 wire::pong(server, &mut self.stream).unwrap()
             }
             _ => {}
