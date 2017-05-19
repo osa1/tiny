@@ -12,7 +12,7 @@ extern crate time;
 extern crate term_input;
 extern crate termbox_simple;
 
-mod comms;
+mod conn;
 mod utils;
 mod wire;
 pub mod trie;
@@ -23,15 +23,15 @@ use std::io::Write;
 use std::io;
 use std::mem;
 
-use comms::{Comms, CommsRet};
+use conn::{Conn, ConnEv};
 use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
 use tui::{TUI, TUIRet, MsgTarget};
 use wire::{Cmd, Msg, Pfx, Receiver};
 
 pub struct Tiny {
-    /// A connection to a server is maintained by 'Comms'.
-    comms: Vec<Comms>,
+    /// A connection to a server is maintained by 'Conn'.
+    conns: Vec<Conn>,
     tui: TUI,
     input_ev_handler: Input,
     nick: String,
@@ -50,7 +50,7 @@ enum LoopRet {
 impl Tiny {
     pub fn new(nick : String, hostname : String, realname : String) -> Tiny {
         Tiny {
-            comms: Vec::with_capacity(1),
+            conns: Vec::with_capacity(1),
             tui: TUI::new(),
             input_ev_handler: Input::new(),
             nick: nick,
@@ -72,8 +72,8 @@ impl Tiny {
             unsafe { libc::FD_SET(0, &mut fd_set); }
 
             let mut max_fd : libc::c_int = 0;
-            for comm in self.comms.iter() {
-                let fd = comm.get_raw_fd();
+            for conn in self.conns.iter() {
+                let fd = conn.get_raw_fd();
                 max_fd = max(fd, max_fd);
                 unsafe { libc::FD_SET(fd, &mut fd_set); }
             }
@@ -121,26 +121,26 @@ impl Tiny {
             // TODO: Can multiple sockets be set in single select() call? I
             // assume yes for now.
             else {
-                // Collecting comms to read in this Vec becuase Rust sucs.
-                let mut comm_idxs = Vec::with_capacity(1);
-                for (comm_idx, comm) in self.comms.iter_mut().enumerate() {
-                    let fd = comm.get_raw_fd();
+                // Collecting conns to read in this Vec becuase Rust sucs.
+                let mut conn_idxs = Vec::with_capacity(1);
+                for (conn_idx, conn) in self.conns.iter_mut().enumerate() {
+                    let fd = conn.get_raw_fd();
                     if unsafe { libc::FD_ISSET(fd, &mut fd_set_) } {
-                        comm_idxs.push(comm_idx);
+                        conn_idxs.push(conn_idx);
                     }
                 }
 
                 let mut abort = false;
                 let mut reset_fds = false;
-                for comm_idx in comm_idxs {
-                    match self.handle_socket(comm_idx) {
+                for conn_idx in conn_idxs {
+                    match self.handle_socket(conn_idx) {
                         LoopRet::Abort => { abort = true; },
                         LoopRet::Disconnected { .. } => {
-                            let comm = self.comms.remove(comm_idx);
+                            let conn = self.conns.remove(conn_idx);
                             self.tui.add_err_msg(
                                 "Disconnected.", &time::now(),
                                 &MsgTarget::AllServTabs {
-                                    serv_name: &comm.serv_name,
+                                    serv_name: &conn.serv_name,
                                 });
                             reset_fds = true;
                         },
@@ -222,10 +222,10 @@ impl Tiny {
                 self.tui.add_client_msg("Connecting...",
                                         &MsgTarget::Server { serv_name: serv_name });
 
-                match Comms::try_connect(serv_addr, serv_name,
-                                         &self.nick, &self.hostname, &self.realname) {
-                    Ok(comms) => {
-                        self.comms.push(comms);
+                match Conn::try_connect(serv_addr, serv_name,
+                                        &self.nick, &self.hostname, &self.realname) {
+                    Ok(conn) => {
+                        self.conns.push(conn);
                     },
                     Err(err) => {
                         self.tui.add_client_err_msg(&format!("Error: {}", err),
@@ -238,9 +238,9 @@ impl Tiny {
 
     fn join(&mut self, src: MsgSource, chan: &str) {
         wire::join(chan, &mut self.tui).unwrap(); // debug
-        match self.find_comm(src.serv_name()) {
-            Some(comm) => {
-                wire::join(chan, comm).unwrap();
+        match self.find_conn(src.serv_name()) {
+            Some(conn) => {
+                wire::join(chan, conn).unwrap();
                 return;
             }
             None => {
@@ -265,8 +265,8 @@ impl Tiny {
 
             MsgSource::Chan { serv_name, chan_name } => {
                 {
-                    let comm = self.find_comm(&serv_name).unwrap();
-                    wire::privmsg(&chan_name, &msg_string, comm).unwrap();
+                    let conn = self.find_conn(&serv_name).unwrap();
+                    wire::privmsg(&chan_name, &msg_string, conn).unwrap();
                 }
                 self.tui.add_privmsg(&self.nick, &msg_string,
                                      &time::now(),
@@ -276,8 +276,8 @@ impl Tiny {
 
             MsgSource::User { serv_name, nick } => {
                 {
-                    let comm = self.find_comm(&serv_name).unwrap();
-                    wire::privmsg(&nick, &msg_string, comm).unwrap();
+                    let conn = self.find_conn(&serv_name).unwrap();
+                    wire::privmsg(&nick, &msg_string, conn).unwrap();
                 }
                 self.tui.add_privmsg(&self.nick, &msg_string,
                                      &time::now(),
@@ -286,10 +286,10 @@ impl Tiny {
         }
     }
 
-    fn find_comm(&mut self, serv_name : &str) -> Option<&mut Comms> {
-        for comm in self.comms.iter_mut() {
-            if comm.serv_name == serv_name {
-                return Some(comm);
+    fn find_conn(&mut self, serv_name : &str) -> Option<&mut Conn> {
+        for conn in self.conns.iter_mut() {
+            if conn.serv_name == serv_name {
+                return Some(conn);
             }
         }
         None
@@ -297,28 +297,28 @@ impl Tiny {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_socket(&mut self, comm_idx : usize) -> LoopRet {
+    fn handle_socket(&mut self, conn_idx: usize) -> LoopRet {
         let mut disconnect : Option<libc::c_int> = None;
 
         let rets = {
-            let mut comm = unsafe { self.comms.get_unchecked_mut(comm_idx) };
-            comm.read_incoming_msg()
+            let mut conn = unsafe { self.conns.get_unchecked_mut(conn_idx) };
+            conn.read_incoming_msg()
         };
 
         for ret in rets {
             // tui.show_msg_current_tab(&format!("{:?}", ret));
             writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
             match ret {
-                CommsRet::Disconnected(fd) => {
+                ConnEv::Disconnected(fd) => {
                     disconnect = Some(fd);
                 },
-                CommsRet::Err(err_msg) => {
-                    let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
+                ConnEv::Err(err_msg) => {
+                    let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.serv_name;
                     self.tui.add_err_msg(&err_msg, &time::now(),
                                          &MsgTarget::Server { serv_name: serv_name });
                 },
-                CommsRet::Msg(msg) => {
-                    self.handle_msg(comm_idx, msg, time::now());
+                ConnEv::Msg(msg) => {
+                    self.handle_msg(conn_idx, msg, time::now());
                 }
             }
         }
@@ -330,8 +330,8 @@ impl Tiny {
         }
     }
 
-    fn handle_msg(&mut self, comm_idx: usize, msg: Msg, tm: time::Tm) {
-        let comm = &self.comms[comm_idx];
+    fn handle_msg(&mut self, conn_idx: usize, msg: Msg, tm: time::Tm) {
+        let conn = &self.conns[conn_idx];
         let pfx = match msg.pfx {
             None => { return; /* TODO: log this */ }
             Some(pfx) => pfx
@@ -340,18 +340,18 @@ impl Tiny {
 
             Cmd::PRIVMSG { receivers, contents } => {
                 let sender = match pfx {
-                    Pfx::Server(_) => &comm.serv_name,
+                    Pfx::Server(_) => &conn.serv_name,
                     Pfx::User { ref nick, .. } => nick,
                 };
                 match receivers {
                     Receiver::Chan(chan) => {
                         self.tui.add_privmsg(sender, &contents, &tm, &MsgTarget::Chan {
-                            serv_name: &comm.serv_name,
+                            serv_name: &conn.serv_name,
                             chan_name: &chan,
                         });
                     }
                     Receiver::User(_) => {
-                        let msg_target = pfx_to_target(&pfx, &comm.serv_name);
+                        let msg_target = pfx_to_target(&pfx, &conn.serv_name);
                         // TODO: Set the topic if a new tab is created.
                         self.tui.add_privmsg(sender, &contents, &tm, &msg_target);
                     }
@@ -364,7 +364,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird JOIN message pfx {:?}", pfx).unwrap();
                     }
                     Pfx::User { nick, .. } => {
-                        let serv_name = &self.comms[comm_idx].serv_name;
+                        let serv_name = &self.conns[conn_idx].serv_name;
                         if nick == self.nick {
                             self.tui.new_chan_tab(&serv_name, &chan);
                         } else {
@@ -383,7 +383,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird PART message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick, .. } => {
-                        let serv_name = &self.comms[comm_idx].serv_name;
+                        let serv_name = &self.conns[conn_idx].serv_name;
                         self.tui.remove_nick(
                             &nick,
                             Some(&time::now()),
@@ -398,7 +398,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird QUIT message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { ref nick, .. } => {
-                        let serv_name = &self.comms[comm_idx].serv_name;
+                        let serv_name = &self.conns[conn_idx].serv_name;
                         self.tui.remove_nick(
                             nick,
                             Some(&time::now()),
@@ -408,9 +408,9 @@ impl Tiny {
             }
 
             Cmd::NOTICE { nick, msg } => {
-                let comm = &self.comms[comm_idx];
+                let conn = &self.conns[conn_idx];
                 if nick == "*" || nick == self.nick {
-                    self.tui.add_msg(&msg, &time::now(), &pfx_to_target(&pfx, &comm.serv_name));
+                    self.tui.add_msg(&msg, &time::now(), &pfx_to_target(&pfx, &conn.serv_name));
                 } else {
                     writeln!(self.tui, "Weird NOTICE target: {}", nick).unwrap();
                 }
@@ -422,7 +422,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird NICK message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick: ref old_nick, .. } => {
-                        let serv_name = &unsafe { self.comms.get_unchecked(comm_idx) }.serv_name;
+                        let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.serv_name;
                         self.tui.rename_nick(
                             old_nick, &nick, &time::now(),
                             &MsgTarget::AllUserTabs { serv_name: serv_name, nick: old_nick, });
@@ -438,10 +438,10 @@ impl Tiny {
                         || n == 375 /* RPL_MOTDSTART */
                         || n == 376 /* RPL_ENDOFMOTD */ {
                     debug_assert!(params.len() == 2);
-                    let comm = &self.comms[comm_idx];
+                    let conn = &self.conns[conn_idx];
                     let msg  = &params[1];
                     self.tui.add_msg(
-                        msg, &time::now(), &MsgTarget::Server { serv_name: &comm.serv_name });
+                        msg, &time::now(), &MsgTarget::Server { serv_name: &conn.serv_name });
                 }
 
                 else if n == 4 // RPL_MYINFO
@@ -449,19 +449,19 @@ impl Tiny {
                         || (n >= 252 && n <= 254)
                                    /* RPL_LUSEROP, RPL_LUSERUNKNOWN, */
                                    /* RPL_LUSERCHANNELS */ {
-                    let comm = &self.comms[comm_idx];
+                    let conn = &self.conns[conn_idx];
                     let msg  = params.into_iter().collect::<Vec<String>>().join(" ");
                     self.tui.add_msg(
-                        &msg, &time::now(), &MsgTarget::Server { serv_name: &comm.serv_name });
+                        &msg, &time::now(), &MsgTarget::Server { serv_name: &conn.serv_name });
                 }
 
                 else if n == 265
                         || n == 266
                         || n == 250 {
-                    let comm = &self.comms[comm_idx];
+                    let conn = &self.conns[conn_idx];
                     let msg  = &params[params.len() - 1];
                     self.tui.add_msg(
-                        msg, &time::now(), &MsgTarget::Server { serv_name: &comm.serv_name });
+                        msg, &time::now(), &MsgTarget::Server { serv_name: &conn.serv_name });
                 }
 
                 // RPL_TOPIC
@@ -469,21 +469,21 @@ impl Tiny {
                     // FIXME: RFC 2812 says this will have 2 arguments, but freenode
                     // sends 3 arguments (extra one being our nick).
                     assert!(params.len() == 3 || params.len() == 2);
-                    let comm  = &self.comms[comm_idx];
+                    let conn  = &self.conns[conn_idx];
                     let chan  = &params[params.len() - 2];
                     let topic = &params[params.len() - 1];
                     self.tui.set_topic(topic, &MsgTarget::Chan {
-                        serv_name: &comm.serv_name,
+                        serv_name: &conn.serv_name,
                         chan_name: chan,
                     });
                 }
 
                 // RPL_NAMREPLY: List of users in a channel
                 else if n == 353 {
-                    let comm = unsafe { &self.comms.get_unchecked(comm_idx) };
+                    let conn = unsafe { &self.conns.get_unchecked(conn_idx) };
                     let chan = &params[2];
                     let chan_target = MsgTarget::Chan {
-                        serv_name: &comm.serv_name,
+                        serv_name: &conn.serv_name,
                         chan_name: chan,
                     };
 

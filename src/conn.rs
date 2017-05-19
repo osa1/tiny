@@ -14,11 +14,11 @@ use std::str;
 use wire::{Cmd, Msg};
 use wire;
 
-pub struct Comms {
+pub struct Conn {
     /// The TCP connection to the server.
     stream: TcpStream,
 
-    status: CommStatus,
+    status: ConnStatus,
 
     pub serv_name: String,
 
@@ -30,7 +30,7 @@ pub struct Comms {
     log_file: Option<File>,
 }
 
-enum CommStatus {
+enum ConnStatus {
     /// Need to introduce self
     Introduce {
         nick: String,
@@ -42,15 +42,15 @@ enum CommStatus {
 }
 
 #[derive(Debug)]
-pub enum CommsRet {
+pub enum ConnEv {
     Disconnected(RawFd),
     Err(String),
     Msg(Msg),
 }
 
-impl Comms {
+impl Conn {
     pub fn try_connect(serv_addr: &str, serv_name: &str, nick: &str, hostname: &str, realname: &str)
-                       -> io::Result<Comms> {
+                       -> io::Result<Conn> {
         let stream = TcpBuilder::new_v4()?.to_tcp_stream()?;
         stream.set_nonblocking(true)?;
         // This will fail with EINPROGRESS
@@ -65,9 +65,9 @@ impl Comms {
             }
         };
 
-        Ok(Comms {
+        Ok(Conn {
             stream: stream,
-            status: CommStatus::Introduce {
+            status: ConnStatus::Introduce {
                 nick: nick.to_owned(),
                 hostname: hostname.to_owned(),
                 realname: realname.to_owned()
@@ -94,7 +94,7 @@ impl Comms {
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
-    pub fn read_incoming_msg(&mut self) -> Vec<CommsRet> {
+    pub fn read_incoming_msg(&mut self) -> Vec<ConnEv> {
         let mut read_buf: [u8; 512] = [0; 512];
 
         // Handle disconnects
@@ -102,14 +102,14 @@ impl Comms {
             Err(err) => {
                 // TODO: I don't understand why this happens. I'm ``randomly''
                 // getting "temporarily unavailable" errors.
-                return vec![CommsRet::Err(format!("Error in read(): {:?}", err))];
+                return vec![ConnEv::Err(format!("Error in read(): {:?}", err))];
             },
             Ok(bytes_read) => {
                 writeln!(&mut io::stderr(), "read: {:?} bytes", bytes_read).unwrap();
                 self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
                 let mut ret = self.handle_msgs();
                 if bytes_read == 0 {
-                    ret.push(CommsRet::Disconnected(self.get_raw_fd()));
+                    ret.push(ConnEv::Disconnected(self.get_raw_fd()));
                 }
                 ret
             }
@@ -125,7 +125,7 @@ impl Comms {
                                                 **c != 0x4 /* EOT */));
     }
 
-    fn handle_msgs(&mut self) -> Vec<CommsRet> {
+    fn handle_msgs(&mut self) -> Vec<ConnEv> {
         let mut ret = Vec::with_capacity(1);
         while let Some(msg) = Msg::read(&mut self.buf, &self.log_file) {
             self.handle_msg(msg, &mut ret);
@@ -133,7 +133,7 @@ impl Comms {
         ret
     }
 
-    fn handle_msg(&mut self, msg: Msg, ret: &mut Vec<CommsRet>) {
+    fn handle_msg(&mut self, msg: Msg, ret: &mut Vec<ConnEv>) {
         match &msg {
             &Msg { cmd: Cmd::PING { ref server }, .. } => {
                 wire::pong(server, &mut self.stream).unwrap()
@@ -141,18 +141,18 @@ impl Comms {
             _ => {}
         }
 
-        let status = mem::replace(&mut self.status, CommStatus::PingPong);
-        if let CommStatus::Introduce { ref nick, ref hostname, ref realname } = status {
+        let status = mem::replace(&mut self.status, ConnStatus::PingPong);
+        if let ConnStatus::Introduce { ref nick, ref hostname, ref realname } = status {
             if let Err(err) = self.introduce(&nick, &hostname, &realname) {
-                ret.push(CommsRet::Err(format!("Error: {:?}", err)));
+                ret.push(ConnEv::Err(format!("Error: {:?}", err)));
             }
         }
 
-        ret.push(CommsRet::Msg(msg));
+        ret.push(ConnEv::Msg(msg));
     }
 }
 
-impl Write for Comms {
+impl Write for Conn {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.stream.write(buf)
@@ -174,7 +174,7 @@ impl Write for Comms {
     }
 
     #[inline]
-    fn by_ref(&mut self) -> &mut Comms {
+    fn by_ref(&mut self) -> &mut Conn {
         self
     }
 }
