@@ -202,6 +202,46 @@ impl TextField {
                 }
             },
 
+            Key::CtrlArrow(Arrow::Left) => {
+                if self.cursor > 0 {
+                    let mut cur = self.cursor as usize;
+                    let mut skipped = false;
+                    while cur > 0 && self.buffer[cur - 1].is_whitespace() {
+                        cur -= 1;
+                        skipped = true;
+                    }
+                    while cur > 0 && self.buffer[cur - 1].is_alphanumeric() {
+                        cur -= 1;
+                        skipped = true;
+                    }
+                    if !skipped {
+                        cur -= 1; // skip at least one char
+                    }
+                    self.move_cursor(cur as i32);
+                }
+                WidgetRet::KeyHandled
+            }
+
+            Key::CtrlArrow(Arrow::Right) => {
+                if (self.cursor as usize) < self.buffer.len() {
+                    let mut cur = self.cursor as usize;
+                    let mut skipped = false;
+                    while cur < self.buffer.len() && self.buffer[cur].is_alphanumeric() {
+                        cur += 1;
+                        skipped = true;
+                    }
+                    while cur < self.buffer.len() && self.buffer[cur].is_whitespace() {
+                        cur += 1;
+                        skipped = true;
+                    }
+                    if !skipped {
+                        cur += 1; // skip at least one char
+                    }
+                    self.move_cursor(cur as i32);
+                }
+                WidgetRet::KeyHandled
+            }
+
             ////////////////////////////////////////////////////////////////////
             // Scrolling in history or autocompletion list
 
