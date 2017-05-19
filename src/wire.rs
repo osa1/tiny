@@ -138,9 +138,9 @@ impl Msg {
             let mut slice: &[u8] = &buf[ 0 .. crlf_idx ];
 
             // Log the message in debug mode
-            if cfg!(debug_assertions) {
-                writeln!(log_file.as_ref().unwrap(), "{}",
-                unsafe { str::from_utf8_unchecked(slice) }).unwrap();
+            if let Some(mut log_file) = log_file.as_ref() {
+                writeln!(log_file, "{}",
+                         unsafe { str::from_utf8_unchecked(slice) }).unwrap();
             }
 
             let pfx: Option<Pfx> = {
@@ -333,7 +333,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":nick!~nick@unaffiliated/nick PRIVMSG tiny :a b c\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf),
+            Msg::read(&mut buf, &None),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "nick".to_owned(),
@@ -352,7 +352,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":barjavel.freenode.net NOTICE * :*** Looking up your hostname...\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf),
+            Msg::read(&mut buf, &None),
             Some(Msg {
                 pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
                 cmd: Cmd::NOTICE {
@@ -382,7 +382,7 @@ mod tests {
                CASEMAPPING=rfc1459 :are supported by this server\r\n").unwrap();
 
         let mut msgs = vec![];
-        while let Some(msg) = Msg::read(&mut buf) {
+        while let Some(msg) = Msg::read(&mut buf, &None) {
             msgs.push(msg);
         }
 
@@ -394,7 +394,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@123.123.123.123 PART #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf),
+            Msg::read(&mut buf, &None),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
@@ -412,7 +412,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@192.168.0.1 JOIN #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf),
+            Msg::read(&mut buf, &None),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
