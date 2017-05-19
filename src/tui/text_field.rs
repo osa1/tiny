@@ -307,12 +307,12 @@ impl TextField {
 
         // Try to imitate vim's behaviour here.
         if char.is_whitespace() {
-            self.consume_before(|c| c.is_whitespace());
-            self.consume_before(|c| c.is_alphanumeric());
+            self.consume_before(char::is_whitespace);
+            self.consume_before(char::is_alphanumeric);
         } else {
             let char = self.buffer[(self.cursor - 1) as usize];
             if char.is_alphanumeric() {
-                self.consume_before(|c| c.is_alphanumeric());
+                self.consume_before(char::is_alphanumeric);
             } else if self.cursor != 0 { // consume at least one char
                 let cursor = self.cursor;
                 self.buffer.remove(cursor as usize - 1);
