@@ -139,6 +139,7 @@ impl TUI {
 
     pub fn resize(&mut self) {
         self.termbox.resize();
+        self.termbox.clear();
         let w = self.termbox.width();
         let h = self.termbox.height();
         self.ui.resize(w, h);
