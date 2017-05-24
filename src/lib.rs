@@ -12,17 +12,19 @@ extern crate term_input;
 extern crate termbox_simple;
 
 mod conn;
+mod logger;
 mod utils;
 mod wire;
 pub mod trie;
 pub mod tui;
 
 use std::io::Write;
-use std::io;
 use std::os::unix::io::{RawFd};
+use std::path::PathBuf;
 
 use conn::{Conn, ConnEv};
 use ev_loop::{EvLoop, EvLoopCtrl, READ_EV};
+use logger::Logger;
 use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
 use tui::{TUI, TUIRet, MsgTarget};
@@ -36,6 +38,7 @@ pub struct Tiny {
     nick: String,
     hostname: String,
     realname: String,
+    logger: Logger,
 }
 
 impl Tiny {
@@ -47,6 +50,7 @@ impl Tiny {
             nick: nick,
             hostname: hostname,
             realname: realname,
+            logger: Logger::new(PathBuf::from("tiny_logs")),
         };
 
         tiny.tui.new_server_tab("debug");
@@ -229,7 +233,7 @@ impl Tiny {
 
         for ret in rets {
             // tui.show_msg_current_tab(&format!("{:?}", ret));
-            writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
+            // writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
             match ret {
                 ConnEv::Disconnected(fd) => {
                     let conn = self.conns.remove(conn_idx);
@@ -261,13 +265,15 @@ impl Tiny {
         match msg.cmd {
 
             Cmd::PRIVMSG { receivers, contents } => {
-                let sender = match pfx {
+                let receiver = match pfx {
                     Pfx::Server(_) => &conn.serv_name,
                     Pfx::User { ref nick, .. } => nick,
                 };
                 match receivers {
                     Receiver::Chan(chan) => {
-                        self.tui.add_privmsg(sender, &contents, &tm, &MsgTarget::Chan {
+                        writeln!(self.logger.get_chan_file(&conn.serv_name, &chan),
+                                 "PRIVMSG: {}", contents).unwrap();
+                        self.tui.add_privmsg(receiver, &contents, &tm, &MsgTarget::Chan {
                             serv_name: &conn.serv_name,
                             chan_name: &chan,
                         });
@@ -275,7 +281,7 @@ impl Tiny {
                     Receiver::User(_) => {
                         let msg_target = pfx_to_target(&pfx, &conn.serv_name);
                         // TODO: Set the topic if a new tab is created.
-                        self.tui.add_privmsg(sender, &contents, &tm, &msg_target);
+                        self.tui.add_privmsg(receiver, &contents, &tm, &msg_target);
                     }
                 }
             }
@@ -287,6 +293,8 @@ impl Tiny {
                     }
                     Pfx::User { nick, .. } => {
                         let serv_name = &self.conns[conn_idx].serv_name;
+                        writeln!(self.logger.get_chan_file(serv_name, &chan),
+                                 "JOIN: {}", nick).unwrap();
                         if nick == self.nick {
                             self.tui.new_chan_tab(&serv_name, &chan);
                         } else {
@@ -306,6 +314,8 @@ impl Tiny {
                     },
                     Pfx::User { nick, .. } => {
                         let serv_name = &self.conns[conn_idx].serv_name;
+                        writeln!(self.logger.get_chan_file(serv_name, &chan),
+                                 "PART: {}", nick).unwrap();
                         self.tui.remove_nick(
                             &nick,
                             Some(&time::now()),
