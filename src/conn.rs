@@ -15,6 +15,10 @@ use wire::{Cmd, Msg};
 use wire;
 
 pub struct Conn {
+    nick: String,
+    hostname: String,
+    realname: String,
+
     /// The TCP connection to the server.
     stream: TcpStream,
 
@@ -32,27 +36,21 @@ pub struct Conn {
 
 enum ConnStatus {
     /// Need to introduce self
-    Introduce {
-        nick: String,
-        hostname: String,
-        realname: String
-    },
-
+    Introduce,
     PingPong,
 }
 
 #[derive(Debug)]
 pub enum ConnEv {
-    Disconnected(RawFd),
+    Disconnected,
     Err(String),
     Msg(Msg),
 }
 
 impl Conn {
-    pub fn try_connect(serv_addr: &str, serv_name: &str, nick: &str, hostname: &str, realname: &str)
-                       -> io::Result<Conn> {
-        let stream = TcpBuilder::new_v4()?.to_tcp_stream()?;
-        stream.set_nonblocking(true)?;
+    pub fn new(serv_addr: &str, serv_name: &str, nick: &str, hostname: &str, realname: &str) -> Conn {
+        let stream = TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
+        stream.set_nonblocking(true).unwrap();
         // This will fail with EINPROGRESS
         let _ = stream.connect(serv_addr);
 
@@ -65,17 +63,16 @@ impl Conn {
             }
         };
 
-        Ok(Conn {
+        Conn {
+            nick: nick.to_owned(),
+            hostname: hostname.to_owned(),
+            realname: realname.to_owned(),
             stream: stream,
-            status: ConnStatus::Introduce {
-                nick: nick.to_owned(),
-                hostname: hostname.to_owned(),
-                realname: realname.to_owned()
-            },
+            status: ConnStatus::Introduce,
             serv_name: serv_name.to_owned(),
             buf: vec![],
             log_file: log_file,
-        })
+        }
     }
 
     /// Get the RawFd, to be used with select() or other I/O multiplexer.
@@ -86,9 +83,9 @@ impl Conn {
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
 
-    fn introduce(&mut self, nick: &str, hostname: &str, realname: &str) -> io::Result<()> {
-        try!(wire::user(hostname, realname, &mut self.stream));
-        wire::nick(nick, &mut self.stream)
+    fn introduce(&mut self) -> io::Result<()> {
+        try!(wire::user(&self.hostname, &self.realname, &mut self.stream));
+        wire::nick(&self.nick, &mut self.stream)
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -109,7 +106,7 @@ impl Conn {
                 self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
                 let mut ret = self.handle_msgs();
                 if bytes_read == 0 {
-                    ret.push(ConnEv::Disconnected(self.get_raw_fd()));
+                    ret.push(ConnEv::Disconnected);
                 }
                 ret
             }
@@ -142,8 +139,8 @@ impl Conn {
         }
 
         let status = mem::replace(&mut self.status, ConnStatus::PingPong);
-        if let ConnStatus::Introduce { ref nick, ref hostname, ref realname } = status {
-            if let Err(err) = self.introduce(&nick, &hostname, &realname) {
+        if let ConnStatus::Introduce = status {
+            if let Err(err) = self.introduce() {
                 ret.push(ConnEv::Err(format!("Error: {:?}", err)));
             }
         }

@@ -135,22 +135,14 @@ impl Tiny {
                 self.tui.add_client_msg("Connecting...",
                                         &MsgTarget::Server { serv_name: serv_name });
 
-                match Conn::try_connect(serv_addr, serv_name,
-                                        &self.nick, &self.hostname, &self.realname) {
-                    Ok(conn) => {
-                        let fd = conn.get_raw_fd();
-                        self.conns.push(conn);
-                        ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
-                            let conn_idx = tiny.find_fd_conn(fd).unwrap();
-                            tiny.handle_socket(conn_idx, ctrl);
-                            tiny.tui.draw();
-                        }));
-                    }
-                    Err(err) => {
-                        self.tui.add_client_err_msg(&format!("Error: {}", err),
-                                                    &MsgTarget::Server { serv_name: serv_name });
-                    }
-                }
+                let conn = Conn::new(serv_addr, serv_name, &self.nick, &self.hostname, &self.realname);
+                let fd = conn.get_raw_fd();
+                self.conns.push(conn);
+                ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
+                    let conn_idx = tiny.find_fd_conn(fd).unwrap();
+                    tiny.handle_socket(conn_idx, ctrl);
+                    tiny.tui.draw();
+                }));
             }
         }
     }
@@ -235,14 +227,14 @@ impl Tiny {
             // tui.show_msg_current_tab(&format!("{:?}", ret));
             // writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
             match ret {
-                ConnEv::Disconnected(fd) => {
+                ConnEv::Disconnected => {
                     let conn = self.conns.remove(conn_idx);
                     self.tui.add_err_msg(
                         "Disconnected.", &time::now(),
                         &MsgTarget::AllServTabs {
                             serv_name: &conn.serv_name,
                         });
-                    ctrl.remove_fd(fd);
+                    ctrl.remove_self();
                 },
                 ConnEv::Err(err_msg) => {
                     let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.serv_name;
