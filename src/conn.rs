@@ -19,6 +19,9 @@ pub struct Conn {
     hostname: String,
     realname: String,
 
+    /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
+    host: Option<String>,
+
     /// The TCP connection to the server.
     stream: TcpStream,
 
@@ -39,7 +42,7 @@ const PING_TICKS: u8 = 30;
 /// How many ticks to wait after sending a ping to the server to consider a disconnect.
 const PONG_TICKS: u8 = 10;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum ConnStatus {
     /// Need to introduce self
     Introduce,
@@ -83,6 +86,7 @@ impl Conn {
             nick: nick.to_owned(),
             hostname: hostname.to_owned(),
             realname: realname.to_owned(),
+            host: None,
             stream: stream,
             status: ConnStatus::Introduce,
             serv_name: serv_name.to_owned(),
@@ -192,8 +196,41 @@ impl Conn {
             }
         }
 
+        if let &Msg { cmd: Cmd::Reply { num: 002, ref params }, .. } = &msg {
+            // 002    RPL_YOURHOST
+            //        "Your host is <servername>, running version <ver>"
+
+            // An example <servername>: cherryh.freenode.net[149.56.134.238/8001]
+
+            match parse_servername(params) {
+                None => {
+                    evs.push(ConnEv::Err(format!("Can't parse hostname from params: {:?}", params)));
+                }
+                Some(host) => {
+                    self.host = Some(host);
+                }
+            }
+        }
+
         evs.push(ConnEv::Msg(msg));
     }
+}
+
+macro_rules! try_opt {
+    ($expr:expr) => (match $expr {
+        Option::Some(val) => val,
+        Option::None => {
+            return Option::None
+        }
+    })
+}
+
+/// Try to parse servername in a 002 RPL_YOURHOST reply
+fn parse_servername(params: &[String]) -> Option<String> {
+    let msg = try_opt!(params.get(1));
+    let slice1 = &msg[13..];
+    let servername_ends = try_opt!(wire::find_byte(slice1.as_bytes(), b'['));
+    Some((&slice1[..servername_ends]).to_owned())
 }
 
 impl Write for Conn {
