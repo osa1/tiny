@@ -170,7 +170,7 @@ impl Conn {
         self.buf.extend(slice.iter().filter(|c| **c != 0x1 /* SOH */ ||
                                                 **c != 0x2 /* STX */ ||
                                                 **c != 0x0 /* NUL */ ||
-                                                **c != 0x4 /* EOT */));
+                                                **c != 0x4 /* EOT */ ));
     }
 
     fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>) {
@@ -180,11 +180,8 @@ impl Conn {
     }
 
     fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>) {
-        match &msg {
-            &Msg { cmd: Cmd::PING { ref server }, .. } => {
-                wire::pong(server, &mut self.stream).unwrap()
-            }
-            _ => {}
+        if let &Msg { cmd: Cmd::PING { ref server }, .. } = &msg {
+            wire::pong(server, &mut self.stream).unwrap();
         }
 
         if let ConnStatus::Introduce = self.status {
@@ -200,27 +197,22 @@ impl Conn {
 }
 
 impl Write for Conn {
-    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.stream.write(buf)
     }
 
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.stream.flush()
     }
 
-    #[inline]
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         self.stream.write_all(buf)
     }
 
-    #[inline]
     fn write_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
         self.stream.write_fmt(fmt)
     }
 
-    #[inline]
     fn by_ref(&mut self) -> &mut Conn {
         self
     }
