@@ -79,6 +79,19 @@ impl Tiny {
             tiny.tui.draw();
         }
 
+/*
+        ev_loop.add_timer(1000, 1000, Box::new(|_, tiny, _| {
+            for conn in &mut tiny.conns {
+                conn.tick();
+                // debug
+                tiny.tui.add_msg(
+                    "tick!",
+                    &time::now(),
+                    &MsgTarget::Server { serv_name: conn.get_serv_name() });
+            }
+        }));
+*/
+
         ev_loop.run(tiny);
     }
 

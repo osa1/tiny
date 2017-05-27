@@ -34,10 +34,26 @@ pub struct Conn {
     log_file: Option<File>,
 }
 
+/// How many ticks to wait before sending a ping to the server.
+const PING_TICKS: u8 = 30;
+/// How many ticks to wait after sending a ping to the server to consider a disconnect.
+const PONG_TICKS: u8 = 10;
+
+#[derive(Copy, Clone)]
 enum ConnStatus {
     /// Need to introduce self
     Introduce,
-    PingPong,
+    PingPong {
+        /// Ticks passed since last time we've heard from the server.
+        /// Reset on each message. After `PING_TICKS` ticks we send a PING message and move to
+        /// `WaitPong` state.
+        ticks_passed: u8,
+    },
+    WaitPong {
+        /// Ticks passed since we sent a PING to the server.
+        /// After a message move to `PingPong` state. On timeout we reset the connection.
+        ticks_passed: u8,
+    },
 }
 
 #[derive(Debug)]
@@ -83,6 +99,38 @@ impl Conn {
     pub fn get_serv_name(&self) -> &str {
         &self.serv_name
     }
+
+}
+
+impl Conn {
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Tick handling
+
+/*
+    pub fn tick(&mut self) {
+        match self.status {
+            ConnStatus::Introduce => {},
+            ConnStatus::PingPong { ticks_passed } => {
+                if ticks_passed + 1 == PING_TICKS {
+                    wire::ping(&self.serv_name, &mut self.stream).unwrap();;
+                    self.status = ConnStatus::WaitPong { ticks_passed: 0 };
+                } else {
+                    self.status = ConnStatus::PingPong { ticks_passed: ticks_passed + 1 };
+                }
+            }
+            ConnStatus::WaitPong { ticks_passed } => {
+                if ticks_passed + 1 == PONG_TICKS {
+                    // TODO: propagate disconnect event
+                    self.stream = init_stream(&self.serv_addr);
+                    self.status = ConnStatus::Introduce;
+                } else {
+                    self.status = ConnStatus::WaitPong { ticks_passed: ticks_passed + 1 };
+                }
+            }
+        }
+    }
+*/
 
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
@@ -139,10 +187,11 @@ impl Conn {
             _ => {}
         }
 
-        let status = mem::replace(&mut self.status, ConnStatus::PingPong);
-        if let ConnStatus::Introduce = status {
+        if let ConnStatus::Introduce = self.status {
             if let Err(err) = self.introduce() {
                 evs.push(ConnEv::Err(format!("Error: {:?}", err)));
+            } else {
+                self.status = ConnStatus::PingPong { ticks_passed: 0 };
             }
         }
 
