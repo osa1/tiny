@@ -221,19 +221,22 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let it_worked: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+        let count: Rc<RefCell<i32>> = Rc::new(RefCell::new(0));
 
         let mut ev_loop = EvLoop::new();
         {
-            let it_worked_clone = it_worked.clone();
+            let count_clone = count.clone();
             ev_loop.add_timer(100, 100, Box::new(move |ctrl, _, _| {
-                *it_worked_clone.borrow_mut() = true;
-                ctrl.stop();
+                *count_clone.borrow_mut() += 1;
+                println!("bump");
+                if *(*count_clone).borrow() == 10 {
+                    ctrl.stop();
+                }
             }));
         }
         ev_loop.run(());
 
-        assert!(*(*it_worked).borrow());
+        assert_eq!(*(*count).borrow(), 10);
     }
 
     #[test]
