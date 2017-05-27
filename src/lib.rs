@@ -199,7 +199,7 @@ impl Tiny {
 
     fn find_conn(&mut self, serv_name : &str) -> Option<&mut Conn> {
         for conn in self.conns.iter_mut() {
-            if conn.serv_name == serv_name {
+            if conn.get_serv_name() == serv_name {
                 return Some(conn);
             }
         }
@@ -218,12 +218,13 @@ impl Tiny {
     ////////////////////////////////////////////////////////////////////////////
 
     fn handle_socket(&mut self, conn_idx: usize, ctrl: &mut EvLoopCtrl<Tiny>) {
-        let rets = {
+        let mut rets = Vec::with_capacity(2);
+        {
             let mut conn = &mut self.conns[conn_idx];
-            conn.read_incoming_msg()
-        };
+            conn.read_incoming_msg(&mut rets)
+        }
 
-        for ret in rets {
+        for ret in rets.into_iter() {
             // tui.show_msg_current_tab(&format!("{:?}", ret));
             // writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
             match ret {
@@ -232,12 +233,12 @@ impl Tiny {
                     self.tui.add_err_msg(
                         "Disconnected.", &time::now(),
                         &MsgTarget::AllServTabs {
-                            serv_name: &conn.serv_name,
+                            serv_name: conn.get_serv_name(),
                         });
                     ctrl.remove_self();
                 },
                 ConnEv::Err(err_msg) => {
-                    let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.serv_name;
+                    let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.get_serv_name();
                     self.tui.add_err_msg(&err_msg, &time::now(),
                                          &MsgTarget::Server { serv_name: serv_name });
                 },
@@ -258,20 +259,20 @@ impl Tiny {
 
             Cmd::PRIVMSG { receivers, contents } => {
                 let receiver = match pfx {
-                    Pfx::Server(_) => &conn.serv_name,
+                    Pfx::Server(_) => conn.get_serv_name(),
                     Pfx::User { ref nick, .. } => nick,
                 };
                 match receivers {
                     Receiver::Chan(chan) => {
-                        writeln!(self.logger.get_chan_file(&conn.serv_name, &chan),
+                        writeln!(self.logger.get_chan_file(&conn.get_serv_name(), &chan),
                                  "PRIVMSG: {}", contents).unwrap();
                         self.tui.add_privmsg(receiver, &contents, &tm, &MsgTarget::Chan {
-                            serv_name: &conn.serv_name,
+                            serv_name: conn.get_serv_name(),
                             chan_name: &chan,
                         });
                     }
                     Receiver::User(_) => {
-                        let msg_target = pfx_to_target(&pfx, &conn.serv_name);
+                        let msg_target = pfx_to_target(&pfx, conn.get_serv_name());
                         // TODO: Set the topic if a new tab is created.
                         self.tui.add_privmsg(receiver, &contents, &tm, &msg_target);
                     }
@@ -284,7 +285,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird JOIN message pfx {:?}", pfx).unwrap();
                     }
                     Pfx::User { nick, .. } => {
-                        let serv_name = &self.conns[conn_idx].serv_name;
+                        let serv_name = self.conns[conn_idx].get_serv_name();
                         writeln!(self.logger.get_chan_file(serv_name, &chan),
                                  "JOIN: {}", nick).unwrap();
                         if nick == self.nick {
@@ -305,7 +306,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird PART message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick, .. } => {
-                        let serv_name = &self.conns[conn_idx].serv_name;
+                        let serv_name = self.conns[conn_idx].get_serv_name();
                         writeln!(self.logger.get_chan_file(serv_name, &chan),
                                  "PART: {}", nick).unwrap();
                         self.tui.remove_nick(
@@ -322,7 +323,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird QUIT message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { ref nick, .. } => {
-                        let serv_name = &self.conns[conn_idx].serv_name;
+                        let serv_name = self.conns[conn_idx].get_serv_name();
                         self.tui.remove_nick(
                             nick,
                             Some(&time::now()),
@@ -334,7 +335,7 @@ impl Tiny {
             Cmd::NOTICE { nick, msg } => {
                 let conn = &self.conns[conn_idx];
                 if nick == "*" || nick == self.nick {
-                    self.tui.add_msg(&msg, &time::now(), &pfx_to_target(&pfx, &conn.serv_name));
+                    self.tui.add_msg(&msg, &time::now(), &pfx_to_target(&pfx, conn.get_serv_name()));
                 } else {
                     writeln!(self.tui, "Weird NOTICE target: {}", nick).unwrap();
                 }
@@ -346,7 +347,7 @@ impl Tiny {
                         writeln!(self.tui, "Weird NICK message pfx {:?}", pfx).unwrap();
                     },
                     Pfx::User { nick: ref old_nick, .. } => {
-                        let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.serv_name;
+                        let serv_name = unsafe { self.conns.get_unchecked(conn_idx) }.get_serv_name();
                         self.tui.rename_nick(
                             old_nick, &nick, &time::now(),
                             &MsgTarget::AllUserTabs { serv_name: serv_name, nick: old_nick, });
@@ -365,7 +366,7 @@ impl Tiny {
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[1];
                     self.tui.add_msg(
-                        msg, &time::now(), &MsgTarget::Server { serv_name: &conn.serv_name });
+                        msg, &time::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 else if n == 4 // RPL_MYINFO
@@ -376,7 +377,7 @@ impl Tiny {
                     let conn = &self.conns[conn_idx];
                     let msg  = params.into_iter().collect::<Vec<String>>().join(" ");
                     self.tui.add_msg(
-                        &msg, &time::now(), &MsgTarget::Server { serv_name: &conn.serv_name });
+                        &msg, &time::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 else if n == 265
@@ -385,7 +386,7 @@ impl Tiny {
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[params.len() - 1];
                     self.tui.add_msg(
-                        msg, &time::now(), &MsgTarget::Server { serv_name: &conn.serv_name });
+                        msg, &time::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 // RPL_TOPIC
@@ -397,7 +398,7 @@ impl Tiny {
                     let chan  = &params[params.len() - 2];
                     let topic = &params[params.len() - 1];
                     self.tui.set_topic(topic, &MsgTarget::Chan {
-                        serv_name: &conn.serv_name,
+                        serv_name: conn.get_serv_name(),
                         chan_name: chan,
                     });
                 }
@@ -407,7 +408,7 @@ impl Tiny {
                     let conn = unsafe { &self.conns.get_unchecked(conn_idx) };
                     let chan = &params[2];
                     let chan_target = MsgTarget::Chan {
-                        serv_name: &conn.serv_name,
+                        serv_name: conn.get_serv_name(),
                         chan_name: chan,
                     };
 

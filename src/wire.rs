@@ -122,7 +122,7 @@ enum MsgType<'a> {
 static CRLF: [u8; 2] = [b'\r', b'\n'];
 
 impl Msg {
-    /// Try to read an IRC message off buffer. Drops the message when parsing is successful.
+    /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
     /// Otherwise the buffer is left unchanged.
     pub fn read(buf: &mut Vec<u8>, log_file: &Option<File>) -> Option<Msg> {
         // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so

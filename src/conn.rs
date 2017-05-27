@@ -24,7 +24,7 @@ pub struct Conn {
 
     status: ConnStatus,
 
-    pub serv_name: String,
+    serv_name: String,
 
     /// _Partial_ messages collected here until they make a complete message.
     buf: Vec<u8>,
@@ -80,6 +80,10 @@ impl Conn {
         self.stream.as_raw_fd()
     }
 
+    pub fn get_serv_name(&self) -> &str {
+        &self.serv_name
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
 
@@ -91,7 +95,7 @@ impl Conn {
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
-    pub fn read_incoming_msg(&mut self) -> Vec<ConnEv> {
+    pub fn read_incoming_msg(&mut self, evs: &mut Vec<ConnEv>) {
         let mut read_buf: [u8; 512] = [0; 512];
 
         // Handle disconnects
@@ -99,16 +103,15 @@ impl Conn {
             Err(err) => {
                 // TODO: I don't understand why this happens. I'm ``randomly''
                 // getting "temporarily unavailable" errors.
-                return vec![ConnEv::Err(format!("Error in read(): {:?}", err))];
-            },
+                evs.push(ConnEv::Err(format!("Error in read(): {:?}", err)));
+            }
             Ok(bytes_read) => {
                 writeln!(&mut io::stderr(), "read: {:?} bytes", bytes_read).unwrap();
                 self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
-                let mut ret = self.handle_msgs();
+                self.handle_msgs(evs);
                 if bytes_read == 0 {
-                    ret.push(ConnEv::Disconnected);
+                    evs.push(ConnEv::Disconnected);
                 }
-                ret
             }
         }
     }
@@ -122,15 +125,13 @@ impl Conn {
                                                 **c != 0x4 /* EOT */));
     }
 
-    fn handle_msgs(&mut self) -> Vec<ConnEv> {
-        let mut ret = Vec::with_capacity(1);
+    fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>) {
         while let Some(msg) = Msg::read(&mut self.buf, &self.log_file) {
-            self.handle_msg(msg, &mut ret);
+            self.handle_msg(msg, evs);
         }
-        ret
     }
 
-    fn handle_msg(&mut self, msg: Msg, ret: &mut Vec<ConnEv>) {
+    fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>) {
         match &msg {
             &Msg { cmd: Cmd::PING { ref server }, .. } => {
                 wire::pong(server, &mut self.stream).unwrap()
@@ -141,11 +142,11 @@ impl Conn {
         let status = mem::replace(&mut self.status, ConnStatus::PingPong);
         if let ConnStatus::Introduce = status {
             if let Err(err) = self.introduce() {
-                ret.push(ConnEv::Err(format!("Error: {:?}", err)));
+                evs.push(ConnEv::Err(format!("Error: {:?}", err)));
             }
         }
 
-        ret.push(ConnEv::Msg(msg));
+        evs.push(ConnEv::Msg(msg));
     }
 }
 
