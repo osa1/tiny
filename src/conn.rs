@@ -39,9 +39,9 @@ pub struct Conn {
 }
 
 /// How many ticks to wait before sending a ping to the server.
-const PING_TICKS: u8 = 10;
+const PING_TICKS: u8 = 60;
 /// How many ticks to wait after sending a ping to the server to consider a disconnect.
-const PONG_TICKS: u8 = 10;
+const PONG_TICKS: u8 = 60;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum ConnStatus {
