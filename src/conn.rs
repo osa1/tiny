@@ -121,14 +121,14 @@ impl Conn {
     ////////////////////////////////////////////////////////////////////////////
     // Tick handling
 
-    pub fn tick(&mut self, evs: &mut Vec<ConnEv>) {
+    pub fn tick(&mut self, evs: &mut Vec<ConnEv>, debug_out: &mut Write) {
         match self.status {
             ConnStatus::Introduce => {},
             ConnStatus::PingPong { ticks_passed } => {
                 if ticks_passed + 1 == PING_TICKS {
                     match self.host {
                         None => {
-                            writeln!(&mut io::stderr(), "Can't send PING, host unknown").unwrap();
+                            writeln!(debug_out, "{}: Can't send PING, host unknown", self.serv_name).unwrap();
                         }
                         Some(ref host_) => {
                             wire::ping(&mut self.stream, host_).unwrap();;
@@ -168,7 +168,7 @@ impl Conn {
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
-    pub fn read_incoming_msg(&mut self, evs: &mut Vec<ConnEv>) {
+    pub fn read_incoming_msg(&mut self, evs: &mut Vec<ConnEv>, debug_out: &mut Write) {
         let mut read_buf: [u8; 512] = [0; 512];
 
         // Handle disconnects
@@ -179,10 +179,10 @@ impl Conn {
                 evs.push(ConnEv::Err(format!("Error in read(): {:?}", err)));
             }
             Ok(bytes_read) => {
-                writeln!(&mut io::stderr(), "read: {:?} bytes", bytes_read).unwrap();
+                writeln!(debug_out, "{} read {:?} bytes", self.serv_name, bytes_read).unwrap();
                 self.reset_ticks();
                 self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
-                self.handle_msgs(evs);
+                self.handle_msgs(evs, debug_out);
                 if bytes_read == 0 {
                     evs.push(ConnEv::Disconnected);
                 }
@@ -199,13 +199,13 @@ impl Conn {
                                                 **c != 0x4 /* EOT */ ));
     }
 
-    fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>) {
+    fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>, debug_out: &mut Write) {
         while let Some(msg) = Msg::read(&mut self.buf, &self.log_file) {
-            self.handle_msg(msg, evs);
+            self.handle_msg(msg, evs, debug_out);
         }
     }
 
-    fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>) {
+    fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>, debug_out: &mut Write) {
         if let &Msg { cmd: Cmd::PING { ref server }, .. } = &msg {
             wire::pong(server, &mut self.stream).unwrap();
         }
@@ -229,7 +229,7 @@ impl Conn {
                     evs.push(ConnEv::Err(format!("Can't parse hostname from params: {:?}", params)));
                 }
                 Some(host) => {
-                    writeln!(&mut io::stderr(), "host: {}", host).unwrap();
+                    writeln!(debug_out, "{} host: {}", self.serv_name, host).unwrap();
                     self.host = Some(host);
                 }
             }

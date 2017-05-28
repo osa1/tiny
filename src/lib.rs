@@ -84,7 +84,7 @@ impl Tiny {
                 let mut evs = Vec::with_capacity(1);
                 {
                     let conn = &mut tiny.conns[conn_idx];
-                    conn.tick(&mut evs);
+                    conn.tick(&mut evs, &mut tiny.tui);
                 }
                 tiny.handle_socket_evs(conn_idx, evs, ctrl);
                 // debug
@@ -245,7 +245,7 @@ impl Tiny {
         let mut evs = Vec::with_capacity(2);
         {
             let mut conn = &mut self.conns[conn_idx];
-            conn.read_incoming_msg(&mut evs)
+            conn.read_incoming_msg(&mut evs, &mut self.tui)
         }
         self.handle_socket_evs(conn_idx, evs, ctrl);
     }
