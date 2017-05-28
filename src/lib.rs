@@ -274,11 +274,13 @@ impl Tiny {
                         tiny.tui.draw();
                     }));
                 }
-                ConnEv::Err(err_msg) => {
+                ConnEv::Err(err) => {
                     self.tui.add_err_msg(
-                        &err_msg,
+                        &format!("{:?}", err),
                         &time::now(),
                         &MsgTarget::Server { serv_name: self.conns[conn_idx].get_serv_name() });
+                    ctrl.remove_self();
+                    self.conns.remove(conn_idx);
                 }
                 ConnEv::Msg(msg) => {
                     self.handle_msg(conn_idx, msg, time::now());

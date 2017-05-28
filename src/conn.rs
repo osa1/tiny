@@ -39,9 +39,9 @@ pub struct Conn {
 }
 
 /// How many ticks to wait before sending a ping to the server.
-const PING_TICKS: u8 = 60;
+const PING_TICKS: u8 = 10;
 /// How many ticks to wait after sending a ping to the server to consider a disconnect.
-const PONG_TICKS: u8 = 60;
+const PONG_TICKS: u8 = 10;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum ConnStatus {
@@ -63,7 +63,7 @@ enum ConnStatus {
 #[derive(Debug)]
 pub enum ConnEv {
     Disconnected,
-    Err(String),
+    Err(io::Error),
     Msg(Msg),
 }
 
@@ -131,6 +131,7 @@ impl Conn {
                             writeln!(debug_out, "{}: Can't send PING, host unknown", self.serv_name).unwrap();
                         }
                         Some(ref host_) => {
+                            writeln!(debug_out, "{}: Ping timeout, sending PING", self.serv_name).unwrap();
                             wire::ping(&mut self.stream, host_).unwrap();;
                         }
                     }
@@ -160,9 +161,9 @@ impl Conn {
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
 
-    fn introduce(&mut self) -> io::Result<()> {
-        try!(wire::user(&self.hostname, &self.realname, &mut self.stream));
-        wire::nick(&self.nick, &mut self.stream)
+    fn introduce(&mut self) {
+        wire::user(&self.hostname, &self.realname, &mut self.stream).unwrap();
+        wire::nick(&self.nick, &mut self.stream).unwrap();
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -174,9 +175,7 @@ impl Conn {
         // Handle disconnects
         match self.stream.read(&mut read_buf) {
             Err(err) => {
-                // TODO: I don't understand why this happens. I'm ``randomly''
-                // getting "temporarily unavailable" errors.
-                evs.push(ConnEv::Err(format!("Error in read(): {:?}", err)));
+                evs.push(ConnEv::Err(err));
             }
             Ok(bytes_read) => {
                 writeln!(debug_out, "{} read {:?} bytes", self.serv_name, bytes_read).unwrap();
@@ -211,11 +210,8 @@ impl Conn {
         }
 
         if let ConnStatus::Introduce = self.status {
-            if let Err(err) = self.introduce() {
-                evs.push(ConnEv::Err(format!("Error: {:?}", err)));
-            } else {
-                self.status = ConnStatus::PingPong { ticks_passed: 0 };
-            }
+            self.introduce();
+            self.status = ConnStatus::PingPong { ticks_passed: 0 };
         }
 
         if let &Msg { cmd: Cmd::Reply { num: 002, ref params }, .. } = &msg {
@@ -226,7 +222,8 @@ impl Conn {
 
             match parse_servername(params) {
                 None => {
-                    evs.push(ConnEv::Err(format!("Can't parse hostname from params: {:?}", params)));
+                    writeln!(debug_out, "{} Can't parse hostname from params: {:?}",
+                             self.serv_name, params).unwrap();
                 }
                 Some(host) => {
                     writeln!(debug_out, "{} host: {}", self.serv_name, host).unwrap();
