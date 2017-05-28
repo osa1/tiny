@@ -14,7 +14,7 @@ pub fn nick<W : Write>(arg: &str, mut sink: W) -> std::io::Result<()> {
 }
 
 pub fn ping<W: Write>(mut sink: W, arg: &str) -> std::io::Result<()> {
-    write!(sink, "PING {}", arg)
+    write!(sink, "PING {}\r\n", arg)
 }
 
 pub fn pong<W: Write>(arg: &str, mut sink: W) -> std::io::Result<()> {
