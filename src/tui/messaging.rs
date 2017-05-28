@@ -108,6 +108,16 @@ impl MessagingUI {
                 WidgetRet::KeyHandled
             },
 
+            Key::ShiftUp => {
+                self.msg_area.scroll_up();
+                WidgetRet::KeyHandled
+            },
+
+            Key::ShiftDown => {
+                self.msg_area.scroll_down();
+                WidgetRet::KeyHandled
+            },
+
             Key::Tab => {
                 self.input_field.event(Box::new(self.nicks.clone()));
                 WidgetRet::KeyHandled

@@ -37,6 +37,8 @@ pub enum Key {
     PageDown,
     Tab,
     Backspace,
+    ShiftUp,
+    ShiftDown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,8 +97,10 @@ static XTERM_CTRL_ARROW_RIGHT: [u8; 6] = [27, 91, 49, 59, 53, 67];
 static XTERM_CTRL_ARROW_UP   : [u8; 6] = [27, 91, 49, 59, 53, 65];
 static XTERM_PAGE_DOWN       : [u8; 4] = [27, 91, 54, 126];
 static XTERM_PAGE_UP         : [u8; 4] = [27, 91, 53, 126];
+static XTERM_SHIFT_UP        : [u8; 6] = [27, 91, 49, 59, 50, 65];
+static XTERM_SHIFT_DOWN      : [u8; 6] = [27, 91, 49, 59, 50, 66];
 
-static XTERM_KEY_SEQS : [(&'static [u8], Event); 18] =
+static XTERM_KEY_SEQS : [(&'static [u8], Event); 20] =
     [ (&XTERM_ALT_ARROW_DOWN,  Event::Key(Key::AltArrow(Arrow::Down))),
       (&XTERM_ALT_ARROW_LEFT,  Event::Key(Key::AltArrow(Arrow::Left))),
       (&XTERM_ALT_ARROW_RIGHT, Event::Key(Key::AltArrow(Arrow::Right))),
@@ -115,6 +119,8 @@ static XTERM_KEY_SEQS : [(&'static [u8], Event); 18] =
       (&XTERM_CTRL_ARROW_UP,   Event::Key(Key::CtrlArrow(Arrow::Up))),
       (&XTERM_PAGE_DOWN,       Event::Key(Key::PageDown)),
       (&XTERM_PAGE_UP,         Event::Key(Key::PageUp)),
+      (&XTERM_SHIFT_UP,        Event::Key(Key::ShiftUp)),
+      (&XTERM_SHIFT_DOWN,      Event::Key(Key::ShiftDown)),
     ];
 
 // Make sure not to use 27 (ESC) because it's used as a prefix in many combinations.
