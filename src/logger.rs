@@ -40,6 +40,7 @@ impl Logger {
         }
     }
 
+/*
     pub fn get_serv_file(&mut self, serv: &str) -> &mut File {
         let pos = self.fds.iter().position(|&(ref serv_, ref chan_, _)| {
             serv_ == serv && chan_ == &None
@@ -57,4 +58,5 @@ impl Logger {
             }
         }
     }
+*/
 }

@@ -79,18 +79,22 @@ impl Tiny {
             tiny.tui.draw();
         }
 
-/*
-        ev_loop.add_timer(1000, 1000, Box::new(|_, tiny, _| {
-            for conn in &mut tiny.conns {
-                conn.tick();
+        ev_loop.add_timer(1000, 1000, Box::new(|ctrl, tiny, _| {
+            for conn_idx in 0 .. tiny.conns.len() {
+                let mut evs = Vec::with_capacity(1);
+                {
+                    let conn = &mut tiny.conns[conn_idx];
+                    conn.tick(&mut evs);
+                }
+                tiny.handle_socket_evs(conn_idx, evs, ctrl);
                 // debug
-                tiny.tui.add_msg(
-                    "tick!",
-                    &time::now(),
-                    &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                // tiny.tui.add_msg(
+                //     "tick!",
+                //     &time::now(),
+                //     &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                // tiny.tui.draw();
             }
         }));
-*/
 
         ev_loop.run(tiny);
     }
@@ -152,9 +156,16 @@ impl Tiny {
                 let fd = conn.get_raw_fd();
                 self.conns.push(conn);
                 ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
-                    let conn_idx = tiny.find_fd_conn(fd).unwrap();
-                    tiny.handle_socket(conn_idx, ctrl);
-                    tiny.tui.draw();
+                    match tiny.find_fd_conn(fd) {
+                        None => {
+                            writeln!(tiny.tui, "BUG: Can't find fd in conns: {:?}", fd).unwrap();
+                            ctrl.remove_self();
+                        }
+                        Some(conn_idx) => {
+                            tiny.handle_socket(conn_idx, ctrl);
+                            tiny.tui.draw();
+                        }
+                    }
                 }));
             }
         }
@@ -231,30 +242,44 @@ impl Tiny {
     ////////////////////////////////////////////////////////////////////////////
 
     fn handle_socket(&mut self, conn_idx: usize, ctrl: &mut EvLoopCtrl<Tiny>) {
-        let mut rets = Vec::with_capacity(2);
+        let mut evs = Vec::with_capacity(2);
         {
             let mut conn = &mut self.conns[conn_idx];
-            conn.read_incoming_msg(&mut rets)
+            conn.read_incoming_msg(&mut evs)
         }
+        self.handle_socket_evs(conn_idx, evs, ctrl);
+    }
 
-        for ret in rets.into_iter() {
-            // tui.show_msg_current_tab(&format!("{:?}", ret));
-            // writeln!(&mut io::stderr(), "incoming msg: {:?}", ret).unwrap();
-            match ret {
+    fn handle_socket_evs(&mut self, conn_idx: usize, evs: Vec<ConnEv>, ctrl: &mut EvLoopCtrl<Tiny>) {
+        for ev in evs.into_iter() {
+            match ev {
                 ConnEv::Disconnected => {
-                    let conn = self.conns.remove(conn_idx);
+                    let mut conn = &mut self.conns[conn_idx];
+                    ctrl.remove_self();
                     self.tui.add_err_msg(
-                        "Disconnected.", &time::now(),
+                        "Disconnected.",
+                        &time::now(),
                         &MsgTarget::AllServTabs {
                             serv_name: conn.get_serv_name(),
                         });
-                    ctrl.remove_self();
-                },
+                    ctrl.remove_self(); // remove old fd
+                    self.tui.add_client_msg("Connecting...",
+                                            &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                    conn.reconnect();
+                    let fd = conn.get_raw_fd();
+                    // FIXME: Duplicated code
+                    ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
+                        let conn_idx = tiny.find_fd_conn(fd).unwrap();
+                        tiny.handle_socket(conn_idx, ctrl);
+                        tiny.tui.draw();
+                    }));
+                }
                 ConnEv::Err(err_msg) => {
-                    let serv_name = &unsafe { self.conns.get_unchecked(conn_idx) }.get_serv_name();
-                    self.tui.add_err_msg(&err_msg, &time::now(),
-                                         &MsgTarget::Server { serv_name: serv_name });
-                },
+                    self.tui.add_err_msg(
+                        &err_msg,
+                        &time::now(),
+                        &MsgTarget::Server { serv_name: self.conns[conn_idx].get_serv_name() });
+                }
                 ConnEv::Msg(msg) => {
                     self.handle_msg(conn_idx, msg, time::now());
                 }

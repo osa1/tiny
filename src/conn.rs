@@ -6,7 +6,6 @@ use std::fs;
 use std::io::Read;
 use std::io::Write;
 use std::io;
-use std::mem;
 use std::net::TcpStream;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
@@ -21,6 +20,8 @@ pub struct Conn {
 
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
     host: Option<String>,
+
+    serv_addr: String,
 
     /// The TCP connection to the server.
     stream: TcpStream,
@@ -38,9 +39,9 @@ pub struct Conn {
 }
 
 /// How many ticks to wait before sending a ping to the server.
-const PING_TICKS: u8 = 30;
+const PING_TICKS: u8 = 60;
 /// How many ticks to wait after sending a ping to the server to consider a disconnect.
-const PONG_TICKS: u8 = 10;
+const PONG_TICKS: u8 = 60;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum ConnStatus {
@@ -66,13 +67,16 @@ pub enum ConnEv {
     Msg(Msg),
 }
 
+fn init_stream(serv_addr: &str) -> TcpStream {
+    let stream = TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
+    stream.set_nonblocking(true).unwrap();
+    // This will fail with EINPROGRESS
+    let _ = stream.connect(serv_addr);
+    stream
+}
+
 impl Conn {
     pub fn new(serv_addr: &str, serv_name: &str, nick: &str, hostname: &str, realname: &str) -> Conn {
-        let stream = TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
-        stream.set_nonblocking(true).unwrap();
-        // This will fail with EINPROGRESS
-        let _ = stream.connect(serv_addr);
-
         let log_file = {
             if cfg!(debug_assertions) {
                 let _ = fs::create_dir("logs");
@@ -87,12 +91,18 @@ impl Conn {
             hostname: hostname.to_owned(),
             realname: realname.to_owned(),
             host: None,
-            stream: stream,
+            serv_addr: serv_addr.to_owned(),
+            stream: init_stream(serv_addr),
             status: ConnStatus::Introduce,
             serv_name: serv_name.to_owned(),
             buf: vec![],
             log_file: log_file,
         }
+    }
+
+    pub fn reconnect(&mut self) {
+        self.stream = init_stream(&self.serv_addr);
+        self.status = ConnStatus::Introduce;
     }
 
     /// Get the RawFd, to be used with select() or other I/O multiplexer.
@@ -111,13 +121,19 @@ impl Conn {
     ////////////////////////////////////////////////////////////////////////////
     // Tick handling
 
-/*
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, evs: &mut Vec<ConnEv>) {
         match self.status {
             ConnStatus::Introduce => {},
             ConnStatus::PingPong { ticks_passed } => {
                 if ticks_passed + 1 == PING_TICKS {
-                    wire::ping(&self.serv_name, &mut self.stream).unwrap();;
+                    match self.host {
+                        None => {
+                            writeln!(&mut io::stderr(), "Can't send PING, host unknown").unwrap();
+                        }
+                        Some(ref host_) => {
+                            wire::ping(&mut self.stream, host_).unwrap();;
+                        }
+                    }
                     self.status = ConnStatus::WaitPong { ticks_passed: 0 };
                 } else {
                     self.status = ConnStatus::PingPong { ticks_passed: ticks_passed + 1 };
@@ -125,8 +141,7 @@ impl Conn {
             }
             ConnStatus::WaitPong { ticks_passed } => {
                 if ticks_passed + 1 == PONG_TICKS {
-                    // TODO: propagate disconnect event
-                    self.stream = init_stream(&self.serv_addr);
+                    evs.push(ConnEv::Disconnected);
                     self.status = ConnStatus::Introduce;
                 } else {
                     self.status = ConnStatus::WaitPong { ticks_passed: ticks_passed + 1 };
@@ -134,7 +149,13 @@ impl Conn {
             }
         }
     }
-*/
+
+    fn reset_ticks(&mut self) {
+        match self.status {
+            ConnStatus::Introduce => {},
+            _ => { self.status = ConnStatus::PingPong { ticks_passed: 0 }; }
+        }
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
@@ -159,6 +180,7 @@ impl Conn {
             }
             Ok(bytes_read) => {
                 writeln!(&mut io::stderr(), "read: {:?} bytes", bytes_read).unwrap();
+                self.reset_ticks();
                 self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
                 self.handle_msgs(evs);
                 if bytes_read == 0 {
@@ -207,6 +229,7 @@ impl Conn {
                     evs.push(ConnEv::Err(format!("Can't parse hostname from params: {:?}", params)));
                 }
                 Some(host) => {
+                    writeln!(&mut io::stderr(), "host: {}", host).unwrap();
                     self.host = Some(host);
                 }
             }
@@ -227,7 +250,7 @@ macro_rules! try_opt {
 
 /// Try to parse servername in a 002 RPL_YOURHOST reply
 fn parse_servername(params: &[String]) -> Option<String> {
-    let msg = try_opt!(params.get(1));
+    let msg = try_opt!(params.get(1).or(params.get(0)));
     let slice1 = &msg[13..];
     let servername_ends = try_opt!(wire::find_byte(slice1.as_bytes(), b'['));
     Some((&slice1[..servername_ends]).to_owned())
@@ -252,5 +275,25 @@ impl Write for Conn {
 
     fn by_ref(&mut self) -> &mut Conn {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_servername_1() {
+        let args = vec!["tiny_test".to_owned(),
+                        "Your host is adams.freenode.net[94.125.182.252/8001], \
+                         running version ircd-seven-1.1.4".to_owned()];
+        assert_eq!(parse_servername(&args), Some("adams.freenode.net".to_owned()));
+    }
+
+    #[test]
+    fn test_parse_servername_2() {
+        let args = vec!["Your host is adams.freenode.net[94.125.182.252/8001], \
+                         running version ircd-seven-1.1.4".to_owned()];
+        assert_eq!(parse_servername(&args), Some("adams.freenode.net".to_owned()));
     }
 }

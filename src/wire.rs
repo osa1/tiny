@@ -13,6 +13,10 @@ pub fn nick<W : Write>(arg: &str, mut sink: W) -> std::io::Result<()> {
     write!(sink, "NICK {}\r\n", arg)
 }
 
+pub fn ping<W: Write>(mut sink: W, arg: &str) -> std::io::Result<()> {
+    write!(sink, "PING {}", arg)
+}
+
 pub fn pong<W: Write>(arg: &str, mut sink: W) -> std::io::Result<()> {
     write!(sink, "PONG {}\r\n", arg)
 }
@@ -25,12 +29,14 @@ pub fn privmsg<W: Write>(msgtarget: &str, msg: &str, mut sink: W) -> std::io::Re
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
+/*
 pub fn quit<W : Write>(msg : Option<&str>, mut sink: W) -> std::io::Result<()> {
     match msg {
         None => write!(sink, "QUIT\r\n"),
         Some(msg) => write!(sink, "QUIT {}\r\n", msg)
     }
 }
+*/
 
 /// <prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
 /// From RFC 2812:
