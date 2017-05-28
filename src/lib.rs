@@ -466,6 +466,15 @@ impl Tiny {
                     }
                 }
 
+                // ERR_NICKNAMEINUSE
+                else if n == 433 {
+                    // TODO
+                    self.tui.add_err_msg(
+                        &format!("Nick already in use: {:?}", params[1]),
+                        &time::now(),
+                        &MsgTarget::Server { serv_name: self.conns[conn_idx].get_serv_name() });
+                }
+
                 // RPL_ENDOFNAMES: End of NAMES list
                 else if n == 366 {}
 
