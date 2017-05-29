@@ -108,8 +108,7 @@ impl Termbox {
     }
 
     pub fn change_cell(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
-        // FIXME: This is assuming that the char is represented as its utf-8 encoding!
-        unsafe { tb_change_cell(x as libc::c_int, y as libc::c_int, ch as u32, fg, bg) }
+        unsafe { tb_change_cell(x as libc::c_int, y as libc::c_int, char_to_utf8(ch), fg, bg) }
     }
 
     pub fn get_output_mode(&self) -> OutputMode {
@@ -129,5 +128,35 @@ impl Termbox {
 impl Drop for Termbox {
     fn drop(&mut self) {
         unsafe { tb_shutdown(); }
+    }
+}
+
+
+// https://github.com/rust-lang/rust/blob/03bed655142dd5e42ba4539de53b3663d8a123e0/src/libcore/char.rs#L424
+
+const TAG_CONT:    u8  = 0b1000_0000;
+const TAG_TWO_B:   u8  = 0b1100_0000;
+const TAG_THREE_B: u8  = 0b1110_0000;
+const TAG_FOUR_B:  u8  = 0b1111_0000;
+const MAX_ONE_B:   u32 =     0x80;
+const MAX_TWO_B:   u32 =    0x800;
+const MAX_THREE_B: u32 =  0x10000;
+
+fn char_to_utf8(c: char) -> u32 {
+    let code = c as u32;
+    if code < MAX_ONE_B {
+        code as u32
+    } else if code < MAX_TWO_B {
+        ((((code >> 6 & 0x1F) as u8 | TAG_TWO_B) as u32) << 8) +
+        (((code & 0x3F) as u8 | TAG_CONT) as u32)
+    } else if code < MAX_THREE_B {
+        ((((code >> 12 & 0x0F) as u8 | TAG_THREE_B) as u32) << 16) +
+        ((((code >>  6 & 0x3F) as u8 | TAG_CONT) as u32) << 8) +
+        (((code & 0x3F) as u8 | TAG_CONT) as u32)
+    } else {
+        ((((code >> 18 & 0x07) as u8 | TAG_FOUR_B) as u32) << 24) +
+        ((((code >> 12 & 0x3F) as u8 | TAG_CONT) as u32) << 16) +
+        ((((code >>  6 & 0x3F) as u8 | TAG_CONT) as u32) << 8) +
+        (((code & 0x3F) as u8 | TAG_CONT) as u32)
     }
 }
