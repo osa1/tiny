@@ -6,7 +6,7 @@ use std::str;
 
 use termbox_simple::Termbox;
 
-use self::line::Line;
+pub use self::line::Line;
 use tui::style::Style;
 
 pub struct MsgArea {

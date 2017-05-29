@@ -11,6 +11,7 @@ use time::Tm;
 
 use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
+use tui::msg_area::Line;
 use tui::msg_area::MsgArea;
 use tui::style;
 use tui::text_field::TextField;
@@ -20,7 +21,10 @@ use tui::widget::{WidgetRet, Widget};
 /// show incoming/sent messages.
 pub struct MessagingUI {
     /// Channel topic, user info etc.
-    topic : Option<String>,
+    topic : Option<Line>,
+
+    /// Whether the draw the topic line
+    draw_topic: bool,
 
     /// Incoming and sent messages appear
     msg_area : MsgArea,
@@ -57,6 +61,7 @@ impl MessagingUI {
     pub fn new(width : i32, height : i32) -> MessagingUI {
         MessagingUI {
             topic: None,
+            draw_topic: true,
             msg_area: MsgArea::new(width, height - 1),
             input_field: vec![Box::new(TextField::new(width))],
             width: width,
@@ -69,25 +74,30 @@ impl MessagingUI {
     }
 
     pub fn set_topic(&mut self, topic : String) {
-        self.topic = Some(topic);
-        // FIXME: Disabling this - need to decide when/how to draw channel topics
-        // self.msg_area.resize(self.width, self.height - 2);
+        let mut line = Line::new();
+        line.set_style(&style::TOPIC);
+        line.add_text(&topic);
+        let w = self.width;
+        let h = self.height;
+        self.topic = Some(line);
+        self.resize(w, h);
     }
 
-    pub fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
-        // TODO: Most channels have long topics that don't fit into single line.
-        // if let Some(ref topic) = self.topic {
-        //     // rustbox.print(pos_x as usize, pos_y as usize,
-        //     //               style::TOPIC.style,
-        //     //               style::TOPIC.fg,
-        //     //               style::TOPIC.bg,
-        //     //               topic);
-        //     self.msg_area.draw(rustbox, pos_x, pos_y + 1);
-        // } else {
-        //     self.msg_area.draw(rustbox, pos_x, pos_y);
-        // }
-
-        self.msg_area.draw(tb, pos_x, pos_y);
+    pub fn draw(&self, tb: &mut Termbox, pos_x: i32, pos_y: i32) {
+        if self.draw_topic && self.topic.is_some() {
+            let topic_line = self.topic.as_ref().unwrap();
+            let topic_line_height = topic_line.rendered_height(self.width);
+            // fill background
+            for x in 0 .. self.width {
+                for y in 0 .. topic_line_height {
+                    tb.change_cell(x, y, ' ', style::TOPIC.bg, style::TOPIC.bg);
+                }
+            }
+            topic_line.draw(tb, pos_x, pos_y, self.width);
+            self.msg_area.draw(tb, pos_x, pos_y + topic_line_height);
+        } else {
+            self.msg_area.draw(tb, pos_x, pos_y);
+        }
         self.input_field.draw(tb, pos_x, pos_y + self.height - 1);
     }
 
@@ -140,11 +150,25 @@ impl MessagingUI {
         }
     }
 
-    pub fn resize(&mut self, width : i32, height : i32) {
+    pub fn resize(&mut self, width: i32, height: i32) {
         self.width = width;
         self.height = height;
-        self.msg_area.resize(width, height - 1);
         self.input_field.resize(width, 1);
+
+        if let Some(ref topic_line) = self.topic {
+            let topic_height = topic_line.rendered_height(width);
+            let msg_area_height = height - topic_height - 1; // -1 for input field
+            if msg_area_height < 10 {
+                // not enough space -- do not draw topic
+                self.draw_topic = false;
+                self.msg_area.resize(width, height - 1);
+            } else {
+                self.draw_topic = true;
+                self.msg_area.resize(width, msg_area_height);
+            }
+        } else {
+            self.msg_area.resize(width, height - 1);
+        }
     }
 
     fn toggle_exit_dialogue(&mut self) {
