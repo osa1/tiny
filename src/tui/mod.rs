@@ -9,15 +9,9 @@ pub mod termbox;
 pub mod text_field;
 pub mod widget;
 
-use std::fs::File;
 use std::fs;
-use std::io::Write;
-use std::io;
-use std::mem;
 use std::str;
-
 use time::Tm;
-use time;
 
 use self::tabbed::{Tabbed, TabbedRet, MsgSource};
 
@@ -30,13 +24,6 @@ pub struct TUI {
 
     /// A tab for every server + channel
     ui       : Tabbed,
-
-    /// For debugging only - `write()` method is called with incomplete lines,
-    /// we collect those here. Messages are only shown with `flush()`.
-    buffer   : Vec<u8>,
-
-    /// For debugging only - `write()` also logs to a file.
-    log_file : File,
 }
 
 #[derive(Debug)]
@@ -66,8 +53,6 @@ impl TUI {
         TUI {
             ui: Tabbed::new(tui.width() as i32, tui.height() as i32),
             termbox: tui,
-            buffer: Vec::with_capacity(100),
-            log_file: File::create("logs/debug.txt").unwrap(),
         }
     }
 }
@@ -247,42 +232,5 @@ impl TUI {
     #[inline]
     pub fn rename_nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm, target : &MsgTarget) {
         self.ui.rename_nick(old_nick, new_nick, tm, target);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-// Write instance is used for debugging - messages show up in a "debug" tab.
-
-impl Write for TUI {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut line_start = 0;
-
-        for (byte_idx, byte) in buf.iter().enumerate() {
-            if *byte == b'\n' {
-                if self.buffer.len() != 0 {
-                    debug_assert!(line_start == 0);
-                    self.buffer.extend_from_slice(&buf[ 0 .. byte_idx ]);
-                    let mut msg : Vec<u8> = Vec::with_capacity(100);
-                    mem::swap(&mut msg, &mut self.buffer);
-                    self.add_msg(&unsafe { String::from_utf8_unchecked(msg) },
-                                 &time::now(),
-                                 &MsgTarget::Server { serv_name: "debug" });
-                } else {
-                    self.add_msg(unsafe { str::from_utf8_unchecked(&buf[ line_start .. byte_idx ]) },
-                                 &time::now(),
-                                 &MsgTarget::Server { serv_name: "debug" });
-                }
-
-                line_start = byte_idx + 1;
-            }
-        }
-
-        self.buffer.extend_from_slice(&buf[ line_start .. ]);
-        self.log_file.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.log_file.flush()
     }
 }

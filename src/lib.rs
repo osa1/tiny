@@ -18,7 +18,6 @@ mod wire;
 pub mod trie;
 pub mod tui;
 
-use std::io::Write;
 use std::os::unix::io::{RawFd};
 use std::path::PathBuf;
 
@@ -50,7 +49,7 @@ impl Tiny {
             nick: nick,
             hostname: hostname,
             realname: realname,
-            logger: Logger::new(PathBuf::from("tiny_logs")),
+            logger: Logger::new(PathBuf::from("logs")),
         };
 
         tiny.tui.new_server_tab("debug");
@@ -84,7 +83,7 @@ impl Tiny {
                 let mut evs = Vec::with_capacity(1);
                 {
                     let conn = &mut tiny.conns[conn_idx];
-                    conn.tick(&mut evs, &mut tiny.tui);
+                    conn.tick(&mut evs, tiny.logger.get_debug_logs());
                 }
                 tiny.handle_socket_evs(conn_idx, evs, ctrl);
                 // debug
@@ -107,9 +106,9 @@ impl Tiny {
                     ctrl.stop();
                 }
                 TUIRet::Input { msg, from } => {
-                    writeln!(self.tui,
-                             "Input source: {:#?}, msg: {}",
-                             from, msg.iter().cloned().collect::<String>()).unwrap();
+                    self.logger.get_debug_logs().write_line(
+                    format_args!("Input source: {:#?}, msg: {}",
+                                 from, msg.iter().cloned().collect::<String>()));
 
                     // We know msg has at least one character as the TUI won't accept it otherwise.
                     if msg[0] == '/' {
@@ -121,7 +120,8 @@ impl Tiny {
                 TUIRet::KeyHandled => {}
                 // TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
                 ev => {
-                    writeln!(self.tui, "Ignoring event: {:?}", ev).unwrap();
+                    self.logger.get_debug_logs().write_line(
+                        format_args!("Ignoring event: {:?}", ev));
                 }
             }
         }
@@ -148,7 +148,8 @@ impl Tiny {
             }
             Some(serv_name) => {
                 self.tui.new_server_tab(serv_name);
-                writeln!(self.tui, "Created tab: {}", serv_name).unwrap();
+                self.logger.get_debug_logs().write_line(
+                    format_args!("Created tab: {}", serv_name));
                 self.tui.add_client_msg("Connecting...",
                                         &MsgTarget::Server { serv_name: serv_name });
 
@@ -158,7 +159,8 @@ impl Tiny {
                 ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
                     match tiny.find_fd_conn(fd) {
                         None => {
-                            writeln!(tiny.tui, "BUG: Can't find fd in conns: {:?}", fd).unwrap();
+                            tiny.logger.get_debug_logs().write_line(
+                                format_args!("BUG: Can't find fd in conns: {:?}", fd));
                             ctrl.remove_self();
                         }
                         Some(conn_idx) => {
@@ -172,7 +174,6 @@ impl Tiny {
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
-        wire::join(chan, &mut self.tui).unwrap();
         match self.find_conn(src.serv_name()) {
             Some(conn) => {
                 wire::join(chan, conn).unwrap();
@@ -181,7 +182,7 @@ impl Tiny {
             None => {
                 // drop the borrowed self and run next statement
                 // rustc is too dumb to figure that None can't borrow.
-            },
+            }
         }
 
         self.tui.add_client_err_msg(
@@ -245,7 +246,7 @@ impl Tiny {
         let mut evs = Vec::with_capacity(2);
         {
             let mut conn = &mut self.conns[conn_idx];
-            conn.read_incoming_msg(&mut evs, &mut self.tui)
+            conn.read_incoming_msg(&mut evs, &mut self.logger)
         }
         self.handle_socket_evs(conn_idx, evs, ctrl);
     }
@@ -304,8 +305,8 @@ impl Tiny {
                 };
                 match receivers {
                     Receiver::Chan(chan) => {
-                        writeln!(self.logger.get_chan_file(&conn.get_serv_name(), &chan),
-                                 "PRIVMSG: {}", contents).unwrap();
+                        self.logger.get_chan_logs(&conn.get_serv_name(), &chan).write_line(
+                            format_args!("PRIVMSG: {}", contents));
                         self.tui.add_privmsg(receiver, &contents, &tm, &MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
                             chan_name: &chan,
@@ -322,12 +323,13 @@ impl Tiny {
             Cmd::JOIN { chan } => {
                 match pfx {
                     Pfx::Server(_) => {
-                        writeln!(self.tui, "Weird JOIN message pfx {:?}", pfx).unwrap();
+                        self.logger.get_debug_logs().write_line(
+                            format_args!("Weird JOIN message pfx {:?}", pfx));
                     }
                     Pfx::User { nick, .. } => {
                         let serv_name = self.conns[conn_idx].get_serv_name();
-                        writeln!(self.logger.get_chan_file(serv_name, &chan),
-                                 "JOIN: {}", nick).unwrap();
+                        self.logger.get_chan_logs(serv_name, &chan).write_line(
+                            format_args!("JOIN: {}", nick));
                         if nick == self.nick {
                             self.tui.new_chan_tab(&serv_name, &chan);
                         } else {
@@ -343,12 +345,13 @@ impl Tiny {
             Cmd::PART { chan, .. } => {
                 match pfx {
                     Pfx::Server(_) => {
-                        writeln!(self.tui, "Weird PART message pfx {:?}", pfx).unwrap();
+                        self.logger.get_debug_logs().write_line(
+                            format_args!("Weird PART message pfx {:?}", pfx));
                     },
                     Pfx::User { nick, .. } => {
                         let serv_name = self.conns[conn_idx].get_serv_name();
-                        writeln!(self.logger.get_chan_file(serv_name, &chan),
-                                 "PART: {}", nick).unwrap();
+                        self.logger.get_chan_logs(serv_name, &chan).write_line(
+                            format_args!("PART: {}", nick));
                         self.tui.remove_nick(
                             &nick,
                             Some(&time::now()),
@@ -360,7 +363,8 @@ impl Tiny {
             Cmd::QUIT { .. } => {
                 match pfx {
                     Pfx::Server(_) => {
-                        writeln!(self.tui, "Weird QUIT message pfx {:?}", pfx).unwrap();
+                        self.logger.get_debug_logs().write_line(
+                            format_args!("Weird QUIT message pfx {:?}", pfx));
                     },
                     Pfx::User { ref nick, .. } => {
                         let serv_name = self.conns[conn_idx].get_serv_name();
@@ -377,14 +381,16 @@ impl Tiny {
                 if nick == "*" || nick == self.nick {
                     self.tui.add_msg(&msg, &time::now(), &pfx_to_target(&pfx, conn.get_serv_name()));
                 } else {
-                    writeln!(self.tui, "Weird NOTICE target: {}", nick).unwrap();
+                    self.logger.get_debug_logs().write_line(
+                        format_args!("Weird NOTICE target: {}", nick));
                 }
             }
 
             Cmd::NICK { nick } => {
                 match pfx {
                     Pfx::Server(_) => {
-                        writeln!(self.tui, "Weird NICK message pfx {:?}", pfx).unwrap();
+                        self.logger.get_debug_logs().write_line(
+                            format_args!("Weird NICK message pfx {:?}", pfx));
                     },
                     Pfx::User { nick: ref old_nick, .. } => {
                         let serv_name = unsafe { self.conns.get_unchecked(conn_idx) }.get_serv_name();
@@ -461,7 +467,8 @@ impl Tiny {
                         } else {
                             nick
                         };
-                        writeln!(self.tui, "adding nick {} to {:?}", nick, chan_target).unwrap();
+                        self.logger.get_debug_logs().write_line(
+                            format_args!("adding nick {} to {:?}", nick, chan_target));
                         self.tui.add_nick(nick, None, &chan_target);
                     }
                 }
@@ -479,14 +486,15 @@ impl Tiny {
                 else if n == 366 {}
 
                 else {
-                    writeln!(self.tui,
-                             "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
-                             pfx, n, params).unwrap();
+                    self.logger.get_debug_logs().write_line(
+                        format_args!("Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
+                                     pfx, n, params));
                 }
             }
 
             _ => {
-                writeln!(self.tui, "Ignoring msg:\nPfx: {:?}, msg: {:?}", pfx, msg.cmd).unwrap();
+                self.logger.get_debug_logs().write_line(
+                    format_args!("Ignoring msg:\nPfx: {:?}, msg: {:?}", pfx, msg.cmd));
             }
         }
     }

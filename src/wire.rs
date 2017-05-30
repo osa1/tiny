@@ -1,9 +1,10 @@
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
 
-use std::fs::File;
 use std::io::Write;
 use std::str;
 use std;
+
+use logger::LogFile;
 
 pub fn user<W : Write>(hostname: &str, realname: &str, mut sink: W) -> std::io::Result<()> {
     write!(sink, "USER {} 0 * :{}\r\n", hostname, realname)
@@ -130,7 +131,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 impl Msg {
     /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
     /// Otherwise the buffer is left unchanged.
-    pub fn read(buf: &mut Vec<u8>, log_file: &Option<File>) -> Option<Msg> {
+    pub fn read(buf: &mut Vec<u8>, logger: Option<LogFile>) -> Option<Msg> {
         // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
         // using this hacky method instead.
         let crlf_idx = {
@@ -143,10 +144,15 @@ impl Msg {
         let ret = {
             let mut slice: &[u8] = &buf[ 0 .. crlf_idx ];
 
-            // Log the message in debug mode
-            if let Some(mut log_file) = log_file.as_ref() {
-                writeln!(log_file, "{}",
-                         unsafe { str::from_utf8_unchecked(slice) }).unwrap();
+            if let Some(mut logger) = logger {
+                match str::from_utf8(slice) {
+                    Ok(str) => {
+                        logger.write_line(format_args!("< {}", str));
+                    }
+                    Err(e) => {
+                        logger.write_line(format_args!("< (non-utf8: {:?}) {:?}", e, slice));
+                    }
+                }
             }
 
             let pfx: Option<Pfx> = {
