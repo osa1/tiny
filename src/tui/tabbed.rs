@@ -268,19 +268,20 @@ impl Tabbed {
     }
 
     fn draw_right_arrow(&self) -> bool {
-        // width of the whole line
-        let mut line_width = if self.draw_left_arrow() { 2 } else { 0 };
-        {
+        let w1 = self.h_scroll + self.width;
+        let w2 = {
+            let mut w = if self.draw_left_arrow() { 2 } else { 0 };
             let last_tab_idx = self.tabs.len() - 1;
             for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                line_width += tab.width();
+                w += tab.width();
                 if tab_idx != last_tab_idx {
-                    line_width += 1;
+                    w += 1;
                 }
             }
-        }
-
-        self.width - line_width - self.h_scroll - 2 < 0 // -2 for right arrow
+            w
+        };
+        
+        w2 > w1
     }
 
     // right one is exclusive
