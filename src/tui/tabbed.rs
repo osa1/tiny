@@ -6,6 +6,7 @@ use time::Tm;
 use tui::messaging::MessagingUI;
 use tui::MsgTarget;
 use tui::style;
+use tui::style::Style;
 use tui::termbox;
 use tui::widget::{WidgetRet};
 
@@ -34,8 +35,18 @@ struct Tab {
 #[derive(Copy, Clone)]
 pub enum TabStyle {
     Important,
-    Hightlight,
+    Highlight,
     Normal,
+}
+
+impl TabStyle {
+    pub fn get_style(self) -> Style {
+        match self {
+            TabStyle::Important => style::TAB_IMPORTANT,
+            TabStyle::Highlight => style::TAB_HIGHLIGHT,
+            TabStyle::Normal => style::TAB_NORMAL,
+        }
+    }
 }
 
 /// TUI source of a message from the user.
@@ -80,15 +91,13 @@ impl Tab {
     }
 
     pub fn draw(&self, tb: &mut Termbox, pos_x: i32, pos_y: i32, active: bool) {
-        if active {
-            termbox::print(tb, pos_x, pos_y,
-                           style::TAB_ACTIVE.fg, style::TAB_ACTIVE.bg,
-                           self.visible_name());
+        let style: Style = if active {
+            style::TAB_ACTIVE
         } else {
-            termbox::print(tb, pos_x, pos_y,
-                           style::TAB_PASSIVE.fg, style::TAB_PASSIVE.bg,
-                           self.visible_name());
-        }
+            self.style.get_style()
+        };
+
+        termbox::print(tb, pos_x, pos_y, style.fg, style.bg, self.visible_name());
     }
 }
 
@@ -229,10 +238,31 @@ impl Tabbed {
             tab.widget.resize(width, height - 1);
         }
     }
+}
 
-    ////////////////////////////////////////////////////////////////////////////
-    // Rendering
+////////////////////////////////////////////////////////////////////////////////
+// Rendering
 
+fn arrow_style(tabs: &[Tab]) -> Style {
+    let mut arrow_style = style::TAB_NORMAL;
+
+    for tab in tabs  {
+        match tab.style {
+            TabStyle::Important => {
+                arrow_style = style::TAB_IMPORTANT;
+                break;
+            }
+            TabStyle::Highlight => {
+                arrow_style = style::TAB_HIGHLIGHT;
+            }
+            TabStyle::Normal => {}
+        }
+    }
+
+    arrow_style
+}
+
+impl Tabbed {
     fn draw_left_arrow(&self) -> bool {
         self.h_scroll > 0
     }
@@ -300,14 +330,15 @@ impl Tabbed {
         let left_arr = self.draw_left_arrow();
         let right_arr = self.draw_right_arrow();
 
+        let (tab_left, tab_right) = self.rendered_tabs();
+
         if left_arr {
+            let style = arrow_style(&self.tabs[0..tab_left]);
             tb.change_cell(pos_x, pos_y + self.height - 1,
                            LEFT_ARROW,
-                           style::TAB_PASSIVE.fg, style::TAB_PASSIVE.bg);
+                           style.fg, style.bg);
             pos_x += 1;
         }
-
-        let (tab_left, tab_right) = self.rendered_tabs();
 
         // Debugging
         // use std::io;
@@ -323,9 +354,10 @@ impl Tabbed {
         }
 
         if right_arr {
+            let style = arrow_style(&self.tabs[tab_right..]);
             tb.change_cell(pos_x, pos_y + self.height - 1,
                            RIGHT_ARROW,
-                           style::TAB_PASSIVE.fg, style::TAB_PASSIVE.bg);
+                           style.fg, style.bg);
         }
     }
 

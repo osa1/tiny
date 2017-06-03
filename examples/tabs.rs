@@ -11,6 +11,7 @@ use ev_loop::{EvLoop, READ_EV};
 use term_input::{Input, Event};
 use tiny::tui::tabbed::MsgSource;
 use tiny::tui::{TUI, TUIRet, MsgTarget};
+use tiny::tui::tabbed::TabStyle;
 
 fn main() {
     let mut tui = TUI::new();
@@ -18,9 +19,20 @@ fn main() {
     for serv_idx in 0 .. 10 {
         let server = format!("server_{}", serv_idx);
         tui.new_server_tab(&server);
-        for chan_idx in 0 .. 3 {
-            tui.new_chan_tab(&server, &format!("chan_{}", chan_idx));
-        }
+
+        tui.new_chan_tab(&server, "chan_0");
+        tui.set_tab_style(TabStyle::Important, &MsgTarget::Chan {
+            serv_name: &server,
+            chan_name: "chan_0"
+        });
+
+        tui.new_chan_tab(&server, "chan_1");
+        tui.set_tab_style(TabStyle::Highlight, &MsgTarget::Chan {
+            serv_name: &server,
+            chan_name: "chan_1"
+        });
+
+        tui.new_chan_tab(&server, "chan_2");
     }
 
     tui.draw();

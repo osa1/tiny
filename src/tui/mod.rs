@@ -13,7 +13,7 @@ use std::fs;
 use std::str;
 use time::Tm;
 
-use self::tabbed::{Tabbed, TabbedRet, MsgSource};
+use self::tabbed::{Tabbed, TabbedRet, TabStyle, MsgSource};
 
 use term_input::{Event, Key};
 use termbox_simple::{Termbox, OutputMode};
@@ -71,6 +71,10 @@ impl TUI {
 
     pub fn new_user_tab(&mut self, serv_name : &str, nick : &str) {
         self.ui.new_user_tab(serv_name, nick);
+    }
+
+    pub fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
+        self.ui.set_tab_style(style, target);
     }
 }
 
