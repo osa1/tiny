@@ -269,7 +269,7 @@ impl Tabbed {
 
     fn draw_right_arrow(&self) -> bool {
         // width of the whole line
-        let mut line_width = if self.draw_left_arrow() { 1 } else { 0 };
+        let mut line_width = if self.draw_left_arrow() { 2 } else { 0 };
         {
             let last_tab_idx = self.tabs.len() - 1;
             for (tab_idx, tab) in self.tabs.iter().enumerate() {
@@ -280,7 +280,7 @@ impl Tabbed {
             }
         }
 
-        self.width - line_width - self.h_scroll - 1 < 0 // -1 for right arrow
+        self.width - line_width - self.h_scroll - 2 < 0 // -2 for right arrow
     }
 
     // right one is exclusive
@@ -300,8 +300,8 @@ impl Tabbed {
         {
             // how much space left on screen
             let mut width_left = self.width;
-            if self.draw_left_arrow() { width_left -= 1; }
-            if self.draw_right_arrow() { width_left -= 1; }
+            if self.draw_left_arrow() { width_left -= 2; }
+            if self.draw_right_arrow() { width_left -= 2; }
             // drop any tabs that overflows from the screen
             for (tab_idx, tab) in (&self.tabs[i..]).iter().enumerate() {
                 if tab.width() > width_left {
@@ -337,7 +337,7 @@ impl Tabbed {
             tb.change_cell(pos_x, pos_y + self.height - 1,
                            LEFT_ARROW,
                            style.fg, style.bg);
-            pos_x += 1;
+            pos_x += 2;
         }
 
         // Debugging
