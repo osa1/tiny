@@ -28,6 +28,19 @@ fn main() {
     let mut ev_loop: EvLoop<TUI> = EvLoop::new();
 
     {
+        let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+        unsafe {
+            libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
+            libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
+        };
+
+        ev_loop.add_signal(&sig_mask, Box::new(|_, tui| {
+            tui.resize();
+            tui.draw();
+        }));
+    }
+
+    {
         let mut ev_buffer: Vec<Event> = Vec::new();
         let mut input = Input::new();
         ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, tui| {
