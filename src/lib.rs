@@ -52,7 +52,7 @@ impl Tiny {
             logger: Logger::new(PathBuf::from("logs")),
         };
 
-        tiny.tui.new_server_tab("debug");
+        tiny.tui.new_server_tab(""); // FIXME hack, close this after /connect
         tiny.tui.draw();
 
         let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
@@ -148,6 +148,10 @@ impl Tiny {
             }
             Some(serv_name) => {
                 self.tui.new_server_tab(serv_name);
+
+                // close the hacky "" tab if it exists
+                self.tui.close_server_tab("");
+
                 self.logger.get_debug_logs().write_line(
                     format_args!("Created tab: {}", serv_name));
                 self.tui.add_client_msg("Connecting...",
@@ -194,9 +198,16 @@ impl Tiny {
         let msg_string = msg.iter().cloned().collect::<String>();
 
         match from {
-            MsgSource::Serv { .. } => {
-                self.tui.add_client_err_msg("Can't send PRIVMSG to a server.",
-                                            &MsgTarget::CurrentTab);
+            MsgSource::Serv { ref serv_name } => {
+                if serv_name == "" {
+                    // our hacky tab used when not connected to any servers
+                    self.tui.add_client_err_msg("Use `/connect <server>` to connect to a server",
+                                                &MsgTarget::CurrentTab);
+
+                } else {
+                    self.tui.add_client_err_msg("Can't send PRIVMSG to a server.",
+                                                &MsgTarget::CurrentTab);
+                }
             },
 
             MsgSource::Chan { serv_name, chan_name } => {

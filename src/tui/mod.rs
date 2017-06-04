@@ -65,6 +65,10 @@ impl TUI {
         self.ui.new_server_tab(serv_name);
     }
 
+    pub fn close_server_tab(&mut self, serv_name: &str) {
+        self.ui.close_server_tab(serv_name);
+    }
+
     pub fn new_chan_tab(&mut self, serv_name : &str, chan_name : &str) {
         self.ui.new_chan_tab(serv_name, chan_name);
     }

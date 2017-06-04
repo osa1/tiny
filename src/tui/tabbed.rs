@@ -143,6 +143,20 @@ impl Tabbed {
         }
     }
 
+    /// Closes a server tab and all associated channel tabs.
+    pub fn close_server_tab(&mut self, serv_name_: &str) {
+        self.tabs.retain(|tab: &Tab| {
+            match tab.src {
+                MsgSource::Serv { ref serv_name }
+                    | MsgSource::Chan { ref serv_name, .. }
+                    | MsgSource::User { ref serv_name, .. }
+                    => serv_name_ != serv_name,
+            }
+        });
+
+        self.select_tab(0); // FIXME
+    }
+
     /// Returns index of the new tab if a new tab is created.
     pub fn new_chan_tab(&mut self, serv_name : &str, chan_name : &str) -> Option<usize> {
         match self.find_chan_tab_idx(&serv_name, &chan_name) {
