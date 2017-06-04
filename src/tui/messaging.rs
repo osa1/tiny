@@ -156,6 +156,8 @@ impl MessagingUI {
     }
 
     pub fn resize(&mut self, width: i32, height: i32) {
+        self.width = width;
+        self.height = height;
         self.msg_area.resize(width, height - 1);
     }
 
