@@ -379,7 +379,15 @@ impl Tabbed {
     // Moving between tabs, horizontal scroll updates
 
     fn select_tab(&mut self, tab_idx: usize) {
-        self.active_idx = tab_idx;
+        if tab_idx < self.active_idx {
+            while tab_idx < self.active_idx {
+                self.prev_tab();
+            }
+        } else {
+            while tab_idx > self.active_idx {
+                self.next_tab();
+            }
+        }
     }
 
     fn next_tab(&mut self) {
