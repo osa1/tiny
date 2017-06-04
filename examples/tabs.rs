@@ -4,13 +4,12 @@ extern crate ev_loop;
 extern crate libc;
 extern crate term_input;
 extern crate termbox_simple;
-extern crate time;
 extern crate tiny;
 
 use ev_loop::{EvLoop, READ_EV};
 use term_input::{Input, Event};
 use tiny::tui::tabbed::MsgSource;
-use tiny::tui::{TUI, TUIRet, MsgTarget};
+use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 use tiny::tui::tabbed::TabStyle;
 
 fn main() {
@@ -66,7 +65,7 @@ fn main() {
                                 tui.add_privmsg(
                                     "me",
                                     &msg_string,
-                                    &time::now(),
+                                    Timestamp::now(),
                                     &MsgTarget::Chan { serv_name: &serv_name, chan_name: &chan_name });
                             }
 

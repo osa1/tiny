@@ -26,7 +26,7 @@ use ev_loop::{EvLoop, EvLoopCtrl, READ_EV};
 use logger::Logger;
 use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
-use tui::{TUI, TUIRet, MsgTarget};
+use tui::{TUI, TUIRet, MsgTarget, Timestamp};
 use wire::{Cmd, Msg, Pfx, Receiver};
 
 pub struct Tiny {
@@ -89,7 +89,7 @@ impl Tiny {
                 // debug
                 // tiny.tui.add_msg(
                 //     "tick!",
-                //     &time::now(),
+                //     Timestamp::now(),
                 //     &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 // tiny.tui.draw();
             }
@@ -205,7 +205,7 @@ impl Tiny {
                     wire::privmsg(&chan_name, &msg_string, conn).unwrap();
                 }
                 self.tui.add_privmsg(&self.nick, &msg_string,
-                                     &time::now(),
+                                     Timestamp::now(),
                                      &MsgTarget::Chan { serv_name: &serv_name,
                                                         chan_name: &chan_name });
             },
@@ -216,7 +216,7 @@ impl Tiny {
                     wire::privmsg(&nick, &msg_string, conn).unwrap();
                 }
                 self.tui.add_privmsg(&self.nick, &msg_string,
-                                     &time::now(),
+                                     Timestamp::now(),
                                      &MsgTarget::User { serv_name: &serv_name, nick: &nick });
             }
         }
@@ -259,7 +259,7 @@ impl Tiny {
                     ctrl.remove_self();
                     self.tui.add_err_msg(
                         "Disconnected.",
-                        &time::now(),
+                        Timestamp::now(),
                         &MsgTarget::AllServTabs {
                             serv_name: conn.get_serv_name(),
                         });
@@ -278,19 +278,19 @@ impl Tiny {
                 ConnEv::Err(err) => {
                     self.tui.add_err_msg(
                         &format!("{:?}", err),
-                        &time::now(),
+                        Timestamp::now(),
                         &MsgTarget::Server { serv_name: self.conns[conn_idx].get_serv_name() });
                     ctrl.remove_self();
                     self.conns.remove(conn_idx);
                 }
                 ConnEv::Msg(msg) => {
-                    self.handle_msg(conn_idx, msg, time::now());
+                    self.handle_msg(conn_idx, msg, Timestamp::now());
                 }
             }
         }
     }
 
-    fn handle_msg(&mut self, conn_idx: usize, msg: Msg, tm: time::Tm) {
+    fn handle_msg(&mut self, conn_idx: usize, msg: Msg, ts: Timestamp) {
         let conn = &self.conns[conn_idx];
         let pfx = match msg.pfx {
             None => { return; /* TODO: log this */ }
@@ -307,7 +307,7 @@ impl Tiny {
                     Receiver::Chan(chan) => {
                         self.logger.get_chan_logs(&conn.get_serv_name(), &chan).write_line(
                             format_args!("PRIVMSG: {}", contents));
-                        self.tui.add_privmsg(receiver, &contents, &tm, &MsgTarget::Chan {
+                        self.tui.add_privmsg(receiver, &contents, ts, &MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
                             chan_name: &chan,
                         });
@@ -315,7 +315,7 @@ impl Tiny {
                     Receiver::User(_) => {
                         let msg_target = pfx_to_target(&pfx, conn.get_serv_name());
                         // TODO: Set the topic if a new tab is created.
-                        self.tui.add_privmsg(receiver, &contents, &tm, &msg_target);
+                        self.tui.add_privmsg(receiver, &contents, ts, &msg_target);
                     }
                 }
             }
@@ -335,7 +335,7 @@ impl Tiny {
                         } else {
                             self.tui.add_nick(
                                 &nick,
-                                Some(&time::now()),
+                                Some(Timestamp::now()),
                                 &MsgTarget::Chan { serv_name: &serv_name, chan_name: &chan });
                         }
                     }
@@ -354,7 +354,7 @@ impl Tiny {
                             format_args!("PART: {}", nick));
                         self.tui.remove_nick(
                             &nick,
-                            Some(&time::now()),
+                            Some(Timestamp::now()),
                             &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
                     }
                 }
@@ -370,7 +370,7 @@ impl Tiny {
                         let serv_name = self.conns[conn_idx].get_serv_name();
                         self.tui.remove_nick(
                             nick,
-                            Some(&time::now()),
+                            Some(Timestamp::now()),
                             &MsgTarget::AllUserTabs { serv_name: serv_name, nick: nick });
                     }
                 }
@@ -379,7 +379,7 @@ impl Tiny {
             Cmd::NOTICE { nick, msg } => {
                 let conn = &self.conns[conn_idx];
                 if nick == "*" || nick == self.nick {
-                    self.tui.add_msg(&msg, &time::now(), &pfx_to_target(&pfx, conn.get_serv_name()));
+                    self.tui.add_msg(&msg, Timestamp::now(), &pfx_to_target(&pfx, conn.get_serv_name()));
                 } else {
                     self.logger.get_debug_logs().write_line(
                         format_args!("Weird NOTICE target: {}", nick));
@@ -395,7 +395,7 @@ impl Tiny {
                     Pfx::User { nick: ref old_nick, .. } => {
                         let serv_name = unsafe { self.conns.get_unchecked(conn_idx) }.get_serv_name();
                         self.tui.rename_nick(
-                            old_nick, &nick, &time::now(),
+                            old_nick, &nick, Timestamp::now(),
                             &MsgTarget::AllUserTabs { serv_name: serv_name, nick: old_nick, });
                     }
                 }
@@ -412,7 +412,7 @@ impl Tiny {
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[1];
                     self.tui.add_msg(
-                        msg, &time::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                        msg, Timestamp::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 else if n == 4 // RPL_MYINFO
@@ -423,7 +423,7 @@ impl Tiny {
                     let conn = &self.conns[conn_idx];
                     let msg  = params.into_iter().collect::<Vec<String>>().join(" ");
                     self.tui.add_msg(
-                        &msg, &time::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                        &msg, Timestamp::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 else if n == 265
@@ -432,7 +432,7 @@ impl Tiny {
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[params.len() - 1];
                     self.tui.add_msg(
-                        msg, &time::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                        msg, Timestamp::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 // RPL_TOPIC
@@ -443,7 +443,7 @@ impl Tiny {
                     let conn  = &self.conns[conn_idx];
                     let chan  = &params[params.len() - 2];
                     let topic = &params[params.len() - 1];
-                    self.tui.set_topic(topic, &MsgTarget::Chan {
+                    self.tui.show_topic(topic, Timestamp::now(), &MsgTarget::Chan {
                         serv_name: conn.get_serv_name(),
                         chan_name: chan,
                     });
@@ -478,7 +478,7 @@ impl Tiny {
                     // TODO
                     self.tui.add_err_msg(
                         &format!("Nick already in use: {:?}", params[1]),
-                        &time::now(),
+                        Timestamp::now(),
                         &MsgTarget::Server { serv_name: self.conns[conn_idx].get_serv_name() });
                 }
 

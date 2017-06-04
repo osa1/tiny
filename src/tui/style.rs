@@ -1,4 +1,4 @@
-use termbox_simple::*;
+pub use termbox_simple::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Style {
@@ -31,8 +31,8 @@ pub static ERR_MSG : Style =
 
 pub static TOPIC : Style =
     Style {
-        fg: TB_BLACK,
-        bg: TB_GREEN,
+        fg: 14 | TB_BOLD,
+        bg: TB_DEFAULT,
     };
 
 pub static CLEAR : Style =
@@ -92,6 +92,12 @@ pub static MENTION : Style =
 pub static COMPLETION : Style =
     Style {
         fg: 84,
+        bg: TB_DEFAULT,
+    };
+
+pub static TIMESTAMP: Style =
+    Style {
+        fg: 15 | TB_BOLD,
         bg: TB_DEFAULT,
     };
 

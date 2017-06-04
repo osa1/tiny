@@ -3,15 +3,16 @@ use term_input::Key;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::convert::From;
 use std::rc::Rc;
 
 use rand::Rng;
 use rand;
 use time::Tm;
+use time;
 
 use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
-use tui::msg_area::Line;
 use tui::msg_area::MsgArea;
 use tui::style;
 use tui::text_field::TextField;
@@ -20,12 +21,6 @@ use tui::widget::{WidgetRet, Widget};
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.
 pub struct MessagingUI {
-    /// Channel topic, user info etc.
-    topic : Option<Line>,
-
-    /// Whether the draw the topic line
-    draw_topic: bool,
-
     /// Incoming and sent messages appear
     msg_area : MsgArea,
 
@@ -45,23 +40,45 @@ pub struct MessagingUI {
     // Rc to be able to share with dynamic messages.
     nicks : Rc<Trie>,
 
-    last_activity_line : Option<Box<ActivityLine>>,
+    last_activity_line: Option<ActivityLine>,
+    last_activity_ts: Option<Timestamp>,
+}
+
+/// Like `time::Tm`, but we only care about hour and minute parts.
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct Timestamp {
+    hour: i32,
+    min: i32,
+}
+
+impl Timestamp {
+    pub fn now() -> Timestamp {
+        Timestamp::from(time::now())
+    }
+
+    fn stamp(&self, msg_area: &mut MsgArea) {
+        msg_area.set_style(&style::TIMESTAMP);
+        msg_area.add_text(&format!("{:02}:{:02} ", self.hour, self.min));
+    }
+}
+
+impl From<Tm> for Timestamp {
+    fn from(tm: Tm) -> Timestamp {
+        Timestamp { hour: tm.tm_hour, min: tm.tm_min }
+    }
 }
 
 /// An activity line is just a line that we update on joins / leaves /
 /// disconnects. We group activities that happen in the same minute to avoid
 /// redundantly showing lines.
 struct ActivityLine {
-    tm_hour  : i32,
-    tm_min   : i32,
-    line_idx : usize,
+    ts: Timestamp,
+    line_idx: usize,
 }
 
 impl MessagingUI {
     pub fn new(width : i32, height : i32) -> MessagingUI {
         MessagingUI {
-            topic: None,
-            draw_topic: true,
             msg_area: MsgArea::new(width, height - 1),
             input_field: vec![Box::new(TextField::new(width))],
             width: width,
@@ -70,34 +87,12 @@ impl MessagingUI {
             available_colors: (16 .. 232).into_iter().collect(),
             nicks: Rc::new(Trie::new()),
             last_activity_line: None,
+            last_activity_ts: None,
         }
-    }
-
-    pub fn set_topic(&mut self, topic : String) {
-        let mut line = Line::new();
-        line.set_style(&style::TOPIC);
-        line.add_text(&topic);
-        let w = self.width;
-        let h = self.height;
-        self.topic = Some(line);
-        self.resize(w, h);
     }
 
     pub fn draw(&self, tb: &mut Termbox, pos_x: i32, pos_y: i32) {
-        if self.draw_topic && self.topic.is_some() {
-            let topic_line = self.topic.as_ref().unwrap();
-            let topic_line_height = topic_line.rendered_height(self.width);
-            // fill background
-            for x in 0 .. self.width {
-                for y in 0 .. topic_line_height {
-                    tb.change_cell(x, y, ' ', style::TOPIC.bg, style::TOPIC.bg);
-                }
-            }
-            topic_line.draw(tb, pos_x, pos_y, self.width);
-            self.msg_area.draw(tb, pos_x, pos_y + topic_line_height);
-        } else {
-            self.msg_area.draw(tb, pos_x, pos_y);
-        }
+        self.msg_area.draw(tb, pos_x, pos_y);
         self.input_field.draw(tb, pos_x, pos_y + self.height - 1);
     }
 
@@ -151,24 +146,7 @@ impl MessagingUI {
     }
 
     pub fn resize(&mut self, width: i32, height: i32) {
-        self.width = width;
-        self.height = height;
-        self.input_field.resize(width, 1);
-
-        if let Some(ref topic_line) = self.topic {
-            let topic_height = topic_line.rendered_height(width);
-            let msg_area_height = height - topic_height - 1; // -1 for input field
-            if msg_area_height < 10 {
-                // not enough space -- do not draw topic
-                self.draw_topic = false;
-                self.msg_area.resize(width, height - 1);
-            } else {
-                self.draw_topic = true;
-                self.msg_area.resize(width, msg_area_height);
-            }
-        } else {
-            self.msg_area.resize(width, height - 1);
-        }
+        self.msg_area.resize(width, height - 1);
     }
 
     fn toggle_exit_dialogue(&mut self) {
@@ -188,6 +166,28 @@ impl MessagingUI {
 // Adding new messages
 
 impl MessagingUI {
+
+    fn add_timestamp(&mut self, ts: Timestamp) {
+        if let Some(ts_) = self.last_activity_ts {
+            if ts_ != ts {
+                ts.stamp(&mut self.msg_area);
+            }
+        } else {
+            ts.stamp(&mut self.msg_area);
+
+        }
+        self.last_activity_ts = Some(ts);
+    }
+
+    pub fn show_topic(&mut self, topic: &str, ts: Timestamp) {
+        self.add_timestamp(ts);
+
+        self.msg_area.set_style(&style::TOPIC);
+        self.msg_area.add_text(&format!("Channel topic is: \"{}\"", topic));
+
+        self.msg_area.flush_line();
+    }
+
     pub fn add_client_err_msg(&mut self, msg : &str) {
         self.reset_activity_line();
 
@@ -205,7 +205,7 @@ impl MessagingUI {
         self.reset_activity_line();
     }
 
-    pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm) {
+    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp) {
         self.reset_activity_line();
 
         let translated = translate_irc_colors(msg);
@@ -216,8 +216,7 @@ impl MessagingUI {
             }
         };
 
-        self.msg_area.set_style(&style::USER_MSG);
-        self.msg_area.add_text(&format!("[{}] <", tm.strftime("%H:%M").unwrap()));
+        self.add_timestamp(ts);
 
         {
             let nick_color = self.get_nick_color(sender);
@@ -226,8 +225,8 @@ impl MessagingUI {
             self.msg_area.add_text(sender);
         }
 
-        self.msg_area.set_style(&style::USER_MSG);
-        self.msg_area.add_text("> ");
+        self.msg_area.set_style(&style::Style { fg: style::USER_MSG.fg | style::TB_BOLD, bg: style::USER_MSG.bg });
+        self.msg_area.add_text(": ");
 
         // Highlight the message if it mentions us
         // let mentions_us = WordIdxs::new(msg).any(|&(word_left, word_right)|
@@ -245,25 +244,25 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub fn add_msg(&mut self, msg : &str, tm : &Tm) {
+    pub fn add_msg(&mut self, msg: &str, ts: Timestamp) {
         self.reset_activity_line();
 
+        self.add_timestamp(ts);
         self.msg_area.set_style(&style::USER_MSG);
-        self.msg_area.add_text(&format!("[{}] {}", tm.strftime("%H:%M").unwrap(), msg));
+        self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
-    pub fn add_err_msg(&mut self, msg : &str, tm : &Tm) {
+    pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
         self.reset_activity_line();
 
-        self.msg_area.set_style(&style::USER_MSG);
-        self.msg_area.add_text(&format!("[{}] ", tm.strftime("%H:%M").unwrap()));
+        self.add_timestamp(ts);
         self.msg_area.set_style(&style::ERR_MSG);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
-    fn get_nick_color(&mut self, sender : &str) -> u8 {
+    fn get_nick_color(&mut self, sender: &str) -> u8 {
         match self.nick_colors.get(sender) {
             Some(color) => {
                 return *color;
@@ -293,11 +292,11 @@ impl MessagingUI {
 // Keeping nick list up-to-date
 
 impl MessagingUI {
-    pub fn join(&mut self, nick : &str, tm : Option<&Tm>) {
+    pub fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
         Rc::get_mut(&mut self.nicks).unwrap().insert(nick);
 
-        if let Some(tm) = tm {
-            let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
+        if let Some(ts) = ts {
+            let line_idx = self.get_activity_line_idx(ts);
             self.msg_area.modify_line(line_idx, |line| {
                 line.set_style(&style::JOIN);
                 line.add_char('+');
@@ -307,11 +306,11 @@ impl MessagingUI {
         }
     }
 
-    pub fn part(&mut self, nick : &str, tm : Option<&Tm>) {
+    pub fn part(&mut self, nick: &str, ts: Option<Timestamp>) {
         Rc::get_mut(&mut self.nicks).unwrap().remove(nick);
 
-        if let Some(tm) = tm {
-            let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
+        if let Some(ts) = ts {
+            let line_idx = self.get_activity_line_idx(ts);
             self.msg_area.modify_line(line_idx, |line| {
                 line.set_style(&style::LEAVE);
                 line.add_char('-');
@@ -321,7 +320,7 @@ impl MessagingUI {
         }
     }
 
-    pub fn nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm) {
+    pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
         Rc::get_mut(&mut self.nicks).unwrap().remove(old_nick);
         Rc::get_mut(&mut self.nicks).unwrap().insert(new_nick);
         let color = self.nick_colors.remove(old_nick);
@@ -329,7 +328,7 @@ impl MessagingUI {
             self.nick_colors.insert(new_nick.to_owned(), color_);
         }
 
-        let line_idx = self.get_activity_line_idx(tm.tm_hour, tm.tm_min);
+        let line_idx = self.get_activity_line_idx(ts);
         self.msg_area.modify_line(line_idx, |line| {
             line.set_style(&style::NICK);
             line.add_text(old_nick);
@@ -347,33 +346,21 @@ impl MessagingUI {
         self.last_activity_line = None;
     }
 
-    fn get_activity_line_idx(&mut self, hour : i32, min : i32) -> usize {
+    fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
+        // borrow checkers strikes again
         if let Some(ref mut l) = self.last_activity_line {
-            if l.tm_hour == hour && l.tm_min == min {
-                l.line_idx
-            } else {
-                // FIXME: This part is weird. Maybe msg_area should have a
-                // `add_line(Line)` method instead of weird `add_text()`, `set_style()`
-                // etc.
-                self.msg_area.set_style(&style::GRAY);
-                self.msg_area.add_text(&format!("[{:02}:{:02}] ", hour, min));
-                let line_idx = self.msg_area.flush_line();
-                l.tm_hour = hour;
-                l.tm_min = min;
-                l.line_idx = line_idx;
-                line_idx
+            if l.ts == ts {
+                return l.line_idx;
             }
-        } else {
-            self.msg_area.set_style(&style::GRAY);
-            self.msg_area.add_text(&format!("[{:02}:{:02}] ", hour, min));
-            let line_idx = self.msg_area.flush_line();
-            self.last_activity_line = Some(Box::new(ActivityLine {
-                tm_hour: hour,
-                tm_min: min,
-                line_idx: line_idx,
-            }));
-            line_idx
         }
+
+        self.add_timestamp(ts);
+        let line_idx = self.msg_area.flush_line();
+        self.last_activity_line = Some(ActivityLine {
+            ts: ts,
+            line_idx: line_idx,
+        });
+        line_idx
     }
 }
 

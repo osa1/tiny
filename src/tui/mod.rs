@@ -11,9 +11,9 @@ pub mod widget;
 
 use std::fs;
 use std::str;
-use time::Tm;
 
 use self::tabbed::{Tabbed, TabbedRet, TabStyle, MsgSource};
+pub use self::messaging::Timestamp;
 
 use term_input::{Event, Key};
 use termbox_simple::{Termbox, OutputMode};
@@ -186,55 +186,47 @@ pub enum MsgTarget<'a> {
 impl TUI {
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
-    #[inline]
     pub fn add_client_err_msg(&mut self, msg : &str, target : &MsgTarget) {
         self.ui.add_client_err_msg(msg, target);
     }
 
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
-    #[inline]
     pub fn add_client_msg(&mut self, msg : &str, target : &MsgTarget) {
         self.ui.add_client_msg(msg, target);
     }
 
     /// privmsg is a message coming from a server or client. Shown with sender's
     /// nick/name and receive time and logged.
-    #[inline]
-    pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm, target : &MsgTarget) {
-        self.ui.add_privmsg(sender, msg, tm, target);
+    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
+        self.ui.add_privmsg(sender, msg, ts, target);
     }
 
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
-    #[inline]
-    pub fn add_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
-        self.ui.add_msg(msg, tm, target);
+    pub fn add_msg(&mut self, msg: &str, ts: Timestamp, target : &MsgTarget) {
+        self.ui.add_msg(msg, ts, target);
     }
 
     /// Error messages related with the protocol - e.g. can't join a channel,
     /// nickname is in use etc. Timestamped and logged.
-    #[inline]
-    pub fn add_err_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
-        self.ui.add_err_msg(msg, tm, target);
+    pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp, target : &MsgTarget) {
+        self.ui.add_err_msg(msg, ts, target);
     }
 
-    pub fn set_topic(&mut self, msg : &str, target : &MsgTarget) {
-        self.ui.set_topic(msg, target);
+    pub fn show_topic(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
+        self.ui.show_topic(msg, ts, target);
     }
 
-    #[inline]
-    pub fn add_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
-        self.ui.add_nick(nick, tm, target);
+    pub fn add_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
+        self.ui.add_nick(nick, ts, target);
     }
 
-    #[inline]
-    pub fn remove_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
-        self.ui.remove_nick(nick, tm, target);
+    pub fn remove_nick(&mut self, nick : &str, ts: Option<Timestamp>, target: &MsgTarget) {
+        self.ui.remove_nick(nick, ts, target);
     }
 
-    #[inline]
-    pub fn rename_nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm, target : &MsgTarget) {
-        self.ui.rename_nick(old_nick, new_nick, tm, target);
+    pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp, target: &MsgTarget) {
+        self.ui.rename_nick(old_nick, new_nick, ts, target);
     }
 }

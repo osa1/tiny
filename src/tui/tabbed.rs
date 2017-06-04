@@ -1,9 +1,8 @@
 use term_input::Key;
 use termbox_simple::Termbox;
 
-use time::Tm;
-
 use tui::messaging::MessagingUI;
+use tui::messaging::Timestamp;
 use tui::MsgTarget;
 use tui::style;
 use tui::style::Style;
@@ -547,45 +546,45 @@ impl Tabbed {
         });
     }
 
-    pub fn add_privmsg(&mut self, sender : &str, msg : &str, tm : &Tm, target : &MsgTarget) {
+    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.add_privmsg(sender, msg, tm);
+            tab.widget.add_privmsg(sender, msg, ts);
         });
     }
 
-    pub fn add_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
+    pub fn add_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.add_msg(msg, tm);
+            tab.widget.add_msg(msg, ts);
         });
     }
 
-    pub fn add_err_msg(&mut self, msg : &str, tm : &Tm, target : &MsgTarget) {
+    pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.add_err_msg(msg, tm);
+            tab.widget.add_err_msg(msg, ts);
         });
     }
 
-    pub fn set_topic(&mut self, title : &str, target : &MsgTarget) {
+    pub fn show_topic(&mut self, title: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.set_topic(title.to_owned());
+            tab.widget.show_topic(title, ts);
         });
     }
 
-    pub fn add_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
+    pub fn add_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.join(nick, tm);
+            tab.widget.join(nick, ts);
         });
     }
 
-    pub fn remove_nick(&mut self, nick : &str, tm : Option<&Tm>, target : &MsgTarget) {
+    pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.part(nick, tm);
+            tab.widget.part(nick, ts);
         });
     }
 
-    pub fn rename_nick(&mut self, old_nick : &str, new_nick : &str, tm : &Tm, target : &MsgTarget) {
+    pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.nick(old_nick, new_nick, tm);
+            tab.widget.nick(old_nick, new_nick, ts);
         });
     }
 
