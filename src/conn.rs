@@ -166,8 +166,6 @@ impl Conn {
                 evs.push(ConnEv::Err(err));
             }
             Ok(bytes_read) => {
-                logger.get_debug_logs().write_line(
-                    format_args!("{} read {:?} bytes", self.serv_name, bytes_read));
                 self.reset_ticks();
                 self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
                 self.handle_msgs(evs, logger);
