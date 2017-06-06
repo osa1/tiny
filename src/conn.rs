@@ -240,7 +240,9 @@ macro_rules! try_opt {
 fn parse_servername(params: &[String]) -> Option<String> {
     let msg = try_opt!(params.get(1).or(params.get(0)));
     let slice1 = &msg[13..];
-    let servername_ends = try_opt!(wire::find_byte(slice1.as_bytes(), b'['));
+    let servername_ends =
+        try_opt!(wire::find_byte(slice1.as_bytes(), b'[')
+                 .or(wire::find_byte(slice1.as_bytes(), b',')));
     Some((&slice1[..servername_ends]).to_owned())
 }
 
@@ -280,8 +282,9 @@ mod tests {
 
     #[test]
     fn test_parse_servername_2() {
-        let args = vec!["Your host is adams.freenode.net[94.125.182.252/8001], \
-                         running version ircd-seven-1.1.4".to_owned()];
-        assert_eq!(parse_servername(&args), Some("adams.freenode.net".to_owned()));
+        let args =
+            vec!["tiny_test".to_owned(),
+                 "Your host is belew.mozilla.org, running version InspIRCd-2.0".to_owned()];
+        assert_eq!(parse_servername(&args), Some("belew.mozilla.org".to_owned()));
     }
 }
