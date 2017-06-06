@@ -387,14 +387,9 @@ impl Tiny {
                 }
             }
 
-            Cmd::NOTICE { nick, msg } => {
+            Cmd::NOTICE { msg, .. } => {
                 let conn = &self.conns[conn_idx];
-                if nick == "*" || nick == self.nick {
-                    self.tui.add_msg(&msg, Timestamp::now(), &pfx_to_target(&pfx, conn.get_serv_name()));
-                } else {
-                    self.logger.get_debug_logs().write_line(
-                        format_args!("Weird NOTICE target: {}", nick));
-                }
+                self.tui.add_msg(&msg, Timestamp::now(), &pfx_to_target(&pfx, conn.get_serv_name()));
             }
 
             Cmd::NICK { nick } => {
