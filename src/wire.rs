@@ -7,7 +7,7 @@ use std;
 use logger::LogFile;
 
 pub fn user<W : Write>(hostname: &str, realname: &str, mut sink: W) -> std::io::Result<()> {
-    write!(sink, "USER {} 0 * :{}\r\n", hostname, realname)
+    write!(sink, "USER {} 8 * :{}\r\n", hostname, realname)
 }
 
 pub fn nick<W : Write>(arg: &str, mut sink: W) -> std::io::Result<()> {
