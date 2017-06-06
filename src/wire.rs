@@ -345,7 +345,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":nick!~nick@unaffiliated/nick PRIVMSG tiny :a b c\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, &None),
+            Msg::read(&mut buf, None),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "nick".to_owned(),
@@ -364,7 +364,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":barjavel.freenode.net NOTICE * :*** Looking up your hostname...\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, &None),
+            Msg::read(&mut buf, None),
             Some(Msg {
                 pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
                 cmd: Cmd::NOTICE {
@@ -394,7 +394,7 @@ mod tests {
                CASEMAPPING=rfc1459 :are supported by this server\r\n").unwrap();
 
         let mut msgs = vec![];
-        while let Some(msg) = Msg::read(&mut buf, &None) {
+        while let Some(msg) = Msg::read(&mut buf, None) {
             msgs.push(msg);
         }
 
@@ -406,7 +406,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@123.123.123.123 PART #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, &None),
+            Msg::read(&mut buf, None),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
@@ -424,7 +424,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@192.168.0.1 JOIN #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, &None),
+            Msg::read(&mut buf, None),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),

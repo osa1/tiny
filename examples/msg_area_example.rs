@@ -7,7 +7,7 @@ extern crate tiny;
 
 use ev_loop::{EvLoop, READ_EV};
 use term_input::{Input, Event};
-use tiny::tui::{TUI, TUIRet, MsgTarget};
+use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
     let mut tui = TUI::new();
@@ -25,7 +25,7 @@ fn main() {
                 match tui.handle_input_event(ev) {
                     TUIRet::Input { msg, .. } => {
                         tui.add_msg(&msg.into_iter().collect::<String>(),
-                                    &time::now(),
+                                    Timestamp::now(),
                                     &MsgTarget::Server { serv_name: "debug" });
                     },
                     TUIRet::Abort => {

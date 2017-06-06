@@ -10,15 +10,17 @@ use term_input::{Input, Event};
 
 use std::fs::File;
 use std::io::Read;
-use std::io::Write;
 
-use tiny::tui::{TUI, TUIRet, MsgTarget};
+use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
     let mut tui = TUI::new();
     tui.new_server_tab("debug");
+    let debug_tab = MsgTarget::Server { serv_name: "debug" };
 
-    writeln!(tui, "Loading word list for auto-completion ...").unwrap();
+    tui.add_msg("Loading word list for auto-completion ...",
+                Timestamp::now(),
+                &debug_tab);
     tui.draw();
 
     {
@@ -26,11 +28,11 @@ fn main() {
         let mut file = File::open("/usr/share/dict/american").unwrap();
         file.read_to_string(&mut contents).unwrap();
         for word in contents.lines() {
-            tui.add_nick(word, None, &MsgTarget::Server { serv_name: "debug" });
+            tui.add_nick(word, None, &debug_tab);
         }
     }
 
-    writeln!(tui, "Done.").unwrap();
+    tui.add_msg("Done.", Timestamp::now(), &debug_tab);
     tui.draw();
 
     let mut ev_loop: EvLoop<TUI> = EvLoop::new();
@@ -44,8 +46,8 @@ fn main() {
             match tui.handle_input_event(ev) {
                 TUIRet::Input { msg, .. } => {
                     tui.add_msg(&msg.into_iter().collect::<String>(),
-                    &time::now(),
-                    &MsgTarget::Server { serv_name: "debug" });
+                    Timestamp::now(),
+                    &debug_tab);
                 },
                 TUIRet::Abort => {
                     ctrl.stop();
