@@ -42,6 +42,8 @@ pub struct Conn {
 const PING_TICKS: u8 = 60;
 /// How many ticks to wait after sending a ping to the server to consider a disconnect.
 const PONG_TICKS: u8 = 60;
+/// How many ticks to wait after a disconnect or a socket error.
+pub const RECONNECT_TICKS: u8 = 30;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum ConnStatus {
@@ -58,11 +60,16 @@ enum ConnStatus {
         /// After a message move to `PingPong` state. On timeout we reset the connection.
         ticks_passed: u8,
     },
+    Disconnected {
+        ticks_passed: u8,
+    },
 }
 
 #[derive(Debug)]
 pub enum ConnEv {
     Disconnected,
+    /// Hack to return the main loop that the Conn wants reconnect()
+    WantReconnect,
     Err(io::Error),
     Msg(Msg),
 }
@@ -93,7 +100,10 @@ impl Conn {
         }
     }
 
-    pub fn reconnect(&mut self) {
+    pub fn reconnect(&mut self, new_serv_addr: Option<&str>) {
+        if let Some(new_serv_addr) = new_serv_addr {
+            self.serv_addr = new_serv_addr.to_owned();
+        }
         self.stream = init_stream(&self.serv_addr);
         self.status = ConnStatus::Introduce;
     }
@@ -106,7 +116,6 @@ impl Conn {
     pub fn get_serv_name(&self) -> &str {
         &self.serv_name
     }
-
 }
 
 impl Conn {
@@ -138,12 +147,26 @@ impl Conn {
             ConnStatus::WaitPong { ticks_passed } => {
                 if ticks_passed + 1 == PONG_TICKS {
                     evs.push(ConnEv::Disconnected);
-                    self.status = ConnStatus::Introduce;
+                    self.status = ConnStatus::Disconnected { ticks_passed: 0 };
                 } else {
                     self.status = ConnStatus::WaitPong { ticks_passed: ticks_passed + 1 };
                 }
             }
+            ConnStatus::Disconnected { ticks_passed } => {
+                if ticks_passed + 1 == RECONNECT_TICKS {
+                    // *sigh* it's slightly annoying that we can't reconnect here, we need to
+                    // update the event loop
+                    evs.push(ConnEv::WantReconnect);
+                    self.status = ConnStatus::Introduce;
+                } else {
+                    self.status = ConnStatus::Disconnected { ticks_passed: ticks_passed + 1 };
+                }
+            }
         }
+    }
+
+    pub fn enter_disconnect_state(&mut self) {
+        self.status = ConnStatus::Disconnected { ticks_passed: 0 };
     }
 
     fn reset_ticks(&mut self) {

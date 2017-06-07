@@ -22,7 +22,7 @@ use std::os::unix::io::{RawFd};
 use std::path::PathBuf;
 
 use conn::{Conn, ConnEv};
-use ev_loop::{EvLoop, EvLoopCtrl, READ_EV};
+use ev_loop::{EvLoop, EvLoopCtrl, READ_EV, FdEv};
 use logger::Logger;
 use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
@@ -85,7 +85,7 @@ impl Tiny {
                     let conn = &mut tiny.conns[conn_idx];
                     conn.tick(&mut evs, tiny.logger.get_debug_logs());
                 }
-                tiny.handle_socket_evs(conn_idx, evs, ctrl);
+                tiny.handle_conn_evs(conn_idx, evs, ctrl);
                 // debug
                 // tiny.tui.add_msg(
                 //     "tick!",
@@ -129,8 +129,13 @@ impl Tiny {
 
     fn handle_command(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: String) {
         let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
-        if words[0] == "connect" {
+        if words[0] == "connect" && words.len() == 2 {
             self.connect(ctrl, words[1]);
+        } else if words[0] == "connect" && words.len() == 1 {
+            if !self.reconnect(ctrl, src.serv_name()) {
+                self.logger.get_debug_logs().write_line(
+                    format_args!("Can't reconnect to {}", src.serv_name()));
+            }
         } else if words[0] == "join" {
             self.join(src, words[1]);
         } else if words[0] == "quit" {
@@ -140,6 +145,25 @@ impl Tiny {
                 &format!("Unsupported command: {}", words[0]), &MsgTarget::CurrentTab);
         }
     }
+}
+
+fn mk_sock_ev_handler(fd: RawFd) -> Box<FnMut(FdEv, &mut EvLoopCtrl<Tiny>, &mut Tiny)> {
+    Box::new(move |_, ctrl, tiny| {
+        match tiny.find_fd_conn(fd) {
+            None => {
+                tiny.logger.get_debug_logs().write_line(
+                    format_args!("BUG: Can't find fd in conns: {:?}", fd));
+                ctrl.remove_fd(fd);
+            }
+            Some(conn_idx) => {
+                tiny.handle_socket(conn_idx, ctrl);
+                tiny.tui.draw();
+            }
+        }
+    })
+}
+
+impl Tiny {
 
     fn connect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_addr: &str) {
         match utils::drop_port(serv_addr) {
@@ -147,6 +171,24 @@ impl Tiny {
                 self.tui.add_client_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
             }
             Some(serv_name) => {
+                let mut reconnect = false; // borrowchk workaround
+                // see if we already have a Conn for this server
+                if let Some(conn) = self.find_conn(serv_name) {
+                    ctrl.remove_fd(conn.get_raw_fd());
+                    conn.reconnect(Some(serv_addr));
+                    let fd = conn.get_raw_fd();
+                    ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
+                    reconnect = true;
+                }
+
+                if reconnect {
+                    self.tui.add_client_msg(
+                        "Connecting...",
+                        &MsgTarget::AllServTabs { serv_name: serv_name });
+                    return;
+                }
+
+                // otherwise create a new Conn, tab etc.
                 self.tui.new_server_tab(serv_name);
                 // close the hacky "" tab if it exists
                 self.tui.close_server_tab("");
@@ -159,20 +201,24 @@ impl Tiny {
                     &[]);
                 let fd = conn.get_raw_fd();
                 self.conns.push(conn);
-                ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
-                    match tiny.find_fd_conn(fd) {
-                        None => {
-                            tiny.logger.get_debug_logs().write_line(
-                                format_args!("BUG: Can't find fd in conns: {:?}", fd));
-                            ctrl.remove_self();
-                        }
-                        Some(conn_idx) => {
-                            tiny.handle_socket(conn_idx, ctrl);
-                            tiny.tui.draw();
-                        }
-                    }
-                }));
+                ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
             }
+        }
+    }
+
+    fn reconnect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_name: &str) -> bool {
+        self.tui.add_client_msg(
+            "Reconnecting...",
+            &MsgTarget::AllServTabs { serv_name: serv_name });
+        match self.find_conn(serv_name) {
+            Some(conn) => {
+                ctrl.remove_fd(conn.get_raw_fd());
+                conn.reconnect(None);
+                let fd = conn.get_raw_fd();
+                ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
+                true
+            }
+            None => false
         }
     }
 
@@ -232,7 +278,7 @@ impl Tiny {
         }
     }
 
-    fn find_conn(&mut self, serv_name : &str) -> Option<&mut Conn> {
+    fn find_conn(&mut self, serv_name: &str) -> Option<&mut Conn> {
         for conn in self.conns.iter_mut() {
             if conn.get_serv_name() == serv_name {
                 return Some(conn);
@@ -258,40 +304,42 @@ impl Tiny {
             let mut conn = &mut self.conns[conn_idx];
             conn.read_incoming_msg(&mut evs, &mut self.logger)
         }
-        self.handle_socket_evs(conn_idx, evs, ctrl);
+        self.handle_conn_evs(conn_idx, evs, ctrl);
     }
 
-    fn handle_socket_evs(&mut self, conn_idx: usize, evs: Vec<ConnEv>, ctrl: &mut EvLoopCtrl<Tiny>) {
+    fn handle_conn_evs(&mut self, conn_idx: usize, evs: Vec<ConnEv>, ctrl: &mut EvLoopCtrl<Tiny>) {
         for ev in evs.into_iter() {
             match ev {
                 ConnEv::Disconnected => {
-                    let mut conn = &mut self.conns[conn_idx];
-                    ctrl.remove_self();
+                    let conn = &mut self.conns[conn_idx];
                     self.tui.add_err_msg(
-                        "Disconnected.",
+                        &format!("Disconnected. Will try to reconnect in {} seconds.",
+                                 conn::RECONNECT_TICKS),
                         Timestamp::now(),
-                        &MsgTarget::AllServTabs {
-                            serv_name: conn.get_serv_name(),
-                        });
-                    ctrl.remove_self(); // remove old fd
-                    self.tui.add_client_msg("Connecting...",
-                                            &MsgTarget::Server { serv_name: conn.get_serv_name() });
-                    conn.reconnect();
+                        &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+                    ctrl.remove_fd(conn.get_raw_fd());
+
+                }
+                ConnEv::WantReconnect => {
+                    let mut conn = &mut self.conns[conn_idx];
+                    self.tui.add_client_msg(
+                        "Connecting...",
+                        &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+                    ctrl.remove_fd(conn.get_raw_fd());
+                    conn.reconnect(None);
                     let fd = conn.get_raw_fd();
-                    // FIXME: Duplicated code
-                    ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
-                        let conn_idx = tiny.find_fd_conn(fd).unwrap();
-                        tiny.handle_socket(conn_idx, ctrl);
-                        tiny.tui.draw();
-                    }));
+                    ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
                 }
                 ConnEv::Err(err) => {
+                    // TODO: Some of these errors should not cause a disconnect,
+                    // e.g. EAGAIN, EWOULDBLOCK ...
+                    let mut conn = &mut self.conns[conn_idx];
+                    conn.enter_disconnect_state();
                     self.tui.add_err_msg(
                         &format!("{:?}", err),
                         Timestamp::now(),
-                        &MsgTarget::Server { serv_name: self.conns[conn_idx].get_serv_name() });
-                    ctrl.remove_self();
-                    self.conns.remove(conn_idx);
+                        &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+                    ctrl.remove_fd(conn.get_raw_fd());
                 }
                 ConnEv::Msg(msg) => {
                     self.handle_msg(conn_idx, msg, Timestamp::now());
