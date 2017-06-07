@@ -27,7 +27,7 @@ use logger::Logger;
 use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
 use tui::{TUI, TUIRet, MsgTarget, Timestamp};
-use wire::{Cmd, Msg, Pfx, Receiver};
+use wire::{Cmd, Msg, Pfx};
 
 pub struct Tiny {
     /// A connection to a server is maintained by 'Conn'.
@@ -309,24 +309,24 @@ impl Tiny {
         };
         match msg.cmd {
 
-            Cmd::PRIVMSG { receivers, contents } => {
-                let receiver = match pfx {
+            Cmd::PRIVMSG { target, msg } | Cmd::NOTICE { target, msg } => {
+                let origin = match pfx {
                     Pfx::Server(_) => conn.get_serv_name(),
                     Pfx::User { ref nick, .. } => nick,
                 };
-                match receivers {
-                    Receiver::Chan(chan) => {
+                match target {
+                    wire::MsgTarget::Chan(chan) => {
                         self.logger.get_chan_logs(&conn.get_serv_name(), &chan).write_line(
-                            format_args!("PRIVMSG: {}", contents));
-                        self.tui.add_privmsg(receiver, &contents, ts, &MsgTarget::Chan {
+                            format_args!("PRIVMSG: {}", msg));
+                        self.tui.add_privmsg(origin, &msg, ts, &MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
                             chan_name: &chan,
                         });
                     }
-                    Receiver::User(_) => {
+                    wire::MsgTarget::User(_) => {
                         let msg_target = pfx_to_target(&pfx, conn.get_serv_name());
                         // TODO: Set the topic if a new tab is created.
-                        self.tui.add_privmsg(receiver, &contents, ts, &msg_target);
+                        self.tui.add_privmsg(origin, &msg, ts, &msg_target);
                     }
                 }
             }
@@ -387,11 +387,6 @@ impl Tiny {
                 }
             }
 
-            Cmd::NOTICE { msg, .. } => {
-                let conn = &self.conns[conn_idx];
-                self.tui.add_msg(&msg, Timestamp::now(), &pfx_to_target(&pfx, conn.get_serv_name()));
-            }
-
             Cmd::NICK { nick } => {
                 match pfx {
                     Pfx::Server(_) => {
@@ -406,6 +401,8 @@ impl Tiny {
                     }
                 }
             }
+
+            Cmd::PING { .. } => {}, // ignore
 
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */

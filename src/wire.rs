@@ -54,9 +54,8 @@ pub enum Pfx {
     },
 }
 
-/// A PRIVMSG receiver.
 #[derive(Debug, PartialEq, Eq)]
-pub enum Receiver {
+pub enum MsgTarget {
     Chan(String),
     User(String)
 }
@@ -70,10 +69,15 @@ pub struct Msg {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd {
     PRIVMSG {
-        // TODO: In theory this should be a list of receivers, but in practice I've never
+        // TODO: In theory this should be a list of targets, but in practice I've never
         // encountered that case.
-        receivers: Receiver,
-        contents: String
+        target: MsgTarget,
+        msg: String
+    },
+
+    NOTICE {
+        target: MsgTarget,
+        msg: String,
     },
 
     JOIN {
@@ -91,11 +95,6 @@ pub enum Cmd {
 
     QUIT {
         msg: Option<String>,
-    },
-
-    NOTICE {
-        nick: String,
-        msg: String,
     },
 
     NICK {
@@ -189,23 +188,37 @@ impl Msg {
                     MsgType::Cmd("PRIVMSG") if params.len() == 2 => {
                         let target = params[0];
                         let msg = params[1];
-                        let receiver =
+                        let target =
                             if target.chars().nth(0) == Some('#') {
-                                Receiver::Chan(target.to_owned())
+                                MsgTarget::Chan(target.to_owned())
                             } else {
-                                Receiver::User(target.to_owned())
+                                MsgTarget::User(target.to_owned())
                             };
                         Cmd::PRIVMSG {
-                            receivers: receiver,
-                            contents: msg.to_owned(),
+                            target: target,
+                            msg: msg.to_owned(),
                         }
-                    },
+                    }
+                    MsgType::Cmd("NOTICE") if params.len() == 2 => {
+                        let target = params[0];
+                        let msg = params[1];
+                        let target =
+                            if target.chars().nth(0) == Some('#') {
+                                MsgTarget::Chan(target.to_owned())
+                            } else {
+                                MsgTarget::User(target.to_owned())
+                            };
+                        Cmd::NOTICE {
+                            target: target,
+                            msg: msg.to_owned(),
+                        }
+                    }
                     MsgType::Cmd("JOIN") if params.len() == 1 => {
                         let chan = params[0];
                         Cmd::JOIN {
                             chan: chan.to_owned(),
                         }
-                    },
+                    }
                     MsgType::Cmd("PART") if params.len() == 1 || params.len() == 2 => {
                         let mb_msg = if params.len() == 2 { Some(params[1].to_owned()) } else { None };
                         Cmd::PART {
@@ -217,14 +230,6 @@ impl Msg {
                         let mb_msg = if params.len() == 1 { Some(params[0].to_owned()) } else { None };
                         Cmd::QUIT {
                             msg: mb_msg,
-                        }
-                    }
-                    MsgType::Cmd("NOTICE") if params.len() == 2 => {
-                        let nick = params[0];
-                        let msg = params[1];
-                        Cmd::NOTICE {
-                            nick: nick.to_owned(),
-                            msg: msg.to_owned(),
                         }
                     }
                     MsgType::Cmd("NICK") if params.len() == 1 => {
@@ -352,8 +357,8 @@ mod tests {
                     user: "~nick@unaffiliated/nick".to_owned(),
                 }),
                 cmd: Cmd::PRIVMSG {
-                    receivers: Receiver::User("tiny".to_owned()),
-                    contents: "a b c".to_owned()
+                    target: MsgTarget::User("tiny".to_owned()),
+                    msg: "a b c".to_owned()
                 }
             }));
         assert_eq!(buf.len(), 0);
@@ -368,7 +373,7 @@ mod tests {
             Some(Msg {
                 pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
                 cmd: Cmd::NOTICE {
-                    nick: "*".to_owned(),
+                    target: MsgTarget::User("*".to_owned()),
                     msg: "*** Looking up your hostname...".to_owned()
                 }
             }));
