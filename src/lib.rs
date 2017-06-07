@@ -148,16 +148,15 @@ impl Tiny {
             }
             Some(serv_name) => {
                 self.tui.new_server_tab(serv_name);
-
                 // close the hacky "" tab if it exists
                 self.tui.close_server_tab("");
-
-                self.logger.get_debug_logs().write_line(
-                    format_args!("Created tab: {}", serv_name));
                 self.tui.add_client_msg("Connecting...",
                                         &MsgTarget::Server { serv_name: serv_name });
 
-                let conn = Conn::new(serv_addr, serv_name, &self.nick, &self.hostname, &self.realname);
+                let conn = Conn::new(
+                    serv_addr, serv_name,
+                    &self.nick, &self.hostname, &self.realname,
+                    &[]);
                 let fd = conn.get_raw_fd();
                 self.conns.push(conn);
                 ctrl.add_fd(fd, READ_EV, Box::new(move |_, ctrl, tiny| {
@@ -460,7 +459,6 @@ impl Tiny {
                         serv_name: conn.get_serv_name(),
                         chan_name: chan,
                     };
-
 
                     for nick in params[3].split_whitespace() {
                         // Apparently some nicks have a '@' prefix (indicating ops)

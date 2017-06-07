@@ -1,5 +1,6 @@
 use net2::TcpBuilder;
 use net2::TcpStreamExt;
+use std::collections::HashSet;
 use std::fmt::Arguments;
 use std::io::Read;
 use std::io::Write;
@@ -17,6 +18,9 @@ pub struct Conn {
     nick: String,
     hostname: String,
     realname: String,
+
+    /// Channels to auto-join
+    chans: HashSet<String>,
 
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
     host: Option<String>,
@@ -72,11 +76,14 @@ fn init_stream(serv_addr: &str) -> TcpStream {
 }
 
 impl Conn {
-    pub fn new(serv_addr: &str, serv_name: &str, nick: &str, hostname: &str, realname: &str) -> Conn {
+    pub fn new(serv_addr: &str, serv_name: &str,
+               nick: &str, hostname: &str, realname: &str,
+               chans: &[String]) -> Conn {
         Conn {
             nick: nick.to_owned(),
             hostname: hostname.to_owned(),
             realname: realname.to_owned(),
+            chans: chans.iter().cloned().collect(),
             host: None,
             serv_addr: serv_addr.to_owned(),
             stream: init_stream(serv_addr),
@@ -218,6 +225,22 @@ impl Conn {
                         format_args!("{} host: {}", self.serv_name, host));
                     self.host = Some(host);
                 }
+            }
+        }
+
+        if let &Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = &msg {
+            // RPL_ENDOFMOTD. Join auto-join channels.
+            for chan in &self.chans {
+                wire::join(chan, &mut self.stream).unwrap();
+            }
+        }
+
+        if let &Msg { cmd: Cmd::Reply { num: 332, ref params }, .. } = &msg {
+            if params.len() == 2 || params.len() == 3 {
+                // RPL_TOPIC. We've successfully joined a channel, add the channel to self.chans to
+                // be able to auto-join next time we connect
+                let chan = &params[params.len() - 2];
+                self.chans.insert(chan.to_owned());
             }
         }
 
