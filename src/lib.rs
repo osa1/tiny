@@ -470,8 +470,6 @@ impl Tiny {
                         } else {
                             nick
                         };
-                        self.logger.get_debug_logs().write_line(
-                            format_args!("adding nick {} to {:?}", nick, chan_target));
                         self.tui.add_nick(nick, None, &chan_target);
                     }
                 }
