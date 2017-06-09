@@ -26,6 +26,10 @@ pub fn join<W: Write>(channel: &str, mut sink: W) -> std::io::Result<()> {
     write!(sink, "JOIN {}\r\n", channel)
 }
 
+pub fn part<W: Write>(mut sink: W, channel: &str) -> std::io::Result<()> {
+    write!(sink, "PART {}\r\n", channel)
+}
+
 pub fn privmsg<W: Write>(msgtarget: &str, msg: &str, mut sink: W) -> std::io::Result<()> {
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }

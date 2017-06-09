@@ -1,4 +1,5 @@
 #![feature(alloc_system)]
+#![feature(offset_to)]
 #![feature(test)]
 
 extern crate alloc_system;
@@ -114,7 +115,7 @@ impl Tiny {
                     if msg[0] == '/' {
                         self.handle_command(ctrl, from, (&msg[ 1 .. ]).into_iter().cloned().collect());
                     } else {
-                        self.send_msg(from, msg);
+                        self.send_msg(from, &msg.into_iter().collect::<String>());
                     }
                 }
                 TUIRet::KeyHandled => {}
@@ -129,18 +130,69 @@ impl Tiny {
 
     fn handle_command(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: String) {
         let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
+
         if words[0] == "connect" && words.len() == 2 {
             self.connect(ctrl, words[1]);
-        } else if words[0] == "connect" && words.len() == 1 {
+        }
+
+        else if words[0] == "connect" && words.len() == 1 {
             if !self.reconnect(ctrl, src.serv_name()) {
                 self.logger.get_debug_logs().write_line(
                     format_args!("Can't reconnect to {}", src.serv_name()));
             }
-        } else if words[0] == "join" {
+        }
+
+        else if words[0] == "join" {
             self.join(src, words[1]);
-        } else if words[0] == "quit" {
+        }
+
+        else if words[0] == "quit" {
             ctrl.stop();
-        } else {
+        }
+
+        else if words[0] == "msg" {
+            // need to find index of the third word
+            let mut word_indices = utils::split_whitespace_indices(&msg);
+            word_indices.next(); // "/msg"
+            word_indices.next(); // target
+            if let Some(msg_begins) = word_indices.next() {
+                let msg = &msg[msg_begins ..];
+                let serv = src.serv_name();
+                self.tui.new_user_tab(serv, words[1]);
+                self.send_msg(
+                    MsgSource::User {
+                        serv_name: serv.to_owned(),
+                        nick: words[1].to_owned()
+                    }, msg);
+            } else {
+                self.tui.add_client_err_msg(
+                    "/msg usage: /msg target message",
+                    &MsgTarget::CurrentTab);
+            }
+        }
+
+        else if words[0] == "close" {
+            match src {
+                MsgSource::Serv { serv_name } => {
+                    self.tui.close_server_tab(&serv_name);
+                    self.disconnect(ctrl, &serv_name);
+                }
+                MsgSource::Chan { serv_name, chan_name } => {
+                    self.tui.close_chan_tab(&serv_name, &chan_name);
+                    self.part(&serv_name, &chan_name);
+                }
+                MsgSource::User { serv_name, nick } => {
+                    self.tui.close_user_tab(&serv_name, &nick);
+                }
+            }
+
+            // create the hacky "" tab if we closed the last tab
+            if self.tui.count_tabs() == 0 {
+                self.tui.new_server_tab(""); // FIXME hack, close this after /connect
+            }
+        }
+
+        else {
             self.tui.add_client_err_msg(
                 &format!("Unsupported command: {}", words[0]), &MsgTarget::CurrentTab);
         }
@@ -166,7 +218,12 @@ fn mk_sock_ev_handler(fd: RawFd) -> Box<FnMut(FdEv, &mut EvLoopCtrl<Tiny>, &mut 
 impl Tiny {
 
     fn connect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_addr: &str) {
-        match utils::drop_port(serv_addr) {
+
+        fn drop_port(s: &str) -> Option<&str> {
+            s.find(':').map(|split| &s[ 0 .. split ])
+        }
+
+        match drop_port(serv_addr) {
             None => {
                 self.tui.add_client_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
             }
@@ -206,6 +263,13 @@ impl Tiny {
         }
     }
 
+    fn disconnect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_name: &str) {
+        let conn_idx = self.find_conn_idx(serv_name).unwrap();
+        let conn = self.conns.remove(conn_idx);
+        ctrl.remove_fd(conn.get_raw_fd());
+        // just drop the conn
+    }
+
     fn reconnect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_name: &str) -> bool {
         self.tui.add_client_msg(
             "Reconnecting...",
@@ -239,9 +303,12 @@ impl Tiny {
             &MsgTarget::CurrentTab);
     }
 
-    fn send_msg(&mut self, from: MsgSource, msg: Vec<char>) {
-        let msg_string = msg.iter().cloned().collect::<String>();
+    fn part(&mut self, serv_name: &str, chan_name: &str) {
+        let conn = self.find_conn(serv_name).unwrap();
+        wire::part(conn, chan_name).unwrap();
+    }
 
+    fn send_msg(&mut self, from: MsgSource, msg: &str) {
         match from {
             MsgSource::Serv { ref serv_name } => {
                 if serv_name == "" {
@@ -258,9 +325,9 @@ impl Tiny {
             MsgSource::Chan { serv_name, chan_name } => {
                 {
                     let conn = self.find_conn(&serv_name).unwrap();
-                    wire::privmsg(&chan_name, &msg_string, conn).unwrap();
+                    wire::privmsg(&chan_name, msg, conn).unwrap();
                 }
-                self.tui.add_privmsg(&self.nick, &msg_string,
+                self.tui.add_privmsg(&self.nick, msg,
                                      Timestamp::now(),
                                      &MsgTarget::Chan { serv_name: &serv_name,
                                                         chan_name: &chan_name });
@@ -269,9 +336,9 @@ impl Tiny {
             MsgSource::User { serv_name, nick } => {
                 {
                     let conn = self.find_conn(&serv_name).unwrap();
-                    wire::privmsg(&nick, &msg_string, conn).unwrap();
+                    wire::privmsg(&nick, msg, conn).unwrap();
                 }
-                self.tui.add_privmsg(&self.nick, &msg_string,
+                self.tui.add_privmsg(&self.nick, msg,
                                      Timestamp::now(),
                                      &MsgTarget::User { serv_name: &serv_name, nick: &nick });
             }
@@ -279,9 +346,16 @@ impl Tiny {
     }
 
     fn find_conn(&mut self, serv_name: &str) -> Option<&mut Conn> {
-        for conn in self.conns.iter_mut() {
+        match self.find_conn_idx(serv_name) {
+            None => None,
+            Some(idx) => Some(unsafe { self.conns.get_unchecked_mut(idx) } ),
+        }
+    }
+
+    fn find_conn_idx(&mut self, serv_name: &str) -> Option<usize> {
+        for (conn_idx, conn) in self.conns.iter().enumerate() {
             if conn.get_serv_name() == serv_name {
-                return Some(conn);
+                return Some(conn_idx);
             }
         }
         None
@@ -407,13 +481,15 @@ impl Tiny {
                             format_args!("Weird PART message pfx {:?}", pfx));
                     },
                     Pfx::User { nick, .. } => {
-                        let serv_name = self.conns[conn_idx].get_serv_name();
-                        self.logger.get_chan_logs(serv_name, &chan).write_line(
-                            format_args!("PART: {}", nick));
-                        self.tui.remove_nick(
-                            &nick,
-                            Some(Timestamp::now()),
-                            &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
+                        if nick != self.nick {
+                            let serv_name = self.conns[conn_idx].get_serv_name();
+                            self.logger.get_chan_logs(serv_name, &chan).write_line(
+                                format_args!("PART: {}", nick));
+                            self.tui.remove_nick(
+                                &nick,
+                                Some(Timestamp::now()),
+                                &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
+                        }
                     }
                 }
             }

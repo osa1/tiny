@@ -61,7 +61,11 @@ impl TUI {
 // Tab stuff
 
 impl TUI {
-    pub fn new_server_tab(&mut self, serv_name : &str) {
+    pub fn count_tabs(&self) -> usize {
+        self.ui.count_tabs()
+    }
+
+    pub fn new_server_tab(&mut self, serv_name: &str) {
         self.ui.new_server_tab(serv_name);
     }
 
@@ -69,12 +73,20 @@ impl TUI {
         self.ui.close_server_tab(serv_name);
     }
 
-    pub fn new_chan_tab(&mut self, serv_name : &str, chan_name : &str) {
+    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str) {
         self.ui.new_chan_tab(serv_name, chan_name);
     }
 
-    pub fn new_user_tab(&mut self, serv_name : &str, nick : &str) {
+    pub fn close_chan_tab(&mut self, serv_name: &str, chan_name: &str) {
+        self.ui.close_chan_tab(serv_name, chan_name);
+    }
+
+    pub fn new_user_tab(&mut self, serv_name: &str, nick: &str) {
         self.ui.new_user_tab(serv_name, nick);
+    }
+
+    pub fn close_user_tab(&mut self, serv_name: &str, nick: &str) {
+        self.ui.close_user_tab(serv_name, nick);
     }
 
     pub fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {

@@ -9,8 +9,6 @@ use tui::style::Style;
 use tui::termbox;
 use tui::widget::{WidgetRet};
 
-use utils::opt_to_vec;
-
 static LEFT_ARROW: char = '<';
 static RIGHT_ARROW: char = '>';
 
@@ -123,6 +121,10 @@ impl Tabbed {
         }
     }
 
+    pub fn count_tabs(&self) -> usize {
+        self.tabs.len()
+    }
+
     /// Returns index of the new tab if a new tab is created.
     pub fn new_server_tab(&mut self, serv_name : &str) -> Option<usize> {
         match self.find_serv_tab_idx(&serv_name) {
@@ -158,10 +160,10 @@ impl Tabbed {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_chan_tab(&mut self, serv_name : &str, chan_name : &str) -> Option<usize> {
-        match self.find_chan_tab_idx(&serv_name, &chan_name) {
+    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str) -> Option<usize> {
+        match self.find_chan_tab_idx(serv_name, chan_name) {
             None => {
-                match self.find_last_serv_tab_idx(&serv_name) {
+                match self.find_last_serv_tab_idx(serv_name) {
                     None => {
                         self.new_server_tab(serv_name);
                         self.new_chan_tab(serv_name, chan_name)
@@ -185,11 +187,24 @@ impl Tabbed {
         }
     }
 
+    pub fn close_chan_tab(&mut self, serv_name: &str, chan_name: &str) {
+        match self.find_chan_tab_idx(serv_name, chan_name) {
+            None => {
+                // TODO: report this bug
+            }
+            Some(tab_idx) => {
+                self.tabs.remove(tab_idx);
+            }
+        }
+
+        self.select_tab(0); // FIXME
+    }
+
     /// Returns index of the new tab if a new tab is created.
     pub fn new_user_tab(&mut self, serv_name : &str, nick : &str) -> Option<usize> {
         match self.find_user_tab_idx(serv_name, nick) {
             None => {
-                match self.find_last_serv_tab_idx(&serv_name) {
+                match self.find_last_serv_tab_idx(serv_name) {
                     None => {
                         self.new_server_tab(serv_name);
                         self.new_user_tab(serv_name, nick)
@@ -211,6 +226,19 @@ impl Tabbed {
                 None
             }
         }
+    }
+
+    pub fn close_user_tab(&mut self, serv_name: &str, nick: &str) {
+        match self.find_user_tab_idx(serv_name, nick) {
+            None => {
+                // TODO: report this bug
+            }
+            Some(tab_idx) => {
+                self.tabs.remove(tab_idx);
+            }
+        }
+
+        self.select_tab(0); // FIXME
     }
 
     pub fn keypressed(&mut self, key : Key) -> TabbedRet {
@@ -531,6 +559,12 @@ impl Tabbed {
     }
 
     fn maybe_create_tab(&mut self, target : &MsgTarget) -> Vec<usize> {
+        fn opt_to_vec<T>(opt : Option<T>) -> Vec<T> {
+            match opt {
+                None => vec![],
+                Some(t) => vec![t],
+            }
+        }
         match *target {
             MsgTarget::Server { serv_name } => {
                 opt_to_vec(self.new_server_tab(serv_name))

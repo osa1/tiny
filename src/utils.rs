@@ -1,24 +1,8 @@
-use std::str;
-
-pub fn drop_port(s : &str) -> Option<&str> {
-    s.find(':').map(|split| &s[ 0 .. split ])
-}
-
-#[inline]
-pub fn opt_to_vec<T>(opt : Option<T>) -> Vec<T> {
-    match opt {
-        None => vec![],
-        Some(t) => vec![t],
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-pub struct InsertIterator<'iter, A : 'iter> {
-    insert_point : usize,
-    current_idx  : usize,
-    iter_orig    : &'iter mut Iterator<Item=A>,
-    iter_insert  : &'iter mut Iterator<Item=A>,
+pub struct InsertIterator<'iter, A: 'iter> {
+    insert_point: usize,
+    current_idx: usize,
+    iter_orig: &'iter mut Iterator<Item=A>,
+    iter_insert: &'iter mut Iterator<Item=A>,
 }
 
 impl<'iter, A> Iterator for InsertIterator<'iter, A> {
@@ -38,9 +22,9 @@ impl<'iter, A> Iterator for InsertIterator<'iter, A> {
     }
 }
 
-pub fn insert_iter<'iter, A>(iter_orig    : &'iter mut Iterator<Item=A>,
-                             iter_insert  : &'iter mut Iterator<Item=A>,
-                             insert_point : usize)
+pub fn insert_iter<'iter, A>(iter_orig: &'iter mut Iterator<Item=A>,
+                             iter_insert: &'iter mut Iterator<Item=A>,
+                             insert_point: usize)
                              -> InsertIterator<'iter, A> {
     InsertIterator {
         insert_point: insert_point,
@@ -50,19 +34,65 @@ pub fn insert_iter<'iter, A>(iter_orig    : &'iter mut Iterator<Item=A>,
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+use std::str::SplitWhitespace;
+
+/// Like `std::str::SplitWhitespace`, but returns beginning indices rather than slices.
+pub struct SplitWhitespaceIndices<'a> {
+    inner: SplitWhitespace<'a>,
+    str: &'a str,
+}
+
+impl<'a> Iterator for SplitWhitespaceIndices<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        match self.inner.next() {
+            Some(str) =>
+                self.str.as_ptr().offset_to(str.as_ptr()).map(|i| i as usize),
+            None =>
+                None,
+        }
+    }
+}
+
+pub fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
+    SplitWhitespaceIndices {
+        inner: str.split_whitespace(),
+        str: str
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 mod tests {
 
-extern crate test;
+    extern crate test;
 
-use super::*;
+    use super::*;
 
-#[test]
-fn insert_iter_test() {
-    let mut range1 = 0 .. 5;
-    let mut range2 = 5 .. 10;
-    let iter = insert_iter(&mut range1, &mut range2, 3);
-    assert_eq!(iter.collect::<Vec<i32>>(), vec![0, 1, 2, 5, 6, 7, 8, 9, 3, 4])
+    #[test]
+    fn insert_iter_test() {
+        let mut range1 = 0 .. 5;
+        let mut range2 = 5 .. 10;
+        let iter = insert_iter(&mut range1, &mut range2, 3);
+        assert_eq!(iter.collect::<Vec<i32>>(), vec![0, 1, 2, 5, 6, 7, 8, 9, 3, 4])
+    }
+
+    #[test]
+    fn split_ws_idx() {
+        let str = "x y z";
+        let idxs: Vec<usize> = split_whitespace_indices(str).into_iter().collect();
+        assert_eq!(idxs, vec![0, 2, 4]);
+
+        let str = "       ";
+        let idxs: Vec<usize> = split_whitespace_indices(str).into_iter().collect();
+        assert_eq!(idxs, vec![]);
+
+        let str = "  foo    bar  \n\r   baz     ";
+        let idxs: Vec<usize> = split_whitespace_indices(str).into_iter().collect();
+        assert_eq!(idxs, vec![2, 9, 19]);
+    }
 }
-
-} // tests
