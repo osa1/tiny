@@ -159,6 +159,9 @@ impl MessagingUI {
         self.width = width;
         self.height = height;
         self.msg_area.resize(width, height - 1);
+        for w in &mut self.input_field {
+            w.resize(width, 1);
+        }
     }
 
     fn toggle_exit_dialogue(&mut self) {
