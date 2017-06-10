@@ -2,27 +2,36 @@
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
 
 /// A server to auto-connect on startup.
-pub struct Server {
+pub struct Server<'a> {
     /// Address of the server
-    pub server_addr: &'static str,
+    pub server_addr: &'a str,
 
     /// Port of the server
     pub server_port: u16,
 
     /// Hostname to be used in connection registration
-    pub hostname: &'static str,
+    pub hostname: &'a str,
 
     /// Real name to be used in connection registration
-    pub real_name: &'static str,
+    pub real_name: &'a str,
 
     /// Nicks to try when connecting to this server. tiny tries these sequentially, and starts
     /// adding trailing underscores to the last one if none of the nicks are available.
-    pub nicks: &'static [&'static str],
+    pub nicks: &'a [&'a str],
 
     /// Commands to automatically run after joining to the server. Useful for e.g. registering the
     /// nick via nickserv or joining channels. Uses tiny command syntax.
-    pub auto_cmds: &'static [&'static str],
+    pub auto_cmds: &'a [&'a str],
 }
+
+/// Nick used when connecting to a new server via /connect command
+pub static DEFAULT_NICKS: &'static [&'static str] = &["tiny_user"];
+/// See `DEFAULT_NICK`
+pub static DEFAULT_HOSTNAME: &'static str = "tiny";
+/// See `DEFAULT_NICK`
+pub static DEFAULT_REAL_NAME: &'static str = "anonymous tiny user";
+/// See `DEFAULT_NICK`
+pub static DEFAULT_AUTO_CMDS: &'static [&'static str] = &[];
 
 pub static SERVERS: [Server; 2] =
     [ Server {

@@ -273,8 +273,22 @@ impl Tiny {
                                 &MsgTarget::Server { serv_name: serv_name });
 
         let new_conn = {
-            let current_conn = find_conn(&mut self.conns, src.serv_name()).unwrap();
-            Conn::from_conn(current_conn, serv_addr, serv_port)
+            match find_conn(&mut self.conns, src.serv_name()) {
+                Some(current_conn) =>
+                    Conn::from_conn(current_conn, serv_name, serv_port),
+                None => {
+                    self.logger.get_debug_logs().write_line(
+                        format_args!("connecting to {} {}", serv_name, serv_port));
+                    Conn::from_server(&config::Server {
+                        server_addr: serv_name,
+                        server_port: serv_port,
+                        hostname: config::DEFAULT_HOSTNAME,
+                        real_name: config::DEFAULT_REAL_NAME,
+                        nicks: config::DEFAULT_NICKS,
+                        auto_cmds: config::DEFAULT_AUTO_CMDS,
+                    })
+                }
+            }
         };
         let fd = new_conn.get_raw_fd();
         self.conns.push(new_conn);
