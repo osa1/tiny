@@ -7,7 +7,7 @@ use std::str;
 use termbox_simple::Termbox;
 
 pub use self::line::Line;
-use tui::style::Style;
+use config::Style;
 
 pub struct MsgArea {
     lines       : Vec<Line>,
@@ -97,7 +97,7 @@ impl MsgArea {
 // Adding text
 
 impl MsgArea {
-    pub fn set_style(&mut self, style : &Style) {
+    pub fn set_style(&mut self, style: Style) {
         self.line_buf.set_style(style);
     }
 

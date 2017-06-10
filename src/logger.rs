@@ -31,7 +31,7 @@ impl<'a> LogFile<'a> {
 
 /// Log message destination
 enum LogDest {
-    Server(String),
+    // Server(String),
     Chan { serv: String, chan: String },
     /// For logging raw messages
     ServerRaw(String),
@@ -65,6 +65,7 @@ impl Logger {
     // Stupid code below because of
     // https://users.rust-lang.org/t/weird-borrow-checker-error-for-loop-keeps-references-after-its-scope-ends/10929
 
+/*
     pub fn get_serv_logs(&mut self, serv_: &str) -> LogFile {
         let pos = self.fds.iter().position(|&(ref dest, _)| {
             if let &LogDest::Server(ref serv) = dest {
@@ -87,6 +88,7 @@ impl Logger {
             }
         }
     }
+*/
 
     pub fn get_chan_logs(&mut self, serv_: &str, chan_: &str) -> LogFile {
         let pos = self.fds.iter().position(|&(ref dest, _)| {

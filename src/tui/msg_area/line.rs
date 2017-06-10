@@ -3,7 +3,7 @@
 
 use termbox_simple::Termbox;
 
-use tui::style;
+use config;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
@@ -27,6 +27,10 @@ pub struct Line {
     splits    : Vec<i32>,
 }
 
+pub const TERMBOX_COLOR_PREFIX : char = '\x00';
+pub const COLOR_RESET_PREFIX   : char = '\x01';
+pub const IRC_COLOR_PREFIX     : char = '\x03';
+
 impl Line {
     pub fn new() -> Line {
         Line {
@@ -36,8 +40,8 @@ impl Line {
         }
     }
 
-    pub fn set_style(&mut self, style : &style::Style) {
-        self.str.push(style::TERMBOX_COLOR_PREFIX);
+    pub fn set_style(&mut self, style: config::Style) {
+        self.str.push(TERMBOX_COLOR_PREFIX);
         self.str.push(((style.fg >> 8) as u8) as char);
         self.str.push((style.fg as u8) as char);
         self.str.push((style.bg as u8) as char);
@@ -48,7 +52,7 @@ impl Line {
 
         let mut iter = str.chars();
         while let Some(char) = iter.next() {
-            if char == style::TERMBOX_COLOR_PREFIX {
+            if char == TERMBOX_COLOR_PREFIX {
                 self.str.push(char);
                 // read style (bold, underline etc.)
                 self.str.push(iter.next().unwrap());
@@ -58,7 +62,7 @@ impl Line {
                 self.str.push(iter.next().unwrap());
             }
 
-            else if char == style::COLOR_RESET_PREFIX {
+            else if char == COLOR_RESET_PREFIX {
                 self.str.push(char);
             }
 
@@ -73,7 +77,7 @@ impl Line {
     }
 
     pub fn add_char(&mut self, char : char) {
-        assert!(char != style::TERMBOX_COLOR_PREFIX);
+        assert!(char != TERMBOX_COLOR_PREFIX);
         if char.is_whitespace() {
             self.splits.push(self.len_chars);
         }
@@ -137,7 +141,7 @@ impl Line {
 
         let mut iter = self.str.chars();
         while let Some(char) = iter.next() {
-            if char == style::TERMBOX_COLOR_PREFIX {
+            if char == TERMBOX_COLOR_PREFIX {
                 let b1 = iter.next().unwrap() as u8;
                 let b2 = iter.next().unwrap() as u8;
                 let b3 = iter.next().unwrap() as u8;
@@ -145,9 +149,9 @@ impl Line {
                 bg = b3 as u16;
             }
 
-            else if char == style::COLOR_RESET_PREFIX {
-                fg = style::CLEAR.fg;
-                bg = style::CLEAR.bg;
+            else if char == COLOR_RESET_PREFIX {
+                fg = config::CLEAR.fg;
+                bg = config::CLEAR.bg;
             }
 
             else if char.is_whitespace() {

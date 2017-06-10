@@ -1,7 +1,7 @@
 use term_input::Key;
 use termbox_simple::Termbox;
 
-use tui::style;
+use config;
 use tui::widget::{WidgetRet, Widget};
 
 use std::any::Any;
@@ -30,12 +30,12 @@ impl Widget for ExitDialogue {
 
         let mut col = 0;
         for char in MSG.chars() {
-            tb.change_cell(pos_x + col, pos_y, char, style::YELLOW.fg, style::YELLOW.bg);
+            tb.change_cell(pos_x + col, pos_y, char, config::EXIT_DIALOGUE.fg, config::EXIT_DIALOGUE.bg);
             col += 1;
         }
 
         while col < self.width {
-            tb.change_cell(pos_x + col, pos_y, ' ', style::YELLOW.fg, style::YELLOW.bg);
+            tb.change_cell(pos_x + col, pos_y, ' ', config::EXIT_DIALOGUE.fg, config::EXIT_DIALOGUE.bg);
             col += 1;
         }
     }

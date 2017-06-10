@@ -6,8 +6,8 @@ use std::rc::Rc;
 use term_input::{Key, Arrow};
 use termbox_simple::Termbox;
 
+use config;
 use trie::Trie;
-use tui::style;
 use tui::termbox;
 use tui::widget::{WidgetRet, Widget};
 use utils;
@@ -88,7 +88,7 @@ impl TextField {
                 // draw a placeholder for the cursor
                 tb.change_cell(pos_x + self.cursor - self.scroll, pos_y,
                                ' ',
-                               style::USER_MSG.fg, style::USER_MSG.bg);
+                               config::USER_MSG.fg, config::USER_MSG.bg);
 
                 let completion : &str = &completions[current_completion];
 
@@ -108,11 +108,11 @@ impl TextField {
                                 char_idx < insertion_point + completion.len() {
                             tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
                                            char,
-                                           style::COMPLETION.fg, style::COMPLETION.bg);
+                                           config::COMPLETION.fg, config::COMPLETION.bg);
                         } else {
                             tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
                                            char,
-                                           style::USER_MSG.fg, style::USER_MSG.bg);
+                                           config::USER_MSG.fg, config::USER_MSG.bg);
                         }
 
                     }
@@ -480,14 +480,14 @@ impl TextField {
 fn draw_line(tb: &mut Termbox, line : &[char], pos_x : i32, pos_y : i32, scroll : i32, width : i32, cursor : i32) {
     let slice : &[char] = &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
 
-    termbox::print_chars(tb, pos_x, pos_y, style::USER_MSG.fg, style::USER_MSG.bg, slice);
+    termbox::print_chars(tb, pos_x, pos_y, config::USER_MSG, slice);
 
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
         tb.change_cell(pos_x + cursor - scroll, pos_y,
                        ' ',
-                       style::USER_MSG.fg, style::USER_MSG.bg);
+                       config::CURSOR.fg, config::CURSOR.bg);
     }
     tb.set_cursor(pos_x + cursor - scroll, pos_y);
 }

@@ -9,30 +9,33 @@ use std::net::TcpStream;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
 
+use config;
 use logger::Logger;
 use logger::LogFile;
 use wire::{Cmd, Msg};
 use wire;
 
 pub struct Conn {
-    nick: String,
+    serv_addr: String,
+    serv_port: u16,
     hostname: String,
     realname: String,
+    nicks: Vec<String>,
 
-    /// Channels to auto-join
-    chans: HashSet<String>,
+    /// Always in range of `nicks`
+    current_nick_idx: usize,
+
+    /// Channels to auto-join. Initially empty, every channel we join will be added here to be able
+    /// to re-join automatically on reconnect.
+    auto_join: HashSet<String>,
 
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
     host: Option<String>,
-
-    serv_addr: String,
 
     /// The TCP connection to the server.
     stream: TcpStream,
 
     status: ConnStatus,
-
-    serv_name: String,
 
     /// _Partial_ messages collected here until they make a complete message.
     buf: Vec<u8>,
@@ -67,45 +70,70 @@ enum ConnStatus {
 
 #[derive(Debug)]
 pub enum ConnEv {
+    /// Connected to the server + registered
+    Connected,
+    ///
     Disconnected,
     /// Hack to return the main loop that the Conn wants reconnect()
     WantReconnect,
+    /// Network error happened
     Err(io::Error),
+    /// An incoming message
     Msg(Msg),
 }
 
-fn init_stream(serv_addr: &str) -> TcpStream {
+fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
     let stream = TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
     stream.set_nonblocking(true).unwrap();
     // This will fail with EINPROGRESS
-    let _ = stream.connect(serv_addr);
+    let _ = stream.connect((serv_addr, serv_port));
     stream
 }
 
 impl Conn {
-    pub fn new(serv_addr: &str, serv_name: &str,
-               nick: &str, hostname: &str, realname: &str,
-               chans: &[String]) -> Conn {
+    pub fn from_server(server: &config::Server) -> Conn {
+        let stream = init_stream(&server.server_addr, server.server_port);
         Conn {
-            nick: nick.to_owned(),
-            hostname: hostname.to_owned(),
-            realname: realname.to_owned(),
-            chans: chans.iter().cloned().collect(),
+            serv_addr: server.server_addr.to_owned(),
+            serv_port: server.server_port,
+            hostname: server.hostname.to_owned(),
+            realname: server.real_name.to_owned(),
+            nicks: server.nicks.iter().map(|s| s.to_string()).collect(),
+            current_nick_idx: 0,
+            auto_join: HashSet::new(),
             host: None,
-            serv_addr: serv_addr.to_owned(),
-            stream: init_stream(serv_addr),
+            stream: stream,
             status: ConnStatus::Introduce,
-            serv_name: serv_name.to_owned(),
             buf: vec![],
         }
     }
 
-    pub fn reconnect(&mut self, new_serv_addr: Option<&str>) {
-        if let Some(new_serv_addr) = new_serv_addr {
-            self.serv_addr = new_serv_addr.to_owned();
+    /// Clone an existing connection, but update the server address.
+    pub fn from_conn(conn: &Conn, new_serv_addr: &str, new_serv_port: u16) -> Conn {
+        let stream = init_stream(new_serv_addr, new_serv_port);
+        Conn {
+            serv_addr: new_serv_addr.to_owned(),
+            serv_port: new_serv_port,
+            hostname: conn.hostname.clone(),
+            realname: conn.realname.clone(),
+            nicks: conn.nicks.clone(),
+            current_nick_idx: 0,
+            auto_join: HashSet::new(),
+            host: None,
+            stream: stream,
+            status: ConnStatus::Introduce,
+            buf: vec![],
         }
-        self.stream = init_stream(&self.serv_addr);
+    }
+
+    pub fn reconnect(&mut self, new_serv: Option<(&str, u16)>) {
+        if let Some((new_name, new_port)) = new_serv {
+            self.serv_addr = new_name.to_owned();
+            self.serv_port = new_port;
+        }
+        self.stream = init_stream(&self.serv_addr, self.serv_port);
         self.status = ConnStatus::Introduce;
+        self.current_nick_idx = 0;
     }
 
     /// Get the RawFd, to be used with select() or other I/O multiplexer.
@@ -114,7 +142,24 @@ impl Conn {
     }
 
     pub fn get_serv_name(&self) -> &str {
-        &self.serv_name
+        &self.serv_addr
+    }
+
+    pub fn get_nick(&self) -> &str {
+        &self.nicks[self.current_nick_idx]
+    }
+
+    fn reset_nick(&mut self) {
+        self.current_nick_idx = 0;
+    }
+
+    fn next_nick(&mut self) {
+        if self.current_nick_idx + 1 == self.nicks.len() {
+            let mut new_nick = self.nicks.last().unwrap().to_string();
+            new_nick.push('_');
+            self.nicks.push(new_nick);
+        }
+        self.current_nick_idx += 1;
     }
 }
 
@@ -131,11 +176,13 @@ impl Conn {
                     match self.host {
                         None => {
                             debug_out.write_line(
-                                format_args!("{}: Can't send PING, host unknown", self.serv_name));
+                                format_args!("{}: Can't send PING, host unknown",
+                                             self.serv_addr));
                         }
                         Some(ref host_) => {
                             debug_out.write_line(
-                                format_args!("{}: Ping timeout, sending PING", self.serv_name));
+                                format_args!("{}: Ping timeout, sending PING",
+                                             self.serv_addr));
                             wire::ping(&mut self.stream, host_).unwrap();;
                         }
                     }
@@ -157,6 +204,7 @@ impl Conn {
                     // *sigh* it's slightly annoying that we can't reconnect here, we need to
                     // update the event loop
                     evs.push(ConnEv::WantReconnect);
+                    self.reset_nick();
                     self.status = ConnStatus::Introduce;
                 } else {
                     self.status = ConnStatus::Disconnected { ticks_passed: ticks_passed + 1 };
@@ -164,7 +212,6 @@ impl Conn {
             }
         }
     }
-
     pub fn enter_disconnect_state(&mut self) {
         self.status = ConnStatus::Disconnected { ticks_passed: 0 };
     }
@@ -180,8 +227,20 @@ impl Conn {
     // Sending messages
 
     fn introduce(&mut self) {
-        wire::user(&self.hostname, &self.realname, &mut self.stream).unwrap();
-        wire::nick(&self.nick, &mut self.stream).unwrap();
+        wire::user(&self.stream, &self.hostname, &self.realname).unwrap();
+        self.send_nick();
+    }
+
+    fn send_nick(&mut self) {
+        wire::nick(&self.stream, self.get_nick()).unwrap();
+    }
+
+    pub fn privmsg(&self, target: &str, msg: &str) {
+        wire::privmsg(&self.stream, target, msg).unwrap();
+    }
+
+    pub fn join(&self, chan: &str) {
+        wire::join(&self.stream, chan).unwrap();
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -216,19 +275,24 @@ impl Conn {
     }
 
     fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
-        while let Some(msg) = Msg::read(&mut self.buf, Some(logger.get_raw_serv_logs(&self.serv_name))) {
+        while let Some(msg) = Msg::read(&mut self.buf, Some(logger.get_raw_serv_logs(&self.serv_addr))) {
             self.handle_msg(msg, evs, logger);
         }
     }
 
     fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
         if let &Msg { cmd: Cmd::PING { ref server }, .. } = &msg {
-            wire::pong(server, &mut self.stream).unwrap();
+            wire::pong(&self.stream, server).unwrap();
         }
 
         if let ConnStatus::Introduce = self.status {
             self.introduce();
             self.status = ConnStatus::PingPong { ticks_passed: 0 };
+        }
+
+        if let &Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = &msg {
+            // 001 RPL_WELCOME is how we understand that the registration was successful
+            evs.push(ConnEv::Connected);
         }
 
         if let &Msg { cmd: Cmd::Reply { num: 002, ref params }, .. } = &msg {
@@ -241,29 +305,35 @@ impl Conn {
                 None => {
                     logger.get_debug_logs().write_line(
                         format_args!("{} Can't parse hostname from params: {:?}",
-                                     self.serv_name, params));
+                                     self.serv_addr, params));
                 }
                 Some(host) => {
                     logger.get_debug_logs().write_line(
-                        format_args!("{} host: {}", self.serv_name, host));
+                        format_args!("{} host: {}", self.serv_addr, host));
                     self.host = Some(host);
                 }
             }
         }
 
+        if let &Msg { cmd: Cmd::Reply { num: 433, .. }, .. } = &msg {
+            // ERR_NICKNAMEINUSE
+            self.next_nick();
+            self.send_nick();
+        }
+
         if let &Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = &msg {
             // RPL_ENDOFMOTD. Join auto-join channels.
-            for chan in &self.chans {
-                wire::join(chan, &mut self.stream).unwrap();
+            for chan in &self.auto_join {
+                self.join(chan);
             }
         }
 
         if let &Msg { cmd: Cmd::Reply { num: 332, ref params }, .. } = &msg {
             if params.len() == 2 || params.len() == 3 {
-                // RPL_TOPIC. We've successfully joined a channel, add the channel to self.chans to
-                // be able to auto-join next time we connect
+                // RPL_TOPIC. We've successfully joined a channel, add the channel to
+                // self.auto_join to be able to auto-join next time we connect
                 let chan = &params[params.len() - 2];
-                self.chans.insert(chan.to_owned());
+                self.auto_join.insert(chan.to_owned());
             }
         }
 

@@ -1,11 +1,11 @@
 use term_input::Key;
 use termbox_simple::Termbox;
 
+use config;
+use config::Style;
 use tui::messaging::MessagingUI;
 use tui::messaging::Timestamp;
 use tui::MsgTarget;
-use tui::style;
-use tui::style::Style;
 use tui::termbox;
 use tui::widget::{WidgetRet};
 
@@ -39,9 +39,9 @@ pub enum TabStyle {
 impl TabStyle {
     pub fn get_style(self) -> Style {
         match self {
-            TabStyle::Important => style::TAB_IMPORTANT,
-            TabStyle::Highlight => style::TAB_HIGHLIGHT,
-            TabStyle::Normal => style::TAB_NORMAL,
+            TabStyle::Important => config::TAB_IMPORTANT,
+            TabStyle::Highlight => config::TAB_HIGHLIGHT,
+            TabStyle::Normal => config::TAB_NORMAL,
         }
     }
 }
@@ -89,12 +89,12 @@ impl Tab {
 
     pub fn draw(&self, tb: &mut Termbox, pos_x: i32, pos_y: i32, active: bool) {
         let style: Style = if active {
-            style::TAB_ACTIVE
+            config::TAB_ACTIVE
         } else {
             self.style.get_style()
         };
 
-        termbox::print(tb, pos_x, pos_y, style.fg, style.bg, self.visible_name());
+        termbox::print(tb, pos_x, pos_y, style, self.visible_name());
     }
 }
 
@@ -285,16 +285,16 @@ impl Tabbed {
 // Rendering
 
 fn arrow_style(tabs: &[Tab]) -> Style {
-    let mut arrow_style = style::TAB_NORMAL;
+    let mut arrow_style = config::TAB_NORMAL;
 
     for tab in tabs  {
         match tab.style {
             TabStyle::Important => {
-                arrow_style = style::TAB_IMPORTANT;
+                arrow_style = config::TAB_IMPORTANT;
                 break;
             }
             TabStyle::Highlight => {
-                arrow_style = style::TAB_HIGHLIGHT;
+                arrow_style = config::TAB_HIGHLIGHT;
             }
             TabStyle::Normal => {}
         }

@@ -1,6 +1,3 @@
-#[macro_use]
-pub mod style;
-
 pub mod exit_dialogue;
 pub mod messaging;
 pub mod msg_area;
@@ -12,6 +9,7 @@ pub mod widget;
 use std::fs;
 use std::str;
 
+use config;
 use self::tabbed::{Tabbed, TabbedRet, TabStyle, MsgSource};
 pub use self::messaging::Timestamp;
 
@@ -46,7 +44,7 @@ impl TUI {
     pub fn new() -> TUI {
         let mut tui = Termbox::init().unwrap(); // TODO: check errors
         tui.set_output_mode(OutputMode::Output256);
-        tui.set_clear_attributes(style::CLEAR.fg, style::CLEAR.bg);
+        tui.set_clear_attributes(config::CLEAR.fg, config::CLEAR.bg);
 
         let _ = fs::create_dir("logs");
 

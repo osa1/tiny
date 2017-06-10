@@ -12,6 +12,7 @@ extern crate time;
 extern crate term_input;
 extern crate termbox_simple;
 
+mod config;
 mod conn;
 mod logger;
 mod utils;
@@ -35,21 +36,15 @@ pub struct Tiny {
     conns: Vec<Conn>,
     tui: TUI,
     input_ev_handler: Input,
-    nick: String,
-    hostname: String,
-    realname: String,
     logger: Logger,
 }
 
 impl Tiny {
-    pub fn run(nick: String, hostname: String, realname: String) {
+    pub fn run() {
         let mut tiny = Tiny {
-            conns: Vec::with_capacity(1),
+            conns: Vec::with_capacity(config::SERVERS.len()),
             tui: TUI::new(),
             input_ev_handler: Input::new(),
-            nick: nick,
-            hostname: hostname,
-            realname: realname,
             logger: Logger::new(PathBuf::from("logs")),
         };
 
@@ -96,6 +91,15 @@ impl Tiny {
             }
         }));
 
+        for server in config::SERVERS.iter() {
+            // close the hacky "" tab if it exists
+            tiny.tui.close_server_tab("");
+            let conn = Conn::from_server(server);
+            let fd = conn.get_raw_fd();
+            tiny.conns.push(conn);
+            ev_loop.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
+        }
+
         ev_loop.run(tiny);
     }
 
@@ -113,7 +117,8 @@ impl Tiny {
 
                     // We know msg has at least one character as the TUI won't accept it otherwise.
                     if msg[0] == '/' {
-                        self.handle_command(ctrl, from, (&msg[ 1 .. ]).into_iter().cloned().collect());
+                        let msg_str: String = (&msg[ 1 .. ]).into_iter().cloned().collect();
+                        self.handle_command(ctrl, from, &msg_str);
                     } else {
                         self.send_msg(from, &msg.into_iter().collect::<String>());
                     }
@@ -128,11 +133,11 @@ impl Tiny {
         }
     }
 
-    fn handle_command(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: String) {
+    fn handle_command(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: &str) {
         let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
 
         if words[0] == "connect" && words.len() == 2 {
-            self.connect(ctrl, words[1]);
+            self.connect(ctrl, src, words[1]);
         }
 
         else if words[0] == "connect" && words.len() == 1 {
@@ -217,54 +222,71 @@ fn mk_sock_ev_handler(fd: RawFd) -> Box<FnMut(FdEv, &mut EvLoopCtrl<Tiny>, &mut 
 
 impl Tiny {
 
-    fn connect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_addr: &str) {
+    fn connect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, serv_addr: &str) {
 
-        fn drop_port(s: &str) -> Option<&str> {
-            s.find(':').map(|split| &s[ 0 .. split ])
+        fn split_port(s: &str) -> Option<(&str, &str)> {
+            s.find(':').map(|split| (&s[ 0 .. split ], &s[ split + 1 .. ]))
         }
 
-        match drop_port(serv_addr) {
-            None => {
-                self.tui.add_client_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
-            }
-            Some(serv_name) => {
-                let mut reconnect = false; // borrowchk workaround
-                // see if we already have a Conn for this server
-                if let Some(conn) = self.find_conn(serv_name) {
-                    ctrl.remove_fd(conn.get_raw_fd());
-                    conn.reconnect(Some(serv_addr));
-                    let fd = conn.get_raw_fd();
-                    ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
-                    reconnect = true;
-                }
-
-                if reconnect {
-                    self.tui.add_client_msg(
-                        "Connecting...",
-                        &MsgTarget::AllServTabs { serv_name: serv_name });
+        let (serv_name, serv_port) = {
+            match split_port(serv_addr) {
+                None => {
+                    self.tui.add_client_err_msg(
+                        "connect: Need a <host>:<port>",
+                        &MsgTarget::CurrentTab);
                     return;
                 }
-
-                // otherwise create a new Conn, tab etc.
-                self.tui.new_server_tab(serv_name);
-                // close the hacky "" tab if it exists
-                self.tui.close_server_tab("");
-                self.tui.add_client_msg("Connecting...",
-                                        &MsgTarget::Server { serv_name: serv_name });
-
-                let conn = Conn::new(
-                    serv_addr, serv_name,
-                    &self.nick, &self.hostname, &self.realname,
-                    &[]);
-                let fd = conn.get_raw_fd();
-                self.conns.push(conn);
-                ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
+                Some((serv_name, serv_port)) => {
+                    match serv_port.parse::<u16>() {
+                        Err(err) => {
+                            self.tui.add_client_err_msg(
+                                &format!("connect: Can't parse port {}: {}", serv_port, err),
+                                &MsgTarget::CurrentTab);
+                            return;
+                        }
+                        Ok(serv_port) => {
+                            (serv_name, serv_port)
+                        }
+                    }
+                }
             }
+        };
+
+        let mut reconnect = false; // borrowchk workaround
+        // see if we already have a Conn for this server
+        if let Some(conn) = find_conn(&mut self.conns, serv_name) {
+            ctrl.remove_fd(conn.get_raw_fd());
+            conn.reconnect(Some((serv_name, serv_port)));
+            let fd = conn.get_raw_fd();
+            ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
+            reconnect = true;
         }
+
+        if reconnect {
+            self.tui.add_client_msg(
+                "Connecting...",
+                &MsgTarget::AllServTabs { serv_name: serv_name });
+            return;
+        }
+
+        // otherwise create a new Conn, tab etc.
+        self.tui.new_server_tab(serv_name);
+        // close the hacky "" tab if it exists
+        self.tui.close_server_tab("");
+        self.tui.add_client_msg("Connecting...",
+                                &MsgTarget::Server { serv_name: serv_name });
+
+        let new_conn = {
+            let current_conn = find_conn(&mut self.conns, src.serv_name()).unwrap();
+            Conn::from_conn(current_conn, serv_addr, serv_port)
+        };
+        let fd = new_conn.get_raw_fd();
+        self.conns.push(new_conn);
+        ctrl.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
     }
 
     fn disconnect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_name: &str) {
-        let conn_idx = self.find_conn_idx(serv_name).unwrap();
+        let conn_idx = find_conn_idx(&mut self.conns, serv_name).unwrap();
         let conn = self.conns.remove(conn_idx);
         ctrl.remove_fd(conn.get_raw_fd());
         // just drop the conn
@@ -274,7 +296,7 @@ impl Tiny {
         self.tui.add_client_msg(
             "Reconnecting...",
             &MsgTarget::AllServTabs { serv_name: serv_name });
-        match self.find_conn(serv_name) {
+        match find_conn(&mut self.conns, serv_name) {
             Some(conn) => {
                 ctrl.remove_fd(conn.get_raw_fd());
                 conn.reconnect(None);
@@ -287,9 +309,9 @@ impl Tiny {
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
-        match self.find_conn(src.serv_name()) {
+        match find_conn(&mut self.conns, src.serv_name()) {
             Some(conn) => {
-                wire::join(chan, conn).unwrap();
+                conn.join(chan);
                 return;
             }
             None => {
@@ -304,7 +326,7 @@ impl Tiny {
     }
 
     fn part(&mut self, serv_name: &str, chan_name: &str) {
-        let conn = self.find_conn(serv_name).unwrap();
+        let conn = find_conn(&mut self.conns, serv_name).unwrap();
         wire::part(conn, chan_name).unwrap();
     }
 
@@ -323,42 +345,22 @@ impl Tiny {
             },
 
             MsgSource::Chan { serv_name, chan_name } => {
-                {
-                    let conn = self.find_conn(&serv_name).unwrap();
-                    wire::privmsg(&chan_name, msg, conn).unwrap();
-                }
-                self.tui.add_privmsg(&self.nick, msg,
+                let conn = find_conn(&mut self.conns, &serv_name).unwrap();
+                conn.privmsg(&chan_name, msg);
+                self.tui.add_privmsg(conn.get_nick(), msg,
                                      Timestamp::now(),
                                      &MsgTarget::Chan { serv_name: &serv_name,
                                                         chan_name: &chan_name });
             },
 
             MsgSource::User { serv_name, nick } => {
-                {
-                    let conn = self.find_conn(&serv_name).unwrap();
-                    wire::privmsg(&nick, msg, conn).unwrap();
-                }
-                self.tui.add_privmsg(&self.nick, msg,
+                let conn = find_conn(&mut self.conns, &serv_name).unwrap();
+                conn.privmsg(&nick, msg);
+                self.tui.add_privmsg(conn.get_nick(), msg,
                                      Timestamp::now(),
                                      &MsgTarget::User { serv_name: &serv_name, nick: &nick });
             }
         }
-    }
-
-    fn find_conn(&mut self, serv_name: &str) -> Option<&mut Conn> {
-        match self.find_conn_idx(serv_name) {
-            None => None,
-            Some(idx) => Some(unsafe { self.conns.get_unchecked_mut(idx) } ),
-        }
-    }
-
-    fn find_conn_idx(&mut self, serv_name: &str) -> Option<usize> {
-        for (conn_idx, conn) in self.conns.iter().enumerate() {
-            if conn.get_serv_name() == serv_name {
-                return Some(conn_idx);
-            }
-        }
-        None
     }
 
     fn find_fd_conn(&mut self, fd: RawFd) -> Option<usize> {
@@ -384,6 +386,27 @@ impl Tiny {
     fn handle_conn_evs(&mut self, conn_idx: usize, evs: Vec<ConnEv>, ctrl: &mut EvLoopCtrl<Tiny>) {
         for ev in evs.into_iter() {
             match ev {
+                ConnEv::Connected => {
+                    let mut serv_auto_cmds = None;
+                    {
+                        let conn = &self.conns[conn_idx];
+                        let conn_name = conn.get_serv_name();
+                        for server in config::SERVERS.iter() {
+                            if server.server_addr == conn_name {
+                                serv_auto_cmds = Some((server.server_addr, server.auto_cmds));
+                                break;
+                            }
+                        }
+                    }
+                    if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
+                        for cmd in auto_cmds.iter() {
+                            self.handle_command(
+                                ctrl,
+                                MsgSource::Serv { serv_name: serv_name.to_owned() },
+                                cmd);
+                        }
+                    }
+                }
                 ConnEv::Disconnected => {
                     let conn = &mut self.conns[conn_idx];
                     self.tui.add_err_msg(
@@ -462,7 +485,7 @@ impl Tiny {
                         let serv_name = self.conns[conn_idx].get_serv_name();
                         self.logger.get_chan_logs(serv_name, &chan).write_line(
                             format_args!("JOIN: {}", nick));
-                        if nick == self.nick {
+                        if nick == conn.get_nick() {
                             self.tui.new_chan_tab(&serv_name, &chan);
                         } else {
                             self.tui.add_nick(
@@ -481,7 +504,7 @@ impl Tiny {
                             format_args!("Weird PART message pfx {:?}", pfx));
                     },
                     Pfx::User { nick, .. } => {
-                        if nick != self.nick {
+                        if nick != conn.get_nick() {
                             let serv_name = self.conns[conn_idx].get_serv_name();
                             self.logger.get_chan_logs(serv_name, &chan).write_line(
                                 format_args!("PART: {}", nick));
@@ -526,6 +549,7 @@ impl Tiny {
             }
 
             Cmd::PING { .. } => {}, // ignore
+            Cmd::Other { ref cmd, .. } if cmd == "PONG" => {}, // ignore
 
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
@@ -628,4 +652,20 @@ fn pfx_to_target<'a>(pfx : &'a Pfx, curr_serv : &'a str) -> MsgTarget<'a> {
         Pfx::Server(_) => MsgTarget::Server { serv_name: curr_serv },
         Pfx::User { ref nick, .. } => MsgTarget::User { serv_name: curr_serv, nick: nick },
     }
+}
+
+fn find_conn<'a>(conns: &'a mut [Conn], serv_name: &str) -> Option<&'a mut Conn> {
+    match find_conn_idx(conns, serv_name) {
+        None => None,
+        Some(idx) => Some(unsafe { conns.get_unchecked_mut(idx) } ),
+    }
+}
+
+fn find_conn_idx(conns: &[Conn], serv_name: &str) -> Option<usize> {
+    for (conn_idx, conn) in conns.iter().enumerate() {
+        if conn.get_serv_name() == serv_name {
+            return Some(conn_idx);
+        }
+    }
+    None
 }

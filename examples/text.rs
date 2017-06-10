@@ -37,7 +37,7 @@ fn main() {
         for line in text.lines() {
             msg_area.set_style(&style::TOPIC);
             msg_area.add_text(">>>");
-            msg_area.set_style(&style::SERVER_MSG);
+            msg_area.set_style(&style::USER_MSG);
             msg_area.add_text("  ");
             msg_area.add_text(line);
             msg_area.flush_line();

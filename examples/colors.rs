@@ -20,6 +20,17 @@ fn main() {
 
     let mut ev_loop: EvLoop<Termbox> = EvLoop::new();
 
+    // Register resize event handler just to avoid poll() failures in the event loop
+    {
+        let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+        unsafe {
+            libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
+            libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
+        };
+
+        ev_loop.add_signal(&sig_mask, Box::new(|_, tiny| {}));
+    }
+
     ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, tui| {
         input.read_input_events(&mut ev_buffer);
         for ev in ev_buffer.iter() {

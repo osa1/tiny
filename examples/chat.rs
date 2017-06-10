@@ -62,5 +62,20 @@ fn main() {
         }));
     }
 
+    {
+        let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+        unsafe {
+            libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
+            libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
+        };
+
+        ev_loop.add_signal(&sig_mask, Box::new(|_, tui| {
+            tui.resize();
+            tui.draw();
+        }));
+
+        tui.draw();
+    }
+
     ev_loop.run(tui);
 }

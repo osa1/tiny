@@ -11,10 +11,12 @@ use rand;
 use time::Tm;
 use time;
 
+use config;
+use config::Style;
 use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
+use tui::msg_area::line::{TERMBOX_COLOR_PREFIX, IRC_COLOR_PREFIX};
 use tui::msg_area::MsgArea;
-use tui::style;
 use tui::text_field::TextField;
 use tui::widget::{WidgetRet, Widget};
 
@@ -57,7 +59,7 @@ impl Timestamp {
     }
 
     fn stamp(&self, msg_area: &mut MsgArea) {
-        msg_area.set_style(&style::TIMESTAMP);
+        msg_area.set_style(config::TIMESTAMP);
         msg_area.add_text(&format!("{:02}:{:02} ", self.hour, self.min));
     }
 }
@@ -197,7 +199,7 @@ impl MessagingUI {
     pub fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
-        self.msg_area.set_style(&style::TOPIC);
+        self.msg_area.set_style(config::TOPIC);
         self.msg_area.add_text(&format!("Channel topic is: \"{}\"", topic));
 
         self.msg_area.flush_line();
@@ -206,7 +208,7 @@ impl MessagingUI {
     pub fn add_client_err_msg(&mut self, msg : &str) {
         self.reset_activity_line();
 
-        self.msg_area.set_style(&style::ERR_MSG);
+        self.msg_area.set_style(config::ERR_MSG);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -214,7 +216,7 @@ impl MessagingUI {
     pub fn add_client_msg(&mut self, msg : &str) {
         self.reset_activity_line();
 
-        self.msg_area.set_style(&style::USER_MSG);
+        self.msg_area.set_style(config::USER_MSG);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
         self.reset_activity_line();
@@ -235,12 +237,12 @@ impl MessagingUI {
 
         {
             let nick_color = self.get_nick_color(sender);
-            let style = style::Style { fg: nick_color as u16, bg: style::USER_MSG.bg };
-            self.msg_area.set_style(&style);
+            let style = Style { fg: nick_color as u16, bg: config::USER_MSG.bg };
+            self.msg_area.set_style(style);
             self.msg_area.add_text(sender);
         }
 
-        self.msg_area.set_style(&style::Style { fg: style::USER_MSG.fg | style::TB_BOLD, bg: style::USER_MSG.bg });
+        self.msg_area.set_style(Style { fg: config::USER_MSG.fg | config::TB_BOLD, bg: config::USER_MSG.bg });
         self.msg_area.add_text(": ");
 
         // Highlight the message if it mentions us
@@ -250,9 +252,9 @@ impl MessagingUI {
 
         self.msg_area.set_style(
             if mentions_us {
-                &style::HIGHLIGHT
+                config::HIGHLIGHT
             } else {
-                &style::USER_MSG
+                config::USER_MSG
             });
 
         self.msg_area.add_text(msg);
@@ -263,7 +265,7 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area.set_style(&style::USER_MSG);
+        self.msg_area.set_style(config::USER_MSG);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -272,7 +274,7 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area.set_style(&style::ERR_MSG);
+        self.msg_area.set_style(config::ERR_MSG);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -313,7 +315,7 @@ impl MessagingUI {
         if let Some(ts) = ts {
             let line_idx = self.get_activity_line_idx(ts);
             self.msg_area.modify_line(line_idx, |line| {
-                line.set_style(&style::JOIN);
+                line.set_style(config::JOIN);
                 line.add_char('+');
                 line.add_text(nick);
                 line.add_char(' ');
@@ -327,7 +329,7 @@ impl MessagingUI {
         if let Some(ts) = ts {
             let line_idx = self.get_activity_line_idx(ts);
             self.msg_area.modify_line(line_idx, |line| {
-                line.set_style(&style::LEAVE);
+                line.set_style(config::PART);
                 line.add_char('-');
                 line.add_text(nick);
                 line.add_char(' ');
@@ -345,7 +347,7 @@ impl MessagingUI {
 
         let line_idx = self.get_activity_line_idx(ts);
         self.msg_area.modify_line(line_idx, |line| {
-            line.set_style(&style::NICK);
+            line.set_style(config::NICK);
             line.add_text(old_nick);
             line.add_text("->");
             line.add_text(new_nick);
@@ -383,7 +385,7 @@ impl MessagingUI {
 
 fn translate_irc_colors(str : &str) -> Option<String> {
     // Most messages won't have any colors, so we have this fast path here
-    if str.find(style::IRC_COLOR_PREFIX).is_none() {
+    if str.find(IRC_COLOR_PREFIX).is_none() {
         return None;
     }
 
@@ -391,7 +393,7 @@ fn translate_irc_colors(str : &str) -> Option<String> {
 
     let mut iter = str.chars();
     while let Some(mut char) = iter.next() {
-        if char == style::IRC_COLOR_PREFIX {
+        if char == IRC_COLOR_PREFIX {
             let fg1 = to_dec(iter.next().unwrap());
             let fg2 = to_dec(iter.next().unwrap());
             let fg  = fg1 * 10 + fg2;
@@ -400,23 +402,23 @@ fn translate_irc_colors(str : &str) -> Option<String> {
                     let bg1 = to_dec(iter.next().unwrap());
                     let bg2 = to_dec(iter.next().unwrap());
                     let bg  = bg1 * 10 + bg2;
-                    ret.push(style::TERMBOX_COLOR_PREFIX);
+                    ret.push(TERMBOX_COLOR_PREFIX);
                     ret.push(0 as char); // style
                     ret.push(irc_color_to_termbox(fg) as char);
                     ret.push(irc_color_to_termbox(bg) as char);
                     continue;
                 } else {
-                    ret.push(style::TERMBOX_COLOR_PREFIX);
+                    ret.push(TERMBOX_COLOR_PREFIX);
                     ret.push(0 as char); // style
                     ret.push(irc_color_to_termbox(fg) as char);
-                    ret.push(irc_color_to_termbox(style::USER_MSG.bg as u8) as char);
+                    ret.push(irc_color_to_termbox(config::USER_MSG.bg as u8) as char);
                     char = char_;
                 }
             } else {
-                ret.push(style::TERMBOX_COLOR_PREFIX);
+                ret.push(TERMBOX_COLOR_PREFIX);
                 ret.push(0 as char); // style
                 ret.push(irc_color_to_termbox(fg) as char);
-                ret.push(irc_color_to_termbox(style::USER_MSG.bg as u8) as char);
+                ret.push(irc_color_to_termbox(config::USER_MSG.bg as u8) as char);
                 break;
             }
         }
