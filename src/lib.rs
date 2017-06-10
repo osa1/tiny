@@ -6,7 +6,6 @@ extern crate alloc_system;
 extern crate ev_loop;
 extern crate libc;
 extern crate net2;
-extern crate rand;
 extern crate time;
 
 extern crate term_input;

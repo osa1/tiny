@@ -2,12 +2,9 @@ use termbox_simple::Termbox;
 use term_input::Key;
 
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::convert::From;
 use std::rc::Rc;
 
-use rand::Rng;
-use rand;
 use time::Tm;
 use time;
 
@@ -24,23 +21,25 @@ use tui::widget::{WidgetRet, Widget};
 /// show incoming/sent messages.
 pub struct MessagingUI {
     /// Incoming and sent messages appear
-    msg_area : MsgArea,
+    msg_area: MsgArea,
 
     /// Stacked user input fields. Topmost one handles keypresses.
-    input_field : Vec<Box<Widget>>,
+    input_field: Vec<Box<Widget>>,
 
-    width  : i32,
-    height : i32,
+    width: i32,
+    height: i32,
 
     // NOTE: Color is encoded in Termbox's 216 colors. (in 256-color mode)
-    nick_colors      : HashMap<String, u8>,
-    available_colors : HashSet<u8>,
+    nick_colors: HashMap<String, u8>,
+    /// Index of the next color to use when highlighting a new nick. Always a valid index to
+    /// `config::NICK_COLORS`.
+    next_color_idx: usize,
 
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
     //
     // Rc to be able to share with dynamic messages.
-    nicks : Rc<Trie>,
+    nicks: Rc<Trie>,
 
     last_activity_line: Option<ActivityLine>,
     last_activity_ts: Option<Timestamp>,
@@ -86,7 +85,7 @@ impl MessagingUI {
             width: width,
             height: height,
             nick_colors: HashMap::new(),
-            available_colors: (16 .. 232).into_iter().collect(),
+            next_color_idx: 0,
             nicks: Rc::new(Trie::new()),
             last_activity_line: None,
             last_activity_ts: None,
@@ -280,28 +279,14 @@ impl MessagingUI {
     }
 
     fn get_nick_color(&mut self, sender: &str) -> u8 {
-        match self.nick_colors.get(sender) {
-            Some(color) => {
-                return *color;
-            }
-            None => {},
+        if let Some(color) = self.nick_colors.get(sender) {
+            return *color;
         }
 
-        let mut rng = rand::thread_rng();
-        let ret = {
-            if !self.available_colors.is_empty() {
-                let ret =
-                    *self.available_colors.iter().nth(
-                        rng.gen_range(0, self.available_colors.len())).unwrap();
-                self.available_colors.remove(&ret);
-                ret
-            } else {
-                rng.gen_range(16, 232)
-            }
-        };
-
-        self.nick_colors.insert(sender.to_owned(), ret);
-        ret
+        let color = config::NICK_COLORS[self.next_color_idx];
+        self.nick_colors.insert(sender.to_owned(), color);
+        self.next_color_idx = (self.next_color_idx + 1) % (config::NICK_COLORS.len() - 1);
+        color
     }
 }
 
