@@ -18,3 +18,6 @@ net2 = "0.2.23"
 term_input = { path = "term_input/" }
 termbox_simple = { path = "termbox/" }
 time = "0.1"
+
+[dependencies.yaml-rust]
+git = "https://github.com/chyh1990/yaml-rust.git"

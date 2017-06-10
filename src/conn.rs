@@ -91,14 +91,14 @@ fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
 }
 
 impl Conn {
-    pub fn from_server(server: &config::Server) -> Conn {
+    pub fn from_server(server: config::Server) -> Conn {
         let stream = init_stream(&server.server_addr, server.server_port);
         Conn {
-            serv_addr: server.server_addr.to_owned(),
+            serv_addr: server.server_addr,
             serv_port: server.server_port,
-            hostname: server.hostname.to_owned(),
-            realname: server.real_name.to_owned(),
-            nicks: server.nicks.iter().map(|s| s.to_string()).collect(),
+            hostname: server.hostname,
+            realname: server.real_name,
+            nicks: server.nicks,
             current_nick_idx: 0,
             auto_join: HashSet::new(),
             host: None,

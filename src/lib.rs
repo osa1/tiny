@@ -7,6 +7,7 @@ extern crate ev_loop;
 extern crate libc;
 extern crate net2;
 extern crate time;
+extern crate yaml_rust;
 
 extern crate term_input;
 extern crate termbox_simple;
@@ -31,8 +32,9 @@ use tui::{TUI, TUIRet, MsgTarget, Timestamp};
 use wire::{Cmd, Msg, Pfx};
 
 pub struct Tiny {
-    /// A connection to a server is maintained by 'Conn'.
     conns: Vec<Conn>,
+    defaults: config::Defaults,
+    servers: Vec<config::Server>,
     tui: TUI,
     input_ev_handler: Input,
     logger: Logger,
@@ -40,8 +42,23 @@ pub struct Tiny {
 
 impl Tiny {
     pub fn run() {
+        let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
+
+        let (servers, defaults) =
+            config::read_config().unwrap_or_else(|| (vec![], config::get_defaults()));
+
+        let mut conns = Vec::with_capacity(servers.len());
+        for server in servers.iter().cloned() {
+            let conn = Conn::from_server(server);
+            let fd = conn.get_raw_fd();
+            conns.push(conn);
+            ev_loop.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
+        }
+
         let mut tiny = Tiny {
-            conns: Vec::with_capacity(config::SERVERS.len()),
+            conns: conns,
+            defaults: defaults,
+            servers: servers,
             tui: TUI::new(),
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from("logs")),
@@ -50,7 +67,6 @@ impl Tiny {
         tiny.init_mention_tab();
         tiny.tui.draw();
 
-        let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
         // we maintain this separately as otherwise we're having borrow checker problems
         let mut ev_buffer = vec![];
         ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, tiny| {
@@ -89,13 +105,6 @@ impl Tiny {
                 // tiny.tui.draw();
             }
         }));
-
-        for server in config::SERVERS.iter() {
-            let conn = Conn::from_server(server);
-            let fd = conn.get_raw_fd();
-            tiny.conns.push(conn);
-            ev_loop.add_fd(fd, READ_EV, mk_sock_ev_handler(fd));
-        }
 
         ev_loop.run(tiny);
     }
@@ -279,13 +288,13 @@ impl Tiny {
                 None => {
                     self.logger.get_debug_logs().write_line(
                         format_args!("connecting to {} {}", serv_name, serv_port));
-                    Conn::from_server(&config::Server {
-                        server_addr: serv_name,
+                    Conn::from_server(config::Server {
+                        server_addr: serv_name.to_owned(),
                         server_port: serv_port,
-                        hostname: config::DEFAULT_HOSTNAME,
-                        real_name: config::DEFAULT_REAL_NAME,
-                        nicks: config::DEFAULT_NICKS,
-                        auto_cmds: config::DEFAULT_AUTO_CMDS,
+                        hostname: self.defaults.hostname.clone(),
+                        real_name: self.defaults.realname.clone(),
+                        nicks: self.defaults.nicks.clone(),
+                        auto_cmds: self.defaults.auto_cmds.clone(),
                     })
                 }
             }
@@ -400,9 +409,10 @@ impl Tiny {
                     {
                         let conn = &self.conns[conn_idx];
                         let conn_name = conn.get_serv_name();
-                        for server in config::SERVERS.iter() {
+                        for server in &self.servers {
                             if server.server_addr == conn_name {
-                                serv_auto_cmds = Some((server.server_addr, server.auto_cmds));
+                                // redundant clone() here because of aliasing
+                                serv_auto_cmds = Some((server.server_addr.clone(), server.auto_cmds.clone()));
                                 break;
                             }
                         }
