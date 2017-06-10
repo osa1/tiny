@@ -118,7 +118,7 @@ pub const EXIT_DIALOGUE: Style =
 
 pub const HIGHLIGHT: Style =
     Style {
-        fg: 161,
+        fg: 9 | TB_BOLD,
         bg: TB_DEFAULT,
     };
 

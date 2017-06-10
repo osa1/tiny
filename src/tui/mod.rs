@@ -175,6 +175,7 @@ impl TUI {
 // Showing messages
 
 /// Target of a message coming from an IRC server.
+/// `size_of::<MsgTarget>() == 40`. Good idea to pass by reference.
 #[derive(Debug)]
 pub enum MsgTarget<'a> {
     Server { serv_name: &'a str },
@@ -214,6 +215,13 @@ impl TUI {
     /// nick/name and receive time and logged.
     pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.ui.add_privmsg(sender, msg, ts, target);
+    }
+
+    /// Similar to `add_privmsg`, except the whole message is highlighted.
+    pub fn add_privmsg_higlight(
+        &mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget)
+    {
+        self.ui.add_privmsg_higlight(sender, msg, ts, target);
     }
 
     /// A message without any explicit sender info. Useful for e.g. in server

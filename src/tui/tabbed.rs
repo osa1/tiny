@@ -604,7 +604,13 @@ impl Tabbed {
 
     pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab : &mut Tab| {
-            tab.widget.add_privmsg(sender, msg, ts);
+            tab.widget.add_privmsg(sender, msg, ts, false);
+        });
+    }
+
+    pub fn add_privmsg_higlight(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
+        self.apply_to_target(target, &|tab : &mut Tab| {
+            tab.widget.add_privmsg(sender, msg, ts, true);
         });
     }
 

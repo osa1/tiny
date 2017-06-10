@@ -47,7 +47,7 @@ impl Tiny {
             logger: Logger::new(PathBuf::from("logs")),
         };
 
-        tiny.tui.new_server_tab(""); // FIXME hack, close this after /connect
+        tiny.init_mention_tab();
         tiny.tui.draw();
 
         let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
@@ -91,8 +91,6 @@ impl Tiny {
         }));
 
         for server in config::SERVERS.iter() {
-            // close the hacky "" tab if it exists
-            tiny.tui.close_server_tab("");
             let conn = Conn::from_server(server);
             let fd = conn.get_raw_fd();
             tiny.conns.push(conn);
@@ -100,6 +98,13 @@ impl Tiny {
         }
 
         ev_loop.run(tiny);
+    }
+
+    fn init_mention_tab(&mut self) {
+        self.tui.new_server_tab("mentions");
+        self.tui.add_client_msg(
+            "Any mentions to you will be listed here.",
+            &MsgTarget::Server { serv_name: "mentions" });
     }
 
     fn handle_stdin(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, ev_buffer: &mut Vec<Event>) {
@@ -150,10 +155,6 @@ impl Tiny {
             self.join(src, words[1]);
         }
 
-        else if words[0] == "quit" {
-            ctrl.stop();
-        }
-
         else if words[0] == "msg" {
             // need to find index of the third word
             let mut word_indices = utils::split_whitespace_indices(&msg);
@@ -177,6 +178,9 @@ impl Tiny {
 
         else if words[0] == "close" {
             match src {
+                MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
+                    // ignore
+                }
                 MsgSource::Serv { serv_name } => {
                     self.tui.close_server_tab(&serv_name);
                     self.disconnect(ctrl, &serv_name);
@@ -188,11 +192,6 @@ impl Tiny {
                 MsgSource::User { serv_name, nick } => {
                     self.tui.close_user_tab(&serv_name, &nick);
                 }
-            }
-
-            // create the hacky "" tab if we closed the last tab
-            if self.tui.count_tabs() == 0 {
-                self.tui.new_server_tab(""); // FIXME hack, close this after /connect
             }
         }
 
@@ -270,8 +269,6 @@ impl Tiny {
 
         // otherwise create a new Conn, tab etc.
         self.tui.new_server_tab(serv_name);
-        // close the hacky "" tab if it exists
-        self.tui.close_server_tab("");
         self.tui.add_client_msg("Connecting...",
                                 &MsgTarget::Server { serv_name: serv_name });
 
@@ -332,8 +329,7 @@ impl Tiny {
     fn send_msg(&mut self, from: MsgSource, msg: &str) {
         match from {
             MsgSource::Serv { ref serv_name } => {
-                if serv_name == "" {
-                    // our hacky tab used when not connected to any servers
+                if serv_name == "mentions" {
                     self.tui.add_client_err_msg("Use `/connect <server>` to connect to a server",
                                                 &MsgTarget::CurrentTab);
 
@@ -461,14 +457,24 @@ impl Tiny {
                     wire::MsgTarget::Chan(chan) => {
                         self.logger.get_chan_logs(&conn.get_serv_name(), &chan).write_line(
                             format_args!("PRIVMSG: {}", msg));
-                        self.tui.add_privmsg(origin, &msg, ts, &MsgTarget::Chan {
+                        let msg_target = MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
                             chan_name: &chan,
-                        });
+                        };
+                        // highlight the message if it mentions us
+                        if msg.find(conn.get_nick()).is_some() {
+                            self.tui.add_privmsg_higlight(origin, &msg, ts, &msg_target);
+                            self.tui.add_msg(
+                                &format!("{} in {}:{}: {}",
+                                         origin, conn.get_serv_name(), chan, msg),
+                                ts,
+                                &MsgTarget::Server { serv_name: "mentions" });
+                        } else {
+                            self.tui.add_privmsg(origin, &msg, ts, &msg_target);
+                        }
                     }
                     wire::MsgTarget::User(_) => {
                         let msg_target = pfx_to_target(&pfx, conn.get_serv_name());
-                        // TODO: Set the topic if a new tab is created.
                         self.tui.add_privmsg(origin, &msg, ts, &msg_target);
                     }
                 }

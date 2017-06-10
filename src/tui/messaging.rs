@@ -221,7 +221,7 @@ impl MessagingUI {
         self.reset_activity_line();
     }
 
-    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp) {
+    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, higlight: bool) {
         self.reset_activity_line();
 
         let translated = translate_irc_colors(msg);
@@ -244,13 +244,8 @@ impl MessagingUI {
         self.msg_area.set_style(Style { fg: config::USER_MSG.fg | config::TB_BOLD, bg: config::USER_MSG.bg });
         self.msg_area.add_text(": ");
 
-        // Highlight the message if it mentions us
-        // let mentions_us = WordIdxs::new(msg).any(|&(word_left, word_right)|
-        //                                          msg[ word_left .. word_right ] == our_nick);
-        let mentions_us = false; // TODO
-
         self.msg_area.set_style(
-            if mentions_us {
+            if higlight {
                 config::HIGHLIGHT
             } else {
                 config::USER_MSG
