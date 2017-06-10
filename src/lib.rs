@@ -12,11 +12,11 @@ extern crate time;
 extern crate term_input;
 extern crate termbox_simple;
 
-mod config;
 mod conn;
 mod logger;
 mod utils;
 mod wire;
+pub mod config;
 pub mod trie;
 pub mod tui;
 
