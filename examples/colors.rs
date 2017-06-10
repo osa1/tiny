@@ -28,7 +28,7 @@ fn main() {
             libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
         };
 
-        ev_loop.add_signal(&sig_mask, Box::new(|_, tiny| {}));
+        ev_loop.add_signal(&sig_mask, Box::new(|_, _| {}));
     }
 
     ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, tui| {

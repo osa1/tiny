@@ -1,6 +1,6 @@
+#![cfg_attr(test, feature(test))]
 #![feature(alloc_system)]
 #![feature(offset_to)]
-#![feature(test)]
 
 extern crate alloc_system;
 extern crate ev_loop;
