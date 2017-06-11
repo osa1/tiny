@@ -31,7 +31,7 @@ struct Tab {
 
 #[derive(Copy, Clone)]
 pub enum TabStyle {
-    Important,
+    NewMsg,
     Highlight,
     Normal,
 }
@@ -39,7 +39,7 @@ pub enum TabStyle {
 impl TabStyle {
     pub fn get_style(self) -> Style {
         match self {
-            TabStyle::Important => config::TAB_IMPORTANT,
+            TabStyle::NewMsg => config::TAB_NEW_MSG,
             TabStyle::Highlight => config::TAB_HIGHLIGHT,
             TabStyle::Normal => config::TAB_NORMAL,
         }
@@ -126,7 +126,7 @@ impl Tabbed {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_server_tab(&mut self, serv_name : &str) -> Option<usize> {
+    pub fn new_server_tab(&mut self, serv_name: &str, select: bool) -> Option<usize> {
         match self.find_serv_tab_idx(&serv_name) {
             None => {
                 self.tabs.push(Tab {
@@ -135,38 +135,34 @@ impl Tabbed {
                     style: TabStyle::Normal,
                 });
                 let tab_idx = self.tabs.len() - 1;
-                self.select_tab(tab_idx);
+                if select { self.select_tab(tab_idx); }
                 Some(tab_idx)
             },
             Some(tab_idx) => {
-                self.select_tab(tab_idx);
+                if select { self.select_tab(tab_idx); }
                 None
             }
         }
     }
 
     /// Closes a server tab and all associated channel tabs.
-    pub fn close_server_tab(&mut self, serv_name_: &str) {
-        self.tabs.retain(|tab: &Tab| {
-            match tab.src {
-                MsgSource::Serv { ref serv_name }
-                    | MsgSource::Chan { ref serv_name, .. }
-                    | MsgSource::User { ref serv_name, .. }
-                    => serv_name_ != serv_name,
+    pub fn close_server_tab(&mut self, serv_name: &str) {
+        if let Some(tab_idx) = self.find_serv_tab_idx(serv_name) {
+            self.tabs.retain(|tab: &Tab| tab.src.serv_name() != serv_name);
+            if self.active_idx == tab_idx {
+                self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
-        });
-
-        self.select_tab(0); // FIXME
+        }
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str) -> Option<usize> {
+    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str, select: bool) -> Option<usize> {
         match self.find_chan_tab_idx(serv_name, chan_name) {
             None => {
                 match self.find_last_serv_tab_idx(serv_name) {
                     None => {
-                        self.new_server_tab(serv_name);
-                        self.new_chan_tab(serv_name, chan_name)
+                        self.new_server_tab(serv_name, false);
+                        self.new_chan_tab(serv_name, chan_name, select)
                     },
                     Some(tab_idx) => {
                         self.tabs.insert(tab_idx + 1, Tab {
@@ -175,39 +171,35 @@ impl Tabbed {
                                                    chan_name: chan_name.to_owned() },
                             style: TabStyle::Normal,
                         });
-                        self.select_tab(tab_idx + 1);
+                        if select { self.select_tab(tab_idx + 1); }
                         Some(tab_idx + 1)
                     }
                 }
             },
             Some(tab_idx) => {
-                self.select_tab(tab_idx);
+                if select { self.select_tab(tab_idx); }
                 None
             }
         }
     }
 
     pub fn close_chan_tab(&mut self, serv_name: &str, chan_name: &str) {
-        match self.find_chan_tab_idx(serv_name, chan_name) {
-            None => {
-                // TODO: report this bug
-            }
-            Some(tab_idx) => {
-                self.tabs.remove(tab_idx);
+        if let Some(tab_idx) = self.find_chan_tab_idx(serv_name, chan_name) {
+            self.tabs.remove(tab_idx);
+            if self.active_idx == tab_idx {
+                self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
-
-        self.select_tab(0); // FIXME
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_user_tab(&mut self, serv_name : &str, nick : &str) -> Option<usize> {
+    pub fn new_user_tab(&mut self, serv_name: &str, nick: &str, select: bool) -> Option<usize> {
         match self.find_user_tab_idx(serv_name, nick) {
             None => {
                 match self.find_last_serv_tab_idx(serv_name) {
                     None => {
-                        self.new_server_tab(serv_name);
-                        self.new_user_tab(serv_name, nick)
+                        self.new_server_tab(serv_name, false);
+                        self.new_user_tab(serv_name, nick, select)
                     },
                     Some(tab_idx) => {
                         self.tabs.insert(tab_idx + 1, Tab {
@@ -216,29 +208,25 @@ impl Tabbed {
                                                    nick: nick.to_owned() },
                             style: TabStyle::Normal,
                         });
-                        self.select_tab(tab_idx + 1);
+                        if select { self.select_tab(tab_idx + 1); }
                         Some(tab_idx + 1)
                     }
                 }
             },
             Some(tab_idx) => {
-                self.select_tab(tab_idx);
+                if select { self.select_tab(tab_idx); }
                 None
             }
         }
     }
 
     pub fn close_user_tab(&mut self, serv_name: &str, nick: &str) {
-        match self.find_user_tab_idx(serv_name, nick) {
-            None => {
-                // TODO: report this bug
-            }
-            Some(tab_idx) => {
-                self.tabs.remove(tab_idx);
+        if let Some(tab_idx) = self.find_user_tab_idx(serv_name, nick) {
+            self.tabs.remove(tab_idx);
+            if self.active_idx == tab_idx {
+                self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
-
-        self.select_tab(0); // FIXME
     }
 
     pub fn keypressed(&mut self, key : Key) -> TabbedRet {
@@ -289,8 +277,8 @@ fn arrow_style(tabs: &[Tab]) -> Style {
 
     for tab in tabs  {
         match tab.style {
-            TabStyle::Important => {
-                arrow_style = config::TAB_IMPORTANT;
+            TabStyle::NewMsg => {
+                arrow_style = config::TAB_NEW_MSG;
                 break;
             }
             TabStyle::Highlight => {
@@ -409,16 +397,27 @@ impl Tabbed {
     fn select_tab(&mut self, tab_idx: usize) {
         if tab_idx < self.active_idx {
             while tab_idx < self.active_idx {
-                self.prev_tab();
+                self.prev_tab_();
             }
         } else {
             while tab_idx > self.active_idx {
-                self.next_tab();
+                self.next_tab_();
             }
         }
+        self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
 
     fn next_tab(&mut self) {
+        self.next_tab_();
+        self.tabs[self.active_idx].set_style(TabStyle::Normal);
+    }
+
+    fn prev_tab(&mut self) {
+        self.prev_tab_();
+        self.tabs[self.active_idx].set_style(TabStyle::Normal);
+    }
+
+    fn next_tab_(&mut self) {
         if self.active_idx == self.tabs.len() - 1 {
             self.active_idx = 0;
             self.h_scroll = 0;
@@ -437,11 +436,11 @@ impl Tabbed {
         }
     }
 
-    fn prev_tab(&mut self) {
+    fn prev_tab_(&mut self) {
         if self.active_idx == 0 {
             let next_active = self.tabs.len() - 1;
             while self.active_idx != next_active {
-                self.next_tab();
+                self.next_tab_();
             }
         } else {
             let next_active = self.active_idx - 1;
@@ -460,8 +459,8 @@ impl Tabbed {
     ////////////////////////////////////////////////////////////////////////////
     // Interfacing with tabs
 
-    fn apply_to_target<F>(&mut self, target : &MsgTarget, f : &F)
-            where F : Fn(&mut Tab) -> () {
+    fn apply_to_target<F>(&mut self, target: &MsgTarget, f: &F)
+            where F: Fn(&mut Tab, bool) {
 
         // Creating a vector just to make borrow checker happy. Borrow checker
         // sucks once more. Here it sucks 2x, I can't even create a Vec<&mut Tab>,
@@ -554,7 +553,7 @@ impl Tabbed {
         }
 
         for tab_idx in target_idxs {
-            f(unsafe { self.tabs.get_unchecked_mut(tab_idx) });
+            f(unsafe { self.tabs.get_unchecked_mut(tab_idx) }, self.active_idx == tab_idx);
         }
     }
 
@@ -567,15 +566,15 @@ impl Tabbed {
         }
         match *target {
             MsgTarget::Server { serv_name } => {
-                opt_to_vec(self.new_server_tab(serv_name))
+                opt_to_vec(self.new_server_tab(serv_name, false))
             },
 
             MsgTarget::Chan { serv_name, chan_name } => {
-                opt_to_vec(self.new_chan_tab(serv_name, chan_name))
+                opt_to_vec(self.new_chan_tab(serv_name, chan_name, false))
             },
 
             MsgTarget::User { serv_name, nick } => {
-                opt_to_vec(self.new_user_tab(serv_name, nick))
+                opt_to_vec(self.new_user_tab(serv_name, nick, false))
             },
 
             MsgTarget::MultipleTabs(ref targets) => {
@@ -587,65 +586,69 @@ impl Tabbed {
     }
 
     pub fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab| tab.set_style(style));
+        self.apply_to_target(target, &|tab: &mut Tab, is_active: bool| {
+            if !is_active {
+                tab.set_style(style);
+            }
+        });
     }
 
     pub fn add_client_err_msg(&mut self, msg : &str, target : &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_client_err_msg(msg);
         });
     }
 
     pub fn add_client_msg(&mut self, msg : &str, target : &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_client_msg(msg);
         });
     }
 
     pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_privmsg(sender, msg, ts, false);
         });
     }
 
     pub fn add_privmsg_higlight(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_privmsg(sender, msg, ts, true);
         });
     }
 
     pub fn add_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_msg(msg, ts);
         });
     }
 
     pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_err_msg(msg, ts);
         });
     }
 
     pub fn show_topic(&mut self, title: &str, ts: Timestamp, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.show_topic(title, ts);
         });
     }
 
     pub fn add_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.join(nick, ts);
         });
     }
 
     pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.part(nick, ts);
         });
     }
 
     pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab : &mut Tab| {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, ts);
         });
     }

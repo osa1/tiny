@@ -28,6 +28,7 @@ use ev_loop::{EvLoop, EvLoopCtrl, READ_EV, FdEv};
 use logger::Logger;
 use term_input::{Input, Event};
 use tui::tabbed::MsgSource;
+use tui::tabbed::TabStyle;
 use tui::{TUI, TUIRet, MsgTarget, Timestamp};
 use wire::{Cmd, Msg, Pfx};
 
@@ -110,7 +111,7 @@ impl Tiny {
     }
 
     fn init_mention_tab(&mut self) {
-        self.tui.new_server_tab("mentions");
+        self.tui.new_server_tab("mentions", false);
         self.tui.add_client_msg(
             "Any mentions to you will be listed here.",
             &MsgTarget::Server { serv_name: "mentions" });
@@ -131,7 +132,7 @@ impl Tiny {
                     // We know msg has at least one character as the TUI won't accept it otherwise.
                     if msg[0] == '/' {
                         let msg_str: String = (&msg[ 1 .. ]).into_iter().cloned().collect();
-                        self.handle_command(ctrl, from, &msg_str);
+                        self.handle_command(ctrl, from, &msg_str, true);
                     } else {
                         self.send_msg(from, &msg.into_iter().collect::<String>());
                     }
@@ -146,7 +147,9 @@ impl Tiny {
         }
     }
 
-    fn handle_command(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: &str) {
+    fn handle_command(
+        &mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: &str, switch_tabs: bool)
+    {
         let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
 
         if words[0] == "connect" && words.len() == 2 {
@@ -172,7 +175,7 @@ impl Tiny {
             if let Some(msg_begins) = word_indices.next() {
                 let msg = &msg[msg_begins ..];
                 let serv = src.serv_name();
-                self.tui.new_user_tab(serv, words[1]);
+                self.tui.new_user_tab(serv, words[1], switch_tabs);
                 self.send_msg(
                     MsgSource::User {
                         serv_name: serv.to_owned(),
@@ -277,7 +280,7 @@ impl Tiny {
         }
 
         // otherwise create a new Conn, tab etc.
-        self.tui.new_server_tab(serv_name);
+        self.tui.new_server_tab(serv_name, false);
         self.tui.add_client_msg("Connecting...",
                                 &MsgTarget::Server { serv_name: serv_name });
 
@@ -422,7 +425,8 @@ impl Tiny {
                             self.handle_command(
                                 ctrl,
                                 MsgSource::Serv { serv_name: serv_name.to_owned() },
-                                cmd);
+                                cmd,
+                                false /* don't change tabs in auto commands */);
                         }
                     }
                 }
@@ -488,18 +492,28 @@ impl Tiny {
                         // highlight the message if it mentions us
                         if msg.find(conn.get_nick()).is_some() {
                             self.tui.add_privmsg_higlight(origin, &msg, ts, &msg_target);
+                            self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
+                            let mentions_target = MsgTarget::Server { serv_name: "mentions" };
                             self.tui.add_msg(
                                 &format!("{} in {}:{}: {}",
                                          origin, conn.get_serv_name(), chan, msg),
                                 ts,
-                                &MsgTarget::Server { serv_name: "mentions" });
+                                &mentions_target);
+                            self.tui.set_tab_style(TabStyle::Highlight, &mentions_target);
                         } else {
                             self.tui.add_privmsg(origin, &msg, ts, &msg_target);
+                            self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                         }
                     }
-                    wire::MsgTarget::User(_) => {
+                    wire::MsgTarget::User(target) => {
                         let msg_target = pfx_to_target(&pfx, conn.get_serv_name());
                         self.tui.add_privmsg(origin, &msg, ts, &msg_target);
+                        if target == conn.get_nick() {
+                            self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
+                        } else {
+                            // not sure if this case can happen
+                            self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                        }
                     }
                 }
             }
@@ -515,7 +529,7 @@ impl Tiny {
                         self.logger.get_chan_logs(serv_name, &chan).write_line(
                             format_args!("JOIN: {}", nick));
                         if nick == conn.get_nick() {
-                            self.tui.new_chan_tab(&serv_name, &chan);
+                            self.tui.new_chan_tab(&serv_name, &chan, false);
                         } else {
                             self.tui.add_nick(
                                 &nick,

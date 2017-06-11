@@ -231,14 +231,14 @@ pub const TAB_NORMAL: Style =
         bg: 0,
     };
 
-pub const TAB_IMPORTANT: Style =
+pub const TAB_NEW_MSG: Style =
     Style {
-        fg: 9 | TB_BOLD,
+        fg: 5,
         bg: 0,
     };
 
 pub const TAB_HIGHLIGHT: Style =
     Style {
-        fg: 5,
+        fg: 9 | TB_BOLD,
         bg: 0,
     };
