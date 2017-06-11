@@ -7,6 +7,7 @@ readme = "README.md"
 license = "MIT"
 keywords = ["irc"]
 categories = ["network-programming"]
+description = "An IRC client"
 
 [workspace]
 
