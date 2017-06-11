@@ -172,9 +172,16 @@ fn bench_trie_build(b : &mut Bencher) {
     let mut contents = String::new();
     let mut words : Vec<&str> = vec![];
     {
-        let mut file = File::open("/usr/share/dict/american").unwrap();
-        file.read_to_string(&mut contents).unwrap();
-        words.extend(contents.lines());
+        match File::open("/usr/share/dict/american") {
+            Err(_) => {
+                println!("Can't open dictionary file, aborting benchmark.");
+                return;
+            }
+            Ok(mut file) => {
+                file.read_to_string(&mut contents).unwrap();
+                words.extend(contents.lines());
+            }
+        }
     }
 
     b.iter(|| {
@@ -228,9 +235,16 @@ fn bench_trie_lookup(b : &mut Bencher) {
     let mut contents = String::new();
     let mut words : Vec<&str> = vec![];
     {
-        let mut file = File::open("/usr/share/dict/american").unwrap();
-        file.read_to_string(&mut contents).unwrap();
-        words.extend(contents.lines());
+        match File::open("/usr/share/dict/american") {
+            Err(_) => {
+                println!("Can't open dictionary file, aborting benchmark.");
+                return;
+            }
+            Ok(mut file) => {
+                file.read_to_string(&mut contents).unwrap();
+                words.extend(contents.lines());
+            }
+        }
     }
 
     let mut trie = Trie::new();
@@ -253,9 +267,16 @@ fn bench_trie_list_all(b : &mut Bencher) {
     let mut contents = String::new();
     let mut words : Vec<&str> = vec![];
     {
-        let mut file = File::open("/usr/share/dict/american").unwrap();
-        file.read_to_string(&mut contents).unwrap();
-        words.extend(contents.lines());
+        match File::open("/usr/share/dict/american") {
+            Err(_) => {
+                println!("Can't open dictionary file, aborting benchmark.");
+                return;
+            }
+            Ok(mut file) => {
+                file.read_to_string(&mut contents).unwrap();
+                words.extend(contents.lines());
+            }
+        }
     }
 
     let mut trie = Trie::new();
