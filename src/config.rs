@@ -52,7 +52,7 @@ pub fn get_defaults() -> Defaults {
 
 fn get_config_path() -> PathBuf {
     let mut config_path = home_dir().unwrap();
-    config_path.push(".tinyrc.yaml");
+    config_path.push(".tinyrc.yml");
     config_path
 }
 
