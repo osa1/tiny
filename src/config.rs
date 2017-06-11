@@ -129,8 +129,8 @@ pub fn read_config() -> Option<(Vec<Server>, Defaults)> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Colors used to highlight nicks
-pub static NICK_COLORS: [u8; 15] =
-    [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 ];
+pub static NICK_COLORS: [u8; 13] =
+    [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ];
 
 pub use termbox_simple::*;
 
@@ -151,13 +151,13 @@ pub const CLEAR: Style =
 
 pub const USER_MSG: Style =
     Style {
-        fg: 15,
+        fg: 0,
         bg: TB_DEFAULT,
     };
 
 pub const ERR_MSG: Style =
     Style {
-        fg: 15 | TB_BOLD,
+        fg: 0 | TB_BOLD,
         bg: 1,
     };
 
@@ -215,13 +215,13 @@ pub const COMPLETION: Style =
 
 pub const TIMESTAMP: Style =
     Style {
-        fg: 15 | TB_BOLD,
+        fg: 0 | TB_BOLD,
         bg: TB_DEFAULT,
     };
 
 pub const TAB_ACTIVE: Style =
     Style {
-        fg: 15 | TB_BOLD,
+        fg: 0 | TB_BOLD,
         bg: 0,
     };
 
