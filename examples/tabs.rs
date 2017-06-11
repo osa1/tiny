@@ -17,21 +17,21 @@ fn main() {
 
     for serv_idx in 0 .. 10 {
         let server = format!("server_{}", serv_idx);
-        tui.new_server_tab(&server);
+        tui.new_server_tab(&server, false);
 
-        tui.new_chan_tab(&server, "chan_0");
-        tui.set_tab_style(TabStyle::Important, &MsgTarget::Chan {
+        tui.new_chan_tab(&server, "chan_0", false);
+        tui.set_tab_style(TabStyle::NewMsg, &MsgTarget::Chan {
             serv_name: &server,
             chan_name: "chan_0"
         });
 
-        tui.new_chan_tab(&server, "chan_1");
+        tui.new_chan_tab(&server, "chan_1", false);
         tui.set_tab_style(TabStyle::Highlight, &MsgTarget::Chan {
             serv_name: &server,
             chan_name: "chan_1"
         });
 
-        tui.new_chan_tab(&server, "chan_2");
+        tui.new_chan_tab(&server, "chan_2", false);
     }
 
     tui.draw();

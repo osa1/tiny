@@ -15,7 +15,7 @@ use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
     let mut tui = TUI::new();
-    tui.new_server_tab("debug");
+    tui.new_server_tab("debug", false);
     let debug_tab = MsgTarget::Server { serv_name: "debug" };
 
     tui.add_msg("Loading word list for auto-completion ...",
