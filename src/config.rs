@@ -56,7 +56,7 @@ fn get_config_path() -> PathBuf {
     config_path
 }
 
-pub fn read_config() -> Option<(Vec<Server>, Defaults)> {
+pub fn read_config() -> Option<(Vec<Server>, Defaults, String)> {
 
     // sigh ... what a mess
 
@@ -79,6 +79,10 @@ pub fn read_config() -> Option<(Vec<Server>, Defaults)> {
     let defaults_yaml: &Yaml =
         config_yaml[0].as_hash().unwrap()
             .get(&Yaml::String("defaults".to_owned())).unwrap();
+
+    let logs_yaml: &Yaml =
+        config_yaml[0].as_hash().unwrap()
+            .get(&Yaml::String("logs".to_owned())).unwrap();
 
     let mut servers = vec![];
 
@@ -121,7 +125,9 @@ pub fn read_config() -> Option<(Vec<Server>, Defaults)> {
                        .into_iter().map(|s| s.as_str().unwrap().to_owned()).collect(),
     };
 
-    Some((servers, defaults))
+    let logs = logs_yaml.as_str().unwrap().to_owned();
+
+    Some((servers, defaults, logs))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

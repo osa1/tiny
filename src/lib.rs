@@ -45,8 +45,9 @@ impl Tiny {
     pub fn run() {
         let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
 
-        let (servers, defaults) =
-            config::read_config().unwrap_or_else(|| (vec![], config::get_defaults()));
+        let (servers, defaults, log_dir) =
+            config::read_config().unwrap_or_else(
+                || (vec![], config::get_defaults(), "tiny_logs".to_owned()));
 
         let mut conns = Vec::with_capacity(servers.len());
         for server in servers.iter().cloned() {
@@ -62,7 +63,7 @@ impl Tiny {
             servers: servers,
             tui: TUI::new(),
             input_ev_handler: Input::new(),
-            logger: Logger::new(PathBuf::from("logs")),
+            logger: Logger::new(PathBuf::from(log_dir)),
         };
 
         tiny.init_mention_tab();
