@@ -341,15 +341,6 @@ impl Conn {
     }
 }
 
-macro_rules! try_opt {
-    ($expr:expr) => (match $expr {
-        Option::Some(val) => val,
-        Option::None => {
-            return Option::None
-        }
-    })
-}
-
 /// Try to parse servername in a 002 RPL_YOURHOST reply
 fn parse_servername(params: &[String]) -> Option<String> {
     let msg = try_opt!(params.get(1).or(params.get(0)));

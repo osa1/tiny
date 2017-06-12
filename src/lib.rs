@@ -12,9 +12,11 @@ extern crate yaml_rust;
 extern crate term_input;
 extern crate termbox_simple;
 
+#[macro_use]
+mod utils;
+
 mod conn;
 mod logger;
-mod utils;
 mod wire;
 pub mod config;
 pub mod trie;
