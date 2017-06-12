@@ -7,6 +7,7 @@ use yaml_rust::ScanError;
 
 use std::env::home_dir;
 use std::fs::File;
+use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::error;
@@ -81,12 +82,14 @@ fn get_config_path() -> PathBuf {
 #[derive(Debug)]
 pub enum ConfigError {
     Scan(ScanError),
+    Io(io::Error),
 }
 impl error::Error for ConfigError {
     fn description(&self) -> &str {
         use self::ConfigError::*;
         match *self {
             Scan(ref e) => e.description(),
+            Io(ref e) => e.description(),
         }
     }
 }
@@ -95,6 +98,7 @@ impl fmt::Display for ConfigError {
         use self::ConfigError::*;
         let message = match *self {
             Scan(ref e) => e.to_string(), 
+            Io(ref e) => e.to_string(),
         };
         write!(f, "{}", message)
     }
@@ -102,6 +106,11 @@ impl fmt::Display for ConfigError {
 impl From<ScanError> for ConfigError {
     fn from(e: ScanError) -> ConfigError {
         ConfigError::Scan(e)
+    }
+}
+impl From<io::Error> for ConfigError {
+    fn from(e: io::Error) -> ConfigError {
+        ConfigError::Io(e)
     }
 }
 pub fn read_config() -> Result<Option<Config>, ConfigError> {
@@ -113,9 +122,9 @@ pub fn read_config() -> Result<Option<Config>, ConfigError> {
         if !config_path.exists() {
             return Ok(None);
         }
-        let mut config_file = File::open(get_config_path()).unwrap();
+        let mut config_file = File::open(get_config_path())?;
         let mut config_str = String::new();
-        config_file.read_to_string(&mut config_str).unwrap();
+        config_file.read_to_string(&mut config_str)?;
         config_str
     };
 
