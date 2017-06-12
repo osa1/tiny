@@ -3,12 +3,16 @@
 
 use yaml_rust::Yaml;
 use yaml_rust::YamlLoader;
+use yaml_rust::ScanError;
 
 use std::env::home_dir;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::error;
+use std::fmt;
 
+#[derive(Debug, Clone)]
 pub struct Config {
     ///List of servers
     pub servers: Vec<Server>,
@@ -74,15 +78,40 @@ fn get_config_path() -> PathBuf {
     config_path.push(".tinyrc.yml");
     config_path
 }
-
-pub fn read_config() -> Option<(Vec<Server>, Defaults, String)> {
+#[derive(Debug)]
+pub enum ConfigError {
+    Scan(ScanError),
+}
+impl error::Error for ConfigError {
+    fn description(&self) -> &str {
+        use self::ConfigError::*;
+        match *self {
+            Scan(ref e) => e.description(),
+        }
+    }
+}
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        use self::ConfigError::*;
+        let message = match *self {
+            Scan(ref e) => e.to_string(), 
+        };
+        write!(f, "{}", message)
+    }
+}
+impl From<ScanError> for ConfigError {
+    fn from(e: ScanError) -> ConfigError {
+        ConfigError::Scan(e)
+    }
+}
+pub fn read_config() -> Result<Option<Config>, ConfigError> {
 
     // sigh ... what a mess
 
     let config_str = {
         let config_path = get_config_path();
         if !config_path.exists() {
-            return None;
+            return Ok(None);
         }
         let mut config_file = File::open(get_config_path()).unwrap();
         let mut config_str = String::new();
@@ -90,22 +119,22 @@ pub fn read_config() -> Option<(Vec<Server>, Defaults, String)> {
         config_str
     };
 
-    let config_yaml = YamlLoader::load_from_str(&config_str).unwrap();
+    let config_yaml = &YamlLoader::load_from_str(&config_str)?[0];
 
-    let servers_yaml: &Yaml = config_yaml[0]
+    let servers_yaml: &Yaml = config_yaml
         .as_hash()
         .unwrap()
         .get(&Yaml::String("servers".to_owned()))
         .unwrap();
     // duh, allocation for lookup
 
-    let defaults_yaml: &Yaml = config_yaml[0]
+    let defaults_yaml: &Yaml = config_yaml
         .as_hash()
         .unwrap()
         .get(&Yaml::String("defaults".to_owned()))
         .unwrap();
 
-    let logs_yaml: &Yaml = config_yaml[0]
+    let logs_yaml: &Yaml = config_yaml
         .as_hash()
         .unwrap()
         .get(&Yaml::String("logs".to_owned()))
@@ -207,7 +236,7 @@ pub fn read_config() -> Option<(Vec<Server>, Defaults, String)> {
 
     let logs = logs_yaml.as_str().unwrap().to_owned();
 
-    Some((servers, defaults, logs))
+    Ok(Some(Config::new(servers, defaults, logs)))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
