@@ -9,14 +9,23 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-pub struct Config<P: AsRef<Path>> {
+pub struct Config {
     ///List of servers
     pub servers: Vec<Server>,
     ///Defaults: see definition for Defaults struct
     pub defaults: Defaults,
     ///Path to store chatlogs
-    pub logs: P, //Using AsRef<Path> as opposed to String
-                 //this way, things other than Strings can be used as logs
+    pub logs: PathBuf,
+}
+
+impl Config {
+    pub fn new<P: AsRef<Path>>(servers: Vec<Server>, defaults: Defaults, logs: P) -> Config {
+        Config {
+            servers: servers,
+            defaults: defaults,
+            logs: logs.as_ref().to_path_buf(), //convert to owned
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
