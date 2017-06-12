@@ -4,9 +4,9 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![crates.io](http://meritbadge.herokuapp.com/tiny)](https://crates.io/crates/tiny)
 
-Tiny is an IRC client written in Rust.
+tiny is an IRC client written in Rust.
 
-![Tiny in action](tiny.png)
+![tiny in action](tiny.png)
 
 ## Features
 
@@ -166,3 +166,9 @@ start, open an issue and I'd love to help.
   that tiny currently doesn't support, maybe we should implement a "send raw
   message" command so that any user can directly send an IRC message to a server
   without any support from tiny.
+
+- Implement away mode
+
+- Implement system notification support for private messages and highlights.
+  When to show (and maybe even how to show) a notification should be
+  configurable as otherwise it may be annoying.
