@@ -23,6 +23,7 @@ pub mod trie;
 pub mod tui;
 
 use config::Config;
+use config::ConfigError;
 
 use std::os::unix::io::RawFd;
 use std::path::PathBuf;
@@ -125,8 +126,8 @@ impl Tiny {
 
                 ev_loop.run(tiny);
             }
-            Err(e) => {
-                write!(io::stderr(), "Error loading config: {}", e)
+            Err(ConfigError::Scan(e)) => {
+                write!(io::stderr(), "Error parsing config file: {}", e)
                     .expect("Failed to write to stdout");
             }
         }
