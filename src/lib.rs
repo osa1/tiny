@@ -50,10 +50,10 @@ pub struct Tiny {
 
 impl Tiny {
     pub fn run() {
-        let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
 
         match config::read_config() {
             Ok(config) => {
+                let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
                 let config = config.unwrap_or_else(|| {
                                                        Config::new(vec![],
                                                                    config::get_defaults(),
@@ -128,6 +128,10 @@ impl Tiny {
             }
             Err(ConfigError::Scan(e)) => {
                 write!(io::stderr(), "Error parsing config file: {}", e)
+                    .expect("Failed to write to stdout");
+            }
+            Err(e) => {
+                write!(io::stderr(), "Error loading config file: {}", e)
                     .expect("Failed to write to stdout");
             }
         }
