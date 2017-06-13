@@ -106,22 +106,12 @@ impl MessagingUI {
                 WidgetRet::KeyHandled
             },
 
-            Key::Ctrl('u') => {
+            Key::Ctrl('u') | Key::PageUp => {
                 self.msg_area.page_up();
                 WidgetRet::KeyHandled
             },
 
-            Key::Ctrl('d') => {
-                self.msg_area.page_down();
-                WidgetRet::KeyHandled
-            },
-
-            Key::PageUp => {
-                self.msg_area.page_up();
-                WidgetRet::KeyHandled
-            },
-
-            Key::PageDown => {
+            Key::Ctrl('d') | Key::PageDown => {
                 self.msg_area.page_down();
                 WidgetRet::KeyHandled
             },
@@ -168,7 +158,7 @@ impl MessagingUI {
     }
 
     fn toggle_exit_dialogue(&mut self) {
-        assert!(self.input_field.len() > 0);
+        assert!(!self.input_field.is_empty());
         // FIXME: This is a bit too fragile I think. Since we only stack an exit
         // dialogue on top of the input field at the moment, checking the len()
         // is fine. If we decide to stack more stuff it'll break.
@@ -229,7 +219,7 @@ impl MessagingUI {
         let translated = translate_irc_colors(msg);
         let msg = {
             match translated {
-                Some(ref str) => &str,
+                Some(ref str) => str,
                 None => msg,
             }
         };
