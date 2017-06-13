@@ -271,7 +271,9 @@ impl Conn {
         self.buf.extend(slice.iter().filter(|c| **c != 0x1 /* SOH */ ||
                                                 **c != 0x2 /* STX */ ||
                                                 **c != 0x0 /* NUL */ ||
-                                                **c != 0x4 /* EOT */ ));
+                                                **c != 0x4 /* EOT */ ||
+                                                **c != 0xE /* SO  */ ||
+                                                **c != 0xF /* SI  */ ));
     }
 
     fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
