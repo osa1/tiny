@@ -1,5 +1,6 @@
 #![cfg_attr(test, feature(test))]
 #![feature(alloc_system)]
+#![feature(ascii_ctype)]
 #![feature(offset_to)]
 
 extern crate alloc_system;

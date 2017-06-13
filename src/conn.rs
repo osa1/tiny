@@ -256,24 +256,13 @@ impl Conn {
             }
             Ok(bytes_read) => {
                 self.reset_ticks();
-                self.add_to_msg_buf(&read_buf[ 0 .. bytes_read ]);
+                self.buf.extend(&read_buf[ 0 .. bytes_read ]);
                 self.handle_msgs(evs, logger);
                 if bytes_read == 0 {
                     evs.push(ConnEv::Disconnected);
                 }
             }
         }
-    }
-
-    fn add_to_msg_buf(&mut self, slice: &[u8]) {
-        // Some invisible ASCII characters causing glitches on some terminals,
-        // we filter those out here.
-        self.buf.extend(slice.iter().filter(|c| **c != 0x1 /* SOH */ ||
-                                                **c != 0x2 /* STX */ ||
-                                                **c != 0x0 /* NUL */ ||
-                                                **c != 0x4 /* EOT */ ||
-                                                **c != 0xE /* SO  */ ||
-                                                **c != 0xF /* SI  */ ));
     }
 
     fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {

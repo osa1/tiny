@@ -1,6 +1,7 @@
 use termbox_simple::Termbox;
 use term_input::Key;
 
+use std::ascii::AsciiExt;
 use std::collections::HashMap;
 use std::convert::From;
 use std::iter::Peekable;
@@ -225,15 +226,7 @@ impl MessagingUI {
 
     pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, higlight: bool) {
         self.reset_activity_line();
-
-        let translated = translate_irc_colors(msg);
-        let msg = {
-            match translated {
-                Some(ref str) => &str,
-                None => msg,
-            }
-        };
-
+        let msg = translate_irc_control_chars(&msg);
         self.add_timestamp(ts);
 
         {
@@ -253,7 +246,7 @@ impl MessagingUI {
                 config::USER_MSG
             });
 
-        self.msg_area.add_text(msg);
+        self.msg_area.add_text(&msg);
         self.msg_area.flush_line();
     }
 
@@ -365,75 +358,85 @@ impl MessagingUI {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Parse at least one, at most two digits.
+/// Parse at least one, at most two digits. Does not consume the iterator when
+/// result is `None`.
 fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
 
     fn to_dec(ch: char) -> Option<u8> {
         ch.to_digit(10).map(|c| c as u8)
     }
 
-    let c1_digit = try_opt!(to_dec(try_opt!(chars.next())));
+    let c1_char = *try_opt!(chars.peek());
+    let c1_digit = match to_dec(c1_char) {
+        None => { return None; },
+        Some(c1_digit) => {
+            chars.next();
+            c1_digit
+        }
+    };
 
-    // Can't peek() and consume so using this indirection
-    let ret;
-    let mut consume = false;
-
-    match chars.peek() {
-        None => { ret = Some(c1_digit); }
-        Some(c2) =>
-            match to_dec(*c2) {
-                None => { ret = Some(c1_digit); }
+    match chars.peek().cloned() {
+        None =>
+            Some(c1_digit),
+        Some(c2) => {
+            match to_dec(c2) {
+                None =>
+                    Some(c1_digit),
                 Some(c2_digit) => {
-                    ret = Some(c1_digit * 10 + c2_digit);
-                    consume = true;
+                    chars.next();
+                    Some(c1_digit * 10 + c2_digit)
                 }
-            }
-    }
-
-    if consume { chars.next(); }
-    ret
-}
-
-fn translate_irc_colors(str : &str) -> Option<String> {
-    // Most messages won't have any colors, so we have this fast path here
-    if str.find(IRC_COLOR_PREFIX).is_none() {
-        return None;
-    }
-
-    let mut ret = String::with_capacity(str.len());
-
-    let mut iter = str.chars().peekable();
-    while let Some(mut char) = iter.next() {
-        if char == IRC_COLOR_PREFIX {
-            let fg = try_opt!(parse_color_code(&mut iter));
-            if let Some(char_) = iter.next() {
-                if char_ == ',' {
-                    let bg = try_opt!(parse_color_code(&mut iter));
-                    ret.push(TERMBOX_COLOR_PREFIX);
-                    ret.push(0 as char); // style
-                    ret.push(irc_color_to_termbox(fg) as char);
-                    ret.push(irc_color_to_termbox(bg) as char);
-                    continue;
-                } else {
-                    ret.push(TERMBOX_COLOR_PREFIX);
-                    ret.push(0 as char); // style
-                    ret.push(irc_color_to_termbox(fg) as char);
-                    ret.push(irc_color_to_termbox(config::USER_MSG.bg as u8) as char);
-                    char = char_;
-                }
-            } else {
-                ret.push(TERMBOX_COLOR_PREFIX);
-                ret.push(0 as char); // style
-                ret.push(irc_color_to_termbox(fg) as char);
-                ret.push(irc_color_to_termbox(config::USER_MSG.bg as u8) as char);
-                break;
             }
         }
+    }
+}
 
-        ret.push(char);
+fn translate_irc_control_chars(str: &str) -> String {
+    let mut ret = String::with_capacity(str.len());
+    let mut iter = str.chars().peekable();
+
+    fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
+        ret.push(TERMBOX_COLOR_PREFIX);
+        ret.push(0 as char); // style
+        ret.push(irc_color_to_termbox(irc_fg) as char);
+        ret.push(irc_color_to_termbox(irc_bg.unwrap_or(config::USER_MSG.bg as u8)) as char);
     }
 
-    Some(ret)
+    while let Some(char) = iter.next() {
+        if char == IRC_COLOR_PREFIX {
+            match parse_color_code(&mut iter) {
+                None => {
+                    // just skip the control char
+                }
+                Some(fg) => {
+                    if let Some(char) = iter.peek().cloned() {
+                        if char == ',' {
+                            iter.next(); // consume ','
+                            match parse_color_code(&mut iter) {
+                                None => {
+                                    // comma was not part of the color code,
+                                    // add it to the new string
+                                    push_color(&mut ret, fg, None);
+                                    ret.push(char);
+                                }
+                                Some(bg) => {
+                                    push_color(&mut ret, fg, Some(bg));
+                                }
+                            }
+                        } else {
+                            push_color(&mut ret, fg, None);
+                        }
+                    } else {
+                        push_color(&mut ret, fg, None);
+                    }
+                }
+            }
+        } else if !char.is_ascii_control() {
+            ret.push(char);
+        }
+    }
+
+    ret
 }
 
 // IRC colors: http://en.wikichip.org/wiki/irc/colors
@@ -469,14 +472,5 @@ mod tests {
         assert_eq!(parse_color_code(&mut "1".chars().peekable()), Some(1));
         assert_eq!(parse_color_code(&mut "01".chars().peekable()), Some(1));
         assert_eq!(parse_color_code(&mut "1,".chars().peekable()), Some(1));
-    }
-
-    #[test]
-    fn color_translation() {
-        assert!(translate_irc_colors("\x034test").is_some());
-        assert!(translate_irc_colors("\x034,8test").is_some());
-        assert!(translate_irc_colors("\x034,08test").is_some());
-        assert!(translate_irc_colors("\x0304,8test").is_some());
-        assert!(translate_irc_colors("\x0304,08test").is_some());
     }
 }
