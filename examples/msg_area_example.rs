@@ -11,7 +11,7 @@ use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
     let mut tui = TUI::new();
-    tui.new_server_tab("debug", false);
+    tui.new_server_tab("debug");
     tui.draw();
 
     let mut ev_loop: EvLoop<TUI> = EvLoop::new();

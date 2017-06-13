@@ -126,7 +126,7 @@ impl Tabbed {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_server_tab(&mut self, serv_name: &str, select: bool) -> Option<usize> {
+    pub fn new_server_tab(&mut self, serv_name: &str) -> Option<usize> {
         match self.find_serv_tab_idx(&serv_name) {
             None => {
                 self.tabs.push(Tab {
@@ -135,11 +135,9 @@ impl Tabbed {
                     style: TabStyle::Normal,
                 });
                 let tab_idx = self.tabs.len() - 1;
-                if select { self.select_tab(tab_idx); }
                 Some(tab_idx)
             },
-            Some(tab_idx) => {
-                if select { self.select_tab(tab_idx); }
+            Some(_) => {
                 None
             }
         }
@@ -156,13 +154,13 @@ impl Tabbed {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str, select: bool) -> Option<usize> {
+    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str) -> Option<usize> {
         match self.find_chan_tab_idx(serv_name, chan_name) {
             None => {
                 match self.find_last_serv_tab_idx(serv_name) {
                     None => {
-                        self.new_server_tab(serv_name, false);
-                        self.new_chan_tab(serv_name, chan_name, select)
+                        self.new_server_tab(serv_name);
+                        self.new_chan_tab(serv_name, chan_name)
                     },
                     Some(tab_idx) => {
                         self.tabs.insert(tab_idx + 1, Tab {
@@ -171,13 +169,11 @@ impl Tabbed {
                                                    chan_name: chan_name.to_owned() },
                             style: TabStyle::Normal,
                         });
-                        if select { self.select_tab(tab_idx + 1); }
                         Some(tab_idx + 1)
                     }
                 }
             },
-            Some(tab_idx) => {
-                if select { self.select_tab(tab_idx); }
+            Some(_) => {
                 None
             }
         }
@@ -193,13 +189,13 @@ impl Tabbed {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_user_tab(&mut self, serv_name: &str, nick: &str, select: bool) -> Option<usize> {
+    pub fn new_user_tab(&mut self, serv_name: &str, nick: &str) -> Option<usize> {
         match self.find_user_tab_idx(serv_name, nick) {
             None => {
                 match self.find_last_serv_tab_idx(serv_name) {
                     None => {
-                        self.new_server_tab(serv_name, false);
-                        self.new_user_tab(serv_name, nick, select)
+                        self.new_server_tab(serv_name);
+                        self.new_user_tab(serv_name, nick)
                     },
                     Some(tab_idx) => {
                         self.tabs.insert(tab_idx + 1, Tab {
@@ -208,13 +204,11 @@ impl Tabbed {
                                                    nick: nick.to_owned() },
                             style: TabStyle::Normal,
                         });
-                        if select { self.select_tab(tab_idx + 1); }
                         Some(tab_idx + 1)
                     }
                 }
             },
-            Some(tab_idx) => {
-                if select { self.select_tab(tab_idx); }
+            Some(_) => {
                 None
             }
         }
@@ -566,15 +560,15 @@ impl Tabbed {
         }
         match *target {
             MsgTarget::Server { serv_name } => {
-                opt_to_vec(self.new_server_tab(serv_name, false))
+                opt_to_vec(self.new_server_tab(serv_name))
             },
 
             MsgTarget::Chan { serv_name, chan_name } => {
-                opt_to_vec(self.new_chan_tab(serv_name, chan_name, false))
+                opt_to_vec(self.new_chan_tab(serv_name, chan_name))
             },
 
             MsgTarget::User { serv_name, nick } => {
-                opt_to_vec(self.new_user_tab(serv_name, nick, false))
+                opt_to_vec(self.new_user_tab(serv_name, nick))
             },
 
             MsgTarget::MultipleTabs(ref targets) => {

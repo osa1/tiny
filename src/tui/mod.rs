@@ -63,24 +63,24 @@ impl TUI {
         self.ui.count_tabs()
     }
 
-    pub fn new_server_tab(&mut self, serv_name: &str, select: bool) {
-        self.ui.new_server_tab(serv_name, select);
+    pub fn new_server_tab(&mut self, serv_name: &str) {
+        self.ui.new_server_tab(serv_name);
     }
 
     pub fn close_server_tab(&mut self, serv_name: &str) {
         self.ui.close_server_tab(serv_name);
     }
 
-    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str, select: bool) {
-        self.ui.new_chan_tab(serv_name, chan_name, select);
+    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str) {
+        self.ui.new_chan_tab(serv_name, chan_name);
     }
 
     pub fn close_chan_tab(&mut self, serv_name: &str, chan_name: &str) {
         self.ui.close_chan_tab(serv_name, chan_name);
     }
 
-    pub fn new_user_tab(&mut self, serv_name: &str, nick: &str, select: bool) {
-        self.ui.new_user_tab(serv_name, nick, select);
+    pub fn new_user_tab(&mut self, serv_name: &str, nick: &str) {
+        self.ui.new_user_tab(serv_name, nick);
     }
 
     pub fn close_user_tab(&mut self, serv_name: &str, nick: &str) {

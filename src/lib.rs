@@ -22,6 +22,7 @@ pub mod config;
 pub mod trie;
 pub mod tui;
 
+use std::ascii::AsciiExt;
 use std::os::unix::io::{RawFd};
 use std::path::PathBuf;
 
@@ -114,7 +115,7 @@ impl Tiny {
     }
 
     fn init_mention_tab(&mut self) {
-        self.tui.new_server_tab("mentions", false);
+        self.tui.new_server_tab("mentions");
         self.tui.add_client_msg(
             "Any mentions to you will be listed here.",
             &MsgTarget::Server { serv_name: "mentions" });
@@ -135,7 +136,7 @@ impl Tiny {
                     // We know msg has at least one character as the TUI won't accept it otherwise.
                     if msg[0] == '/' {
                         let msg_str: String = (&msg[ 1 .. ]).into_iter().cloned().collect();
-                        self.handle_command(ctrl, from, &msg_str, true);
+                        self.handle_command(ctrl, from, &msg_str);
                     } else {
                         self.send_msg(from, &msg.into_iter().collect::<String>());
                     }
@@ -151,7 +152,7 @@ impl Tiny {
     }
 
     fn handle_command(
-        &mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: &str, switch_tabs: bool)
+        &mut self, ctrl: &mut EvLoopCtrl<Tiny>, src: MsgSource, msg: &str)
     {
         let words : Vec<&str> = msg.split_whitespace().into_iter().collect();
 
@@ -178,7 +179,6 @@ impl Tiny {
             if let Some(msg_begins) = word_indices.next() {
                 let msg = &msg[msg_begins ..];
                 let serv = src.serv_name();
-                self.tui.new_user_tab(serv, words[1], switch_tabs);
                 self.send_msg(
                     MsgSource::User {
                         serv_name: serv.to_owned(),
@@ -283,7 +283,7 @@ impl Tiny {
         }
 
         // otherwise create a new Conn, tab etc.
-        self.tui.new_server_tab(serv_name, false);
+        self.tui.new_server_tab(serv_name);
         self.tui.add_client_msg("Connecting...",
                                 &MsgTarget::Server { serv_name: serv_name });
 
@@ -380,9 +380,12 @@ impl Tiny {
             MsgSource::User { serv_name, nick } => {
                 let conn = find_conn(&mut self.conns, &serv_name).unwrap();
                 conn.privmsg(&nick, msg);
-                self.tui.add_privmsg(conn.get_nick(), msg,
-                                     Timestamp::now(),
-                                     &MsgTarget::User { serv_name: &serv_name, nick: &nick });
+                let msg_target = if nick.eq_ignore_ascii_case("nickserv") {
+                    MsgTarget::Server { serv_name: &serv_name }
+                } else {
+                    MsgTarget::User { serv_name: &serv_name, nick: &nick }
+                };
+                self.tui.add_privmsg(conn.get_nick(), msg, Timestamp::now(), &msg_target);
             }
         }
     }
@@ -425,11 +428,7 @@ impl Tiny {
                     }
                     if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
                         for cmd in auto_cmds.iter() {
-                            self.handle_command(
-                                ctrl,
-                                MsgSource::Serv { serv_name: serv_name.to_owned() },
-                                cmd,
-                                false /* don't change tabs in auto commands */);
+                            self.handle_command(ctrl, MsgSource::Serv { serv_name: serv_name.to_owned() }, cmd);
                         }
                     }
                 }
@@ -509,7 +508,15 @@ impl Tiny {
                         }
                     }
                     wire::MsgTarget::User(target) => {
-                        let msg_target = pfx_to_target(&pfx, conn.get_serv_name());
+                        let serv_name = conn.get_serv_name();
+                        let msg_target = match pfx {
+                            Pfx::Server(_) =>
+                                MsgTarget::Server { serv_name: serv_name },
+                            Pfx::User { ref nick, .. } if nick.eq_ignore_ascii_case("nickserv") =>
+                                MsgTarget::Server { serv_name: serv_name },
+                            Pfx::User { ref nick, .. } =>
+                                MsgTarget::User { serv_name: serv_name, nick: nick },
+                        };
                         self.tui.add_privmsg(origin, &msg, ts, &msg_target);
                         if target == conn.get_nick() {
                             self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
@@ -532,7 +539,7 @@ impl Tiny {
                         self.logger.get_chan_logs(serv_name, &chan).write_line(
                             format_args!("JOIN: {}", nick));
                         if nick == conn.get_nick() {
-                            self.tui.new_chan_tab(&serv_name, &chan, false);
+                            self.tui.new_chan_tab(&serv_name, &chan);
                         } else {
                             self.tui.add_nick(
                                 &nick,
@@ -690,13 +697,6 @@ impl Tiny {
                     format_args!("Ignoring msg:\nPfx: {:?}, msg: {:?}", pfx, msg.cmd));
             }
         }
-    }
-}
-
-fn pfx_to_target<'a>(pfx : &'a Pfx, curr_serv : &'a str) -> MsgTarget<'a> {
-    match *pfx {
-        Pfx::Server(_) => MsgTarget::Server { serv_name: curr_serv },
-        Pfx::User { ref nick, .. } => MsgTarget::User { serv_name: curr_serv, nick: nick },
     }
 }
 
