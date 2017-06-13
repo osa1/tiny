@@ -47,36 +47,32 @@ system calls used in tiny are not available on Windows.
 
 ## Configuration
 
-tiny looks for a `~/.tinyrc.yml` for configuration. Configuration files look
-like this:
+When tiny couldn't find a config file at `~/.tinyrc.yml` it creates one with
+some defaults and exits. Edit that file before re-running tiny to change the
+defaults. If you want to create the file yourself, the default file looks like
+this:
 
 ```yaml
-# servers to auto connect
+# Servers to auto-connect
 servers:
-
-    - addr: chat.freenode.net
+    - addr: irc.mozilla.org
       port: 6667
-      hostname: <your hostname>
-      realname: <your realname>
-      nicks: [<nick1>, <nick2>]
+      hostname: yourhost
+      realname: yourname
+      nicks: [tiny_user]
       auto_cmds:
-        - 'msg NickServ identify <your nick password>'
-        - 'join #haskell'
-        - 'join #ghc'
-        - 'join #osdev'
+          - 'msg NickServ identify hunter2'
+          - 'join #tiny'
 
-    - ... add more servers here ...
-
-# defaults used when connecting to a server via the `/connect` command
+# Defaults used when connecting to servers via the /connect command
 defaults:
-
-    nicks: [<nick>]
-    hostname: <your hostname>
-    realname: <your realname>
+    nicks: [tiny_user]
+    hostname: yourhost
+    realname: yourname
     auto_cmds: []
 
-# where to put log files
-logs: '/home/user/tiny_logs'
+# Where to put log files
+log_dir: '/home/user/tiny_logs'
 ```
 
 ## Key bindings

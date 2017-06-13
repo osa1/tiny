@@ -23,7 +23,9 @@ path = "bin/main.rs"
 ev_loop = { path = "ev_loop/" }
 libc = "0.2.22"
 net2 = "0.2.23"
+serde = "1.0.8"
+serde_yaml = "0.7.1"
 term_input = { path = "term_input/" }
 termbox_simple = { path = "termbox/" }
 time = "0.1"
-yaml-rust = { git = "https://github.com/chyh1990/yaml-rust.git" }
+serde_derive = "1.0.8"

@@ -101,7 +101,9 @@ mod tests {
 
         let str = "       ";
         let idxs: Vec<usize> = split_whitespace_indices(str).into_iter().collect();
-        assert_eq!(idxs, vec![]);
+        let expected: Vec<usize> = vec![];
+        // Next line fails when I inline `expected`. Probably a rustc bug.
+        assert_eq!(idxs, expected);
 
         let str = "  foo    bar  \n\r   baz     ";
         let idxs: Vec<usize> = split_whitespace_indices(str).into_iter().collect();

@@ -8,7 +8,9 @@ extern crate ev_loop;
 extern crate libc;
 extern crate net2;
 extern crate time;
-extern crate yaml_rust;
+extern crate serde;
+extern crate serde_yaml;
+#[macro_use] extern crate serde_derive;
 
 extern crate term_input;
 extern crate termbox_simple;
@@ -24,7 +26,10 @@ pub mod trie;
 pub mod tui;
 
 use std::ascii::AsciiExt;
-use std::os::unix::io::{RawFd};
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
+use std::os::unix::io::RawFd;
 use std::path::PathBuf;
 
 use conn::{Conn, ConnEv};
@@ -36,7 +41,48 @@ use tui::tabbed::TabStyle;
 use tui::{TUI, TUIRet, MsgTarget, Timestamp};
 use wire::{Cmd, Msg, Pfx};
 
-pub struct Tiny {
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn run() {
+    let config_path = config::get_config_path();
+    if !config_path.is_file() {
+        generate_default_config();
+    } else {
+        let contents = {
+            let mut str = String::new();
+            let mut file = File::open(config_path).unwrap();
+            file.read_to_string(&mut str).unwrap();
+            str
+        };
+
+        match serde_yaml::from_str(&contents) {
+            Err(yaml_err) => {
+                println!("Can't parse config file:");
+                println!("{}", yaml_err);
+                ::std::process::exit(1);
+            },
+            Ok(config::Config { servers, defaults, log_dir }) => {
+                Tiny::run(servers, defaults, log_dir)
+            }
+        }
+    }
+}
+
+fn generate_default_config() {
+    let config_path = config::get_config_path();
+    {
+        let mut file = File::create(&config_path).unwrap();
+        file.write_all(config::get_default_config_yaml().as_bytes()).unwrap();
+    }
+    println!("\
+tiny couldn't find a config file at {0:?}, and created a config file with defaults.
+You may want to edit {0:?} before re-running tiny.", config_path);
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct Tiny {
     conns: Vec<Conn>,
     defaults: config::Defaults,
     servers: Vec<config::Server>,
@@ -46,12 +92,8 @@ pub struct Tiny {
 }
 
 impl Tiny {
-    pub fn run() {
+    pub fn run(servers: Vec<config::Server>, defaults: config::Defaults, log_dir: String) {
         let mut ev_loop: EvLoop<Tiny> = EvLoop::new();
-
-        let (servers, defaults, log_dir) =
-            config::read_config().unwrap_or_else(
-                || (vec![], config::get_defaults(), "tiny_logs".to_owned()));
 
         let mut conns = Vec::with_capacity(servers.len());
         for server in servers.iter().cloned() {
@@ -296,10 +338,10 @@ impl Tiny {
                     self.logger.get_debug_logs().write_line(
                         format_args!("connecting to {} {}", serv_name, serv_port));
                     Conn::from_server(config::Server {
-                        server_addr: serv_name.to_owned(),
-                        server_port: serv_port,
+                        addr: serv_name.to_owned(),
+                        port: serv_port,
                         hostname: self.defaults.hostname.clone(),
-                        real_name: self.defaults.realname.clone(),
+                        realname: self.defaults.realname.clone(),
                         nicks: self.defaults.nicks.clone(),
                         auto_cmds: self.defaults.auto_cmds.clone(),
                     })
@@ -420,9 +462,9 @@ impl Tiny {
                         let conn = &self.conns[conn_idx];
                         let conn_name = conn.get_serv_name();
                         for server in &self.servers {
-                            if server.server_addr == conn_name {
+                            if server.addr == conn_name {
                                 // redundant clone() here because of aliasing
-                                serv_auto_cmds = Some((server.server_addr.clone(), server.auto_cmds.clone()));
+                                serv_auto_cmds = Some((server.addr.clone(), server.auto_cmds.clone()));
                                 break;
                             }
                         }

@@ -92,12 +92,12 @@ fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
 
 impl Conn {
     pub fn from_server(server: config::Server) -> Conn {
-        let stream = init_stream(&server.server_addr, server.server_port);
+        let stream = init_stream(&server.addr, server.port);
         Conn {
-            serv_addr: server.server_addr,
-            serv_port: server.server_port,
+            serv_addr: server.addr,
+            serv_port: server.port,
             hostname: server.hostname,
-            realname: server.real_name,
+            realname: server.realname,
             nicks: server.nicks,
             current_nick_idx: 0,
             auto_join: HashSet::new(),
