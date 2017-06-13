@@ -93,7 +93,7 @@ pub fn read_config() -> Option<(Vec<Server>, Defaults, String)> {
     let yaml_nicks_key = Yaml::String("nicks".to_owned());
     let yaml_auto_cmds_key = Yaml::String("auto_cmds".to_owned());
 
-    for server in servers_yaml.as_vec().unwrap().into_iter() {
+    for server in servers_yaml.as_vec().unwrap() {
         let server_hash = server.as_hash().unwrap();
         let server_addr =
             server_hash.get(&yaml_addr_key).unwrap().as_str().unwrap().to_owned();

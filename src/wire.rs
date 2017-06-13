@@ -166,7 +166,7 @@ impl Msg {
                     // drop the : from pfx
                     pfx = &pfx[ 1 .. ];
                     slice = &slice_[ 1 .. ]; // drop the space
-                    Some(parse_pfx(&pfx))
+                    Some(parse_pfx(pfx))
                 } else {
                     None
                 }
@@ -230,7 +230,7 @@ impl Msg {
                             msg: mb_msg,
                         }
                     }
-                    MsgType::Cmd("QUIT") if params.len() == 0 || params.len() == 1 => {
+                MsgType::Cmd("QUIT") if params.len() <= 1 => {
                         let mb_msg = if params.len() == 1 { Some(params[0].to_owned()) } else { None };
                         Cmd::QUIT {
                             msg: mb_msg,
@@ -304,7 +304,7 @@ fn parse_reply_num(bs: &[u8]) -> Option<u16> {
 }
 
 fn parse_params(chrs: &str) -> Vec<&str> {
-    debug_assert!(chrs.chars().nth(0) != Some(' '));
+    debug_assert_ne!(chrs.chars().nth(0), Some(' '));
 
     let mut ret: Vec<&str> = Vec::new();
 

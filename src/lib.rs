@@ -172,7 +172,7 @@ impl Tiny {
 
         else if words[0] == "msg" {
             // need to find index of the third word
-            let mut word_indices = utils::split_whitespace_indices(&msg);
+            let mut word_indices = utils::split_whitespace_indices(msg);
             word_indices.next(); // "/msg"
             word_indices.next(); // target
             if let Some(msg_begins) = word_indices.next() {
@@ -311,7 +311,7 @@ impl Tiny {
     }
 
     fn disconnect(&mut self, ctrl: &mut EvLoopCtrl<Tiny>, serv_name: &str) {
-        let conn_idx = find_conn_idx(&mut self.conns, serv_name).unwrap();
+        let conn_idx = find_conn_idx(&self.conns, serv_name).unwrap();
         let conn = self.conns.remove(conn_idx);
         ctrl.remove_fd(conn.get_raw_fd());
         // just drop the conn
@@ -334,17 +334,12 @@ impl Tiny {
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
-        match find_conn(&mut self.conns, src.serv_name()) {
-            Some(conn) => {
-                conn.join(chan);
-                return;
-            }
-            None => {
-                // drop the borrowed self and run next statement
-                // rustc is too dumb to figure that None can't borrow.
-            }
+        if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
+            conn.join(chan);
+            return;
         }
-
+        // else drop the borrowed self and run next statement
+        // rustc is too dumb to figure that None can't borrow.
         self.tui.add_client_err_msg(
             &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
             &MsgTarget::CurrentTab);
@@ -408,7 +403,7 @@ impl Tiny {
     }
 
     fn handle_conn_evs(&mut self, conn_idx: usize, evs: Vec<ConnEv>, ctrl: &mut EvLoopCtrl<Tiny>) {
-        for ev in evs.into_iter() {
+        for ev in evs {
             match ev {
                 ConnEv::Connected => {
                     let mut serv_auto_cmds = None;
@@ -424,7 +419,7 @@ impl Tiny {
                         }
                     }
                     if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
-                        for cmd in auto_cmds.iter() {
+                        for cmd in &auto_cmds {
                             self.handle_command(
                                 ctrl,
                                 MsgSource::Serv { serv_name: serv_name.to_owned() },
@@ -486,7 +481,7 @@ impl Tiny {
                 };
                 match target {
                     wire::MsgTarget::Chan(chan) => {
-                        self.logger.get_chan_logs(&conn.get_serv_name(), &chan).write_line(
+                        self.logger.get_chan_logs(conn.get_serv_name(), &chan).write_line(
                             format_args!("PRIVMSG: {}", msg));
                         let msg_target = MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
@@ -532,12 +527,12 @@ impl Tiny {
                         self.logger.get_chan_logs(serv_name, &chan).write_line(
                             format_args!("JOIN: {}", nick));
                         if nick == conn.get_nick() {
-                            self.tui.new_chan_tab(&serv_name, &chan, false);
+                            self.tui.new_chan_tab(serv_name, &chan, false);
                         } else {
                             self.tui.add_nick(
                                 &nick,
                                 Some(Timestamp::now()),
-                                &MsgTarget::Chan { serv_name: &serv_name, chan_name: &chan });
+                                &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
                         }
                     }
                 }
@@ -598,13 +593,13 @@ impl Tiny {
             Cmd::Other { ref cmd, .. } if cmd == "PONG" => {}, // ignore
 
             Cmd::Reply { num: n, params } => {
-                if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
+                if n <= 3 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                         || n == 251 /* RPL_LUSERCLIENT */
                         || n == 255 /* RPL_LUSERME */
                         || n == 372 /* RPL_MOTD */
                         || n == 375 /* RPL_MOTDSTART */
                         || n == 376 /* RPL_ENDOFMOTD */ {
-                    debug_assert!(params.len() == 2);
+                    debug_assert_eq!(params.len(), 2);
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[1];
                     self.tui.add_msg(

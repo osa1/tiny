@@ -7,7 +7,7 @@ use config;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Line {
     /// Note that this String may not be directly renderable because of color
     /// encodings.
@@ -33,11 +33,7 @@ pub const IRC_COLOR_PREFIX     : char = '\x03';
 
 impl Line {
     pub fn new() -> Line {
-        Line {
-            str: String::new(),
-            len_chars: 0,
-            splits: Vec::new(),
-        }
+        Default::default()
     }
 
     pub fn set_style(&mut self, style: config::Style) {
@@ -77,7 +73,7 @@ impl Line {
     }
 
     pub fn add_char(&mut self, char : char) {
-        assert!(char != TERMBOX_COLOR_PREFIX);
+        assert_ne!(char, TERMBOX_COLOR_PREFIX);
         if char.is_whitespace() {
             self.splits.push(self.len_chars);
         }

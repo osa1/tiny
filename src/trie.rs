@@ -1,3 +1,4 @@
+#[derive(Default)]
 pub struct Trie {
     vec : Vec<(char, Box<Trie>)>,
     word : bool,
@@ -5,10 +6,7 @@ pub struct Trie {
 
 impl Trie {
     pub fn new() -> Trie {
-        Trie {
-            vec: vec![],
-            word: false,
-        }
+        Default::default()
     }
 
     pub fn insert(&mut self, str : &str) {
@@ -37,11 +35,8 @@ impl Trie {
     pub fn remove(&mut self, str : &str) {
         let mut chars = str.chars();
         if let Some(char) = chars.next() {
-            match self.vec.binary_search_by(|&(char_,_)| char_.cmp(&char)) {
-                Ok(idx) => {
-                    self.vec[idx].1.remove(chars.as_str());
-                },
-                Err(_) => {},
+            if let Ok(idx) = self.vec.binary_search_by(|&(char_,_)| char_.cmp(&char)) {
+                self.vec[idx].1.remove(chars.as_str());
             }
         } else {
             self.word = false;

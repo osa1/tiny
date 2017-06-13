@@ -292,12 +292,12 @@ impl Conn {
             self.status = ConnStatus::PingPong { ticks_passed: 0 };
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = &msg {
+        if let &Msg { cmd: Cmd::Reply { num: 1, .. }, .. } = &msg {
             // 001 RPL_WELCOME is how we understand that the registration was successful
             evs.push(ConnEv::Connected);
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 002, ref params }, .. } = &msg {
+        if let &Msg { cmd: Cmd::Reply { num: 2, ref params }, .. } = &msg {
             // 002    RPL_YOURHOST
             //        "Your host is <servername>, running version <ver>"
 
@@ -317,20 +317,20 @@ impl Conn {
             }
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 433, .. }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 433, .. }, .. } = msg {
             // ERR_NICKNAMEINUSE
             self.next_nick();
             self.send_nick();
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = msg {
             // RPL_ENDOFMOTD. Join auto-join channels.
             for chan in &self.auto_join {
                 self.join(chan);
             }
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 332, ref params }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 332, ref params }, .. } = msg {
             if params.len() == 2 || params.len() == 3 {
                 // RPL_TOPIC. We've successfully joined a channel, add the channel to
                 // self.auto_join to be able to auto-join next time we connect
@@ -345,11 +345,11 @@ impl Conn {
 
 /// Try to parse servername in a 002 RPL_YOURHOST reply
 fn parse_servername(params: &[String]) -> Option<String> {
-    let msg = try_opt!(params.get(1).or(params.get(0)));
+    let msg = try_opt!(params.get(1).or_else(|| params.get(0)));
     let slice1 = &msg[13..];
     let servername_ends =
         try_opt!(wire::find_byte(slice1.as_bytes(), b'[')
-                 .or(wire::find_byte(slice1.as_bytes(), b',')));
+                 .or_else(|| wire::find_byte(slice1.as_bytes(), b',')));
     Some((&slice1[..servername_ends]).to_owned())
 }
 
