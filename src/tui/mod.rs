@@ -120,16 +120,17 @@ impl TUI {
             },
 
             Event::String(str) => {
-                // This happens when keys pressed too fast or a text pasted to the terminal
-                if str.len() <= 8 {
-                    // Assume fast key press
-                    let mut ret = TUIRet::KeyHandled;
+                // For some reason on my terminal newlines in text are
+                // translated to carriage returns when pasting so we check for
+                // both just to make sure
+                if !str.contains('\n') && !str.contains('\r') {
+                    // TODO this may be too slow for pasting long single lines
                     for ch in str.chars() {
-                        ret = self.handle_input_event(Event::Key(Key::Char(ch)));
+                        self.handle_input_event(Event::Key(Key::Char(ch)));
                     }
-                    ret
+                    TUIRet::KeyHandled
                 } else {
-                    // Assume paste
+                    // TODO: Paste with newlines
                     TUIRet::EventIgnored(Event::String(str.to_owned()))
                 }
             },

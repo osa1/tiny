@@ -144,10 +144,6 @@ impl MessagingUI {
 
             key => {
                 match self.input_field.keypressed(key) {
-                    WidgetRet::KeyIgnored => {
-                        // self.show_server_msg("KEY IGNORED", format!("{:?}", key).as_ref());
-                        WidgetRet::KeyIgnored
-                    },
                     WidgetRet::Remove => {
                         self.input_field.pop();
                         WidgetRet::KeyHandled
