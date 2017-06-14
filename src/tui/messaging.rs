@@ -1,12 +1,9 @@
 use termbox_simple::Termbox;
 use term_input::Key;
 
-use std::ascii::AsciiExt;
 use std::collections::HashMap;
 use std::convert::From;
-use std::iter::Peekable;
 use std::rc::Rc;
-use std::str::Chars;
 
 use time::Tm;
 use time;
@@ -15,7 +12,6 @@ use config;
 use config::Style;
 use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
-use tui::msg_area::line::{TERMBOX_COLOR_PREFIX, IRC_COLOR_PREFIX};
 use tui::msg_area::MsgArea;
 use tui::text_field::TextField;
 use tui::widget::{WidgetRet, Widget};
@@ -222,7 +218,6 @@ impl MessagingUI {
 
     pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, higlight: bool) {
         self.reset_activity_line();
-        let msg = translate_irc_control_chars(&msg);
         self.add_timestamp(ts);
 
         {
@@ -242,7 +237,7 @@ impl MessagingUI {
                 config::USER_MSG
             });
 
-        self.msg_area.add_text(&msg);
+        self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
@@ -349,124 +344,5 @@ impl MessagingUI {
             line_idx: line_idx,
         });
         line_idx
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-/// Parse at least one, at most two digits. Does not consume the iterator when
-/// result is `None`.
-fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
-
-    fn to_dec(ch: char) -> Option<u8> {
-        ch.to_digit(10).map(|c| c as u8)
-    }
-
-    let c1_char = *try_opt!(chars.peek());
-    let c1_digit = match to_dec(c1_char) {
-        None => { return None; },
-        Some(c1_digit) => {
-            chars.next();
-            c1_digit
-        }
-    };
-
-    match chars.peek().cloned() {
-        None =>
-            Some(c1_digit),
-        Some(c2) => {
-            match to_dec(c2) {
-                None =>
-                    Some(c1_digit),
-                Some(c2_digit) => {
-                    chars.next();
-                    Some(c1_digit * 10 + c2_digit)
-                }
-            }
-        }
-    }
-}
-
-fn translate_irc_control_chars(str: &str) -> String {
-    let mut ret = String::with_capacity(str.len());
-    let mut iter = str.chars().peekable();
-
-    fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
-        ret.push(TERMBOX_COLOR_PREFIX);
-        ret.push(0 as char); // style
-        ret.push(irc_color_to_termbox(irc_fg) as char);
-        ret.push(irc_color_to_termbox(irc_bg.unwrap_or(config::USER_MSG.bg as u8)) as char);
-    }
-
-    while let Some(char) = iter.next() {
-        if char == IRC_COLOR_PREFIX {
-            match parse_color_code(&mut iter) {
-                None => {
-                    // just skip the control char
-                }
-                Some(fg) => {
-                    if let Some(char) = iter.peek().cloned() {
-                        if char == ',' {
-                            iter.next(); // consume ','
-                            match parse_color_code(&mut iter) {
-                                None => {
-                                    // comma was not part of the color code,
-                                    // add it to the new string
-                                    push_color(&mut ret, fg, None);
-                                    ret.push(char);
-                                }
-                                Some(bg) => {
-                                    push_color(&mut ret, fg, Some(bg));
-                                }
-                            }
-                        } else {
-                            push_color(&mut ret, fg, None);
-                        }
-                    } else {
-                        push_color(&mut ret, fg, None);
-                    }
-                }
-            }
-        } else if !char.is_ascii_control() {
-            ret.push(char);
-        }
-    }
-
-    ret
-}
-
-// IRC colors: http://en.wikichip.org/wiki/irc/colors
-// Termbox colors: http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
-fn irc_color_to_termbox(irc_color : u8) -> u8 {
-    match irc_color {
-         0 => 15,  // white
-         1 => 0,   // black
-         2 => 17,  // navy
-         3 => 2,   // green
-         4 => 9,   // red
-         5 => 88,  // maroon
-         6 => 5,   // purple
-         7 => 130, // olive
-         8 => 11,  // yellow
-         9 => 10,  // light green
-        10 => 6,   // teal
-        11 => 14,  // cyan
-        12 => 12,  // awful blue
-        13 => 13,  // magenta
-        14 => 8,   // gray
-        15 => 7,   // light gray
-         _ => panic!("Unknown irc color: {}", irc_color)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_color_code() {
-        assert_eq!(parse_color_code(&mut "1".chars().peekable()), Some(1));
-        assert_eq!(parse_color_code(&mut "01".chars().peekable()), Some(1));
-        assert_eq!(parse_color_code(&mut "1,".chars().peekable()), Some(1));
     }
 }

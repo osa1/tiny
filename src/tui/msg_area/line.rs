@@ -1,6 +1,9 @@
 // use std::io;
 // use std::io::Write;
 
+use std::ascii::AsciiExt;
+use std::iter::Peekable;
+use std::str::Chars;
 use termbox_simple::Termbox;
 
 use config;
@@ -27,9 +30,9 @@ pub struct Line {
     splits    : Vec<i32>,
 }
 
-pub const TERMBOX_COLOR_PREFIX : char = '\x00';
-pub const COLOR_RESET_PREFIX   : char = '\x01';
-pub const IRC_COLOR_PREFIX     : char = '\x03';
+const TERMBOX_COLOR_PREFIX : char = '\x00';
+const COLOR_RESET_PREFIX   : char = '\x01';
+const IRC_COLOR_PREFIX     : char = '\x03';
 
 impl Line {
     pub fn new() -> Line {
@@ -47,7 +50,8 @@ impl Line {
         self.str.push((style.bg as u8) as char);
     }
 
-    pub fn add_text(&mut self, str : &str) {
+    pub fn add_text(&mut self, str: &str) {
+        let str = translate_irc_control_chars(str);
         self.str.reserve(str.len());
 
         let mut iter = str.chars();
@@ -186,6 +190,8 @@ impl Line {
             }
 
             else {
+                debug_assert!(!char.is_ascii_control());
+
                 // Not possible to split. Need to make sure we don't render out
                 // of bounds.
                 if col - pos_x < width {
@@ -198,6 +204,113 @@ impl Line {
                 char_idx += 1;
             }
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/// Parse at least one, at most two digits. Does not consume the iterator when
+/// result is `None`.
+fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
+
+    fn to_dec(ch: char) -> Option<u8> {
+        ch.to_digit(10).map(|c| c as u8)
+    }
+
+    let c1_char = *try_opt!(chars.peek());
+    let c1_digit = match to_dec(c1_char) {
+        None => { return None; },
+        Some(c1_digit) => {
+            chars.next();
+            c1_digit
+        }
+    };
+
+    match chars.peek().cloned() {
+        None =>
+            Some(c1_digit),
+        Some(c2) => {
+            match to_dec(c2) {
+                None =>
+                    Some(c1_digit),
+                Some(c2_digit) => {
+                    chars.next();
+                    Some(c1_digit * 10 + c2_digit)
+                }
+            }
+        }
+    }
+}
+
+fn translate_irc_control_chars(str: &str) -> String {
+    let mut ret = String::with_capacity(str.len());
+    let mut iter = str.chars().peekable();
+
+    fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
+        ret.push(TERMBOX_COLOR_PREFIX);
+        ret.push(0 as char); // style
+        ret.push(irc_color_to_termbox(irc_fg) as char);
+        ret.push(irc_color_to_termbox(irc_bg.unwrap_or(config::USER_MSG.bg as u8)) as char);
+    }
+
+    while let Some(char) = iter.next() {
+        if char == IRC_COLOR_PREFIX {
+            match parse_color_code(&mut iter) {
+                None => {
+                    // just skip the control char
+                }
+                Some(fg) => {
+                    if let Some(char) = iter.peek().cloned() {
+                        if char == ',' {
+                            iter.next(); // consume ','
+                            match parse_color_code(&mut iter) {
+                                None => {
+                                    // comma was not part of the color code,
+                                    // add it to the new string
+                                    push_color(&mut ret, fg, None);
+                                    ret.push(char);
+                                }
+                                Some(bg) => {
+                                    push_color(&mut ret, fg, Some(bg));
+                                }
+                            }
+                        } else {
+                            push_color(&mut ret, fg, None);
+                        }
+                    } else {
+                        push_color(&mut ret, fg, None);
+                    }
+                }
+            }
+        } else if !char.is_ascii_control() {
+            ret.push(char);
+        }
+    }
+
+    ret
+}
+
+// IRC colors: http://en.wikichip.org/wiki/irc/colors
+// Termbox colors: http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
+fn irc_color_to_termbox(irc_color : u8) -> u8 {
+    match irc_color {
+         0 => 15,  // white
+         1 => 0,   // black
+         2 => 17,  // navy
+         3 => 2,   // green
+         4 => 9,   // red
+         5 => 88,  // maroon
+         6 => 5,   // purple
+         7 => 130, // olive
+         8 => 11,  // yellow
+         9 => 10,  // light green
+        10 => 6,   // teal
+        11 => 14,  // cyan
+        12 => 12,  // awful blue
+        13 => 13,  // magenta
+        14 => 8,   // gray
+        15 => 7,   // light gray
+         _ => panic!("Unknown irc color: {}", irc_color)
     }
 }
 
@@ -278,15 +391,41 @@ fn height_test_5() {
 
 #[test]
 fn height_test_6() {
-    let mut text = String::new();
-    {
+    let text: String = {
+        let mut text = String::new();
+        let mut single_line = String::new();
         let mut file = File::open("test/lipsum.txt").unwrap();
         file.read_to_string(&mut text).unwrap();
-    }
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 102); // make sure we did it right
+        for (line_idx, line) in lines.iter().enumerate() {
+            single_line.push_str(line);
+            if line_idx != lines.len() - 1 {
+                single_line.push(' ');
+            }
+        }
+        single_line
+    };
 
     let mut line = Line::new();
     line.add_text(&text);
-    assert!(line.rendered_height(1) >= 1160);
+    // lipsum.txt has 1160 words in it. each line should contain at most one
+    // word so we should have 1160 lines.
+    assert_eq!(line.rendered_height(1), 1160);
+}
+
+#[test]
+fn test_parse_color_code() {
+    assert_eq!(parse_color_code(&mut "1".chars().peekable()), Some(1));
+    assert_eq!(parse_color_code(&mut "01".chars().peekable()), Some(1));
+    assert_eq!(parse_color_code(&mut "1,".chars().peekable()), Some(1));
+}
+
+#[test]
+fn test_translate_irc_control_chars() {
+    assert_eq!(
+        translate_irc_control_chars("  Le Voyageur imprudent  "),
+        "  Le Voyageur imprudent  ");
 }
 
 #[bench]
