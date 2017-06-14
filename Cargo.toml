@@ -20,12 +20,15 @@ name = "tiny"
 path = "bin/main.rs"
 
 [dependencies]
-ev_loop = { path = "ev_loop/" }
 libc = "0.2.22"
+mio = "0.6.9"
 net2 = "0.2.23"
 serde = "1.0.8"
+serde_derive = "1.0.8"
 serde_yaml = "0.7.1"
 term_input = { path = "term_input/" }
 termbox_simple = { path = "termbox/" }
 time = "0.1"
-serde_derive = "1.0.8"
+
+[profile.release]
+lto = true
