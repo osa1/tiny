@@ -111,11 +111,40 @@ impl MsgArea {
 
     pub fn flush_line(&mut self) -> usize {
         self.lines.push(mem::replace(&mut self.line_buf, Line::new()));
+        if self.scroll != 0 {
+            self.scroll += 1;
+        }
         self.lines.len() - 1
     }
 
     #[inline]
     pub fn modify_line<F>(&mut self, idx : usize, f : F) where F : Fn(&mut Line) {
         f(&mut self.lines[idx]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn newline_scrolling() {
+        let mut msg_area = MsgArea::new(100, 1);
+        // Adding a new line when scroll is 0 should not change it
+        assert_eq!(msg_area.scroll, 0);
+        msg_area.add_text("line1");
+        msg_area.flush_line();
+        assert_eq!(msg_area.scroll, 0);
+
+        msg_area.add_text("line2");
+        msg_area.flush_line();
+        assert_eq!(msg_area.scroll, 0);
+
+        msg_area.scroll_up();
+        assert_eq!(msg_area.scroll, 1);
+        msg_area.add_text("line3");
+        msg_area.flush_line();
+        assert_eq!(msg_area.scroll, 2);
     }
 }
