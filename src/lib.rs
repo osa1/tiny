@@ -494,7 +494,6 @@ impl Tiny {
                     self.tui.add_client_msg(
                         "Connecting...",
                         &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
-                    deregister_fd(poll, conn.get_raw_fd());
                     conn.reconnect(None);
                     let fd = conn.get_raw_fd();
                     register_fd(poll, fd);
