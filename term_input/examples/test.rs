@@ -1,9 +1,15 @@
-extern crate ev_loop;
 extern crate libc;
+extern crate mio;
 extern crate term_input;
 
+use mio::Events;
+use mio::Poll;
+use mio::PollOpt;
+use mio::Ready;
+use mio::Token;
+use mio::unix::EventedFd;
+
 use term_input::{Event, Key, Input};
-use ev_loop::{EvLoop, READ_EV};
 
 fn main() {
     // put the terminal in non-buffering, no-enchoing mode
@@ -16,19 +22,31 @@ fn main() {
     new_term.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG | libc::IEXTEN);
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &new_term) };
 
-    let mut ev_loop: EvLoop<()> = EvLoop::new();
+    let poll = Poll::new().unwrap();
+    poll.register(
+        &EventedFd(&libc::STDIN_FILENO),
+        Token(libc::STDIN_FILENO as usize),
+        Ready::readable(),
+        PollOpt::level()).unwrap();
+
     let mut input = Input::new();
     let mut evs = Vec::new();
-    ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, _| {
-        input.read_input_events(&mut evs);
-        println!("{:?}", evs);
-        for ev in evs.iter() {
-            if ev == &Event::Key(Key::Esc) {
-                ctrl.stop();
+    let mut events = Events::with_capacity(10);
+    'mainloop:
+    loop {
+        match poll.poll(&mut events, None) {
+            Err(_) => {}
+            Ok(_) => {
+                input.read_input_events(&mut evs);
+                println!("{:?}", evs);
+                for ev in evs.iter() {
+                    if ev == &Event::Key(Key::Esc) {
+                        break 'mainloop;
+                    }
+                }
             }
         }
-    }));
-    ev_loop.run(());
+    }
 
     // restore the old settings
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &old_term) };

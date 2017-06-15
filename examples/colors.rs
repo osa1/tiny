@@ -1,9 +1,14 @@
-extern crate ev_loop;
+extern crate libc;
+extern crate mio;
 extern crate term_input;
 extern crate termbox_simple;
-extern crate libc;
 
-use ev_loop::{EvLoop, READ_EV};
+use mio::Events;
+use mio::Poll;
+use mio::PollOpt;
+use mio::Ready;
+use mio::Token;
+use mio::unix::EventedFd;
 use term_input::{Input, Event, Key};
 use termbox_simple::*;
 
@@ -12,42 +17,41 @@ fn main() {
     tui.set_output_mode(OutputMode::Output256);
     tui.set_clear_attributes(0, 0);
 
-    let mut input = Input::new();
-    let mut ev_buffer: Vec<Event> = Vec::new();
-
     let mut fg = true;
     draw(&mut tui, fg);
 
-    let mut ev_loop: EvLoop<Termbox> = EvLoop::new();
+    let poll = Poll::new().unwrap();
+    poll.register(
+        &EventedFd(&libc::STDIN_FILENO),
+        Token(libc::STDIN_FILENO as usize),
+        Ready::readable(),
+        PollOpt::level()).unwrap();
 
-    // Register resize event handler just to avoid poll() failures in the event loop
-    {
-        let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
-        unsafe {
-            libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
-            libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
-        };
 
-        ev_loop.add_signal(&sig_mask, Box::new(|_, _| {}));
-    }
-
-    ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, tui| {
-        input.read_input_events(&mut ev_buffer);
-        for ev in ev_buffer.iter() {
-            match ev {
-                &Event::Key(Key::Tab) => {
-                    fg = !fg;
-                },
-                &Event::Key(Key::Esc) => {
-                    ctrl.stop();
-                },
-                _ => {},
+    let mut input = Input::new();
+    let mut ev_buffer: Vec<Event> = Vec::new();
+    let mut events = Events::with_capacity(10);
+    'mainloop:
+    loop {
+        match poll.poll(&mut events, None) {
+            Err(_) => {},
+            Ok(_) => {
+                input.read_input_events(&mut ev_buffer);
+                for ev in ev_buffer.iter() {
+                    match ev {
+                        &Event::Key(Key::Tab) => {
+                            fg = !fg;
+                        },
+                        &Event::Key(Key::Esc) => {
+                            break 'mainloop;
+                        },
+                        _ => {},
+                    }
+                }
+                draw(&mut tui, fg);
             }
         }
-        draw(tui, fg);
-    }));
-
-    ev_loop.run(tui);
+    }
 }
 
 fn draw(tui: &mut Termbox, fg: bool) {

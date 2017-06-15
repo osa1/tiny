@@ -12,4 +12,4 @@ libc = "0.2"
 gcc = "0.3.35"
 
 [dev-dependencies]
-ev_loop = { path = "../ev_loop/" }
+mio = "0.6.9"

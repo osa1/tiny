@@ -1,16 +1,21 @@
 // In a chat window add dozens of nicks, each printing some random lines.
 
-extern crate ev_loop;
 extern crate libc;
+extern crate mio;
 extern crate term_input;
 extern crate termbox_simple;
 extern crate time;
 extern crate tiny;
 
+use mio::Events;
+use mio::Poll;
+use mio::PollOpt;
+use mio::Ready;
+use mio::Token;
+use mio::unix::EventedFd;
 use std::fs::File;
 use std::io::Read;
 
-use ev_loop::{EvLoop, READ_EV};
 use term_input::{Input, Event};
 use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
@@ -22,8 +27,6 @@ fn main() {
     tui.new_chan_tab("debug", "chan");
     tui.show_topic("This is channel topic", Timestamp::now(), &chan_target);
     tui.draw();
-
-    let mut ev_loop: EvLoop<TUI> = EvLoop::new();
 
     {
         let mut text = String::new();
@@ -40,42 +43,41 @@ fn main() {
 
     tui.draw();
 
-    {
-        let mut ev_buffer: Vec<Event> = Vec::new();
-        let mut input = Input::new();
-        ev_loop.add_fd(libc::STDIN_FILENO, READ_EV, Box::new(move |_, ctrl, tui| {
-            input.read_input_events(&mut ev_buffer);
-            for ev in ev_buffer.drain(0..) {
-                match tui.handle_input_event(ev) {
-                    TUIRet::Input { msg, .. } => {
-                        tui.add_msg(&msg.into_iter().collect::<String>(),
-                                    Timestamp::now(),
-                                    &MsgTarget::Server { serv_name: "debug" });
-                    },
-                    TUIRet::Abort => {
-                        ctrl.stop();
-                    },
-                    _ => {}
-                }
+    let poll = Poll::new().unwrap();
+    poll.register(
+        &EventedFd(&libc::STDIN_FILENO),
+        Token(libc::STDIN_FILENO as usize),
+        Ready::readable(),
+        PollOpt::level()).unwrap();
+
+    let mut input = Input::new();
+    let mut ev_buffer: Vec<Event> = Vec::new();
+    let mut events = Events::with_capacity(10);
+    'mainloop:
+    loop {
+        match poll.poll(&mut events, None) {
+            Err(_) => {
+                // usually SIGWINCH, which is caught by term_input
+                tui.resize();
+                tui.draw();
             }
-            tui.draw();
-        }));
+            Ok(_) => {
+                input.read_input_events(&mut ev_buffer);
+                for ev in ev_buffer.drain(0..) {
+                    match tui.handle_input_event(ev) {
+                        TUIRet::Input { msg, .. } => {
+                            tui.add_msg(&msg.into_iter().collect::<String>(),
+                            Timestamp::now(),
+                            &MsgTarget::Server { serv_name: "debug" });
+                        },
+                        TUIRet::Abort => {
+                            break 'mainloop;
+                        },
+                        _ => {}
+                    }
+                }
+                tui.draw();
+            }
+        }
     }
-
-    {
-        let mut sig_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
-        unsafe {
-            libc::sigemptyset(&mut sig_mask as *mut libc::sigset_t);
-            libc::sigaddset(&mut sig_mask as *mut libc::sigset_t, libc::SIGWINCH);
-        };
-
-        ev_loop.add_signal(&sig_mask, Box::new(|_, tui| {
-            tui.resize();
-            tui.draw();
-        }));
-
-        tui.draw();
-    }
-
-    ev_loop.run(tui);
 }
