@@ -8,6 +8,8 @@ tiny is an IRC client written in Rust.
 
 ![tiny in action](tiny.png)
 
+![tiny in action](tiny_mac.png)
+
 ## Features
 
 - Clean UI: consecutive join/part/quit messages are shown in a single line, time
@@ -41,9 +43,7 @@ Install the Rust nightly toolchain, clone the repo, and run `cargo install` (or
 currently no way to publish a crate on crates.io without publishing all the
 dependencies, so tiny won't be on crates.io for a while.
 
-tiny has been developed and used on Linux. It may work on Darwin, but I don't
-have access to a Mac so I can't try. It won't work on Windows as some of the
-system calls used in tiny are not available on Windows.
+tiny is tested on Linux and OSX.
 
 ## Configuration
 
