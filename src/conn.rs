@@ -243,6 +243,10 @@ impl Conn {
         wire::join(&self.stream, chan).unwrap();
     }
 
+    pub fn away(&self, msg: Option<&str>) {
+        wire::away(&self.stream, msg).unwrap();
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 

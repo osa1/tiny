@@ -212,7 +212,7 @@ impl Tiny {
                     // We know msg has at least one character as the TUI won't accept it otherwise.
                     if msg[0] == '/' {
                         let msg_str: String = (&msg[ 1 .. ]).into_iter().cloned().collect();
-                        self.handle_command(poll, from, &msg_str);
+                        self.handle_cmd(poll, from, &msg_str);
                     } else {
                         self.send_msg(from, &msg.into_iter().collect::<String>());
                     }
@@ -228,7 +228,7 @@ impl Tiny {
         abort
     }
 
-    fn handle_command(&mut self, poll: &Poll, src: MsgSource, msg: &str) {
+    fn handle_cmd(&mut self, poll: &Poll, src: MsgSource, msg: &str) {
         let words: Vec<&str> = msg.split_whitespace().into_iter().collect();
 
         if words[0] == "connect" && words.len() == 2 {
@@ -263,6 +263,21 @@ impl Tiny {
                 self.tui.add_client_err_msg(
                     "/msg usage: /msg target message",
                     &MsgTarget::CurrentTab);
+            }
+        }
+
+        else if words[0] == "away" {
+            let mut word_indices = utils::split_whitespace_indices(&msg);
+            word_indices.next(); // "/away"
+            let msg = {
+                if let Some(msg_begins) = word_indices.next() {
+                    Some(&msg[msg_begins ..])
+                } else {
+                    None
+                }
+            };
+            if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
+                conn.away(msg);
             }
         }
 
@@ -475,7 +490,7 @@ impl Tiny {
                     }
                     if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
                         for cmd in auto_cmds.iter() {
-                            self.handle_command(poll, MsgSource::Serv { serv_name: serv_name.to_owned() }, cmd);
+                            self.handle_cmd(poll, MsgSource::Serv { serv_name: serv_name.to_owned() }, cmd);
                         }
                     }
                 }
@@ -730,6 +745,13 @@ impl Tiny {
 
                 // RPL_ENDOFNAMES: End of NAMES list
                 else if n == 366 {}
+
+                // RPL_UNAWAY or RPL_NOWAWAY
+                else if n == 305 || n == 306 {
+                    let msg = &params[1];
+                    self.tui.add_client_msg(
+                        msg, &MsgTarget::AllServTabs { serv_name: self.conns[conn_idx].get_serv_name() });
+                }
 
                 else {
                     self.logger.get_debug_logs().write_line(

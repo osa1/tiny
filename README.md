@@ -108,6 +108,10 @@ Commands start with `/` character.
 - `/connect`: Reconnect to the current server. Use if you don't want to wait
   tiny to reconnect automatically after a connectivity problem.
 
+- `/away <msg>`: Set away status
+
+- `/away`: Remove away status
+
 ## Development
 
 tiny is in early stages of development. Some of features that you might think
