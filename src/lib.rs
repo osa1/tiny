@@ -753,6 +753,15 @@ impl Tiny {
                         msg, &MsgTarget::AllServTabs { serv_name: self.conns[conn_idx].get_serv_name() });
                 }
 
+                // ERR_NOSUCHNICK
+                else if n == 401 {
+                    let nick = &params[1];
+                    let msg = &params[2];
+                    let serv_name = self.conns[conn_idx].get_serv_name();
+                    self.tui.add_client_msg(
+                        msg, &MsgTarget::User { serv_name: serv_name, nick: nick });
+                }
+
                 else {
                     self.logger.get_debug_logs().write_line(
                         format_args!("Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
