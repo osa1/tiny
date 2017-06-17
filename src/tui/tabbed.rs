@@ -162,14 +162,18 @@ impl Tabbed {
                         self.new_server_tab(serv_name);
                         self.new_chan_tab(serv_name, chan_name)
                     },
-                    Some(tab_idx) => {
-                        self.tabs.insert(tab_idx + 1, Tab {
+                    Some(serv_tab_idx) => {
+                        let chan_tab_idx = serv_tab_idx + 1;
+                        self.tabs.insert(chan_tab_idx, Tab {
                             widget: MessagingUI::new(self.width, self.height - 1),
                             src: MsgSource::Chan { serv_name: serv_name.to_owned(),
                                                    chan_name: chan_name.to_owned() },
                             style: TabStyle::Normal,
                         });
-                        Some(tab_idx + 1)
+                        if self.active_idx >= chan_tab_idx {
+                            self.active_idx += 1;
+                        }
+                        Some(chan_tab_idx)
                     }
                 }
             },
@@ -540,7 +544,7 @@ impl Tabbed {
         }
 
         // Create server/chan/user tab when necessary
-        if target_idxs.len() == 0 {
+        if target_idxs.is_empty() {
             for idx in self.maybe_create_tab(target) {
                 target_idxs.push(idx);
             }
