@@ -37,7 +37,7 @@ pub fn privmsg<W: Write>(mut sink: W, msgtarget: &str, msg: &str) -> std::io::Re
 pub fn away<W: Write>(mut sink: W, msg: Option<&str>) -> std::io::Result<()> {
     match msg {
         None => write!(sink, "AWAY\r\n"),
-        Some(msg) => write!(sink, "AWAY :{}\r\n", msg)
+        Some(msg) => write!(sink, "AWAY :{}\r\n", msg),
     }
 }
 

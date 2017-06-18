@@ -29,6 +29,9 @@ pub struct Conn {
     /// to re-join automatically on reconnect.
     auto_join: HashSet<String>,
 
+    /// Away reason if away mode is on. `None` otherwise.
+    away_status: Option<String>,
+
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
     host: Option<String>,
 
@@ -101,6 +104,7 @@ impl Conn {
             nicks: server.nicks,
             current_nick_idx: 0,
             auto_join: HashSet::new(),
+            away_status: None,
             host: None,
             stream: stream,
             status: ConnStatus::Introduce,
@@ -119,6 +123,7 @@ impl Conn {
             nicks: conn.nicks.clone(),
             current_nick_idx: 0,
             auto_join: HashSet::new(),
+            away_status: None,
             host: None,
             stream: stream,
             status: ConnStatus::Introduce,
@@ -183,7 +188,7 @@ impl Conn {
                             debug_out.write_line(
                                 format_args!("{}: Ping timeout, sending PING",
                                              self.serv_addr));
-                            wire::ping(&mut self.stream, host_).unwrap();;
+                            wire::ping(&self.stream, host_).unwrap();;
                         }
                     }
                     self.status = ConnStatus::WaitPong { ticks_passed: 0 };
@@ -243,7 +248,8 @@ impl Conn {
         wire::join(&self.stream, chan).unwrap();
     }
 
-    pub fn away(&self, msg: Option<&str>) {
+    pub fn away(&mut self, msg: Option<&str>) {
+        self.away_status = msg.map(|s| s.to_string());
         wire::away(&self.stream, msg).unwrap();
     }
 
@@ -320,6 +326,11 @@ impl Conn {
             // RPL_ENDOFMOTD. Join auto-join channels.
             for chan in &self.auto_join {
                 self.join(chan);
+            }
+
+            // Set away mode
+            if let &Some(ref reason) = &self.away_status {
+                wire::away(&self.stream, Some(reason)).unwrap();
             }
         }
 
