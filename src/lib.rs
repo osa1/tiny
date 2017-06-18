@@ -32,6 +32,7 @@ use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
 use std::ascii::AsciiExt;
+use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -476,6 +477,12 @@ impl Tiny {
         for ev in evs.into_iter() {
             match ev {
                 ConnEv::Connected => {
+                    self.tui.add_msg(
+                        "Connected.",
+                        Timestamp::now(),
+                        &MsgTarget::AllServTabs {
+                            serv_name: self.conns[conn_idx].get_serv_name()
+                        });
                     let mut serv_auto_cmds = None;
                     {
                         let conn = &self.conns[conn_idx];
@@ -502,7 +509,6 @@ impl Tiny {
                         Timestamp::now(),
                         &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
                     deregister_fd(poll, conn.get_raw_fd());
-
                 }
                 ConnEv::WantReconnect => {
                     let mut conn = &mut self.conns[conn_idx];
@@ -519,7 +525,10 @@ impl Tiny {
                     let mut conn = &mut self.conns[conn_idx];
                     conn.enter_disconnect_state();
                     self.tui.add_err_msg(
-                        &format!("{:?}", err),
+                        &format!("Conection error: {}. \
+                                 Will try to reconnect in {} seconds.",
+                                 err.description(),
+                                 conn::RECONNECT_TICKS),
                         Timestamp::now(),
                         &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
                     deregister_fd(poll, conn.get_raw_fd());
