@@ -38,6 +38,7 @@ use std::io::Read;
 use std::io::Write;
 use std::os::unix::io::RawFd;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -535,6 +536,10 @@ impl Tiny {
                 }
                 ConnEv::Msg(msg) => {
                     self.handle_msg(conn_idx, msg, Timestamp::now());
+                }
+                ConnEv::NickChange(new_nick) => {
+                    let conn = &self.conns[conn_idx];
+                    self.tui.set_nick(conn.get_serv_name(), Rc::new(new_nick));
                 }
             }
         }

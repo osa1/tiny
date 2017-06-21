@@ -8,11 +8,12 @@ use std::rc::Rc;
 use time::Tm;
 use time;
 
-use config;
 use config::Style;
+use config;
 use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
 use tui::msg_area::MsgArea;
+use tui::termbox;
 use tui::text_field::TextField;
 use tui::widget::{WidgetRet, Widget};
 
@@ -39,6 +40,9 @@ pub struct MessagingUI {
     //
     // Rc to be able to share with dynamic messages.
     nicks: Rc<Trie>,
+
+    current_nick: Option<Rc<String>>,
+    draw_current_nick: bool,
 
     last_activity_line: Option<ActivityLine>,
     last_activity_ts: Option<Timestamp>,
@@ -86,14 +90,48 @@ impl MessagingUI {
             nick_colors: HashMap::new(),
             next_color_idx: 0,
             nicks: Rc::new(Trie::new()),
+            current_nick: None,
+            draw_current_nick: true,
             last_activity_line: None,
             last_activity_ts: None,
         }
     }
 
+    pub fn set_nick(&mut self, nick: Rc<String>) {
+        self.current_nick = Some(nick);
+    }
+
+    pub fn get_nick(&self) -> Option<Rc<String>> {
+        self.current_nick.clone()
+    }
+
     pub fn draw(&self, tb: &mut Termbox, pos_x: i32, pos_y: i32) {
         self.msg_area.draw(tb, pos_x, pos_y);
-        self.input_field.draw(tb, pos_x, pos_y + self.height - 1);
+
+        if let &Some(ref nick) = &self.current_nick {
+            if self.draw_current_nick {
+                termbox::print_chars(
+                    tb,
+                    pos_x,
+                    pos_y + self.height - 1,
+                    config::USER_MSG,
+                    &mut nick.chars());
+                tb.change_cell(
+                    pos_x + nick.len() as i32,
+                    pos_y + self.height - 1,
+                    ':',
+                    config::USER_MSG.fg | config::TB_BOLD,
+                    config::USER_MSG.bg);
+                self.input_field.draw(
+                    tb,
+                    pos_x + nick.len() as i32 + 2,
+                    pos_y + self.height - 1);
+            } else {
+                self.input_field.draw(tb, pos_x, pos_y + self.height - 1);
+            }
+        } else {
+            self.input_field.draw(tb, pos_x, pos_y + self.height - 1);
+        }
     }
 
     pub fn keypressed(&mut self, key : Key) -> WidgetRet {
@@ -143,7 +181,6 @@ impl MessagingUI {
                     WidgetRet::Remove => {
                         self.input_field.pop();
                         WidgetRet::KeyHandled
-
                     },
                     ret => ret,
                 }
@@ -155,8 +192,23 @@ impl MessagingUI {
         self.width = width;
         self.height = height;
         self.msg_area.resize(width, height - 1);
+
+        let nick_width = match &self.current_nick {
+            &None =>
+                0,
+            &Some(ref rc) =>
+                // +2 for ": "
+                rc.len() as i32 + 2,
+        };
+
+        self.draw_current_nick =
+            (nick_width as f32) <= (width as f32) * (30f32 / 100f32);
+
+        let widget_width =
+            if self.draw_current_nick { width - nick_width } else { width };
+
         for w in &mut self.input_field {
-            w.resize(width, 1);
+            w.resize(widget_width, 1);
         }
     }
 
@@ -330,7 +382,7 @@ impl MessagingUI {
     }
 
     fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
-        // borrow checkers strikes again
+        // borrow checker strikes again
         if let Some(ref mut l) = self.last_activity_line {
             if l.ts == ts {
                 return l.line_idx;

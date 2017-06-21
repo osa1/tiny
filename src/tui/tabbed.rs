@@ -1,6 +1,8 @@
 use term_input::Key;
 use termbox_simple::Termbox;
 
+use std::rc::Rc;
+
 use config;
 use config::Style;
 use tui::messaging::MessagingUI;
@@ -173,6 +175,9 @@ impl Tabbed {
                         if self.active_idx >= chan_tab_idx {
                             self.active_idx += 1;
                         }
+                        if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick() {
+                            self.tabs[chan_tab_idx].widget.set_nick(nick);
+                        }
                         Some(chan_tab_idx)
                     }
                 }
@@ -208,6 +213,9 @@ impl Tabbed {
                                                    nick: nick.to_owned() },
                             style: TabStyle::Normal,
                         });
+                        if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
+                            self.tabs[tab_idx + 1].widget.set_nick(nick);
+                        }
                         Some(tab_idx + 1)
                     }
                 }
@@ -563,7 +571,7 @@ impl Tabbed {
             }
         }
         match *target {
-            MsgTarget::Server { serv_name } => {
+            MsgTarget::Server { serv_name } | MsgTarget::AllServTabs { serv_name } => {
                 opt_to_vec(self.new_server_tab(serv_name))
             },
 
@@ -649,6 +657,10 @@ impl Tabbed {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, ts);
         });
+    }
+
+    pub fn set_nick(&mut self, new_nick: Rc<String>, target: &MsgTarget) {
+        self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.set_nick(new_nick.clone()));
     }
 
     ////////////////////////////////////////////////////////////////////////////

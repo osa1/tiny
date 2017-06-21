@@ -478,9 +478,9 @@ impl TextField {
 }
 
 fn draw_line(tb: &mut Termbox, line : &[char], pos_x : i32, pos_y : i32, scroll : i32, width : i32, cursor : i32) {
-    let slice : &[char] = &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
-
-    termbox::print_chars(tb, pos_x, pos_y, config::USER_MSG, slice);
+    let slice: &[char] = &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
+    let chars: &mut Iterator<Item=char> = &mut slice.iter().cloned();
+    termbox::print_chars(tb, pos_x, pos_y, config::USER_MSG, chars);
 
     // On my terminal the cursor is only shown when there's a character
     // under it.

@@ -83,6 +83,8 @@ pub enum ConnEv {
     Err(io::Error),
     /// An incoming message
     Msg(Msg),
+    /// Nick changed
+    NickChange(String),
 }
 
 fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
@@ -289,6 +291,7 @@ impl Conn {
         if let ConnStatus::Introduce = self.status {
             self.introduce();
             self.status = ConnStatus::PingPong { ticks_passed: 0 };
+            evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
         if let &Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = &msg {
@@ -320,6 +323,7 @@ impl Conn {
             // ERR_NICKNAMEINUSE
             self.next_nick();
             self.send_nick();
+            evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
         if let &Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = &msg {

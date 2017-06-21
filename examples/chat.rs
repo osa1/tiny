@@ -15,6 +15,7 @@ use mio::Token;
 use mio::unix::EventedFd;
 use std::fs::File;
 use std::io::Read;
+use std::rc::Rc;
 
 use term_input::{Input, Event};
 use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
@@ -41,6 +42,7 @@ fn main() {
         }
     }
 
+    tui.set_nick("debug", Rc::new("some_long_nick_name____".to_owned()));
     tui.draw();
 
     let poll = Poll::new().unwrap();
