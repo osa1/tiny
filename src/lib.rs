@@ -244,7 +244,7 @@ impl Tiny {
             }
         }
 
-        else if words[0] == "join" {
+        else if words[0] == "join" && words.len() == 2 {
             self.join(src, words[1]);
         }
 
@@ -299,6 +299,14 @@ impl Tiny {
                 MsgSource::User { serv_name, nick } => {
                     self.tui.close_user_tab(&serv_name, &nick);
                 }
+            }
+        }
+
+        else if words[0] == "nick" && words.len() == 2 {
+            if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
+                let new_nick = words[1];
+                conn.set_nick(new_nick);
+                self.tui.set_nick(conn.get_serv_name(), Rc::new(new_nick.to_owned()));
             }
         }
 

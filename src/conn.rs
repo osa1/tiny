@@ -156,6 +156,16 @@ impl Conn {
         &self.nicks[self.current_nick_idx]
     }
 
+    pub fn set_nick(&mut self, nick: &str) {
+        if let Some(nick_idx) = self.nicks.iter().position(|n| n == nick) {
+            self.current_nick_idx = nick_idx;
+        } else {
+            self.nicks.push(nick.to_owned());
+            self.current_nick_idx = self.nicks.len() - 1;
+        }
+        self.send_nick();
+    }
+
     fn reset_nick(&mut self) {
         self.current_nick_idx = 0;
     }

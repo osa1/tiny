@@ -112,6 +112,8 @@ Commands start with `/` character.
 
 - `/away`: Remove away status
 
+- `/nick <nick>`: Change nick
+
 ## Development
 
 tiny is in early stages of development. Some of features that you might think
