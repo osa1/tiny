@@ -308,7 +308,7 @@ impl MessagingUI {
         // Anything works as long as it's fast
         let mut hash: usize = 5381;
         for c in sender.chars() {
-            hash = hash * 33 + (c as usize);
+            hash = hash.wrapping_mul(33).wrapping_add(c as usize);
         }
         config::NICK_COLORS[hash % config::NICK_COLORS.len()]
     }
