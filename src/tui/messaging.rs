@@ -101,11 +101,13 @@ impl MessagingUI {
 
         if let &Some(ref nick) = &self.current_nick {
             if self.draw_current_nick {
+                let nick_color = self.get_nick_color(nick);
+                let style = Style { fg: nick_color as u16, bg: config::USER_MSG.bg };
                 termbox::print_chars(
                     tb,
                     pos_x,
                     pos_y + self.height - 1,
-                    config::USER_MSG,
+                    style,
                     &mut nick.chars());
                 tb.change_cell(
                     pos_x + nick.len() as i32,
