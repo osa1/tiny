@@ -170,11 +170,7 @@ pub const COMPLETION: Style =
         bg: TB_DEFAULT,
     };
 
-pub const TIMESTAMP: Style =
-    Style {
-        fg: 0 | TB_BOLD,
-        bg: TB_DEFAULT,
-    };
+pub const TIMESTAMP: Style = FADED;
 
 pub const TAB_ACTIVE: Style =
     Style {
