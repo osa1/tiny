@@ -1,7 +1,6 @@
 use termbox_simple::Termbox;
 use term_input::Key;
 
-use std::collections::HashMap;
 use std::convert::From;
 use std::rc::Rc;
 
@@ -28,12 +27,6 @@ pub struct MessagingUI {
 
     width: i32,
     height: i32,
-
-    // NOTE: Color is encoded in Termbox's 216 colors. (in 256-color mode)
-    nick_colors: HashMap<String, u8>,
-    /// Index of the next color to use when highlighting a new nick. Always a valid index to
-    /// `config::NICK_COLORS`.
-    next_color_idx: usize,
 
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
@@ -87,8 +80,6 @@ impl MessagingUI {
             input_field: vec![Box::new(TextField::new(width))],
             width: width,
             height: height,
-            nick_colors: HashMap::new(),
-            next_color_idx: 0,
             nicks: Rc::new(Trie::new()),
             current_nick: None,
             draw_current_nick: true,
@@ -311,15 +302,13 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    fn get_nick_color(&mut self, sender: &str) -> u8 {
-        if let Some(color) = self.nick_colors.get(sender) {
-            return *color;
+    fn get_nick_color(&self, sender: &str) -> u8 {
+        // Anything works as long as it's fast
+        let mut hash: usize = 5381;
+        for c in sender.chars() {
+            hash = hash * 33 + (c as usize);
         }
-
-        let color = config::NICK_COLORS[self.next_color_idx];
-        self.nick_colors.insert(sender.to_owned(), color);
-        self.next_color_idx = (self.next_color_idx + 1) % (config::NICK_COLORS.len() - 1);
-        color
+        config::NICK_COLORS[hash % config::NICK_COLORS.len()]
     }
 }
 
@@ -358,10 +347,6 @@ impl MessagingUI {
     pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
         Rc::get_mut(&mut self.nicks).unwrap().remove(old_nick);
         Rc::get_mut(&mut self.nicks).unwrap().insert(new_nick);
-        let color = self.nick_colors.remove(old_nick);
-        if let Some(color_) = color {
-            self.nick_colors.insert(new_nick.to_owned(), color_);
-        }
 
         let line_idx = self.get_activity_line_idx(ts);
         self.msg_area.modify_line(line_idx, |line| {
