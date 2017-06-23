@@ -123,17 +123,23 @@ pub const CURSOR: Style =
 
 pub const JOIN: Style =
     Style {
-        fg: 242,
+        fg: 10 | TB_BOLD,
         bg: TB_DEFAULT,
     };
 
 pub const PART: Style =
     Style {
-        fg: 242,
+        fg: 1 | TB_BOLD,
         bg: TB_DEFAULT,
     };
 
 pub const NICK: Style =
+    Style {
+        fg: 10 | TB_BOLD,
+        bg: TB_DEFAULT,
+    };
+
+pub const FADED: Style =
     Style {
         fg: 242,
         bg: TB_DEFAULT,

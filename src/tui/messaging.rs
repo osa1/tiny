@@ -326,6 +326,7 @@ impl MessagingUI {
             self.msg_area.modify_line(line_idx, |line| {
                 line.set_style(config::JOIN);
                 line.add_char('+');
+                line.set_style(config::FADED);
                 line.add_text(nick);
                 line.add_char(' ');
             });
@@ -340,6 +341,7 @@ impl MessagingUI {
             self.msg_area.modify_line(line_idx, |line| {
                 line.set_style(config::PART);
                 line.add_char('-');
+                line.set_style(config::FADED);
                 line.add_text(nick);
                 line.add_char(' ');
             });
@@ -352,9 +354,11 @@ impl MessagingUI {
 
         let line_idx = self.get_activity_line_idx(ts);
         self.msg_area.modify_line(line_idx, |line| {
-            line.set_style(config::NICK);
+            line.set_style(config::FADED);
             line.add_text(old_nick);
-            line.add_text("->");
+            line.set_style(config::NICK);
+            line.add_text(">");
+            line.set_style(config::FADED);
             line.add_text(new_nick);
             line.add_char(' ');
         });
