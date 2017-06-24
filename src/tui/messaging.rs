@@ -239,7 +239,7 @@ impl MessagingUI {
         self.add_timestamp(ts);
 
         self.msg_area.set_style(config::TOPIC);
-        self.msg_area.add_text(&format!("Channel topic is: \"{}\"", topic));
+        self.msg_area.add_text(topic);
 
         self.msg_area.flush_line();
     }
