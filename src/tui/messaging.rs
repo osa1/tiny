@@ -261,7 +261,7 @@ impl MessagingUI {
         self.reset_activity_line();
     }
 
-    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, higlight: bool) {
+    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, highlight: bool) {
         self.reset_activity_line();
         self.add_timestamp(ts);
 
@@ -276,7 +276,7 @@ impl MessagingUI {
         self.msg_area.add_text(": ");
 
         self.msg_area.set_style(
-            if higlight {
+            if highlight {
                 config::HIGHLIGHT
             } else {
                 config::USER_MSG
