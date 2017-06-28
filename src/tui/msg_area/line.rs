@@ -127,7 +127,6 @@ impl Line {
         lines
     }
 
-    #[inline]
     pub fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32, width : i32) {
         self.draw_from(tb, pos_x, pos_y, 0, width);
     }

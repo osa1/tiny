@@ -20,7 +20,7 @@ fn main() {
     new_term.c_iflag &= !(libc::IGNBRK | libc::BRKINT | libc::PARMRK | libc::ISTRIP | libc::INLCR |
                           libc::IGNCR | libc::ICRNL | libc::IXON);
     new_term.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG | libc::IEXTEN);
-    unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &new_term) };
+    unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &new_term) };
 
     let poll = Poll::new().unwrap();
     poll.register(

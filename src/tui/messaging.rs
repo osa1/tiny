@@ -169,6 +169,16 @@ impl MessagingUI {
                 WidgetRet::KeyHandled
             },
 
+            Key::Home => {
+                self.msg_area.scroll_top();
+                WidgetRet::KeyHandled
+            },
+
+            Key::End => {
+                self.msg_area.scroll_bottom();
+                WidgetRet::KeyHandled
+            },
+
             key => {
                 match self.input_field.keypressed(key) {
                     WidgetRet::Remove => {

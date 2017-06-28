@@ -84,6 +84,27 @@ impl MsgArea {
         }
     }
 
+    pub fn scroll_top(&mut self) {
+        if self.lines.is_empty() { return; }
+
+        let mut height_left = self.height;
+        let mut i = 0;
+        loop {
+            let rendered = self.lines[i].rendered_height(self.width);
+            if height_left < rendered {
+                break;
+            }
+            height_left -= rendered;
+            i += 1;
+        }
+
+        self.scroll = (self.lines.len() - i) as i32;
+    }
+
+    pub fn scroll_bottom(&mut self) {
+        self.scroll = 0;
+    }
+
     pub fn page_up(&mut self) {
         self.scroll = max(0, min((self.lines.len() as i32) - 1, self.scroll + 10));
     }
