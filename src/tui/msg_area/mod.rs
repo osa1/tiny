@@ -89,7 +89,7 @@ impl MsgArea {
 
         let mut height_left = self.height;
         let mut i = 0;
-        loop {
+        while i < self.lines.len() {
             let rendered = self.lines[i].rendered_height(self.width);
             if height_left < rendered {
                 break;
