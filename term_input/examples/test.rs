@@ -9,6 +9,9 @@ use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
 
+use std::io;
+use std::io::Write;
+
 use term_input::{Event, Key, Input};
 
 fn main() {
@@ -21,6 +24,13 @@ fn main() {
                           libc::IGNCR | libc::ICRNL | libc::IXON);
     new_term.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG | libc::IEXTEN);
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &new_term) };
+
+    // enable focus events
+    {
+        let stdout = io::stdout();
+        stdout.lock().write_all(b"\x1b[?1004h").unwrap();
+        stdout.lock().flush().unwrap();
+    }
 
     let poll = Poll::new().unwrap();
     poll.register(
@@ -50,4 +60,10 @@ fn main() {
 
     // restore the old settings
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &old_term) };
+
+    // disable focus events
+    {
+        let stdout = io::stdout();
+        stdout.lock().write_all(b"\x1b[?1004l").unwrap();
+    }
 }

@@ -11,6 +11,8 @@ enum {
     T_REVERSE,
     T_ENTER_KEYPAD,
     T_EXIT_KEYPAD,
+    T_ENABLE_FOCUS_EVENTS,
+    T_DISABLE_FOCUS_EVENTS,
     T_ENTER_MOUSE,
     T_EXIT_MOUSE,
     T_FUNCS_NUM,
@@ -18,6 +20,8 @@ enum {
 
 #define ENTER_MOUSE_SEQ "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h"
 #define EXIT_MOUSE_SEQ "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l"
+#define ENABLE_FOCUS_SEQ "\033[?1004h"
+#define DISABLE_FOCUS_SEQ "\033[?1004l"
 
 #define EUNSUPPORTED_TERM -1
 
@@ -35,6 +39,8 @@ static const char *rxvt_256color_funcs[] = {
     "\033[7m",
     "\033=",
     "\033>",
+    "",
+    "",
     ENTER_MOUSE_SEQ,
     EXIT_MOUSE_SEQ,
 };
@@ -55,6 +61,8 @@ static const char *eterm_funcs[] = {
     "",
     "",
     "",
+    "",
+    "",
 };
 
 // screen
@@ -71,6 +79,8 @@ static const char *screen_funcs[] = {
     "\033[7m",
     "\033[?1h\033=",
     "\033[?1l\033>",
+    "",
+    "",
     ENTER_MOUSE_SEQ,
     EXIT_MOUSE_SEQ,
 };
@@ -89,6 +99,8 @@ static const char *rxvt_unicode_funcs[] = {
     "\033[7m",
     "\033=",
     "\033>",
+    "",
+    "",
     ENTER_MOUSE_SEQ,
     EXIT_MOUSE_SEQ,
 };
@@ -109,6 +121,8 @@ static const char *linux_funcs[] = {
     "",
     "",
     "",
+    "",
+    "",
 };
 
 // xterm
@@ -125,6 +139,8 @@ static const char *xterm_funcs[] = {
     "\033[7m",
     "\033[?1h\033=",
     "\033[?1l\033>",
+    ENABLE_FOCUS_SEQ,
+    DISABLE_FOCUS_SEQ,
     ENTER_MOUSE_SEQ,
     EXIT_MOUSE_SEQ,
 };
@@ -314,13 +330,15 @@ static int init_term(void) {
     funcs = malloc(sizeof(const char*) * T_FUNCS_NUM);
     // the last two entries are reserved for mouse. because the table offset is
     // not there, the two entries have to fill in manually
-    for (i = 0; i < T_FUNCS_NUM-2; i++) {
+    for (i = 0; i < T_FUNCS_NUM-4; i++) {
         funcs[i] = terminfo_copy_string(data,
             str_offset + 2 * ti_funcs[i], table_offset);
     }
 
-    funcs[T_FUNCS_NUM-2] = ENTER_MOUSE_SEQ;
-    funcs[T_FUNCS_NUM-1] = EXIT_MOUSE_SEQ;
+    funcs[T_ENABLE_FOCUS_EVENTS] = ENABLE_FOCUS_SEQ;
+    funcs[T_DISABLE_FOCUS_EVENTS] = DISABLE_FOCUS_SEQ;
+    funcs[T_ENTER_MOUSE] = ENTER_MOUSE_SEQ;
+    funcs[T_EXIT_MOUSE] = EXIT_MOUSE_SEQ;
 
     init_from_terminfo = true;
     free(data);
@@ -333,7 +351,7 @@ static void shutdown_term(void) {
         // the last two entries are reserved for mouse. because the table offset
         // is not there, the two entries have to fill in manually and do not
         // need to be freed.
-        for (i = 0; i < T_FUNCS_NUM-2; i++) {
+        for (i = 0; i < T_FUNCS_NUM-4; i++) {
             free((void*)funcs[i]);
         }
         free(funcs);

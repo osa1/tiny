@@ -69,11 +69,21 @@ fn main() {
                     match tui.handle_input_event(ev) {
                         TUIRet::Input { msg, .. } => {
                             tui.add_msg(&msg.into_iter().collect::<String>(),
-                            Timestamp::now(),
-                            &MsgTarget::Server { serv_name: "debug" });
+                                        Timestamp::now(),
+                                        &MsgTarget::Server { serv_name: "debug" });
                         },
                         TUIRet::Abort => {
                             break 'mainloop;
+                        },
+                        TUIRet::EventIgnored(Event::FocusGained) => {
+                            tui.add_msg("focus gained",
+                                        Timestamp::now(),
+                                        &MsgTarget::Server { serv_name: "debug" });
+                        },
+                        TUIRet::EventIgnored(Event::FocusLost) => {
+                            tui.add_msg("focus lost",
+                                        Timestamp::now(),
+                                        &MsgTarget::Server { serv_name: "debug" });
                         },
                         _ => {}
                     }

@@ -57,6 +57,9 @@ pub enum Event {
     /// SIGWINCH happened.
     Resize,
 
+    FocusGained,
+    FocusLost,
+
     /// An unknown sequence of bytes (probably for a key combination that we don't care about).
     Unknown(Vec<u8>),
 }
@@ -101,6 +104,8 @@ static XTERM_PAGE_DOWN       : [u8; 4] = [27, 91, 54, 126];
 static XTERM_PAGE_UP         : [u8; 4] = [27, 91, 53, 126];
 static XTERM_SHIFT_UP        : [u8; 6] = [27, 91, 49, 59, 50, 65];
 static XTERM_SHIFT_DOWN      : [u8; 6] = [27, 91, 49, 59, 50, 66];
+static XTERM_FOCUS_GAINED    : [u8; 3] = [27, 91, 73];
+static XTERM_FOCUS_LOST      : [u8; 3] = [27, 91, 79];
 // FIXME: For some reason term_input test program gets first two of these bytes while tiny gets the
 // latter two. Tried to debug this a little bit by changing termattrs but no luck...
 static XTERM_HOME            : [u8; 3] = [27, 91, 72];
@@ -108,7 +113,7 @@ static XTERM_END             : [u8; 3] = [27, 91, 70];
 static XTERM_HOME_2          : [u8; 3] = [27, 79, 72];
 static XTERM_END_2           : [u8; 3] = [27, 79, 70];
 
-static XTERM_KEY_SEQS : [(&'static [u8], Event); 24] =
+static XTERM_KEY_SEQS : [(&'static [u8], Event); 26] =
     [ (&XTERM_ALT_ARROW_DOWN,  Event::Key(Key::AltArrow(Arrow::Down))),
       (&XTERM_ALT_ARROW_LEFT,  Event::Key(Key::AltArrow(Arrow::Left))),
       (&XTERM_ALT_ARROW_RIGHT, Event::Key(Key::AltArrow(Arrow::Right))),
@@ -133,6 +138,8 @@ static XTERM_KEY_SEQS : [(&'static [u8], Event); 24] =
       (&XTERM_END,             Event::Key(Key::End)),
       (&XTERM_HOME_2,          Event::Key(Key::Home)),
       (&XTERM_END_2,           Event::Key(Key::End)),
+      (&XTERM_FOCUS_GAINED,    Event::FocusGained),
+      (&XTERM_FOCUS_LOST,      Event::FocusLost),
     ];
 
 // Make sure not to use 27 (ESC) because it's used as a prefix in many combinations.
