@@ -45,7 +45,7 @@ impl TUI {
     pub fn new() -> TUI {
         let mut tui = Termbox::init().unwrap(); // TODO: check errors
         tui.set_output_mode(OutputMode::Output256);
-        tui.set_clear_attributes(config::CLEAR.fg, config::CLEAR.bg);
+        tui.set_clear_attributes(config::get_theme().clear.fg, config::get_theme().clear.bg);
 
         let _ = fs::create_dir("logs");
 

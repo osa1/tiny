@@ -33,15 +33,15 @@ fn main() {
         let mut file = File::open("test/lipsum.txt").unwrap();
         file.read_to_string(&mut text).unwrap();
         let single_line_text = text.lines().collect::<Vec<&str>>().join("");
-        msg_area.set_style(config::ERR_MSG);
+        msg_area.set_style(config::get_theme().err_msg);
         msg_area.add_text(&single_line_text);
         // writeln!(io::stderr(), "full text added: {}", single_line_text).unwrap();
         msg_area.flush_line();
 
         for line in text.lines() {
-            msg_area.set_style(config::TOPIC);
+            msg_area.set_style(config::get_theme().topic);
             msg_area.add_text(">>>");
-            msg_area.set_style(config::USER_MSG);
+            msg_area.set_style(config::get_theme().user_msg);
             msg_area.add_text("  ");
             msg_area.add_text(line);
             msg_area.flush_line();

@@ -2,6 +2,7 @@
 #![feature(alloc_system)]
 #![feature(ascii_ctype)]
 #![feature(offset_to)]
+#![feature(const_fn)]
 
 extern crate alloc_system;
 extern crate libc;
@@ -57,24 +58,29 @@ pub fn run() {
     if !config_path.is_file() {
         generate_default_config();
     } else {
-        let contents = {
-            let mut str = String::new();
-            let mut file = File::open(config_path).unwrap();
-            file.read_to_string(&mut str).unwrap();
-            str
-        };
-
-        match serde_yaml::from_str(&contents) {
+        match parse_config(config_path) {
             Err(yaml_err) => {
                 println!("Can't parse config file:");
                 println!("{}", yaml_err);
                 ::std::process::exit(1);
             },
-            Ok(config::Config { servers, defaults, log_dir }) => {
+            Ok(config::Config { servers, defaults, theme, log_dir }) => {
+                config::set_theme(theme);
                 Tiny::run(servers, defaults, log_dir)
             }
         }
     }
+}
+
+fn parse_config(config_path: PathBuf) -> serde_yaml::Result<config::Config> {
+    let contents = {
+        let mut str = String::new();
+        let mut file = File::open(config_path).unwrap();
+        file.read_to_string(&mut str).unwrap();
+        str
+    };
+
+    serde_yaml::from_str(&contents)
 }
 
 fn generate_default_config() {
@@ -308,6 +314,16 @@ impl Tiny {
                 conn.set_nick(new_nick);
                 self.tui.set_nick(conn.get_serv_name(), Rc::new(new_nick.to_owned()));
             }
+        }
+
+        else if words[0] == "reload" {
+            match parse_config(config::get_config_path()) {
+                Ok(config::Config { theme, .. }) => config::set_theme(theme),
+                Err(err) => {
+                    self.tui.add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
+                    self.tui.add_client_err_msg(&format!("{}", err), &MsgTarget::CurrentTab);
+                }
+           }
         }
 
         else {
