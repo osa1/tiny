@@ -11,3 +11,8 @@ Main differences are:
 * utf8-related functions are removed.
 
 (Based on [7f7694](https://github.com/nsf/termbox/commit/7f7694061d7d3eba9a7d9b6a8313155c03545e46))
+
+1/7/2017:
+
+* Built-in terminal functions removed. All functions are now read from
+  terminfo.
