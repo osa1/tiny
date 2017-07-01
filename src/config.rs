@@ -75,13 +75,13 @@ defaults:
 # Where to put log files
 log_dir: '{}'
 
-# Color theme based on 256 colors (if supported), colors can be defined as color index (0-255) or with it's name
+# Color theme based on 256 colors (if supported), colors can be defined as color index (0-255) or with its name
 # 
 # Accepted color names are:
 # default, black, darkred, darkgreen, darkyellow, darkblue, darkmagenta, darkcyan, lightgray, darkgray, 
 # red, green, yellow, blue, magenta, cyan, white
 #
-# Attributes can be combined (e.g [bold, underline]), and valid values are bold, underline, reverse
+# Attributes can be combined (e.g [bold, underline]), and valid values are bold, underline
 theme:
     nick_colors: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ]
 
@@ -178,6 +178,7 @@ pub struct Style {
     pub bg: u16,
 }
 
+// Color names are taken from https://wiki.archlinux.org/index.php/Color_output_in_console#X_window_system
 const COLORS: [(&'static str, u16); 17] = 
 [
     // Default bg color of the terminal
@@ -207,19 +208,18 @@ const COLORS: [(&'static str, u16); 17] =
 const ATTRS: [(&'static str, u16); 3] =
 [
     ("bold",      TB_BOLD),
-    ("underline", TB_UNDERLINE),
-    ("reverse",   TB_REVERSE)
+    ("underline", TB_UNDERLINE)
 ];
 
-fn parse_color(val: String) -> Result<u16, ()> {
+fn parse_color(val: String) -> Option<u16> {
     for &(name, color) in &COLORS {
         if val == name {
-            return Ok(color);
+            return Some(color);
         }
     }
 
     // If color name doesn't match try get a number
-    val.parse().map_err(|_| ())
+    val.parse().ok()
 }
 
 fn parse_attr(val: String) -> u16 {
@@ -267,14 +267,14 @@ impl<'de> Deserialize<'de> for Style {
                     match key {
                         Field::Fg => {
                              let color = parse_color(map.next_value()?) 
-                                 .map_err(|_| de::Error::invalid_value(de::Unexpected::UnitVariant, &self))?;
+                                 .ok_or_else(|| de::Error::invalid_value(de::Unexpected::UnitVariant, &self))?;
 
                              fg = Some(color);
                         },
 
                         Field::Bg => {
                             let color = parse_color(map.next_value()?)
-                                .map_err(|_| de::Error::invalid_value(de::Unexpected::UnitVariant, &self))?;
+                                .ok_or_else(|| de::Error::invalid_value(de::Unexpected::UnitVariant, &self))?;
 
                             bg = Some(color);
                         },

@@ -114,6 +114,8 @@ Commands start with `/` character.
 
 - `/nick <nick>`: Change nick
 
+- `/reload`: Reloads theme configuration. Right now only tab styles and exit dialog styles changes immediately. 
+
 ## Development
 
 tiny is in early stages of development. Some of features that you might think
