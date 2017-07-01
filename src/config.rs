@@ -75,18 +75,20 @@ defaults:
 # Where to put log files
 log_dir: '{}'
 
-# Color theme based on 256 colors (if supported), colors can be defined as color index (0-255) or with its name
-# 
-# Accepted color names are:
-# default, black, darkred, darkgreen, darkyellow, darkblue, darkmagenta, darkcyan, lightgray, darkgray, 
-# red, green, yellow, blue, magenta, cyan, white
+# Color theme based on 256 colors (if supported), colors can be defined as color
+# index (0-255) or # with its name
 #
-# Attributes can be combined (e.g [bold, underline]), and valid values are bold, underline
+# Accepted color names are:
+# default, black, darkred, darkgreen, darkyellow, darkblue, darkmagenta,
+# darkcyan, lightgray, darkgray, red, green, yellow, blue, magenta, cyan, white
+#
+# Attributes can be combined (e.g [bold, underline]), and valid values are bold
+# and underline
 theme:
     nick_colors: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ]
 
     # Used for whitespace
-    clear: 
+    clear:
         fg: default
         bg: default
 
@@ -178,10 +180,10 @@ pub struct Style {
     pub bg: u16,
 }
 
-// Color names are taken from https://wiki.archlinux.org/index.php/Color_output_in_console#X_window_system
-const COLORS: [(&'static str, u16); 17] = 
+// Color names are taken from https://en.wikipedia.org/wiki/List_of_software_palettes
+const COLORS: [(&'static str, u16); 17] =
 [
-    // Default bg color of the terminal
+    // Default fg/bg color of the terminal
     ("default",     TB_DEFAULT),
 
     // Dark variants
@@ -193,7 +195,7 @@ const COLORS: [(&'static str, u16); 17] =
     ("darkmagenta", 5),
     ("darkcyan",    6),
     ("lightgray",   7),
-    
+
     // Bright variants
     ("darkgray",    8),
     ("red",         9),
@@ -205,7 +207,7 @@ const COLORS: [(&'static str, u16); 17] =
     ("white",       15)
 ];
 
-const ATTRS: [(&'static str, u16); 3] =
+const ATTRS: [(&'static str, u16); 2] =
 [
     ("bold",      TB_BOLD),
     ("underline", TB_UNDERLINE)
@@ -250,7 +252,12 @@ impl<'de> Deserialize<'de> for Style {
                 let colors = COLORS.iter().map(|&(name, _)| name).collect::<Vec<&str>>().join(", ");
                 let attrs = ATTRS.iter().map(|&(name, _)| name).collect::<Vec<&str>>().join(", ");
 
-                let expected_format = format!("Expected format:\nfg: 0-255 | colorname\nbg: 0-255 | colorname\nattrs: [{}]\n\nColor Names: {}", attrs, colors);
+                let expected_format = format!(
+                    "Expected format:\n\
+                    fg: 0-255 or color name\n\
+                    bg: 0-255 or color name\n\
+                    attrs: [{}]\n\n\
+                    color names: {}", attrs, colors);
                 let msg = format!("color style\n{}", expected_format);
 
                 formatter.write_str(msg.as_str())
@@ -266,7 +273,7 @@ impl<'de> Deserialize<'de> for Style {
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Fg => {
-                             let color = parse_color(map.next_value()?) 
+                             let color = parse_color(map.next_value()?)
                                  .ok_or_else(|| de::Error::invalid_value(de::Unexpected::UnitVariant, &self))?;
 
                              fg = Some(color);
@@ -369,6 +376,40 @@ mod tests {
     #[test]
     fn parse_default_config() {
         match serde_yaml::from_str(&get_default_config_yaml()) {
+            Err(yaml_err) => {
+                println!("{}", yaml_err);
+                assert!(false);
+            }
+            Ok(Config { .. }) => {}
+        }
+    }
+
+    #[test]
+    fn parse_pre_color_config() {
+        // Parse config file without a theme field. Important to be able to
+        // parse old config files.
+        let config = "\
+# Servers to auto-connect
+servers:
+    - addr: irc.mozilla.org
+      port: 6667
+      hostname: yourhost
+      realname: yourname
+      nicks: [tiny_user]
+      auto_cmds:
+          - 'msg NickServ identify hunter2'
+          - 'join #tiny'
+
+# Defaults used when connecting to servers via the /connect command
+defaults:
+    nicks: [tiny_user]
+    hostname: yourhost
+    realname: yourname
+    auto_cmds: []
+
+# Where to put log files
+log_dir: path";
+        match serde_yaml::from_str(config) {
             Err(yaml_err) => {
                 println!("{}", yaml_err);
                 assert!(false);
