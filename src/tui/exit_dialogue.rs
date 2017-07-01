@@ -30,12 +30,12 @@ impl Widget for ExitDialogue {
 
         let mut col = 0;
         for char in MSG.chars() {
-            tb.change_cell(pos_x + col, pos_y, char, config::EXIT_DIALOGUE.fg, config::EXIT_DIALOGUE.bg);
+            tb.change_cell(pos_x + col, pos_y, char, config::get_theme().exit_dialogue.fg, config::get_theme().exit_dialogue.bg);
             col += 1;
         }
 
         while col < self.width {
-            tb.change_cell(pos_x + col, pos_y, ' ', config::EXIT_DIALOGUE.fg, config::EXIT_DIALOGUE.bg);
+            tb.change_cell(pos_x + col, pos_y, ' ', config::get_theme().exit_dialogue.fg, config::get_theme().exit_dialogue.bg);
             col += 1;
         }
     }

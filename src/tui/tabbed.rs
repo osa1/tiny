@@ -41,9 +41,9 @@ pub enum TabStyle {
 impl TabStyle {
     pub fn get_style(self) -> Style {
         match self {
-            TabStyle::NewMsg => config::TAB_NEW_MSG,
-            TabStyle::Highlight => config::TAB_HIGHLIGHT,
-            TabStyle::Normal => config::TAB_NORMAL,
+            TabStyle::NewMsg => config::get_theme().tab_new_msg,
+            TabStyle::Highlight => config::get_theme().tab_highlight,
+            TabStyle::Normal => config::get_theme().tab_normal,
         }
     }
 }
@@ -91,7 +91,7 @@ impl Tab {
 
     pub fn draw(&self, tb: &mut Termbox, pos_x: i32, pos_y: i32, active: bool) {
         let style: Style = if active {
-            config::TAB_ACTIVE
+            config::get_theme().tab_active
         } else {
             self.style.get_style()
         };
@@ -279,16 +279,16 @@ impl Tabbed {
 // Rendering
 
 fn arrow_style(tabs: &[Tab]) -> Style {
-    let mut arrow_style = config::TAB_NORMAL;
+    let mut arrow_style = config::get_theme().tab_normal;
 
     for tab in tabs  {
         match tab.style {
             TabStyle::NewMsg => {
-                arrow_style = config::TAB_NEW_MSG;
+                arrow_style = config::get_theme().tab_new_msg;
                 break;
             }
             TabStyle::Highlight => {
-                arrow_style = config::TAB_HIGHLIGHT;
+                arrow_style = config::get_theme().tab_highlight;
             }
             TabStyle::Normal => {}
         }

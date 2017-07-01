@@ -153,8 +153,8 @@ impl Line {
             }
 
             else if char == COLOR_RESET_PREFIX {
-                fg = config::CLEAR.fg;
-                bg = config::CLEAR.bg;
+                fg = config::get_theme().clear.fg;
+                bg = config::get_theme().clear.bg;
             }
 
             else if char.is_whitespace() {
@@ -249,7 +249,7 @@ fn translate_irc_control_chars(str: &str) -> String {
         ret.push(TERMBOX_COLOR_PREFIX);
         ret.push(0 as char); // style
         ret.push(irc_color_to_termbox(irc_fg) as char);
-        ret.push(irc_color_to_termbox(irc_bg.unwrap_or(config::USER_MSG.bg as u8)) as char);
+        ret.push(irc_color_to_termbox(irc_bg.unwrap_or(config::get_theme().user_msg.bg as u8)) as char);
     }
 
     while let Some(char) = iter.next() {
