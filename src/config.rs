@@ -40,6 +40,7 @@ pub struct Defaults {
 pub struct Config {
     pub servers: Vec<Server>,
     pub defaults: Defaults,
+    #[serde(default)]
     pub theme: Theme,
     pub log_dir: String,
 }
