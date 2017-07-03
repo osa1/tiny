@@ -13,12 +13,13 @@ use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
 use term_input::{Input, Event};
+use tiny::config;
 use tiny::tui::tabbed::MsgSource;
 use tiny::tui::tabbed::TabStyle;
 use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
-    let mut tui = TUI::new();
+    let mut tui = TUI::new(config::default_colors());
 
     for serv_idx in 0 .. 10 {
         let server = format!("server_{}", serv_idx);

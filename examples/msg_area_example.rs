@@ -13,10 +13,11 @@ use mio::Token;
 use mio::unix::EventedFd;
 
 use term_input::{Input, Event};
+use tiny::config;
 use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
-    let mut tui = TUI::new();
+    let mut tui = TUI::new(config::default_colors());
     tui.new_server_tab("debug");
     tui.draw();
 

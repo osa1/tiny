@@ -10,7 +10,7 @@ use std::fs;
 use std::rc::Rc;
 use std::str;
 
-use config;
+use config::Colors;
 use self::tabbed::{Tabbed, TabbedRet, TabStyle, MsgSource};
 pub use self::messaging::Timestamp;
 
@@ -19,10 +19,13 @@ use termbox_simple::{Termbox, OutputMode};
 
 pub struct TUI {
     /// Termbox instance
-    termbox  : Termbox,
+    termbox: Termbox,
+
+    /// Color scheme
+    colors: Colors,
 
     /// A tab for every server + channel
-    ui       : Tabbed,
+    ui: Tabbed,
 }
 
 #[derive(Debug)]
@@ -42,17 +45,23 @@ pub enum TUIRet {
 }
 
 impl TUI {
-    pub fn new() -> TUI {
+    pub fn new(colors: Colors) -> TUI {
         let mut tui = Termbox::init().unwrap(); // TODO: check errors
         tui.set_output_mode(OutputMode::Output256);
-        tui.set_clear_attributes(config::CLEAR.fg, config::CLEAR.bg);
+        tui.set_clear_attributes(colors.clear.fg, colors.clear.bg);
 
         let _ = fs::create_dir("logs");
 
         TUI {
             ui: Tabbed::new(tui.width() as i32, tui.height() as i32),
+            colors: colors,
             termbox: tui,
         }
+    }
+
+    pub fn set_colors(&mut self, colors: Colors) {
+        self.termbox.set_clear_attributes(colors.clear.fg, colors.clear.bg);
+        self.colors = colors;
     }
 }
 
@@ -172,7 +181,7 @@ impl TUI {
 
     pub fn draw(&mut self) {
         self.termbox.clear();
-        self.ui.draw(&mut self.termbox, 0, 0);
+        self.ui.draw(&mut self.termbox, &self.colors, 0, 0);
         self.termbox.present();
     }
 }

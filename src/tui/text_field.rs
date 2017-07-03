@@ -6,7 +6,7 @@ use std::rc::Rc;
 use term_input::{Key, Arrow};
 use termbox_simple::Termbox;
 
-use config;
+use config::Colors;
 use trie::Trie;
 use tui::termbox;
 use tui::widget::{WidgetRet, Widget};
@@ -71,13 +71,14 @@ impl TextField {
         self.move_cursor_to_end();
     }
 
-    pub fn draw_(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
+    pub fn draw_(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         match self.mode {
             Mode::Edit => {
-                draw_line(tb, &self.buffer, pos_x, pos_y, self.scroll, self.width, self.cursor);
+                draw_line(tb, colors,
+                          &self.buffer, pos_x, pos_y, self.scroll, self.width, self.cursor);
             },
             Mode::History(hist_curs) => {
-                draw_line(tb,
+                draw_line(tb, colors,
                           &self.history[hist_curs as usize],
                           pos_x, pos_y, self.scroll, self.width, self.cursor);
             },
@@ -88,7 +89,7 @@ impl TextField {
                 // draw a placeholder for the cursor
                 tb.change_cell(pos_x + self.cursor - self.scroll, pos_y,
                                ' ',
-                               config::USER_MSG.fg, config::USER_MSG.bg);
+                               colors.user_msg.fg, colors.user_msg.bg);
 
                 let completion : &str = &completions[current_completion];
 
@@ -108,11 +109,11 @@ impl TextField {
                                 char_idx < insertion_point + completion.len() {
                             tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
                                            char,
-                                           config::COMPLETION.fg, config::COMPLETION.bg);
+                                           colors.completion.fg, colors.completion.bg);
                         } else {
                             tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
                                            char,
-                                           config::USER_MSG.fg, config::USER_MSG.bg);
+                                           colors.user_msg.fg, colors.user_msg.bg);
                         }
 
                     }
@@ -477,17 +478,20 @@ impl TextField {
     }
 }
 
-fn draw_line(tb: &mut Termbox, line : &[char], pos_x : i32, pos_y : i32, scroll : i32, width : i32, cursor : i32) {
-    let slice: &[char] = &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
+fn draw_line(tb: &mut Termbox, colors: &Colors,
+             line: &[char], pos_x: i32, pos_y: i32, scroll: i32, width: i32, cursor: i32)
+{
+    let slice: &[char] =
+        &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
     let chars: &mut Iterator<Item=char> = &mut slice.iter().cloned();
-    termbox::print_chars(tb, pos_x, pos_y, config::USER_MSG, chars);
+    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, chars);
 
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
         tb.change_cell(pos_x + cursor - scroll, pos_y,
                        ' ',
-                       config::CURSOR.fg, config::CURSOR.bg);
+                       colors.cursor.fg, colors.cursor.bg);
     }
     tb.set_cursor(pos_x + cursor - scroll, pos_y);
 }
@@ -497,8 +501,8 @@ impl Widget for TextField {
         self.resize_(width, height);
     }
 
-    fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
-        self.draw_(tb, pos_x, pos_y);
+    fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+        self.draw_(tb, colors, pos_x, pos_y);
     }
 
     fn keypressed(&mut self, key : Key) -> WidgetRet {

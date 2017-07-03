@@ -15,10 +15,11 @@ use std::fs::File;
 use std::io::Read;
 
 use term_input::{Input, Event};
+use tiny::config;
 use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
-    let mut tui = TUI::new();
+    let mut tui = TUI::new(config::default_colors());
     tui.new_server_tab("debug");
     let debug_tab = MsgTarget::Server { serv_name: "debug" };
 

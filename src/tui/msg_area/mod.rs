@@ -6,8 +6,9 @@ use std::str;
 
 use termbox_simple::Termbox;
 
+use config::Colors;
 pub use self::line::Line;
-use config::Style;
+pub use self::line::SegStyle;
 
 pub struct MsgArea {
     lines       : Vec<Line>,
@@ -40,7 +41,7 @@ impl MsgArea {
         self.height = height;
     }
 
-    pub fn draw(&self, tb : &mut Termbox, pos_x : i32, pos_y : i32) {
+    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         let mut row = pos_y + self.height - 1;
 
         // Draw lines in reverse order
@@ -55,13 +56,13 @@ impl MsgArea {
             // Do we have enough space to render this line?
             if line_row >= pos_y {
                 // Render it
-                line.draw(tb, pos_x, line_row, self.width);
+                line.draw(tb, colors, pos_x, line_row, self.width);
                 row = line_row - 1;
                 line_idx -= 1;
             } else {
                 // Maybe we can still render some part of it
                 let render_from = pos_y - line_row;
-                line.draw_from(tb, pos_x, line_row, render_from, self.width);
+                line.draw_from(tb, colors, pos_x, line_row, render_from, self.width);
                 break;
             }
         }
@@ -118,7 +119,7 @@ impl MsgArea {
 // Adding text
 
 impl MsgArea {
-    pub fn set_style(&mut self, style: Style) {
+    pub fn set_style(&mut self, style: SegStyle) {
         self.line_buf.set_style(style);
     }
 
