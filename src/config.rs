@@ -77,18 +77,18 @@ defaults:
 log_dir: '{}'
 
 # Color theme based on 256 colors (if supported), colors can be defined as color
-# index (0-255) or # with its name
+# index (0-255) or with its name
 #
 # Accepted color names are:
-# default, black, darkred, darkgreen, darkyellow, darkblue, darkmagenta,
-# darkcyan, lightgray, darkgray, red, green, yellow, blue, magenta, cyan, white
+# default (0), black (0), maroon (1), green (2), olive (3), navy (4),
+# purple (5), teal (6), silver (7), gray (8), red (9), lime (10),
+# yellow (11), blue (12), magenta (13), cyan (14), white (15)
 #
 # Attributes can be combined (e.g [bold, underline]), and valid values are bold
 # and underline
 colors:
-    nick: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ]
+    nick: [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ]
 
-    # Used for whitespace
     clear:
         fg: default
         bg: default
@@ -99,11 +99,11 @@ colors:
 
     err_msg:
         fg: black
-        bg: darkred
-        attrs: [underline]
+        bg: maroon
+        attrs: [bold]
 
     topic:
-        fg: lightgray
+        fg: cyan
         bg: default
         attrs: [bold]
 
@@ -112,17 +112,17 @@ colors:
         bg: default
 
     join:
-        fg: green
+        fg: lime
         bg: default
         attrs: [bold]
 
     part:
-        fg: darkred
+        fg: maroon
         bg: default
         attrs: [bold]
 
     nick_change:
-        fg: green
+        fg: lime
         bg: default
         attrs: [bold]
 
@@ -132,7 +132,7 @@ colors:
 
     exit_dialogue:
         fg: default
-        bg: darkblue
+        bg: navy
 
     highlight:
         fg: red
@@ -148,29 +148,30 @@ colors:
         bg: default
 
     tab_active:
-        fg: darkred
-        bg: black
+        fg: default
+        bg: default
         attrs: [bold]
 
     tab_normal:
-        fg: darkgray
-        bg: black
+        fg: gray
+        bg: default
 
     tab_new_msg:
-        fg: darkmagenta
-        bg: black
+        fg: purple
+        bg: default
 
     tab_highlight:
         fg: red
-        bg: black
+        bg: default
         attrs: [bold]\n", log_dir.as_path().to_str().unwrap())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Colors
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-use serde::de::{self, Deserializer, Visitor, MapAccess};
+
 pub use termbox_simple::*;
+use serde::de::{self, Deserializer, Visitor, MapAccess};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
@@ -237,28 +238,23 @@ impl Default for Colors {
 // Color names are taken from https://en.wikipedia.org/wiki/List_of_software_palettes
 const COLORS: [(&'static str, u16); 17] =
 [
-    // Default fg/bg color of the terminal
-    ("default",     TB_DEFAULT),
-
-    // Dark variants
-    ("black",       0),
-    ("darkred",     1),
-    ("darkgreen",   2),
-    ("darkyellow",  3),
-    ("darkblue",    4),
-    ("darkmagenta", 5),
-    ("darkcyan",    6),
-    ("lightgray",   7),
-
-    // Bright variants
-    ("darkgray",    8),
-    ("red",         9),
-    ("green",       10),
-    ("yellow",      11),
-    ("blue",        12),
-    ("magenta",     13),
-    ("cyan",        14),
-    ("white",       15)
+    ("default", TB_DEFAULT), // Default fg/bg color of the terminal
+    ("black",   0),
+    ("maroon",  1),
+    ("green",   2),
+    ("olive",   3),
+    ("navy",    4),
+    ("purple",  5),
+    ("teal",    6),
+    ("silver",  7),
+    ("gray",    8),
+    ("red",     9),
+    ("lime",    10),
+    ("yellow",  11),
+    ("blue",    12),
+    ("magenta", 13),
+    ("cyan",    14),
+    ("white",   15)
 ];
 
 const ATTRS: [(&'static str, u16); 2] =
@@ -306,15 +302,11 @@ impl<'de> Deserialize<'de> for Style {
                 let colors = COLORS.iter().map(|&(name, _)| name).collect::<Vec<&str>>().join(", ");
                 let attrs = ATTRS.iter().map(|&(name, _)| name).collect::<Vec<&str>>().join(", ");
 
-                let expected_format = format!(
-                    "Expected format:\n\
-                    fg: 0-255 or color name\n\
-                    bg: 0-255 or color name\n\
-                    attrs: [{}]\n\n\
-                    color names: {}", attrs, colors);
-                let msg = format!("color style\n{}", expected_format);
-
-                formatter.write_str(msg.as_str())
+                writeln!(formatter,
+                         "fg: 0-255 or color name\n\
+                         bg: 0-255 or color name\n\
+                         attrs: [{}]\n\n\
+                         color names: {}", attrs, colors)
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>

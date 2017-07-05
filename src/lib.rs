@@ -320,7 +320,9 @@ impl Tiny {
                 Ok(config::Config { colors, .. }) => self.tui.set_colors(colors),
                 Err(err) => {
                     self.tui.add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
-                    self.tui.add_client_err_msg(&format!("{}", err), &MsgTarget::CurrentTab);
+                    for line in err.description().lines() {
+                        self.tui.add_client_err_msg(line, &MsgTarget::CurrentTab);
+                    }
                 }
            }
         }
