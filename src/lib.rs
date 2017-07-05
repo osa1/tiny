@@ -138,7 +138,7 @@ impl Tiny {
             conns: conns,
             defaults: defaults,
             servers: servers,
-            tui: TUI::new(),
+            tui: TUI::new(config::default_colors()),
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from(log_dir)),
         };

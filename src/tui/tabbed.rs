@@ -3,7 +3,7 @@ use termbox_simple::Termbox;
 
 use std::rc::Rc;
 
-use config;
+use config::Colors;
 use config::Style;
 use tui::messaging::MessagingUI;
 use tui::messaging::Timestamp;
@@ -39,11 +39,11 @@ pub enum TabStyle {
 }
 
 impl TabStyle {
-    pub fn get_style(self) -> Style {
+    pub fn get_style(self, colors: &Colors) -> Style {
         match self {
-            TabStyle::NewMsg => config::get_theme().tab_new_msg,
-            TabStyle::Highlight => config::get_theme().tab_highlight,
-            TabStyle::Normal => config::get_theme().tab_normal,
+            TabStyle::NewMsg => colors.tab_new_msg,
+            TabStyle::Highlight => colors.tab_highlight,
+            TabStyle::Normal => colors.tab_normal,
         }
     }
 }
@@ -89,11 +89,13 @@ impl Tab {
         self.visible_name().len() as i32
     }
 
-    pub fn draw(&self, tb: &mut Termbox, pos_x: i32, pos_y: i32, active: bool) {
+    pub fn draw(&self, tb: &mut Termbox, colors: &Colors,
+                pos_x: i32, pos_y: i32, active: bool)
+    {
         let style: Style = if active {
-            config::get_theme().tab_active
+            colors.tab_active
         } else {
-            self.style.get_style()
+            self.style.get_style(colors)
         };
 
         termbox::print(tb, pos_x, pos_y, style, self.visible_name());
@@ -278,17 +280,17 @@ impl Tabbed {
 ////////////////////////////////////////////////////////////////////////////////
 // Rendering
 
-fn arrow_style(tabs: &[Tab]) -> Style {
-    let mut arrow_style = config::get_theme().tab_normal;
+fn arrow_style(tabs: &[Tab], colors: &Colors) -> Style {
+    let mut arrow_style = colors.tab_normal;
 
     for tab in tabs  {
         match tab.style {
             TabStyle::NewMsg => {
-                arrow_style = config::get_theme().tab_new_msg;
+                arrow_style = colors.tab_new_msg;
                 break;
             }
             TabStyle::Highlight => {
-                arrow_style = config::get_theme().tab_highlight;
+                arrow_style = colors.tab_highlight;
             }
             TabStyle::Normal => {}
         }
@@ -359,8 +361,8 @@ impl Tabbed {
         (i, j)
     }
 
-    pub fn draw(&self, tb : &mut Termbox, mut pos_x: i32, pos_y: i32) {
-        self.tabs[self.active_idx].widget.draw(tb, pos_x, pos_y);
+    pub fn draw(&self, tb : &mut Termbox, colors: &Colors, mut pos_x: i32, pos_y: i32) {
+        self.tabs[self.active_idx].widget.draw(tb, colors, pos_x, pos_y);
 
         // decide whether we need to draw left/right arrows in tab bar
         let left_arr = self.draw_left_arrow();
@@ -369,7 +371,7 @@ impl Tabbed {
         let (tab_left, tab_right) = self.rendered_tabs();
 
         if left_arr {
-            let style = arrow_style(&self.tabs[0..tab_left]);
+            let style = arrow_style(&self.tabs[0..tab_left], colors);
             tb.change_cell(pos_x, pos_y + self.height - 1,
                            LEFT_ARROW,
                            style.fg, style.bg);
@@ -384,13 +386,15 @@ impl Tabbed {
 
         // finally draw the tabs
         for (tab_idx, tab) in (&self.tabs[tab_left .. tab_right]).iter().enumerate() {
-            tab.draw(tb, pos_x, pos_y + self.height - 1, self.active_idx == tab_idx + tab_left);
+            tab.draw(
+                tb, colors,
+                pos_x, pos_y + self.height - 1, self.active_idx == tab_idx + tab_left);
             // len() is OK since server, chan and nick names are ascii
             pos_x += tab.visible_name().len() as i32 + 1; // +1 for margin
         }
 
         if right_arr {
-            let style = arrow_style(&self.tabs[tab_right..]);
+            let style = arrow_style(&self.tabs[tab_right..], colors);
             tb.change_cell(pos_x, pos_y + self.height - 1,
                            RIGHT_ARROW,
                            style.fg, style.bg);

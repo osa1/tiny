@@ -172,7 +172,7 @@ theme:
 use serde::de::{self, Deserialize, Deserializer, Visitor, MapAccess};
 pub use termbox_simple::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
     /// Termbox fg.
     pub fg: u16,
@@ -180,6 +180,57 @@ pub struct Style {
     /// Termbox bg.
     pub bg: u16,
 }
+
+
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Colors {
+    pub nick: Vec<u8>,
+    pub clear: Style,
+    pub user_msg: Style,
+    pub err_msg: Style,
+    pub topic: Style,
+    pub cursor: Style,
+    pub join: Style,
+    pub part: Style,
+    pub nick_change: Style,
+    pub faded: Style,
+    pub exit_dialogue: Style,
+    pub highlight: Style,
+    pub completion: Style,
+    pub timestamp: Style,
+    pub tab_active: Style,
+    pub tab_normal: Style,
+    pub tab_new_msg: Style,
+    pub tab_highlight: Style,
+}
+
+pub fn default_colors() -> Colors {
+    Colors {
+        nick: vec![ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ],
+        clear: Style { fg: TB_DEFAULT, bg: TB_DEFAULT },
+        user_msg: Style { fg: 0, bg: TB_DEFAULT },
+        err_msg: Style { fg: 0 | TB_BOLD, bg: 1 },
+        topic: Style { fg: 14 | TB_BOLD, bg: TB_DEFAULT },
+        cursor: Style { fg: 0, bg: TB_DEFAULT },
+        join: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
+        part: Style { fg: 1 | TB_BOLD, bg: TB_DEFAULT },
+        nick_change: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
+        faded: Style { fg: 242, bg: TB_DEFAULT },
+        exit_dialogue: Style { fg: TB_DEFAULT, bg: 4 },
+        highlight: Style { fg: 9 | TB_BOLD, bg: TB_DEFAULT },
+        completion: Style { fg: 84, bg: TB_DEFAULT },
+        timestamp: Style { fg: 242, bg: TB_DEFAULT },
+        tab_active: Style { fg: 0 | TB_BOLD, bg: 0 },
+        tab_normal: Style { fg: 8, bg: 0 },
+        tab_new_msg: Style { fg: 5, bg: 0 },
+        tab_highlight: Style { fg: 9 | TB_BOLD, bg: 0 },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Theme parsing
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Color names are taken from https://en.wikipedia.org/wiki/List_of_software_palettes
 const COLORS: [(&'static str, u16); 17] =
@@ -305,68 +356,6 @@ impl<'de> Deserialize<'de> for Style {
 
         deserializer.deserialize_map(StyleVisitor)
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-pub struct Theme {
-    /// Colors used to highlight nicks
-    pub nick_colors: [u8; 14],
-    pub clear: Style,
-    pub user_msg: Style,
-    pub err_msg: Style,
-    pub topic: Style,
-    pub cursor: Style,
-    pub join: Style,
-    pub part: Style,
-    pub nick: Style,
-    pub faded: Style,
-    pub exit_dialogue: Style,
-    pub highlight: Style,
-    pub completion: Style,
-    pub timestamp: Style,
-    pub tab_active: Style,
-    pub tab_normal: Style,
-    pub tab_new_msg: Style,
-    pub tab_highlight: Style
-}
-
-const fn default_theme() -> Theme {
-    Theme {
-        nick_colors: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ],
-        clear: Style { fg: TB_DEFAULT, bg: TB_DEFAULT },
-        user_msg: Style { fg: 0, bg: TB_DEFAULT },
-        err_msg: Style { fg: 0 | TB_BOLD, bg: 1 },
-        topic: Style { fg: 14 | TB_BOLD, bg: TB_DEFAULT },
-        cursor: Style { fg: 0, bg: TB_DEFAULT },
-        join: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
-        part: Style { fg: 1 | TB_BOLD, bg: TB_DEFAULT },
-        nick: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
-        faded: Style { fg: 242, bg: TB_DEFAULT },
-        exit_dialogue: Style { fg: TB_DEFAULT, bg: 4 },
-        highlight: Style { fg: 9 | TB_BOLD, bg: TB_DEFAULT },
-        completion: Style { fg: 84, bg: TB_DEFAULT },
-        timestamp: Style { fg: 242, bg: TB_DEFAULT },
-        tab_active: Style { fg: 1 | TB_BOLD, bg: 0 },
-        tab_normal: Style { fg: 8, bg: 0 },
-        tab_new_msg: Style { fg: 5, bg: 0 },
-        tab_highlight: Style { fg: 9 | TB_BOLD, bg: 0 },
-    }
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        default_theme()
-    }
-}
-
-static mut THEME: Theme = default_theme();
-
-pub fn get_theme() -> &'static Theme {
-    unsafe { &THEME }
-}
-pub fn set_theme(theme: Theme) {
-    unsafe { THEME = theme; }
 }
 
 #[cfg(test)]
