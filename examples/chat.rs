@@ -18,13 +18,13 @@ use std::io::Read;
 use std::rc::Rc;
 
 use term_input::{Input, Event};
-use tiny::config;
+use tiny::config::Colors;
 use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
 
 fn main() {
     let chan_target = MsgTarget::Chan { serv_name: "debug", chan_name: "chan" };
 
-    let mut tui = TUI::new(config::default_colors());
+    let mut tui = TUI::new(Colors::default());
     tui.new_server_tab("debug");
     tui.new_chan_tab("debug", "chan");
     tui.show_topic("This is channel topic", Timestamp::now(), &chan_target);

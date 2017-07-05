@@ -18,7 +18,7 @@ use std::io::Read;
 use term_input::{Input, Event, Key};
 use termbox_simple::*;
 
-use tiny::config;
+use tiny::config::Colors;
 use tiny::tui::msg_area::MsgArea;
 use tiny::tui::msg_area::line::SchemeStyle;
 use tiny::tui::msg_area::line::SegStyle;
@@ -28,7 +28,7 @@ fn main() {
     tui.set_output_mode(OutputMode::Output256);
     tui.set_clear_attributes(0, 0);
 
-    let colors = config::default_colors();
+    let colors = Colors::default();
 
     let mut msg_area = MsgArea::new(tui.width(), tui.height());
 

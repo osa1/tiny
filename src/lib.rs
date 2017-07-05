@@ -64,9 +64,8 @@ pub fn run() {
                 println!("{}", yaml_err);
                 ::std::process::exit(1);
             },
-            Ok(config::Config { servers, defaults, theme, log_dir }) => {
-                config::set_theme(theme);
-                Tiny::run(servers, defaults, log_dir)
+            Ok(config::Config { servers, defaults, colors, log_dir }) => {
+                Tiny::run(servers, defaults, log_dir, colors)
             }
         }
     }
@@ -121,7 +120,7 @@ fn deregister_fd(poll: &Poll, fd: RawFd) {
 }
 
 impl Tiny {
-    pub fn run(servers: Vec<config::Server>, defaults: config::Defaults, log_dir: String) {
+    pub fn run(servers: Vec<config::Server>, defaults: config::Defaults, log_dir: String, colors: config::Colors) {
         let poll = Poll::new().unwrap();
 
         register_fd(&poll, libc::STDIN_FILENO);
@@ -138,7 +137,7 @@ impl Tiny {
             conns: conns,
             defaults: defaults,
             servers: servers,
-            tui: TUI::new(config::default_colors()),
+            tui: TUI::new(colors),
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from(log_dir)),
         };
@@ -318,7 +317,7 @@ impl Tiny {
 
         else if words[0] == "reload" {
             match parse_config(config::get_config_path()) {
-                Ok(config::Config { theme, .. }) => config::set_theme(theme),
+                Ok(config::Config { colors, .. }) => self.tui.set_colors(colors),
                 Err(err) => {
                     self.tui.add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
                     self.tui.add_client_err_msg(&format!("{}", err), &MsgTarget::CurrentTab);

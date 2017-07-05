@@ -1,6 +1,6 @@
 //! To see how color numbers map to actual colors in your terminal run
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
-
+use serde::Deserialize;
 use std::env::home_dir;
 use std::path::PathBuf;
 
@@ -41,7 +41,7 @@ pub struct Config {
     pub servers: Vec<Server>,
     pub defaults: Defaults,
     #[serde(default)]
-    pub theme: Theme,
+    pub colors: Colors,
     pub log_dir: String,
 }
 
@@ -85,8 +85,8 @@ log_dir: '{}'
 #
 # Attributes can be combined (e.g [bold, underline]), and valid values are bold
 # and underline
-theme:
-    nick_colors: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ]
+colors:
+    nick: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 ]
 
     # Used for whitespace
     clear:
@@ -121,7 +121,7 @@ theme:
         bg: default
         attrs: [bold]
 
-    nick:
+    nick_change:
         fg: green
         bg: default
         attrs: [bold]
@@ -167,9 +167,9 @@ theme:
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Theme
+// Colors
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-use serde::de::{self, Deserialize, Deserializer, Visitor, MapAccess};
+use serde::de::{self, Deserializer, Visitor, MapAccess};
 pub use termbox_simple::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,31 +205,33 @@ pub struct Colors {
     pub tab_highlight: Style,
 }
 
-pub fn default_colors() -> Colors {
-    Colors {
-        nick: vec![ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ],
-        clear: Style { fg: TB_DEFAULT, bg: TB_DEFAULT },
-        user_msg: Style { fg: 0, bg: TB_DEFAULT },
-        err_msg: Style { fg: 0 | TB_BOLD, bg: 1 },
-        topic: Style { fg: 14 | TB_BOLD, bg: TB_DEFAULT },
-        cursor: Style { fg: 0, bg: TB_DEFAULT },
-        join: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
-        part: Style { fg: 1 | TB_BOLD, bg: TB_DEFAULT },
-        nick_change: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
-        faded: Style { fg: 242, bg: TB_DEFAULT },
-        exit_dialogue: Style { fg: TB_DEFAULT, bg: 4 },
-        highlight: Style { fg: 9 | TB_BOLD, bg: TB_DEFAULT },
-        completion: Style { fg: 84, bg: TB_DEFAULT },
-        timestamp: Style { fg: 242, bg: TB_DEFAULT },
-        tab_active: Style { fg: 0 | TB_BOLD, bg: 0 },
-        tab_normal: Style { fg: 8, bg: 0 },
-        tab_new_msg: Style { fg: 5, bg: 0 },
-        tab_highlight: Style { fg: 9 | TB_BOLD, bg: 0 },
+impl Default for Colors {
+    fn default() -> Self {
+        Colors {
+            nick: vec![ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ],
+            clear: Style { fg: TB_DEFAULT, bg: TB_DEFAULT },
+            user_msg: Style { fg: 0, bg: TB_DEFAULT },
+            err_msg: Style { fg: 0 | TB_BOLD, bg: 1 },
+            topic: Style { fg: 14 | TB_BOLD, bg: TB_DEFAULT },
+            cursor: Style { fg: 0, bg: TB_DEFAULT },
+            join: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
+            part: Style { fg: 1 | TB_BOLD, bg: TB_DEFAULT },
+            nick_change: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
+            faded: Style { fg: 242, bg: TB_DEFAULT },
+            exit_dialogue: Style { fg: TB_DEFAULT, bg: 4 },
+            highlight: Style { fg: 9 | TB_BOLD, bg: TB_DEFAULT },
+            completion: Style { fg: 84, bg: TB_DEFAULT },
+            timestamp: Style { fg: 242, bg: TB_DEFAULT },
+            tab_active: Style { fg: 0 | TB_BOLD, bg: 0 },
+            tab_normal: Style { fg: 8, bg: 0 },
+            tab_new_msg: Style { fg: 5, bg: 0 },
+            tab_highlight: Style { fg: 9 | TB_BOLD, bg: 0 },
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Theme parsing
+// Color parsing
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Color names are taken from https://en.wikipedia.org/wiki/List_of_software_palettes
