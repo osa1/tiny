@@ -52,13 +52,13 @@ impl TabStyle {
 #[derive(Debug, Clone)]
 pub enum MsgSource {
     /// Message sent to a server tab.
-    Serv { serv_name : String },
+    Serv { serv_name: String },
 
     /// Message sent to a channel tab.
-    Chan { serv_name : String, chan_name : String },
+    Chan { serv_name: String, chan_name: String },
 
     /// Message sent to a privmsg tab.
-    User { serv_name : String, nick : String },
+    User { serv_name: String, nick: String },
 }
 
 impl MsgSource {
@@ -532,8 +532,18 @@ impl Tabbed {
 
             MsgTarget::AllUserTabs { serv_name, nick } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if tab.src.serv_name() == serv_name && tab.widget.has_nick(nick) {
-                        target_idxs.push(tab_idx);
+                    match tab.src {
+                        MsgSource::Serv { .. } => {},
+                        MsgSource::Chan { serv_name: ref serv_name_, .. } => {
+                            if serv_name_ == serv_name && tab.widget.has_nick(nick) {
+                                target_idxs.push(tab_idx);
+                            }
+                        }
+                        MsgSource::User { serv_name: ref serv_name_, nick: ref nick_ } => {
+                            if serv_name_ == serv_name && nick_ == nick {
+                                target_idxs.push(tab_idx);
+                            }
+                        }
                     }
                 }
             },
