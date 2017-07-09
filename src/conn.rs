@@ -258,6 +258,13 @@ impl Conn {
 
     pub fn join(&self, chan: &str) {
         wire::join(&self.stream, chan).unwrap();
+        // the channel will be added to auto-join list on successful join (i.e.
+        // after RPL_TOPIC)
+    }
+
+    pub fn part(&mut self, chan: &str) {
+        wire::part(&self.stream, chan).unwrap();
+        self.auto_join.remove(chan);
     }
 
     pub fn away(&mut self, msg: Option<&str>) {

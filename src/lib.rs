@@ -448,9 +448,9 @@ impl Tiny {
             &MsgTarget::CurrentTab);
     }
 
-    fn part(&mut self, serv_name: &str, chan_name: &str) {
+    fn part(&mut self, serv_name: &str, chan: &str) {
         let conn = find_conn(&mut self.conns, serv_name).unwrap();
-        wire::part(conn, chan_name).unwrap();
+        conn.part(chan);
     }
 
     fn send_msg(&mut self, from: MsgSource, msg: &str) {
