@@ -1,9 +1,7 @@
 use net2::TcpBuilder;
 use net2::TcpStreamExt;
 use std::collections::HashSet;
-use std::fmt::Arguments;
 use std::io::Read;
-use std::io::Write;
 use std::io;
 use std::net::TcpStream;
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -376,28 +374,6 @@ fn parse_servername(params: &[String]) -> Option<String> {
         try_opt!(wire::find_byte(slice1.as_bytes(), b'[')
                  .or(wire::find_byte(slice1.as_bytes(), b',')));
     Some((&slice1[..servername_ends]).to_owned())
-}
-
-impl Write for Conn {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.stream.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.stream.flush()
-    }
-
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.stream.write_all(buf)
-    }
-
-    fn write_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
-        self.stream.write_fmt(fmt)
-    }
-
-    fn by_ref(&mut self) -> &mut Conn {
-        self
-    }
 }
 
 #[cfg(test)]
