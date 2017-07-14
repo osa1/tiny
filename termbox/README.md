@@ -16,3 +16,5 @@ Main differences are:
 
 * Built-in terminal functions removed. All functions are now read from
   terminfo.
+
+* Support for terminal focus events implemented.

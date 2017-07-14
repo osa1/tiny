@@ -3,7 +3,9 @@ name = "termbox_simple"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 links = "termbox_simple"
+description = "A hacked version of termbox (see README)"
 build = "build.rs"
+license = "MIT"
 
 [dependencies]
 libc = "0.2"
