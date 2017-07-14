@@ -26,8 +26,8 @@ net2 = "0.2.23"
 serde = "1.0.8"
 serde_derive = "1.0.8"
 serde_yaml = "0.7.1"
-term_input = { path = "term_input/" }
-termbox_simple = { path = "termbox/" }
+term_input = "0.1.0"
+termbox_simple = "0.1.0"
 time = "0.1"
 
 [profile.release]
