@@ -58,6 +58,7 @@ pub fn quit<W : Write>(mut sink: W, msg : Option<&str>) -> std::io::Result<()> {
 pub enum Pfx {
     Server(String),
 
+    /// <nick>!<user>@<host>
     User {
         nick: String,
         /// user@host

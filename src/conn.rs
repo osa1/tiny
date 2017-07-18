@@ -10,7 +10,7 @@ use std::str;
 use config;
 use logger::Logger;
 use logger::LogFile;
-use wire::{Cmd, Msg};
+use wire::{Cmd, Msg, Pfx};
 use wire;
 
 pub struct Conn {
@@ -31,7 +31,10 @@ pub struct Conn {
     away_status: Option<String>,
 
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
-    host: Option<String>,
+    servername: Option<String>,
+
+    /// Our usermask given by the server. Currently only parsed after a JOIN.
+    usermask: Option<String>,
 
     /// The TCP connection to the server.
     stream: TcpStream,
@@ -105,7 +108,8 @@ impl Conn {
             current_nick_idx: 0,
             auto_join: HashSet::new(),
             away_status: None,
-            host: None,
+            servername: None,
+            usermask: None,
             stream: stream,
             status: ConnStatus::Introduce,
             buf: vec![],
@@ -124,7 +128,8 @@ impl Conn {
             current_nick_idx: 0,
             auto_join: HashSet::new(),
             away_status: None,
-            host: None,
+            servername: None,
+            usermask: None,
             stream: stream,
             status: ConnStatus::Introduce,
             buf: vec![],
@@ -152,6 +157,13 @@ impl Conn {
 
     pub fn get_nick(&self) -> &str {
         &self.nicks[self.current_nick_idx]
+    }
+
+    pub fn get_usermask(&self) -> Option<&str> {
+        match &self.usermask {
+            &None => None,
+            &Some(ref s) => Some(s),
+        }
     }
 
     pub fn set_nick(&mut self, nick: &str) {
@@ -188,10 +200,10 @@ impl Conn {
             ConnStatus::Introduce => {},
             ConnStatus::PingPong { ticks_passed } => {
                 if ticks_passed + 1 == PING_TICKS {
-                    match self.host {
+                    match self.servername {
                         None => {
                             debug_out.write_line(
-                                format_args!("{}: Can't send PING, host unknown",
+                                format_args!("{}: Can't send PING, servername unknown",
                                              self.serv_addr));
                         }
                         Some(ref host_) => {
@@ -309,6 +321,25 @@ impl Conn {
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
+        if let &Msg { cmd: Cmd::JOIN { .. }, pfx: Some(Pfx::User { ref nick, ref user }) } = &msg {
+            if nick == self.get_nick() {
+                let usermask = format!("{}!{}", nick, user);
+                logger.get_debug_logs().write_line(
+                    format_args!("usermask set: {}", usermask));
+                self.usermask = Some(usermask);
+            }
+        }
+
+        if let &Msg { cmd: Cmd::Reply { num: 396, ref params }, .. } = &msg {
+            // :hobana.freenode.net 396 osa1 haskell/developer/osa1
+            // :is now your hidden host (set by services.)
+            if params.len() == 3 {
+                let usermask = format!("{}!~{}@{}", self.get_nick(), self.hostname, params[1]);
+                logger.get_debug_logs().write_line(format_args!("usermask set: {}", usermask));
+                self.usermask = Some(usermask);
+            }
+        }
+
         if let &Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = &msg {
             // 001 RPL_WELCOME is how we understand that the registration was successful
             evs.push(ConnEv::Connected);
@@ -326,10 +357,10 @@ impl Conn {
                         format_args!("{} Can't parse hostname from params: {:?}",
                                      self.serv_addr, params));
                 }
-                Some(host) => {
+                Some(servername) => {
                     logger.get_debug_logs().write_line(
-                        format_args!("{} host: {}", self.serv_addr, host));
-                    self.host = Some(host);
+                        format_args!("{} host: {}", self.serv_addr, servername));
+                    self.servername = Some(servername);
                 }
             }
         }
@@ -379,6 +410,7 @@ fn parse_servername(params: &[String]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wire::{Cmd, Msg};
 
     #[test]
     fn test_parse_servername_1() {
