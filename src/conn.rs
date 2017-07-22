@@ -8,8 +8,9 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::str;
 
 use config;
-use logger::Logger;
 use logger::LogFile;
+use logger::Logger;
+use utils;
 use wire::{Cmd, Msg, Pfx};
 use wire;
 
@@ -33,7 +34,11 @@ pub struct Conn {
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
     servername: Option<String>,
 
-    /// Our usermask given by the server. Currently only parsed after a JOIN.
+    /// Our usermask given by the server. Currently only parsed after a JOIN,
+    /// reply 396.
+    ///
+    /// Note that RPL_USERHOST (302) does not take cloaks into account, so we
+    /// don't parse USERHOST responses to set this field.
     usermask: Option<String>,
 
     /// The TCP connection to the server.
@@ -159,13 +164,6 @@ impl Conn {
         &self.nicks[self.current_nick_idx]
     }
 
-    pub fn get_usermask(&self) -> Option<&str> {
-        match &self.usermask {
-            &None => None,
-            &Some(ref s) => Some(s),
-        }
-    }
-
     pub fn set_nick(&mut self, nick: &str) {
         if let Some(nick_idx) = self.nicks.iter().position(|n| n == nick) {
             self.current_nick_idx = nick_idx;
@@ -263,7 +261,30 @@ impl Conn {
     }
 
     pub fn privmsg(&self, target: &str, msg: &str) {
-        wire::privmsg(&self.stream, target, msg).unwrap();
+        // Max msg len calculation adapted from hexchat
+        // (src/common/outbound.c:split_up_text)
+        let mut max: i32 = 512; // RFC 2812
+        max -= 3;               // :, !, @
+        max -= 13;              // " PRIVMSG ", " ", :, \r, \n
+        max -= self.get_nick().len() as i32;
+        max -= target.len() as i32;
+        match self.usermask {
+            None => {
+                max -= 9;  // max username
+                max -= 64; // max possible hostname (63) + '@'
+                           // NOTE(osa): I think hexchat has an error here, it
+                           // uses 65
+            },
+            Some(ref usermask) => {
+                max -= usermask.len() as i32;
+            },
+        }
+
+        assert!(max > 0);
+
+        for split in utils::split_iterator(msg, max as usize) {
+            wire::privmsg(&self.stream, target, split).unwrap();
+        }
     }
 
     pub fn join(&self, chan: &str) {
@@ -340,6 +361,33 @@ impl Conn {
             }
         }
 
+        if let &Msg { cmd: Cmd::Reply { num: 302, ref params }, .. } = &msg {
+            // 302 RPL_USERHOST
+            // :ircd.stealth.net 302 yournick :syrk=+syrk@millennium.stealth.net
+            //
+            // We know there will be only one nick because /userhost cmd sends
+            // one parameter (our nick)
+            //
+            // Example args: ["osa1", "osa1=+omer@moz-s8a.9ac.93.91.IP "]
+
+            let param = &params[1];
+            match wire::find_byte(param.as_bytes(), b'=') {
+                None => {
+                    logger.get_debug_logs().write_line(
+                        format_args!("can't parse RPL_USERHOST: {}", params[1]));
+                }
+                Some(mut i) => {
+                    if param.as_bytes().get(i + 1) == Some(&b'+')
+                            || param.as_bytes().get(i + 1) == Some(&b'-') {
+                        i += 1;
+                    }
+                    let usermask = (&param[i ..]).trim();
+                    self.usermask = Some(usermask.to_owned());
+                    logger.get_debug_logs().write_line(format_args!("usermask set: {}", usermask));
+                }
+            }
+        }
+
         if let &Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = &msg {
             // 001 RPL_WELCOME is how we understand that the registration was successful
             evs.push(ConnEv::Connected);
@@ -407,10 +455,11 @@ fn parse_servername(params: &[String]) -> Option<String> {
     Some((&slice1[..servername_ends]).to_owned())
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wire::{Cmd, Msg};
 
     #[test]
     fn test_parse_servername_1() {

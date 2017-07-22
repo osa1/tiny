@@ -31,6 +31,7 @@ pub fn part<W: Write>(mut sink: W, channel: &str) -> std::io::Result<()> {
 }
 
 pub fn privmsg<W: Write>(mut sink: W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
+    assert!(msgtarget.len() + msg.len() + 12 <= 512);
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 

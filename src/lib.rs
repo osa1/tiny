@@ -4,6 +4,9 @@
 #![feature(offset_to)]
 #![feature(const_fn)]
 
+#[cfg(test)]
+extern crate quickcheck;
+
 extern crate alloc_system;
 extern crate libc;
 extern crate mio;
