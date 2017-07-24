@@ -260,7 +260,7 @@ impl Conn {
         wire::nick(&self.stream, self.get_nick()).unwrap();
     }
 
-    pub fn privmsg(&self, target: &str, msg: &str) {
+    pub fn split_privmsg<'a>(&self, target: &'a str, msg: &'a str) -> utils::SplitIterator<'a> {
         // Max msg len calculation adapted from hexchat
         // (src/common/outbound.c:split_up_text)
         let mut max: i32 = 512; // RFC 2812
@@ -282,9 +282,14 @@ impl Conn {
 
         assert!(max > 0);
 
-        for split in utils::split_iterator(msg, max as usize) {
-            wire::privmsg(&self.stream, target, split).unwrap();
-        }
+        utils::split_iterator(msg, max as usize)
+    }
+
+    // FIXME: This crashes with an assertion error when the message is too long
+    // to fit into 512 bytes. Need to make sure `split_privmsg` is called before
+    // this.
+    pub fn privmsg(&self, target: &str, msg: &str) {
+        wire::privmsg(&self.stream, target, msg).unwrap();
     }
 
     pub fn join(&self, chan: &str) {

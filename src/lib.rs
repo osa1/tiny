@@ -471,22 +471,26 @@ impl Tiny {
 
             MsgSource::Chan { serv_name, chan_name } => {
                 let conn = find_conn(&mut self.conns, &serv_name).unwrap();
-                conn.privmsg(&chan_name, msg);
-                self.tui.add_privmsg(conn.get_nick(), msg,
-                                     Timestamp::now(),
-                                     &MsgTarget::Chan { serv_name: &serv_name,
-                                                        chan_name: &chan_name });
+                for msg in conn.split_privmsg(&chan_name, msg) {
+                    conn.privmsg(&chan_name, msg);
+                    self.tui.add_privmsg(conn.get_nick(), msg,
+                                         Timestamp::now(),
+                                         &MsgTarget::Chan { serv_name: &serv_name,
+                                                            chan_name: &chan_name });
+                }
             },
 
             MsgSource::User { serv_name, nick } => {
                 let conn = find_conn(&mut self.conns, &serv_name).unwrap();
-                conn.privmsg(&nick, msg);
                 let msg_target = if nick.eq_ignore_ascii_case("nickserv") {
                     MsgTarget::Server { serv_name: &serv_name }
                 } else {
                     MsgTarget::User { serv_name: &serv_name, nick: &nick }
                 };
-                self.tui.add_privmsg(conn.get_nick(), msg, Timestamp::now(), &msg_target);
+                for msg in conn.split_privmsg(&nick, msg) {
+                    conn.privmsg(&nick, msg);
+                    self.tui.add_privmsg(conn.get_nick(), msg, Timestamp::now(), &msg_target);
+                }
             }
         }
     }
