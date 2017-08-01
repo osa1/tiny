@@ -14,6 +14,7 @@ tiny is an IRC client written in Rust.
 
 - Clean UI: consecutive join/part/quit messages are shown in a single line, time
   stamps for a message is omitted if it's the same as the message before.
+  (inspired by [irc-core](https://github.com/glguy/irc-core))
 
 - All mentions to the user are collected in a "mentions" tab, including server
   and channel information. "mentions" tab solves the problem of missing mentions
@@ -35,6 +36,8 @@ tiny is an IRC client written in Rust.
 
 - Key bindings inspired by terminal emulators and vim. See [key bindings
   section](#key-bindings) below.
+
+- Configurable colors
 
 ## Installation
 
@@ -73,6 +76,95 @@ defaults:
 
 # Where to put log files
 log_dir: '/home/user/tiny_logs'
+
+# Color theme based on 256 colors (if supported). Colors can be defined as color
+# indices (0-255) or with their names.
+#
+# Accepted color names are:
+# default (0), black (0), maroon (1), green (2), olive (3), navy (4),
+# purple (5), teal (6), silver (7), gray (8), red (9), lime (10),
+# yellow (11), blue (12), magenta (13), cyan (14), white (15)
+#
+# Attributes can be combined (e.g [bold, underline]), and valid values are bold
+# and underline
+colors:
+    nick: [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ]
+
+    clear:
+        fg: default
+        bg: default
+
+    user_msg:
+        fg: black
+        bg: default
+
+    err_msg:
+        fg: black
+        bg: maroon
+        attrs: [bold]
+
+    topic:
+        fg: cyan
+        bg: default
+        attrs: [bold]
+
+    cursor:
+        fg: black
+        bg: default
+
+    join:
+        fg: lime
+        bg: default
+        attrs: [bold]
+
+    part:
+        fg: maroon
+        bg: default
+        attrs: [bold]
+
+    nick_change:
+        fg: lime
+        bg: default
+        attrs: [bold]
+
+    faded:
+        fg: 242
+        bg: default
+
+    exit_dialogue:
+        fg: default
+        bg: navy
+
+    highlight:
+        fg: red
+        bg: default
+        attrs: [bold]
+
+    completion:
+        fg: 84
+        bg: default
+
+    timestamp:
+        fg: 242
+        bg: default
+
+    tab_active:
+        fg: default
+        bg: default
+        attrs: [bold]
+
+    tab_normal:
+        fg: gray
+        bg: default
+
+    tab_new_msg:
+        fg: purple
+        bg: default
+
+    tab_highlight:
+        fg: red
+        bg: default
+        attrs: [bold]
 ```
 
 ## Key bindings
@@ -139,20 +231,12 @@ start, open an issue and I'd love to help.
 
 ## TODOs
 
-- Paste events are currently ignored. A simple paste support that just sends
-  whatever is in the clipboard could be implemented in a few lines of code, but
-  we should probably be careful with sending long message and messages with
-  newlines in it. I'm thinking maybe in these cases we should open up `$EDITOR`
-  and let the user see and edit what they're pasting.
+- Paste events are ignored when string includes newline characters (`\n`). It'd
+  be nice to use $EDITOR for editing multi-line pastes before sending.
 
 - Logging should be improved. Currently messages are logged in raw form in
   `<log dir>/server_raw.log`, but outgoing message are not logged. Channel logs
   are printed in a weird format etc.
-
-- Colors are not easily configurable. All colors are specified in `config.rs`
-  but that requires recompiling tiny after a change. We should move colors
-  config to the configuration file. (and maybe even implement a "reload" command
-  to live reloading color changes)
 
 - SSL support
 
@@ -165,8 +249,6 @@ start, open an issue and I'd love to help.
   that tiny currently doesn't support, maybe we should implement a "send raw
   message" command so that any user can directly send an IRC message to a server
   without any support from tiny.
-
-- Implement away mode
 
 - Implement system notification support for private messages and highlights.
   When to show (and maybe even how to show) a notification should be
