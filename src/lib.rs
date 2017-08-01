@@ -94,7 +94,6 @@ fn generate_default_config() {
     println!("\
 tiny couldn't find a config file at {0:?}, and created a config file with defaults.
 You may want to edit {0:?} before re-running tiny.", config_path);
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -503,71 +502,77 @@ impl Tiny {
 
     fn handle_conn_evs(&mut self, poll: &Poll, conn_idx: usize, evs: Vec<ConnEv>) {
         for ev in evs.into_iter() {
-            match ev {
-                ConnEv::Connected => {
-                    self.tui.add_msg(
-                        "Connected.",
-                        Timestamp::now(),
-                        &MsgTarget::AllServTabs {
-                            serv_name: self.conns[conn_idx].get_serv_name()
-                        });
-                    let mut serv_auto_cmds = None;
-                    {
-                        let conn = &self.conns[conn_idx];
-                        let conn_name = conn.get_serv_name();
-                        for server in &self.servers {
-                            if server.addr == conn_name {
-                                // redundant clone() here because of aliasing
-                                serv_auto_cmds = Some((server.addr.clone(), server.auto_cmds.clone()));
-                                break;
-                            }
-                        }
-                    }
-                    if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
-                        for cmd in auto_cmds.iter() {
-                            self.handle_cmd(poll, MsgSource::Serv { serv_name: serv_name.to_owned() }, cmd);
-                        }
-                    }
-                }
-                ConnEv::Disconnected => {
-                    let conn = &mut self.conns[conn_idx];
-                    self.tui.add_err_msg(
-                        &format!("Disconnected. Will try to reconnect in {} seconds.",
-                                 conn::RECONNECT_TICKS),
-                        Timestamp::now(),
-                        &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
-                    deregister_fd(poll, conn.get_raw_fd());
-                }
-                ConnEv::WantReconnect => {
-                    let mut conn = &mut self.conns[conn_idx];
-                    self.tui.add_client_msg(
-                        "Connecting...",
-                        &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
-                    conn.reconnect(None);
-                    let fd = conn.get_raw_fd();
-                    register_fd(poll, fd);
-                }
-                ConnEv::Err(err) => {
-                    // TODO: Some of these errors should not cause a disconnect,
-                    // e.g. EAGAIN, EWOULDBLOCK ...
-                    let mut conn = &mut self.conns[conn_idx];
-                    conn.enter_disconnect_state();
-                    self.tui.add_err_msg(
-                        &format!("Conection error: {}. \
-                                 Will try to reconnect in {} seconds.",
-                                 err.description(),
-                                 conn::RECONNECT_TICKS),
-                        Timestamp::now(),
-                        &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
-                    deregister_fd(poll, conn.get_raw_fd());
-                }
-                ConnEv::Msg(msg) => {
-                    self.handle_msg(conn_idx, msg, Timestamp::now());
-                }
-                ConnEv::NickChange(new_nick) => {
+            self.handle_conn_ev(poll, conn_idx, ev);
+        }
+    }
+
+    fn handle_conn_ev(&mut self, poll: &Poll, conn_idx: usize, ev: ConnEv) {
+        match ev {
+            ConnEv::Connected => {
+                self.tui.add_msg(
+                    "Connected.",
+                    Timestamp::now(),
+                    &MsgTarget::AllServTabs {
+                        serv_name: self.conns[conn_idx].get_serv_name()
+                    });
+                let mut serv_auto_cmds = None;
+                {
                     let conn = &self.conns[conn_idx];
-                    self.tui.set_nick(conn.get_serv_name(), Rc::new(new_nick));
+                    let conn_name = conn.get_serv_name();
+                    for server in &self.servers {
+                        if server.addr == conn_name {
+                            // redundant clone() here because of aliasing
+                            serv_auto_cmds = Some((server.addr.clone(), server.auto_cmds.clone()));
+                            break;
+                        }
+                    }
                 }
+                if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
+                    for cmd in auto_cmds.iter() {
+                        self.handle_cmd(poll,
+                                        MsgSource::Serv { serv_name: serv_name.to_owned() },
+                                        cmd);
+                    }
+                }
+            }
+            ConnEv::Disconnected => {
+                let conn = &mut self.conns[conn_idx];
+                self.tui.add_err_msg(
+                    &format!("Disconnected. Will try to reconnect in {} seconds.",
+                             conn::RECONNECT_TICKS),
+                    Timestamp::now(),
+                    &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+                deregister_fd(poll, conn.get_raw_fd());
+            }
+            ConnEv::WantReconnect => {
+                let mut conn = &mut self.conns[conn_idx];
+                self.tui.add_client_msg(
+                    "Connecting...",
+                    &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+                conn.reconnect(None);
+                let fd = conn.get_raw_fd();
+                register_fd(poll, fd);
+            }
+            ConnEv::Err(err) => {
+                // TODO: Some of these errors should not cause a disconnect,
+                // e.g. EAGAIN, EWOULDBLOCK ...
+                let mut conn = &mut self.conns[conn_idx];
+                conn.enter_disconnect_state();
+                self.tui.add_err_msg(
+                    &format!("Conection error: {}. \
+                             Will try to reconnect in {} seconds.",
+                             err.description(),
+                             conn::RECONNECT_TICKS),
+                    Timestamp::now(),
+                    &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+                deregister_fd(poll, conn.get_raw_fd());
+            }
+            ConnEv::Msg(msg) => {
+                self.handle_msg(conn_idx, msg, Timestamp::now());
+            }
+            ConnEv::NickChange(new_nick) => {
+                let conn = &self.conns[conn_idx];
+                self.tui.set_nick(conn.get_serv_name(), Rc::new(new_nick));
             }
         }
     }
