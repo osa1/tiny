@@ -1,4 +1,4 @@
-# 2016/08/01: 0.2.0
+# 2017/08/01: 0.2.0
 
 - A bug triggered by single-digit color codes fixed.
 - NickServ messages now shown in server tabs (previously: shown in privmsg tabs)
