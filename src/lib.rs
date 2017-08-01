@@ -246,9 +246,20 @@ impl Tiny {
         }
 
         else if words[0] == "connect" && words.len() == 1 {
-            if !self.reconnect(poll, src.serv_name()) {
-                self.logger.get_debug_logs().write_line(
-                    format_args!("Can't reconnect to {}", src.serv_name()));
+            self.tui.add_client_msg(
+                "Reconnecting...",
+                &MsgTarget::AllServTabs { serv_name: src.serv_name() });
+            match find_conn(&mut self.conns, src.serv_name()) {
+                Some(conn) => {
+                    deregister_fd(poll, conn.get_raw_fd());
+                    conn.reconnect(None);
+                    let fd = conn.get_raw_fd();
+                    register_fd(poll, fd);
+                }
+                None => {
+                    self.logger.get_debug_logs().write_line(
+                        format_args!("Can't reconnect to {}", src.serv_name()));
+                }
             }
         }
 
@@ -416,22 +427,6 @@ impl Tiny {
         let conn = self.conns.remove(conn_idx);
         deregister_fd(poll, conn.get_raw_fd());
         // just drop the conn
-    }
-
-    fn reconnect(&mut self, poll: &Poll, serv_name: &str) -> bool {
-        self.tui.add_client_msg(
-            "Reconnecting...",
-            &MsgTarget::AllServTabs { serv_name: serv_name });
-        match find_conn(&mut self.conns, serv_name) {
-            Some(conn) => {
-                deregister_fd(poll, conn.get_raw_fd());
-                conn.reconnect(None);
-                let fd = conn.get_raw_fd();
-                register_fd(poll, fd);
-                true
-            }
-            None => false
-        }
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
