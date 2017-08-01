@@ -40,7 +40,6 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
-use std::os::unix::io::RawFd;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
@@ -98,8 +97,8 @@ You may want to edit {0:?} before re-running tiny.", config_path);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Tiny {
-    conns: Vec<Conn>,
+struct Tiny<'poll> {
+    conns: Vec<Conn<'poll>>,
     defaults: config::Defaults,
     servers: Vec<config::Server>,
     tui: TUI,
@@ -109,29 +108,23 @@ struct Tiny {
 
 static STDIN_TOKEN: Token = Token(libc::STDIN_FILENO as usize);
 
-fn register_fd(poll: &Poll, fd: RawFd) {
-    poll.register(
-        &EventedFd(&fd),
-        Token(fd as usize),
-        Ready::readable(),
-        PollOpt::level()).unwrap();
-}
-
-fn deregister_fd(poll: &Poll, fd: RawFd) {
-    poll.deregister(&EventedFd(&fd)).unwrap();
-}
-
-impl Tiny {
-    pub fn run(servers: Vec<config::Server>, defaults: config::Defaults, log_dir: String, colors: config::Colors) {
+impl<'poll> Tiny<'poll> {
+    pub fn run(servers: Vec<config::Server>,
+               defaults: config::Defaults,
+               log_dir: String,
+               colors: config::Colors)
+    {
         let poll = Poll::new().unwrap();
 
-        register_fd(&poll, libc::STDIN_FILENO);
+        poll.register(
+            &EventedFd(&libc::STDIN_FILENO),
+            STDIN_TOKEN,
+            Ready::readable(),
+            PollOpt::level()).unwrap();
 
         let mut conns = Vec::with_capacity(servers.len());
         for server in servers.iter().cloned() {
-            let conn = Conn::from_server(server);
-            let fd = conn.get_raw_fd();
-            register_fd(&poll, fd);
+            let conn = Conn::from_server(server, &poll);
             conns.push(conn);
         }
 
@@ -170,10 +163,12 @@ impl Tiny {
                             match find_token_conn_idx(&tiny.conns, token) {
                                 None => {
                                     tiny.logger.get_debug_logs().write_line(
-                                        format_args!("BUG: Can't find Token in conns: {:?}", event.token()));
+                                        format_args!(
+                                            "BUG: Can't find Token in conns: {:?}",
+                                            event.token()));
                                 }
                                 Some(conn_idx) => {
-                                    tiny.handle_socket(&poll, conn_idx);
+                                    tiny.handle_socket(&poll, event.readiness(), conn_idx);
                                 }
                             }
                         }
@@ -204,7 +199,7 @@ impl Tiny {
             &MsgTarget::Server { serv_name: "mentions" });
     }
 
-    fn handle_stdin(&mut self, poll: &Poll) -> bool {
+    fn handle_stdin(&mut self, poll: &'poll Poll) -> bool {
         let mut ev_buffer = Vec::with_capacity(10);
         let mut abort = false;
         self.input_ev_handler.read_input_events(&mut ev_buffer);
@@ -237,7 +232,7 @@ impl Tiny {
         abort
     }
 
-    fn handle_cmd(&mut self, poll: &Poll, src: MsgSource, msg: &str) {
+    fn handle_cmd(&mut self, poll: &'poll Poll, src: MsgSource, msg: &str) {
         let words: Vec<&str> = msg.split_whitespace().into_iter().collect();
 
         if words[0] == "connect" && words.len() == 2 {
@@ -250,10 +245,7 @@ impl Tiny {
                 &MsgTarget::AllServTabs { serv_name: src.serv_name() });
             match find_conn(&mut self.conns, src.serv_name()) {
                 Some(conn) => {
-                    deregister_fd(poll, conn.get_raw_fd());
                     conn.reconnect(None);
-                    let fd = conn.get_raw_fd();
-                    register_fd(poll, fd);
                 }
                 None => {
                     self.logger.get_debug_logs().write_line(
@@ -308,7 +300,7 @@ impl Tiny {
                 }
                 MsgSource::Serv { serv_name } => {
                     self.tui.close_server_tab(&serv_name);
-                    self.disconnect(poll, &serv_name);
+                    self.disconnect(&serv_name);
                 }
                 MsgSource::Chan { serv_name, chan_name } => {
                     self.tui.close_chan_tab(&serv_name, &chan_name);
@@ -346,7 +338,7 @@ impl Tiny {
         }
     }
 
-    fn connect(&mut self, poll: &Poll, src: MsgSource, serv_addr: &str) {
+    fn connect(&mut self, poll: &'poll Poll, src: MsgSource, serv_addr: &str) {
 
         fn split_port(s: &str) -> Option<(&str, &str)> {
             s.find(':').map(|split| (&s[ 0 .. split ], &s[ split + 1 .. ]))
@@ -379,10 +371,7 @@ impl Tiny {
         let mut reconnect = false; // borrowchk workaround
         // see if we already have a Conn for this server
         if let Some(conn) = find_conn(&mut self.conns, serv_name) {
-            deregister_fd(poll, conn.get_raw_fd());
             conn.reconnect(Some((serv_name, serv_port)));
-            let fd = conn.get_raw_fd();
-            register_fd(poll, fd);
             reconnect = true;
         }
 
@@ -412,20 +401,16 @@ impl Tiny {
                         realname: self.defaults.realname.clone(),
                         nicks: self.defaults.nicks.clone(),
                         auto_cmds: self.defaults.auto_cmds.clone(),
-                    })
+                    }, poll)
                 }
             }
         };
-        let fd = new_conn.get_raw_fd();
         self.conns.push(new_conn);
-        register_fd(poll, fd);
     }
 
-    fn disconnect(&mut self, poll: &Poll, serv_name: &str) {
+    fn disconnect(&mut self, serv_name: &str) {
         let conn_idx = find_conn_idx(&mut self.conns, serv_name).unwrap();
-        let conn = self.conns.remove(conn_idx);
-        deregister_fd(poll, conn.get_raw_fd());
-        // just drop the conn
+        self.conns.remove(conn_idx);
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
@@ -491,22 +476,27 @@ impl Tiny {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_socket(&mut self, poll: &Poll, conn_idx: usize) {
+    fn handle_socket(&mut self, poll: &'poll Poll, readiness: Ready, conn_idx: usize) {
         let mut evs = Vec::with_capacity(2);
         {
             let mut conn = &mut self.conns[conn_idx];
-            conn.read_incoming_msg(&mut evs, &mut self.logger);
+            if readiness.is_readable() {
+                conn.recv(&mut evs, &mut self.logger);
+            }
+            if readiness.is_writable() {
+                conn.send(&mut evs);
+            }
         }
         self.handle_conn_evs(poll, conn_idx, evs);
     }
 
-    fn handle_conn_evs(&mut self, poll: &Poll, conn_idx: usize, evs: Vec<ConnEv>) {
+    fn handle_conn_evs(&mut self, poll: &'poll Poll, conn_idx: usize, evs: Vec<ConnEv>) {
         for ev in evs.into_iter() {
             self.handle_conn_ev(poll, conn_idx, ev);
         }
     }
 
-    fn handle_conn_ev(&mut self, poll: &Poll, conn_idx: usize, ev: ConnEv) {
+    fn handle_conn_ev(&mut self, poll: &'poll Poll, conn_idx: usize, ev: ConnEv) {
         match ev {
             ConnEv::Connected => {
                 self.tui.add_msg(
@@ -542,7 +532,6 @@ impl Tiny {
                              conn::RECONNECT_TICKS),
                     Timestamp::now(),
                     &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
-                deregister_fd(poll, conn.get_raw_fd());
             }
             ConnEv::WantReconnect => {
                 let mut conn = &mut self.conns[conn_idx];
@@ -550,8 +539,6 @@ impl Tiny {
                     "Connecting...",
                     &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
                 conn.reconnect(None);
-                let fd = conn.get_raw_fd();
-                register_fd(poll, fd);
             }
             ConnEv::Err(err) => {
                 // TODO: Some of these errors should not cause a disconnect,
@@ -565,7 +552,6 @@ impl Tiny {
                              conn::RECONNECT_TICKS),
                     Timestamp::now(),
                     &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
-                deregister_fd(poll, conn.get_raw_fd());
             }
             ConnEv::Msg(msg) => {
                 self.handle_msg(conn_idx, msg, Timestamp::now());
@@ -825,14 +811,14 @@ impl Tiny {
 
 fn find_token_conn_idx(conns: &[Conn], token: Token) -> Option<usize> {
     for (conn_idx, conn) in conns.iter().enumerate() {
-        if Token(conn.get_raw_fd() as usize) == token {
+        if conn.get_conn_tok() == token {
             return Some(conn_idx);
         }
     }
     None
 }
 
-fn find_conn<'a>(conns: &'a mut [Conn], serv_name: &str) -> Option<&'a mut Conn> {
+fn find_conn<'a, 'poll>(conns: &'a mut [Conn<'poll>], serv_name: &str) -> Option<&'a mut Conn<'poll>> {
     match find_conn_idx(conns, serv_name) {
         None => None,
         Some(idx) => Some(unsafe { conns.get_unchecked_mut(idx) } ),

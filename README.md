@@ -114,7 +114,8 @@ Commands start with `/` character.
 
 - `/nick <nick>`: Change nick
 
-- `/reload`: Reloads theme configuration. Right now only tab styles and exit dialog styles changes immediately. 
+- `/reload`: Reloads theme configuration. Right now only tab styles and exit
+  dialog styles changes immediately.
 
 ## Development
 
@@ -158,12 +159,6 @@ start, open an issue and I'd love to help.
 - There's currently no way to see all nicks in a channel. (currently to see if
   someone's online in a channel you can do `<nick><TAB>` and see if auto
   completion works)
-
-- Sockets are immediately read when they're ready for reading, but for writing
-  we don't check if they're ready for writing. Thus, if you try to spam a
-  channel or something, you'd probably get a `EAGAIN` and tiny would interpret
-  that as a connectivity problem and try to reconnect. We should buffer outgoing
-  messages and only send them when the socket is ready for writing.
 
 - Only a small subset of IRC messages are implemented. I don't moderate
   channels, so my needs are simple. For moderation commands or other commands
