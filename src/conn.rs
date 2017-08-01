@@ -128,19 +128,23 @@ fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
 }
 
 fn reregister_for_rw(poll: &Poll, fd: RawFd) {
-    poll.reregister(
+    // fails when not already registered, ignore result
+    // (e.g. between a disconnect and reconnect)
+    let _ = poll.reregister(
         &EventedFd(&fd),
         Token(fd as usize),
         Ready::readable() | Ready::writable(),
-        PollOpt::level()).unwrap();
+        PollOpt::level());
 }
 
 fn reregister_for_r(poll: &Poll, fd: RawFd) {
-    poll.reregister(
+    // fails when not already registered, ignore result
+    // (e.g. between a disconnect and reconnect)
+    let _ = poll.reregister(
         &EventedFd(&fd),
         Token(fd as usize),
         Ready::readable(),
-        PollOpt::level()).unwrap();
+        PollOpt::level());
 }
 
 impl<'poll> Conn<'poll> {
@@ -230,7 +234,6 @@ impl<'poll> Conn<'poll> {
     }
 
     /// Get the RawFd, to be used with select() or other I/O multiplexer.
-    /// TODO make this private
     fn get_raw_fd(&self) -> RawFd {
         self.stream.as_raw_fd()
     }
@@ -315,13 +318,12 @@ impl<'poll> Conn<'poll> {
                     // update the event loop
                     evs.push(ConnEv::WantReconnect);
                     self.reset_nick();
-                    self.status = ConnStatus::Introduce;
-                } else {
-                    self.status = ConnStatus::Disconnected { ticks_passed: ticks_passed + 1 };
                 }
+                self.status = ConnStatus::Disconnected { ticks_passed: ticks_passed + 1 };
             }
         }
     }
+
     pub fn enter_disconnect_state(&mut self) {
         self.status = ConnStatus::Disconnected { ticks_passed: 0 };
         self.deregister();

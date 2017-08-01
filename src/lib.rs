@@ -486,6 +486,15 @@ impl<'poll> Tiny<'poll> {
             if readiness.is_writable() {
                 conn.send(&mut evs);
             }
+            if readiness.contains(Ready::hup()) {
+                conn.enter_disconnect_state();
+                self.tui.add_err_msg(
+                    &format!("Conection error (HUP). \
+                             Will try to reconnect in {} seconds.",
+                             conn::RECONNECT_TICKS),
+                    Timestamp::now(),
+                    &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+            }
         }
         self.handle_conn_evs(poll, conn_idx, evs);
     }
