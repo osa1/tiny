@@ -84,6 +84,12 @@ impl Tab {
         self.style = style;
     }
 
+    pub fn update_source<F>(&mut self, f: &F)
+            where F: Fn(&mut MsgSource)
+    {
+        f(&mut self.src)
+    }
+
     pub fn width(&self) -> i32 {
         // TODO: assuming ASCII string here. We should probably switch to a AsciiStr type.
         self.visible_name().len() as i32
@@ -317,7 +323,7 @@ impl Tabbed {
             }
             w
         };
-        
+
         w2 > w1
     }
 
@@ -470,8 +476,8 @@ impl Tabbed {
     // Interfacing with tabs
 
     fn apply_to_target<F>(&mut self, target: &MsgTarget, f: &F)
-            where F: Fn(&mut Tab, bool) {
-
+            where F: Fn(&mut Tab, bool)
+    {
         // Creating a vector just to make borrow checker happy. Borrow checker
         // sucks once more. Here it sucks 2x, I can't even create a Vec<&mut Tab>,
         // I need a Vec<usize>.
@@ -670,6 +676,15 @@ impl Tabbed {
     pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, ts);
+            tab.update_source(&|src: &mut MsgSource| {
+                match src {
+                    &mut MsgSource::Serv { .. } | &mut MsgSource::Chan { .. } => {},
+                    &mut MsgSource::User { ref mut nick, .. } => {
+                        nick.clear();
+                        nick.push_str(new_nick);
+                    },
+                }
+            });
         });
     }
 

@@ -1,3 +1,7 @@
+# WIP
+
+- User tab names are now updated when the user changes their nick.
+
 # 2017/08/01: 0.2.0
 
 - A bug triggered by single-digit color codes fixed.
