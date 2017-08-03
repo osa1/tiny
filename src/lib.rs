@@ -334,7 +334,7 @@ impl<'poll> Tiny<'poll> {
 
         else {
             self.tui.add_client_err_msg(
-                &format!("Unsupported command: {}", words[0]), &MsgTarget::CurrentTab);
+                &format!("Unsupported command: \"/{}\"", msg), &MsgTarget::CurrentTab);
         }
     }
 
