@@ -61,6 +61,42 @@ pub enum SchemeStyle {
     TabNewMsg, TabHighlight,
 }
 
+impl Seg {
+    pub fn style(&self, colors: &Colors) -> config::Style {
+        match self.style {
+            SegStyle::Fixed(style) =>
+                style,
+            SegStyle::Index(idx) =>
+                config::Style {
+                    fg: colors.nick[idx % colors.nick.len()] as u16,
+                    bg: colors.user_msg.bg
+                },
+            SegStyle::SchemeStyle(sty) => {
+                use self::SchemeStyle::*;
+                match sty {
+                    Clear => colors.clear,
+                    UserMsg => colors.user_msg,
+                    ErrMsg => colors.err_msg,
+                    Topic => colors.topic,
+                    Cursor => colors.cursor,
+                    Join => colors.join,
+                    Part => colors.part,
+                    Nick => colors.nick_change,
+                    Faded => colors.faded,
+                    ExitDialogue => colors.exit_dialogue,
+                    Highlight => colors.highlight,
+                    Completion => colors.completion,
+                    Timestamp => colors.timestamp,
+                    TabActive => colors.tab_active,
+                    TabNormal => colors.tab_normal,
+                    TabNewMsg => colors.tab_new_msg,
+                    TabHighlight => colors.tab_highlight,
+                }
+            }
+        }
+    }
+}
+
 // TODO get rid of this
 const TERMBOX_COLOR_PREFIX: char = '\x00';
 
@@ -166,13 +202,8 @@ impl Line {
     }
 
     pub fn draw(&self, tb: &mut Termbox, colors: &Colors,
-                pos_x: i32, pos_y: i32, width: i32)
-    {
-        self.draw_from(tb, colors, pos_x, pos_y, 0, width);
-    }
-
-    pub fn draw_from(&self, tb: &mut Termbox, colors: &Colors,
-                     pos_x: i32, pos_y: i32, first_line: i32, width: i32)
+                pos_x: i32, pos_y: i32, first_line: i32,
+                height: i32, width: i32)
     {
         let mut col = pos_x;
         let mut line = 0;
@@ -183,39 +214,7 @@ impl Line {
 
         let last_seg: [&Seg; 1] = [&self.current_seg];
         for seg in self.segs.iter().chain(last_seg.into_iter().map(|s| *s)) {
-            let sty: config::Style = {
-                match seg.style {
-                    SegStyle::Fixed(style) =>
-                        style,
-                    SegStyle::Index(idx) =>
-                        config::Style {
-                            fg: colors.nick[idx % colors.nick.len()] as u16,
-                            bg: colors.user_msg.bg
-                        },
-                    SegStyle::SchemeStyle(sty) => {
-                        use self::SchemeStyle::*;
-                        match sty {
-                            Clear => colors.clear,
-                            UserMsg => colors.user_msg,
-                            ErrMsg => colors.err_msg,
-                            Topic => colors.topic,
-                            Cursor => colors.cursor,
-                            Join => colors.join,
-                            Part => colors.part,
-                            Nick => colors.nick_change,
-                            Faded => colors.faded,
-                            ExitDialogue => colors.exit_dialogue,
-                            Highlight => colors.highlight,
-                            Completion => colors.completion,
-                            Timestamp => colors.timestamp,
-                            TabActive => colors.tab_active,
-                            TabNormal => colors.tab_normal,
-                            TabNewMsg => colors.tab_new_msg,
-                            TabHighlight => colors.tab_highlight,
-                        }
-                    }
-                }
-            };
+            let sty = seg.style(colors);
 
             for char in seg.text.chars() {
                 if char.is_whitespace() {
@@ -247,6 +246,7 @@ impl Line {
                     } else {
                         // need to split here. ignore whitespace char.
                         line += 1;
+                        if line >= height { break; }
                         col = pos_x;
                     }
                 } else {

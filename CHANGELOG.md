@@ -1,3 +1,8 @@
+# WIP
+
+- Scrolling now scrolls one visible line rather than one complete line in the
+  widget (which can be rendered as multiple lines).
+
 # 2017/08/04: 0.2.1
 
 - User tab names are now updated when the user changes their nick.
