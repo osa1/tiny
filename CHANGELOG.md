@@ -1,6 +1,8 @@
-# WIP
+# 2017/08/04: 0.2.1
 
 - User tab names are now updated when the user changes their nick.
+- Reverted a change made on termbox to be able to run on systems without
+  terminfo files (#19).
 
 # 2017/08/01: 0.2.0
 
