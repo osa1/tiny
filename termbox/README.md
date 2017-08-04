@@ -14,7 +14,4 @@ Main differences are:
 
 1/7/2017:
 
-* Built-in terminal functions removed. All functions are now read from
-  terminfo.
-
 * Support for terminal focus events implemented.

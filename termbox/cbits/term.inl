@@ -25,7 +25,183 @@ enum {
 
 #define EUNSUPPORTED_TERM -1
 
+// rxvt-256color
+static const char *rxvt_256color_funcs[] = {
+    "\0337\033[?47h",
+    "\033[2J\033[?47l\0338",
+    "\033[?25h",
+    "\033[?25l",
+    "\033[H\033[2J",
+    "\033[m",
+    "\033[4m",
+    "\033[1m",
+    "\033[5m",
+    "\033[7m",
+    "\033=",
+    "\033>",
+    "",
+    "",
+    ENTER_MOUSE_SEQ,
+    EXIT_MOUSE_SEQ,
+};
+
+// Eterm
+static const char *eterm_funcs[] = {
+    "\0337\033[?47h",
+    "\033[2J\033[?47l\0338",
+    "\033[?25h",
+    "\033[?25l",
+    "\033[H\033[2J",
+    "\033[m",
+    "\033[4m",
+    "\033[1m",
+    "\033[5m",
+    "\033[7m",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+};
+
+// screen
+static const char *screen_funcs[] = {
+    "\033[?1049h",
+    "\033[?1049l",
+    "\033[34h\033[?25h",
+    "\033[?25l",
+    "\033[H\033[J",
+    "\033[m",
+    "\033[4m",
+    "\033[1m",
+    "\033[5m",
+    "\033[7m",
+    "\033[?1h\033=",
+    "\033[?1l\033>",
+    "",
+    "",
+    ENTER_MOUSE_SEQ,
+    EXIT_MOUSE_SEQ,
+};
+
+// rxvt-unicode
+static const char *rxvt_unicode_funcs[] = {
+    "\033[?1049h",
+    "\033[r\033[?1049l",
+    "\033[?25h",
+    "\033[?25l",
+    "\033[H\033[2J",
+    "\033[m\033(B",
+    "\033[4m",
+    "\033[1m",
+    "\033[5m",
+    "\033[7m",
+    "\033=",
+    "\033>",
+    "",
+    "",
+    ENTER_MOUSE_SEQ,
+    EXIT_MOUSE_SEQ,
+};
+
+// linux
+static const char *linux_funcs[] = {
+    "",
+    "",
+    "\033[?25h\033[?0c",
+    "\033[?25l\033[?1c",
+    "\033[H\033[J",
+    "\033[0;10m",
+    "\033[4m",
+    "\033[1m",
+    "\033[5m",
+    "\033[7m",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+};
+
+// xterm
+static const char *xterm_funcs[] = {
+    "\033[?1049h",
+    "\033[?1049l",
+    "\033[?12l\033[?25h",
+    "\033[?25l",
+    "\033[H\033[2J",
+    "\033(B\033[m",
+    "\033[4m",
+    "\033[1m",
+    "\033[5m",
+    "\033[7m",
+    "\033[?1h\033=",
+    "\033[?1l\033>",
+    ENABLE_FOCUS_SEQ,
+    DISABLE_FOCUS_SEQ,
+    ENTER_MOUSE_SEQ,
+    EXIT_MOUSE_SEQ,
+};
+
+static struct term {
+    const char *name;
+    const char **funcs;
+} terms[] = {
+    {"rxvt-256color", rxvt_256color_funcs},
+    {"Eterm", eterm_funcs},
+    {"screen", screen_funcs},
+    {"rxvt-unicode", rxvt_unicode_funcs},
+    {"linux", linux_funcs},
+    {"xterm", xterm_funcs},
+    {0, 0},
+};
+
+static bool init_from_terminfo = false;
 static const char **funcs;
+
+static int try_compatible(const char *term, const char *name, const char **tfuncs)
+{
+    if (strstr(term, name)) {
+        funcs = tfuncs;
+        return 0;
+    }
+
+    return EUNSUPPORTED_TERM;
+}
+
+static int init_term_builtin(void)
+{
+    int i;
+    const char *term = getenv("TERM");
+
+    if (term) {
+        for (i = 0; terms[i].name; i++) {
+            if (!strcmp(terms[i].name, term)) {
+                funcs = terms[i].funcs;
+                return 0;
+            }
+        }
+
+        /* let's do some heuristic, maybe it's a compatible terminal */
+        if (try_compatible(term, "xterm", xterm_funcs) == 0)
+            return 0;
+        if (try_compatible(term, "rxvt", rxvt_unicode_funcs) == 0)
+            return 0;
+        if (try_compatible(term, "linux", linux_funcs) == 0)
+            return 0;
+        if (try_compatible(term, "Eterm", eterm_funcs) == 0)
+            return 0;
+        if (try_compatible(term, "screen", screen_funcs) == 0)
+            return 0;
+        /* let's assume that 'cygwin' is xterm compatible */
+        if (try_compatible(term, "cygwin", xterm_funcs) == 0)
+            return 0;
+    }
+
+    return EUNSUPPORTED_TERM;
+}
 
 //----------------------------------------------------------------------
 // terminfo
@@ -137,7 +313,8 @@ static int init_term(void) {
     int i;
     char *data = load_terminfo();
     if (!data) {
-        return EUNSUPPORTED_TERM;
+        init_from_terminfo = false;
+        return init_term_builtin();
     }
 
     int16_t *header = (int16_t*)data;
@@ -163,17 +340,20 @@ static int init_term(void) {
     funcs[T_ENTER_MOUSE] = ENTER_MOUSE_SEQ;
     funcs[T_EXIT_MOUSE] = EXIT_MOUSE_SEQ;
 
+    init_from_terminfo = true;
     free(data);
     return 0;
 }
 
 static void shutdown_term(void) {
-    int i;
-    // the last two entries are reserved for mouse. because the table offset
-    // is not there, the two entries have to fill in manually and do not
-    // need to be freed.
-    for (i = 0; i < T_FUNCS_NUM-4; i++) {
-        free((void*)funcs[i]);
+    if (init_from_terminfo) {
+        int i;
+        // the last two entries are reserved for mouse. because the table offset
+        // is not there, the two entries have to fill in manually and do not
+        // need to be freed.
+        for (i = 0; i < T_FUNCS_NUM-4; i++) {
+            free((void*)funcs[i]);
+        }
+        free(funcs);
     }
-    free(funcs);
 }
