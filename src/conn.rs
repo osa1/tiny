@@ -306,8 +306,7 @@ impl<'poll> Conn<'poll> {
             ConnStatus::WaitPong { ticks_passed } => {
                 if ticks_passed + 1 == PONG_TICKS {
                     evs.push(ConnEv::Disconnected);
-                    self.status = ConnStatus::Disconnected { ticks_passed: 0 };
-                    self.deregister();
+                    self.enter_disconnect_state();
                 } else {
                     self.status = ConnStatus::WaitPong { ticks_passed: ticks_passed + 1 };
                 }
@@ -435,6 +434,7 @@ impl<'poll> Conn<'poll> {
                 self.handle_msgs(evs, logger);
                 if bytes_read == 0 {
                     evs.push(ConnEv::Disconnected);
+                    self.enter_disconnect_state();
                 }
             }
         }
