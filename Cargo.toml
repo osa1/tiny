@@ -12,8 +12,6 @@ description = "An IRC client"
 [badges]
 travis-ci = { repository = "osa1/tiny" }
 
-[workspace]
-
 [lib]
 name = "tiny"
 path = "src/lib.rs"
