@@ -35,6 +35,7 @@ use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
+use mio::unix::UnixReady;
 use std::ascii::AsciiExt;
 use std::error::Error;
 use std::fs::File;
@@ -505,7 +506,7 @@ impl<'poll> Tiny<'poll> {
             if readiness.is_writable() {
                 conn.send(&mut evs);
             }
-            if readiness.contains(Ready::hup()) {
+            if readiness.contains(UnixReady::hup()) {
                 conn.enter_disconnect_state();
                 self.tui.add_err_msg(
                     &format!("Conection error (HUP). \
