@@ -2,6 +2,7 @@
 
 - Scrolling now scrolls one visible line rather than one complete line in the
   widget (which can be rendered as multiple lines).
+- `/names` command implemented (see README).
 
 # 2017/08/04: 0.2.1
 

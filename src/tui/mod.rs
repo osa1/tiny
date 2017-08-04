@@ -16,6 +16,7 @@ pub use self::messaging::Timestamp;
 
 use term_input::{Event, Key};
 use termbox_simple::{Termbox, OutputMode};
+use trie::Trie;
 
 pub struct TUI {
     /// Termbox instance
@@ -103,6 +104,10 @@ impl TUI {
 
     pub fn set_nick(&mut self, serv_name: &str, nick: Rc<String>) {
         self.ui.set_nick(nick, &MsgTarget::AllServTabs { serv_name: serv_name });
+    }
+
+    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<Rc<Trie>> {
+        self.ui.get_nicks(serv_name, chan_name)
     }
 }
 
@@ -216,13 +221,13 @@ pub enum MsgTarget<'a> {
 impl TUI {
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
-    pub fn add_client_err_msg(&mut self, msg : &str, target : &MsgTarget) {
+    pub fn add_client_err_msg(&mut self, msg: &str, target: &MsgTarget) {
         self.ui.add_client_err_msg(msg, target);
     }
 
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
-    pub fn add_client_msg(&mut self, msg : &str, target : &MsgTarget) {
+    pub fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
         self.ui.add_client_msg(msg, target);
     }
 

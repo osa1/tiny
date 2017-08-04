@@ -332,6 +332,25 @@ impl<'poll> Tiny<'poll> {
            }
         }
 
+        else if words[0] == "names" {
+            if let &MsgSource::Chan { ref serv_name, ref chan_name } = &src {
+                match self.tui.get_nicks(serv_name, chan_name) {
+                    None => {},
+                    Some(nicks) => {
+                        let target =
+                            MsgTarget::Chan { serv_name: serv_name, chan_name: chan_name };
+                        let nicks_vec = nicks.to_strings("");
+                        self.tui.add_client_msg(
+                            &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
+                            &target);
+                    }
+                }
+            } else {
+                self.tui.add_client_err_msg(
+                    "/names only supported in chan tabs", &MsgTarget::CurrentTab);
+            }
+        }
+
         else {
             self.tui.add_client_err_msg(
                 &format!("Unsupported command: \"/{}\"", msg), &MsgTarget::CurrentTab);
@@ -717,7 +736,9 @@ impl<'poll> Tiny<'poll> {
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[1];
                     self.tui.add_msg(
-                        msg, Timestamp::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                        msg,
+                        Timestamp::now(),
+                        &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 else if n == 4 // RPL_MYINFO
@@ -728,7 +749,9 @@ impl<'poll> Tiny<'poll> {
                     let conn = &self.conns[conn_idx];
                     let msg  = params.into_iter().collect::<Vec<String>>().join(" ");
                     self.tui.add_msg(
-                        &msg, Timestamp::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                        &msg,
+                        Timestamp::now(),
+                        &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 else if n == 265
@@ -737,7 +760,9 @@ impl<'poll> Tiny<'poll> {
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[params.len() - 1];
                     self.tui.add_msg(
-                        msg, Timestamp::now(), &MsgTarget::Server { serv_name: conn.get_serv_name() });
+                        msg,
+                        Timestamp::now(),
+                        &MsgTarget::Server { serv_name: conn.get_serv_name() });
                 }
 
                 // RPL_TOPIC
@@ -791,7 +816,8 @@ impl<'poll> Tiny<'poll> {
                 else if n == 305 || n == 306 {
                     let msg = &params[1];
                     self.tui.add_client_msg(
-                        msg, &MsgTarget::AllServTabs { serv_name: self.conns[conn_idx].get_serv_name() });
+                        msg,
+                        &MsgTarget::AllServTabs { serv_name: self.conns[conn_idx].get_serv_name() });
                 }
 
                 // ERR_NOSUCHNICK
@@ -800,7 +826,8 @@ impl<'poll> Tiny<'poll> {
                     let msg = &params[2];
                     let serv_name = self.conns[conn_idx].get_serv_name();
                     self.tui.add_client_msg(
-                        msg, &MsgTarget::User { serv_name: serv_name, nick: nick });
+                        msg,
+                        &MsgTarget::User { serv_name: serv_name, nick: nick });
                 }
 
                 else {

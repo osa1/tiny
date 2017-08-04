@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use config::Colors;
 use config::Style;
+use trie::Trie;
 use tui::messaging::MessagingUI;
 use tui::messaging::Timestamp;
 use tui::MsgTarget;
@@ -49,7 +50,7 @@ impl TabStyle {
 }
 
 /// TUI source of a message from the user.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MsgSource {
     /// Message sent to a server tab.
     Serv { serv_name: String },
@@ -279,6 +280,13 @@ impl Tabbed {
         self.height = height;
         for tab in self.tabs.iter_mut() {
             tab.widget.resize(width, height - 1);
+        }
+    }
+
+    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<Rc<Trie>> {
+        match self.find_chan_tab_idx(serv_name, chan_name) {
+            None => None,
+            Some(i) => Some(self.tabs[i].widget.get_nicks())
         }
     }
 }

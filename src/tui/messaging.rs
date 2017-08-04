@@ -219,6 +219,10 @@ impl MessagingUI {
         }
     }
 
+    pub fn get_nicks(&self) -> Rc<Trie> {
+        self.nicks.clone()
+    }
+
     fn toggle_exit_dialogue(&mut self) {
         assert!(self.input_field.len() > 0);
         // FIXME: This is a bit too fragile I think. Since we only stack an exit

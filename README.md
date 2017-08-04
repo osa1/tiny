@@ -206,7 +206,9 @@ Commands start with `/` character.
 
 - `/nick <nick>`: Change nick
 
-- `/reload`: Reloads configuration
+- `/names`: List all nicks in the current channel
+
+- `/reload`: Reload configuration
 
 ## Development
 
