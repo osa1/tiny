@@ -183,6 +183,10 @@ colors:
 
 - `C-c enter` to quit.
 
+- `alt-{1,9}` switch to tab
+
+- `alt-0` switch to last tab
+
 ## Commands
 
 Commands start with `/` character.

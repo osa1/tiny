@@ -3,6 +3,7 @@
 - Scrolling now scrolls one visible line rather than one complete line in the
   widget (which can be rendered as multiple lines).
 - `/names` command implemented (see README).
+- Key bindings `alt-{0,9}` added for switching tabs (see README).
 
 # 2017/08/04: 0.2.1
 

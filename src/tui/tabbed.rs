@@ -271,6 +271,30 @@ impl Tabbed {
                 TabbedRet::KeyHandled
             },
 
+            Key::AltChar(c) => {
+                match c.to_digit(10) {
+                    None =>
+                        TabbedRet::KeyIgnored,
+                    Some(i) => {
+                        let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
+                            self.tabs.len() - 1
+                        } else {
+                            i as usize - 1
+                        };
+                        if new_tab_idx > self.active_idx {
+                            for _ in 0 .. new_tab_idx - self.active_idx {
+                                self.next_tab_();
+                            }
+                        } else if new_tab_idx < self.active_idx {
+                            for _ in 0 .. self.active_idx - new_tab_idx {
+                                self.prev_tab_();
+                            }
+                        }
+                        TabbedRet::KeyHandled
+                    }
+                }
+            }
+
             _ => TabbedRet::KeyIgnored,
         }
     }
