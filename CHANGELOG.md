@@ -1,4 +1,4 @@
-# WIP
+# 2017/08/05: 0.2.2
 
 - Scrolling now scrolls one visible line rather than one complete line in the
   widget (which can be rendered as multiple lines).
