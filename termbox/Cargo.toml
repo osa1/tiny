@@ -15,3 +15,4 @@ gcc = "0.3.35"
 
 [dev-dependencies]
 mio = "0.6.9"
+term_input = "0.1.0"
