@@ -27,20 +27,21 @@ use std::sync::atomic::Ordering;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
     AltArrow(Arrow),
+    AltChar(char),
     Arrow(Arrow),
+    Backspace,
     Char(char),
     Ctrl(char),
     CtrlArrow(Arrow),
-    Esc,
-    Enter,
-    PageUp,
-    PageDown,
-    Tab,
-    Backspace,
-    ShiftUp,
-    ShiftDown,
-    Home,
     End,
+    Enter,
+    Esc,
+    Home,
+    PageDown,
+    PageUp,
+    ShiftDown,
+    ShiftUp,
+    Tab,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -185,9 +186,10 @@ impl Input {
 
         if read_stdin(&mut self.buf) {
 
-            let mut buf_slice : &[u8] = &self.buf;
+            let mut buf_slice: &[u8] = &self.buf;
 
-            // read_stdin() returned true, there should be at least one character in the buffer
+            // read_stdin() returned true, there should be at least one
+            // character in the buffer
             debug_assert!(!buf_slice.is_empty());
 
             while !buf_slice.is_empty() {
@@ -260,10 +262,20 @@ fn read_key_comb<'a>(buf_slice: &'a [u8], evs: &mut Vec<Event>) -> Option<&'a [u
         }
     }
 
-    // as a special case, 27 (ESC) not followed by anything is an actual ESC
-    if buf_slice == &[27] {
-        evs.push(Event::Key(Key::Esc));
-        return Some(&buf_slice[1 ..]);
+    if buf_slice[0] == 27 {
+        // 27 not followed by anything is an actual ESC
+        if buf_slice.len() == 1 {
+            evs.push(Event::Key(Key::Esc));
+            return Some(&buf_slice[1 ..]);
+        }
+        // otherwise it's probably alt + key
+        else {
+            debug_assert!(buf_slice.len() >= 2);
+            return utf8_char_len(buf_slice[1]).map(|char_len| {
+                evs.push(Event::Key(Key::AltChar(get_utf8_char(&buf_slice[1..], char_len))));
+                &buf_slice[char_len as usize + 1 ..]
+            });
+        }
     }
 
     None
