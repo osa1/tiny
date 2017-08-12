@@ -789,6 +789,7 @@ impl<'poll> Tiny<'poll> {
                         chan_name: chan,
                     };
 
+                    self.tui.clear_nicks(&chan_target);
                     for nick in params[3].split_whitespace() {
                         // Apparently some nicks have a '@' prefix (indicating ops)
                         // TODO: Not sure where this is documented

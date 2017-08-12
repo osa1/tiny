@@ -336,6 +336,10 @@ impl MessagingUI {
 // Keeping nick list up-to-date
 
 impl MessagingUI {
+    pub fn clear_nicks(&mut self) {
+        Rc::get_mut(&mut self.nicks).unwrap().clear();
+    }
+
     pub fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
         Rc::get_mut(&mut self.nicks).unwrap().insert(nick);
 

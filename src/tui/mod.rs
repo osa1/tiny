@@ -260,6 +260,10 @@ impl TUI {
         self.ui.show_topic(msg, ts, target);
     }
 
+    pub fn clear_nicks(&mut self, target: &MsgTarget) {
+        self.ui.clear_nicks(target);
+    }
+
     pub fn add_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
         self.ui.add_nick(nick, ts, target);
     }

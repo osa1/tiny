@@ -11,6 +11,11 @@ impl Trie {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.vec.clear();
+        self.word = false;
+    }
+
     pub fn insert(&mut self, str : &str) {
         let mut trie_ptr : *mut Trie = &mut *self;
         for char in str.chars() {

@@ -4,6 +4,7 @@
   widget (which can be rendered as multiple lines).
 - `/names` command implemented (see README).
 - Key bindings `alt-{0,9}` added for switching tabs (see README).
+- Channel name list is now reset on `RPL_NAMREPLY`. This fixes #23.
 
 # 2017/08/04: 0.2.1
 

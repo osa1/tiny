@@ -693,6 +693,12 @@ impl Tabbed {
         });
     }
 
+    pub fn clear_nicks(&mut self, target: &MsgTarget) {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
+            tab.widget.clear_nicks();
+        });
+    }
+
     pub fn add_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.join(nick, ts);
