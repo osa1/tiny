@@ -301,7 +301,8 @@ impl<'poll> Tiny<'poll> {
                 }
                 MsgSource::Serv { serv_name } => {
                     self.tui.close_server_tab(&serv_name);
-                    self.disconnect(&serv_name);
+                    let conn_idx = find_conn_idx(&mut self.conns, &serv_name).unwrap();
+                    self.conns.remove(conn_idx);
                 }
                 MsgSource::Chan { serv_name, chan_name } => {
                     self.tui.close_chan_tab(&serv_name, &chan_name);
@@ -428,11 +429,6 @@ impl<'poll> Tiny<'poll> {
         self.conns.push(new_conn);
     }
 
-    fn disconnect(&mut self, serv_name: &str) {
-        let conn_idx = find_conn_idx(&mut self.conns, serv_name).unwrap();
-        self.conns.remove(conn_idx);
-    }
-
     fn join(&mut self, src: MsgSource, chan: &str) {
         match find_conn(&mut self.conns, src.serv_name()) {
             Some(conn) => {
@@ -556,11 +552,13 @@ impl<'poll> Tiny<'poll> {
             }
             ConnEv::Disconnected => {
                 let conn = &mut self.conns[conn_idx];
+                let target = MsgTarget::AllServTabs { serv_name: conn.get_serv_name() };
                 self.tui.add_err_msg(
                     &format!("Disconnected. Will try to reconnect in {} seconds.",
                              conn::RECONNECT_TICKS),
                     Timestamp::now(),
-                    &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
+                    &target);
+                self.tui.clear_nicks(&target);
             }
             ConnEv::WantReconnect => {
                 let mut conn = &mut self.conns[conn_idx];
@@ -789,7 +787,6 @@ impl<'poll> Tiny<'poll> {
                         chan_name: chan,
                     };
 
-                    self.tui.clear_nicks(&chan_target);
                     for nick in params[3].split_whitespace() {
                         // Apparently some nicks have a '@' prefix (indicating ops)
                         // TODO: Not sure where this is documented
