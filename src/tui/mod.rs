@@ -238,10 +238,10 @@ impl TUI {
     }
 
     /// Similar to `add_privmsg`, except the whole message is highlighted.
-    pub fn add_privmsg_higlight(
+    pub fn add_privmsg_highlight(
         &mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget)
     {
-        self.ui.add_privmsg_higlight(sender, msg, ts, target);
+        self.ui.add_privmsg_highlight(sender, msg, ts, target);
     }
 
     /// A message without any explicit sender info. Useful for e.g. in server

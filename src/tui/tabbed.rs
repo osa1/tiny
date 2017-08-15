@@ -32,19 +32,22 @@ struct Tab {
     style: TabStyle,
 }
 
-#[derive(Copy, Clone)]
+// NOTE: Keep the variants sorted in increasing significance, to avoid updating
+// style with higher significance for a less significant style (e.g. updating
+// from `Highlight` to `NewMsg` in `set_tab_style`).
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TabStyle {
+    Normal,
     NewMsg,
     Highlight,
-    Normal,
 }
 
 impl TabStyle {
     pub fn get_style(self, colors: &Colors) -> Style {
         match self {
+            TabStyle::Normal => colors.tab_normal,
             TabStyle::NewMsg => colors.tab_new_msg,
             TabStyle::Highlight => colors.tab_highlight,
-            TabStyle::Normal => colors.tab_normal,
         }
     }
 }
@@ -81,7 +84,7 @@ impl Tab {
         }
     }
 
-    pub fn set_style(&mut self, style: TabStyle) {
+    fn set_style(&mut self, style: TabStyle) {
         self.style = style;
     }
 
@@ -323,6 +326,7 @@ fn arrow_style(tabs: &[Tab], colors: &Colors) -> Style {
 
     for tab in tabs  {
         match tab.style {
+            TabStyle::Normal => {}
             TabStyle::NewMsg => {
                 arrow_style = colors.tab_new_msg;
                 break;
@@ -330,7 +334,6 @@ fn arrow_style(tabs: &[Tab], colors: &Colors) -> Style {
             TabStyle::Highlight => {
                 arrow_style = colors.tab_highlight;
             }
-            TabStyle::Normal => {}
         }
     }
 
@@ -645,7 +648,7 @@ impl Tabbed {
 
     pub fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, is_active: bool| {
-            if !is_active {
+            if !is_active && tab.style < style {
                 tab.set_style(style);
             }
         });
@@ -669,7 +672,7 @@ impl Tabbed {
         });
     }
 
-    pub fn add_privmsg_higlight(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
+    pub fn add_privmsg_highlight(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_privmsg(sender, msg, ts, true);
         });

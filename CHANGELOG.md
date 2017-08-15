@@ -5,6 +5,9 @@
 - `/names` command implemented (see README).
 - Key bindings `alt-{0,9}` added for switching tabs (see README).
 - Channel name list is now reset on `RPL_NAMREPLY`. This fixes #23.
+- A bug that caused "highlight" state of tabs fixed.
+  (new messages in channel tabs no longer cause a tab in "highlight" state to
+  move to "new message" style, #24)
 
 # 2017/08/04: 0.2.1
 

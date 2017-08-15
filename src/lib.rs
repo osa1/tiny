@@ -615,7 +615,7 @@ impl<'poll> Tiny<'poll> {
                         };
                         // highlight the message if it mentions us
                         if msg.find(conn.get_nick()).is_some() {
-                            self.tui.add_privmsg_higlight(origin, &msg, ts, &msg_target);
+                            self.tui.add_privmsg_highlight(origin, &msg, ts, &msg_target);
                             self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
                             let mentions_target = MsgTarget::Server { serv_name: "mentions" };
                             self.tui.add_msg(
