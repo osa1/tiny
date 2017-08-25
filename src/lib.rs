@@ -495,7 +495,7 @@ impl<'poll> Tiny<'poll> {
     fn handle_socket(&mut self, poll: &'poll Poll, readiness: Ready, conn_idx: usize) {
         let mut evs = Vec::with_capacity(2);
         {
-            let mut conn = &mut self.conns[conn_idx];
+            let conn = &mut self.conns[conn_idx];
             if readiness.is_readable() {
                 conn.recv(&mut evs, &mut self.logger);
             }
@@ -561,7 +561,7 @@ impl<'poll> Tiny<'poll> {
                 self.tui.clear_nicks(&target);
             }
             ConnEv::WantReconnect => {
-                let mut conn = &mut self.conns[conn_idx];
+                let conn = &mut self.conns[conn_idx];
                 self.tui.add_client_msg(
                     "Connecting...",
                     &MsgTarget::AllServTabs { serv_name: conn.get_serv_name() });
@@ -570,7 +570,7 @@ impl<'poll> Tiny<'poll> {
             ConnEv::Err(err) => {
                 // TODO: Some of these errors should not cause a disconnect,
                 // e.g. EAGAIN, EWOULDBLOCK ...
-                let mut conn = &mut self.conns[conn_idx];
+                let conn = &mut self.conns[conn_idx];
                 conn.enter_disconnect_state();
                 self.tui.add_err_msg(
                     &format!("Conection error: {}. \
