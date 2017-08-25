@@ -293,6 +293,7 @@ impl Tabbed {
                                 self.prev_tab_();
                             }
                         }
+                        self.tabs[self.active_idx].set_style(TabStyle::Normal);
                         TabbedRet::KeyHandled
                     }
                 }

@@ -4,6 +4,8 @@
 - A bug that caused "highlight" state of tabs fixed.
   (new messages in channel tabs no longer cause a tab in "highlight" state to
   move to "new message" style, #24)
+- Fixed a bug that caused not updating channel status (highlight etc.) after
+  `alt-{0,9}` keys (#26).
 
 # 2017/08/05: 0.2.2
 
