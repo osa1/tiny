@@ -505,7 +505,7 @@ impl<'poll> Tiny<'poll> {
             if readiness.contains(UnixReady::hup()) {
                 conn.enter_disconnect_state();
                 self.tui.add_err_msg(
-                    &format!("Conection error (HUP). \
+                    &format!("Connection error (HUP). \
                              Will try to reconnect in {} seconds.",
                              conn::RECONNECT_TICKS),
                     Timestamp::now(),
@@ -573,7 +573,7 @@ impl<'poll> Tiny<'poll> {
                 let conn = &mut self.conns[conn_idx];
                 conn.enter_disconnect_state();
                 self.tui.add_err_msg(
-                    &format!("Conection error: {}. \
+                    &format!("Connection error: {}. \
                              Will try to reconnect in {} seconds.",
                              err.description(),
                              conn::RECONNECT_TICKS),
