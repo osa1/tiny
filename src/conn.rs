@@ -134,18 +134,15 @@ fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
     // FIXME: This part is really horrible. No way to report errors. The `Conn`
     // will just try to reconnect in case of an error.
     match (serv_addr, serv_port).to_socket_addrs() {
-        Err(err) => {
-            writeln!(io::stderr(), "error while resolving address: {}", err).unwrap();
+        Err(_) => {
             mk_useless_stream()
         },
         Ok(mut addr_iter) => {
             match addr_iter.next() {
                 None => {
-                    writeln!(io::stderr(), "addr iter empty").unwrap();
                     mk_useless_stream()
                 }
                 Some(SocketAddr::V4(addr)) => {
-                    writeln!(io::stderr(), "ipv4").unwrap();
                     let stream = TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
                     stream.set_nonblocking(true).unwrap();
                     // This will fail with EINPROGRESS
@@ -153,7 +150,6 @@ fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
                     stream
                 },
                 Some(SocketAddr::V6(addr)) => {
-                    writeln!(io::stderr(), "ipv6").unwrap();
                     let stream = TcpBuilder::new_v6().unwrap().to_tcp_stream().unwrap();
                     stream.set_nonblocking(true).unwrap();
                     // This will fail with EINPROGRESS
