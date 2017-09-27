@@ -2,7 +2,6 @@ extern crate libc;
 extern crate mio;
 extern crate term_input;
 extern crate termbox_simple;
-extern crate time;
 extern crate tiny;
 
 use mio::Events;
@@ -30,7 +29,7 @@ fn main() {
 
     {
         let mut contents = String::new();
-        let mut file = File::open("/usr/share/dict/american").unwrap();
+        let mut file = File::open("/usr/share/dict/american-english").unwrap();
         file.read_to_string(&mut contents).unwrap();
         for word in contents.lines() {
             tui.add_nick(word, None, &debug_tab);
