@@ -353,6 +353,10 @@ impl<'poll> Tiny<'poll> {
             }
         }
 
+        else if words[0] == "clear" {
+            self.tui.clear(&src.to_target());
+        }
+
         else {
             self.tui.add_client_err_msg(
                 &format!("Unsupported command: \"/{}\"", msg), &MsgTarget::CurrentTab);

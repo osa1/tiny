@@ -322,6 +322,10 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
+    pub fn clear(&mut self) {
+        self.msg_area.clear();
+    }
+
     fn get_nick_color(&self, sender: &str) -> usize {
         // Anything works as long as it's fast
         let mut hash: usize = 5381;

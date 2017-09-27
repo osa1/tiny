@@ -140,7 +140,7 @@ impl MsgArea {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Adding text
+// Adding/removing text
 
 impl MsgArea {
     pub fn set_style(&mut self, style: SegStyle) {
@@ -170,6 +170,12 @@ impl MsgArea {
     #[inline]
     pub fn modify_line<F>(&mut self, idx : usize, f : F) where F : Fn(&mut Line) {
         f(&mut self.lines[idx]);
+    }
+
+    pub fn clear(&mut self) {
+        self.lines.clear();
+        self.scroll = 0;
+        self.lines_height = None;
     }
 }
 

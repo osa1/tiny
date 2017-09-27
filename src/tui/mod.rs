@@ -275,4 +275,8 @@ impl TUI {
     pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp, target: &MsgTarget) {
         self.ui.rename_nick(old_nick, new_nick, ts, target);
     }
+
+    pub fn clear(&mut self, target: &MsgTarget) {
+        self.ui.clear(target);
+    }
 }

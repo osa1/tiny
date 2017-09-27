@@ -73,6 +73,17 @@ impl MsgSource {
             MsgSource::User { ref serv_name, .. } => serv_name,
         }
     }
+
+    pub fn to_target(&self) -> MsgTarget {
+        match self {
+            &MsgSource::Serv { ref serv_name } =>
+                MsgTarget::Server { serv_name },
+            &MsgSource::Chan { ref serv_name, ref chan_name } =>
+                MsgTarget::Chan { serv_name, chan_name },
+            &MsgSource::User { ref serv_name, ref nick } =>
+                MsgTarget::User { serv_name, nick }
+        }
+    }
 }
 
 impl Tab {
@@ -732,6 +743,10 @@ impl Tabbed {
 
     pub fn set_nick(&mut self, new_nick: Rc<String>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.set_nick(new_nick.clone()));
+    }
+
+    pub fn clear(&mut self, target: &MsgTarget) {
+        self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.clear());
     }
 
     ////////////////////////////////////////////////////////////////////////////

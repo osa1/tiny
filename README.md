@@ -214,6 +214,8 @@ Commands start with `/` character.
 
 - `/reload`: Reload configuration
 
+- `/clear`: Clears tab contents
+
 ## Development
 
 tiny is in early stages of development. Some of features that you might think

@@ -68,10 +68,14 @@ fn main() {
                 input.read_input_events(&mut ev_buffer);
                 for ev in ev_buffer.drain(0..) {
                     match tui.handle_input_event(ev) {
-                        TUIRet::Input { msg, .. } => {
-                            tui.add_msg(&msg.into_iter().collect::<String>(),
-                                        Timestamp::now(),
-                                        &MsgTarget::Server { serv_name: "debug" });
+                        TUIRet::Input { msg, from } => {
+                            if msg == "/clear".chars().collect::<Vec<char>>() {
+                                tui.clear(&from.to_target())
+                            } else {
+                                tui.add_msg(&msg.into_iter().collect::<String>(),
+                                            Timestamp::now(),
+                                            &MsgTarget::Server { serv_name: "debug" });
+                            }
                         },
                         TUIRet::Abort => {
                             break 'mainloop;

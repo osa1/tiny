@@ -1,3 +1,7 @@
+# WIP
+
+- `/clear` command implement for clearing tab contents (#22).
+
 # 2017/09/19: 0.2.4
 
 - tiny can now connect to IPv6 servers.
