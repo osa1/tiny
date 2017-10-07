@@ -4,8 +4,9 @@ version = "0.2.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 links = "termbox_simple"
 description = "A hacked version of termbox (see README)"
-build = "build.rs"
+repository = "https://github.com/osa1/tiny"
 license = "MIT"
+build = "build.rs"
 
 [dependencies]
 libc = "0.2"
