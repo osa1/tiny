@@ -93,6 +93,10 @@ impl MessagingUI {
 
     pub fn set_nick(&mut self, nick: Rc<String>) {
         self.current_nick = Some(nick);
+        // update text field size
+        let w = self.width;
+        let h = self.height;
+        self.resize(w, h);
     }
 
     pub fn get_nick(&self) -> Option<Rc<String>> {

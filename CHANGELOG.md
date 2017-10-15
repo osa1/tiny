@@ -1,3 +1,7 @@
+# WIP
+
+- Fixed a bug that caused wrong scrolling in input field after changing nick.
+
 # 2017/10/15: 0.2.5
 
 - `/clear` command implement for clearing tab contents (#22).
