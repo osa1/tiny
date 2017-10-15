@@ -167,6 +167,26 @@ colors:
         attrs: [bold]
 ```
 
+## Command line arguments
+
+By default (i.e. when no command line arguments passed) tiny connects to all
+servers listed in the config. tiny considers command line arguments as patterns
+to be matched in server addresses, so you can pass command line arguments to
+connect to only a subset of servers specified in the config. For example, in
+this config:
+
+```yaml
+servers:
+    - addr: irc.mozilla.org
+      ...
+
+    - addr: chat.freenode.net
+      ...
+```
+
+By default tiny connects to both servers. You can connect to only the second
+server by passing `freenode` as a command line argument.
+
 ## Key bindings
 
 - `C-a`/`C-e` to move cursor beginning/end in the input field

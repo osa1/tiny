@@ -1,6 +1,11 @@
 # WIP
 
 - `/clear` command implement for clearing tab contents (#22).
+- Command line arguments are now considered as patterns to be searched in server
+  addressed. tiny only connects to servers that matches at least one of the
+  given patterns. Not passing any command line arguments means connecting to all
+  servers in the config. Useful for connecting only a subset of servers listed
+  in the config. See README as an example use.
 
 # 2017/09/19: 0.2.4
 

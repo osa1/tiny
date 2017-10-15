@@ -68,6 +68,23 @@ pub fn run() {
                 ::std::process::exit(1);
             },
             Ok(config::Config { servers, defaults, colors, log_dir }) => {
+                let args = ::std::env::args().into_iter().collect::<Vec<String>>();
+                let servers =
+                    if args.len() >= 2 {
+                        // connect only to servers that match at least one of
+                        // the given patterns
+                        let pats = &args[1..];
+                        servers.into_iter().filter(|s| {
+                            for pat in pats {
+                                if s.addr.contains(pat) {
+                                    return true;
+                                }
+                            }
+                            false
+                        }).collect()
+                    } else {
+                        servers
+                    };
                 Tiny::run(servers, defaults, log_dir, colors)
             }
         }
