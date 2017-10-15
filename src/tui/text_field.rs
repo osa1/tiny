@@ -483,8 +483,7 @@ fn draw_line(tb: &mut Termbox, colors: &Colors,
 {
     let slice: &[char] =
         &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
-    let chars: &mut Iterator<Item=char> = &mut slice.iter().cloned();
-    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, chars);
+    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().cloned());
 
     // On my terminal the cursor is only shown when there's a character
     // under it.

@@ -116,7 +116,7 @@ impl MessagingUI {
                     pos_x,
                     pos_y + self.height - 1,
                     style,
-                    &mut nick.chars());
+                    nick.chars());
                 tb.change_cell(
                     pos_x + nick.len() as i32,
                     pos_y + self.height - 1,
