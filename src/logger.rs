@@ -92,7 +92,7 @@ impl Logger {
 
     pub fn get_chan_logs(&mut self, serv_: &str, chan_: &str) -> LogFile {
         let pos = self.fds.iter().position(|&(ref dest, _)| {
-            if let &LogDest::Chan { ref serv, ref chan } = dest {
+            if let LogDest::Chan { ref serv, ref chan } = *dest {
                 serv == serv_ && chan == chan_
             } else {
                 false
@@ -115,7 +115,7 @@ impl Logger {
 
     pub fn get_raw_serv_logs(&mut self, serv_: &str) -> LogFile {
         let pos = self.fds.iter().position(|&(ref dest, _)| {
-            if let &LogDest::ServerRaw(ref serv) = dest {
+            if let LogDest::ServerRaw(ref serv) = *dest {
                 serv == serv_
             } else {
                 false

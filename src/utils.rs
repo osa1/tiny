@@ -103,7 +103,7 @@ impl<'a> Iterator for SplitIterator<'a> {
                 if s.len() <= self.max {
                     let ret = Some(s);
                     self.s = None;
-                    return ret;
+                    ret
                 } else {
                     let mut split = 0;
 
@@ -135,7 +135,7 @@ impl<'a> Iterator for SplitIterator<'a> {
                     } else {
                         let ret = Some(&s[ 0 .. split ]);
                         self.s = Some(&s[ split .. ]);
-                        return ret;
+                        ret
                     }
                 }
             }

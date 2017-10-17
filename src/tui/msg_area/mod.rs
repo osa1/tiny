@@ -162,7 +162,7 @@ impl MsgArea {
             self.scroll += line_height;
         }
         if let Some(ref mut total_height) = self.lines_height {
-            *total_height = *total_height + line_height;
+            *total_height += line_height;
         }
         self.lines.len() - 1
     }

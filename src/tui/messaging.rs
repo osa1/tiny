@@ -116,7 +116,7 @@ impl MessagingUI {
     pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
 
-        if let &Some(ref nick) = &self.current_nick {
+        if let Some(ref nick) = self.current_nick {
             if self.draw_current_nick {
                 let nick_color =
                     colors.nick[self.get_nick_color(nick) % colors.nick.len()];
@@ -152,22 +152,12 @@ impl MessagingUI {
                 WidgetRet::KeyHandled
             },
 
-            Key::Ctrl('u') => {
+            Key::Ctrl('u') | Key::PageUp => {
                 self.msg_area.page_up();
                 WidgetRet::KeyHandled
             },
 
-            Key::Ctrl('d') => {
-                self.msg_area.page_down();
-                WidgetRet::KeyHandled
-            },
-
-            Key::PageUp => {
-                self.msg_area.page_up();
-                WidgetRet::KeyHandled
-            },
-
-            Key::PageDown => {
+            Key::Ctrl('d') | Key::PageDown => {
                 self.msg_area.page_down();
                 WidgetRet::KeyHandled
             },
@@ -201,7 +191,7 @@ impl MessagingUI {
 
             key => {
                 let ret = {
-                    if let Some(ref exit_dialogue) = self.exit_dialogue.as_ref() {
+                    if let Some(exit_dialogue) = self.exit_dialogue.as_ref() {
                         exit_dialogue.keypressed(key)
                     } else {
                         self.input_field.keypressed(key)
@@ -223,10 +213,10 @@ impl MessagingUI {
         self.height = height;
         self.msg_area.resize(width, height - 1);
 
-        let nick_width = match &self.current_nick {
-            &None =>
+        let nick_width = match self.current_nick {
+            None =>
                 0,
-            &Some(ref rc) =>
+            Some(ref rc) =>
                 // +2 for ": "
                 rc.len() as i32 + 2,
         };
@@ -249,7 +239,7 @@ impl MessagingUI {
 
     fn toggle_exit_dialogue(&mut self) {
         let exit_dialogue = ::std::mem::replace(&mut self.exit_dialogue, None);
-        if let None = exit_dialogue {
+        if exit_dialogue.is_none() {
             self.exit_dialogue = Some(ExitDialogue::new(self.width));
         }
     }

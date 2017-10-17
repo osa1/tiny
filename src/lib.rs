@@ -278,7 +278,7 @@ impl<'poll> Tiny<'poll> {
 
         else if words[0] == "msg" {
             // need to find index of the third word
-            let mut word_indices = utils::split_whitespace_indices(&msg);
+            let mut word_indices = utils::split_whitespace_indices(msg);
             word_indices.next(); // "/msg"
             word_indices.next(); // target
             if let Some(msg_begins) = word_indices.next() {
@@ -297,7 +297,7 @@ impl<'poll> Tiny<'poll> {
         }
 
         else if words[0] == "away" {
-            let mut word_indices = utils::split_whitespace_indices(&msg);
+            let mut word_indices = utils::split_whitespace_indices(msg);
             word_indices.next(); // "/away"
             let msg = {
                 if let Some(msg_begins) = word_indices.next() {
@@ -318,7 +318,7 @@ impl<'poll> Tiny<'poll> {
                 }
                 MsgSource::Serv { serv_name } => {
                     self.tui.close_server_tab(&serv_name);
-                    let conn_idx = find_conn_idx(&mut self.conns, &serv_name).unwrap();
+                    let conn_idx = find_conn_idx(&self.conns, &serv_name).unwrap();
                     self.conns.remove(conn_idx);
                 }
                 MsgSource::Chan { serv_name, chan_name } => {
@@ -352,7 +352,7 @@ impl<'poll> Tiny<'poll> {
         }
 
         else if words[0] == "names" {
-            if let &MsgSource::Chan { ref serv_name, ref chan_name } = &src {
+            if let MsgSource::Chan { ref serv_name, ref chan_name } = src {
                 let nicks_vec =
                     self.tui.get_nicks(serv_name, chan_name).map(|nicks| nicks.to_strings(""));
                 if let Some(nicks_vec) = nicks_vec {
@@ -449,15 +449,9 @@ impl<'poll> Tiny<'poll> {
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
-        match find_conn(&mut self.conns, src.serv_name()) {
-            Some(conn) => {
-                conn.join(chan);
-                return;
-            }
-            None => {
-                // drop the borrowed self and run next statement
-                // rustc is too dumb to figure that None can't borrow.
-            }
+        if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
+            conn.join(chan);
+            return;
         }
 
         self.tui.add_client_err_msg(
@@ -535,7 +529,7 @@ impl<'poll> Tiny<'poll> {
     }
 
     fn handle_conn_evs(&mut self, poll: &'poll Poll, conn_idx: usize, evs: Vec<ConnEv>) {
-        for ev in evs.into_iter() {
+        for ev in evs {
             self.handle_conn_ev(poll, conn_idx, ev);
         }
     }
@@ -562,7 +556,7 @@ impl<'poll> Tiny<'poll> {
                     }
                 }
                 if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
-                    for cmd in auto_cmds.iter() {
+                    for cmd in &auto_cmds {
                         self.handle_cmd(poll,
                                         MsgSource::Serv { serv_name: serv_name.to_owned() },
                                         cmd);
@@ -624,7 +618,7 @@ impl<'poll> Tiny<'poll> {
                 };
                 match target {
                     wire::MsgTarget::Chan(chan) => {
-                        self.logger.get_chan_logs(&conn.get_serv_name(), &chan).write_line(
+                        self.logger.get_chan_logs(conn.get_serv_name(), &chan).write_line(
                             format_args!("PRIVMSG: {}", msg));
                         let msg_target = MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
@@ -678,12 +672,12 @@ impl<'poll> Tiny<'poll> {
                         self.logger.get_chan_logs(serv_name, &chan).write_line(
                             format_args!("JOIN: {}", nick));
                         if nick == conn.get_nick() {
-                            self.tui.new_chan_tab(&serv_name, &chan);
+                            self.tui.new_chan_tab(serv_name, &chan);
                         } else {
                             self.tui.add_nick(
                                 &nick,
                                 Some(Timestamp::now()),
-                                &MsgTarget::Chan { serv_name: &serv_name, chan_name: &chan });
+                                &MsgTarget::Chan { serv_name: serv_name, chan_name: &chan });
                         }
                     }
                 }
@@ -750,7 +744,7 @@ impl<'poll> Tiny<'poll> {
                         || n == 372 /* RPL_MOTD */
                         || n == 375 /* RPL_MOTDSTART */
                         || n == 376 /* RPL_ENDOFMOTD */ {
-                    debug_assert!(params.len() == 2);
+                    debug_assert_eq!(params.len(), 2);
                     let conn = &self.conns[conn_idx];
                     let msg  = &params[1];
                     self.tui.add_msg(

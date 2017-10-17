@@ -212,7 +212,7 @@ impl Default for Colors {
             nick: vec![ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ],
             clear: Style { fg: TB_DEFAULT, bg: TB_DEFAULT },
             user_msg: Style { fg: 0, bg: TB_DEFAULT },
-            err_msg: Style { fg: 0 | TB_BOLD, bg: 1 },
+            err_msg: Style { fg: TB_BOLD, bg: 1 },
             topic: Style { fg: 14 | TB_BOLD, bg: TB_DEFAULT },
             cursor: Style { fg: 0, bg: TB_DEFAULT },
             join: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
@@ -223,7 +223,7 @@ impl Default for Colors {
             highlight: Style { fg: 9 | TB_BOLD, bg: TB_DEFAULT },
             completion: Style { fg: 84, bg: TB_DEFAULT },
             timestamp: Style { fg: 242, bg: TB_DEFAULT },
-            tab_active: Style { fg: 0 | TB_BOLD, bg: 0 },
+            tab_active: Style { fg: TB_BOLD, bg: 0 },
             tab_normal: Style { fg: 8, bg: 0 },
             tab_new_msg: Style { fg: 5, bg: 0 },
             tab_highlight: Style { fg: 9 | TB_BOLD, bg: 0 },
@@ -280,8 +280,7 @@ fn parse_attr(val: String) -> u16 {
             return attr;
         }
     }
-
-    return 0;
+    0
 }
 
 impl<'de> Deserialize<'de> for Style {

@@ -37,12 +37,12 @@ fn main() {
             Err(_) => {},
             Ok(_) => {
                 input.read_input_events(&mut ev_buffer);
-                for ev in ev_buffer.iter() {
-                    match ev {
-                        &Event::Key(Key::Tab) => {
+                for ev in &ev_buffer {
+                    match *ev {
+                        Event::Key(Key::Tab) => {
                             fg = !fg;
                         },
-                        &Event::Key(Key::Esc) => {
+                        Event::Key(Key::Esc) => {
                             break 'mainloop;
                         },
                         _ => {},

@@ -156,7 +156,7 @@ impl Line {
     }
 
     pub fn add_char(&mut self, char: char) {
-        assert!(char != TERMBOX_COLOR_PREFIX);
+        assert_ne!(char, TERMBOX_COLOR_PREFIX);
         if char.is_whitespace() {
             self.splits.push(self.len_chars);
         }

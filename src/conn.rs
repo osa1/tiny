@@ -483,7 +483,7 @@ impl<'poll> Conn<'poll> {
     }
 
     fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
-        if let &Msg { cmd: Cmd::PING { ref server }, .. } = &msg {
+        if let Msg { cmd: Cmd::PING { ref server }, .. } = msg {
             wire::pong(&mut self.out_buf, server).unwrap();
             self.reregister_for_rw();
         }
@@ -494,7 +494,7 @@ impl<'poll> Conn<'poll> {
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
-        if let &Msg { cmd: Cmd::JOIN { .. }, pfx: Some(Pfx::User { ref nick, ref user }) } = &msg {
+        if let Msg { cmd: Cmd::JOIN { .. }, pfx: Some(Pfx::User { ref nick, ref user }) } = msg {
             if nick == self.get_nick() {
                 let usermask = format!("{}!{}", nick, user);
                 logger.get_debug_logs().write_line(
@@ -503,7 +503,7 @@ impl<'poll> Conn<'poll> {
             }
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 396, ref params }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 396, ref params }, .. } = msg {
             // :hobana.freenode.net 396 osa1 haskell/developer/osa1
             // :is now your hidden host (set by services.)
             if params.len() == 3 {
@@ -513,7 +513,7 @@ impl<'poll> Conn<'poll> {
             }
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 302, ref params }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 302, ref params }, .. } = msg {
             // 302 RPL_USERHOST
             // :ircd.stealth.net 302 yournick :syrk=+syrk@millennium.stealth.net
             //
@@ -540,12 +540,12 @@ impl<'poll> Conn<'poll> {
             }
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = msg {
             // 001 RPL_WELCOME is how we understand that the registration was successful
             evs.push(ConnEv::Connected);
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 002, ref params }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 002, ref params }, .. } = msg {
             // 002    RPL_YOURHOST
             //        "Your host is <servername>, running version <ver>"
 
@@ -565,14 +565,14 @@ impl<'poll> Conn<'poll> {
             }
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 433, .. }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 433, .. }, .. } = msg {
             // ERR_NICKNAMEINUSE
             self.next_nick();
             self.send_nick();
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = msg {
             // RPL_ENDOFMOTD. Join auto-join channels.
             for chan in &self.auto_join {
                 wire::join(&mut self.out_buf, chan).unwrap();
@@ -586,7 +586,7 @@ impl<'poll> Conn<'poll> {
             }
         }
 
-        if let &Msg { cmd: Cmd::Reply { num: 332, ref params }, .. } = &msg {
+        if let Msg { cmd: Cmd::Reply { num: 332, ref params }, .. } = msg {
             if params.len() == 2 || params.len() == 3 {
                 // RPL_TOPIC. We've successfully joined a channel, add the channel to
                 // self.auto_join to be able to auto-join next time we connect
@@ -601,11 +601,11 @@ impl<'poll> Conn<'poll> {
 
 /// Try to parse servername in a 002 RPL_YOURHOST reply
 fn parse_servername(params: &[String]) -> Option<String> {
-    let msg = try_opt!(params.get(1).or(params.get(0)));
+    let msg = try_opt!(params.get(1).or_else(|| params.get(0)));
     let slice1 = &msg[13..];
     let servername_ends =
         try_opt!(wire::find_byte(slice1.as_bytes(), b'[')
-                 .or(wire::find_byte(slice1.as_bytes(), b',')));
+                 .or_else(|| wire::find_byte(slice1.as_bytes(), b',')));
     Some((&slice1[..servername_ends]).to_owned())
 }
 

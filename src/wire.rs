@@ -313,7 +313,7 @@ fn parse_reply_num(bs: &[u8]) -> Option<u16> {
 }
 
 fn parse_params(chrs: &str) -> Vec<&str> {
-    debug_assert!(chrs.chars().nth(0) != Some(' '));
+    debug_assert_ne!(chrs.chars().nth(0), Some(' '));
 
     let mut ret: Vec<&str> = Vec::new();
 
