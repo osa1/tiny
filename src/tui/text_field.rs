@@ -44,11 +44,11 @@ enum Mode {
 
     /// Auto-completing a nick in channel
     Autocomplete {
-        original_buffer    : Vec<char>,
-        insertion_point    : usize,
-        word_starts        : usize,
-        completions        : Vec<String>,
-        current_completion : usize,
+        original_buffer: Vec<char>,
+        insertion_point: usize,
+        word_starts: usize,
+        completions: Vec<String>,
+        current_completion: usize,
     }
 }
 
@@ -264,10 +264,10 @@ impl TextField {
                         word_starts, completions, current_completion, ..
                     } => {
                         let current_completion =
-                            if current_completion != completions.len() - 1 {
-                                current_completion + 1
+                            if current_completion == completions.len() - 1 {
+                                0
                             } else {
-                                current_completion
+                                current_completion + 1
                             };
 
                         let cursor = (insertion_point + completions[current_completion].len()) as i32;
@@ -305,10 +305,10 @@ impl TextField {
                         word_starts, completions, current_completion, ..
                     } => {
                         let current_completion =
-                            if current_completion > 0 {
-                                current_completion - 1
+                            if current_completion == 0 {
+                                completions.len() - 1
                             } else {
-                                current_completion
+                                current_completion - 1
                             };
 
                         let cursor = (insertion_point + completions[current_completion].len()) as i32;
