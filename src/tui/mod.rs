@@ -106,7 +106,7 @@ impl TUI {
         self.ui.set_nick(nick, &MsgTarget::AllServTabs { serv_name: serv_name });
     }
 
-    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<Rc<Trie>> {
+    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
         self.ui.get_nicks(serv_name, chan_name)
     }
 }

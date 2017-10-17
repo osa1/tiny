@@ -353,16 +353,14 @@ impl<'poll> Tiny<'poll> {
 
         else if words[0] == "names" {
             if let &MsgSource::Chan { ref serv_name, ref chan_name } = &src {
-                match self.tui.get_nicks(serv_name, chan_name) {
-                    None => {},
-                    Some(nicks) => {
-                        let target =
-                            MsgTarget::Chan { serv_name: serv_name, chan_name: chan_name };
-                        let nicks_vec = nicks.to_strings("");
-                        self.tui.add_client_msg(
-                            &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
-                            &target);
-                    }
+                let nicks_vec =
+                    self.tui.get_nicks(serv_name, chan_name).map(|nicks| nicks.to_strings(""));
+                if let Some(nicks_vec) = nicks_vec {
+                    let target =
+                        MsgTarget::Chan { serv_name: serv_name, chan_name: chan_name };
+                    self.tui.add_client_msg(
+                        &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
+                        &target);
                 }
             } else {
                 self.tui.add_client_err_msg(

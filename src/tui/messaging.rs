@@ -17,7 +17,7 @@ use tui::msg_area::line::SegStyle;
 use tui::msg_area::MsgArea;
 use tui::termbox;
 use tui::text_field::TextField;
-use tui::widget::{WidgetRet, Widget};
+use tui::widget::WidgetRet;
 
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.
@@ -25,17 +25,17 @@ pub struct MessagingUI {
     /// Incoming and sent messages appear
     msg_area: MsgArea,
 
-    /// Stacked user input fields. Topmost one handles keypresses.
-    input_field: Vec<Box<Widget>>,
+    // exit_dialogue handles input when available.
+    // two fields (instead of an enum etc.) to avoid borrowchk problems
+    input_field: TextField,
+    exit_dialogue: Option<ExitDialogue>,
 
     width: i32,
     height: i32,
 
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
-    //
-    // Rc to be able to share with dynamic messages.
-    nicks: Rc<Trie>,
+    nicks: Trie,
 
     current_nick: Option<Rc<String>>,
     draw_current_nick: bool,
@@ -80,10 +80,11 @@ impl MessagingUI {
     pub fn new(width : i32, height : i32) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
-            input_field: vec![Box::new(TextField::new(width))],
+            input_field: TextField::new(width),
+            exit_dialogue: None,
             width: width,
             height: height,
-            nicks: Rc::new(Trie::new()),
+            nicks: Trie::new(),
             current_nick: None,
             draw_current_nick: true,
             last_activity_line: None,
@@ -101,6 +102,15 @@ impl MessagingUI {
 
     pub fn get_nick(&self) -> Option<Rc<String>> {
         self.current_nick.clone()
+    }
+
+    fn draw_input_field(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+        match self.exit_dialogue {
+            Some(ref exit_dialogue) =>
+                exit_dialogue.draw(tb, colors, pos_x, pos_y),
+            None =>
+                self.input_field.draw(tb, colors, pos_x, pos_y)
+        }
     }
 
     pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
@@ -123,15 +133,15 @@ impl MessagingUI {
                     ':',
                     colors.user_msg.fg | config::TB_BOLD,
                     colors.user_msg.bg);
-                self.input_field.draw(
+                self.draw_input_field(
                     tb, colors,
                     pos_x + nick.len() as i32 + 2,
                     pos_y + self.height - 1);
             } else {
-                self.input_field.draw(tb, colors, pos_x, pos_y + self.height - 1);
+                self.draw_input_field(tb, colors, pos_x, pos_y + self.height - 1);
             }
         } else {
-            self.input_field.draw(tb, colors, pos_x, pos_y + self.height - 1);
+            self.draw_input_field(tb, colors, pos_x, pos_y + self.height - 1);
         }
     }
 
@@ -173,7 +183,9 @@ impl MessagingUI {
             },
 
             Key::Tab => {
-                self.input_field.event(Box::new(self.nicks.clone()));
+                if self.exit_dialogue.is_none() {
+                    self.input_field.autocomplete(&self.nicks);
+                }
                 WidgetRet::KeyHandled
             },
 
@@ -188,12 +200,19 @@ impl MessagingUI {
             },
 
             key => {
-                match self.input_field.keypressed(key) {
-                    WidgetRet::Remove => {
-                        self.input_field.pop();
-                        WidgetRet::KeyHandled
-                    },
-                    ret => ret,
+                let ret = {
+                    if let Some(ref exit_dialogue) = self.exit_dialogue.as_ref() {
+                        exit_dialogue.keypressed(key)
+                    } else {
+                        self.input_field.keypressed(key)
+                    }
+                };
+
+                if let WidgetRet::Remove = ret {
+                    self.exit_dialogue = None;
+                    WidgetRet::KeyHandled
+                } else {
+                    ret
                 }
             },
         }
@@ -218,24 +237,20 @@ impl MessagingUI {
         let widget_width =
             if self.draw_current_nick { width - nick_width } else { width };
 
-        for w in &mut self.input_field {
-            w.resize(widget_width, 1);
+        self.input_field.resize(widget_width);
+        for exit_dialogue in &mut self.exit_dialogue {
+            exit_dialogue.resize(widget_width);
         }
     }
 
-    pub fn get_nicks(&self) -> Rc<Trie> {
-        self.nicks.clone()
+    pub fn get_nicks(&self) -> &Trie {
+        &self.nicks
     }
 
     fn toggle_exit_dialogue(&mut self) {
-        assert!(self.input_field.len() > 0);
-        // FIXME: This is a bit too fragile I think. Since we only stack an exit
-        // dialogue on top of the input field at the moment, checking the len()
-        // is fine. If we decide to stack more stuff it'll break.
-        if self.input_field.len() == 1 {
-            self.input_field.push(Box::new(ExitDialogue::new(self.width)));
-        } else {
-            self.input_field.pop();
+        let exit_dialogue = ::std::mem::replace(&mut self.exit_dialogue, None);
+        if let None = exit_dialogue {
+            self.exit_dialogue = Some(ExitDialogue::new(self.width));
         }
     }
 }
@@ -345,11 +360,11 @@ impl MessagingUI {
 
 impl MessagingUI {
     pub fn clear_nicks(&mut self) {
-        Rc::get_mut(&mut self.nicks).unwrap().clear();
+        self.nicks.clear();
     }
 
     pub fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
-        Rc::get_mut(&mut self.nicks).unwrap().insert(nick);
+        self.nicks.insert(nick);
 
         if let Some(ts) = ts {
             let line_idx = self.get_activity_line_idx(ts);
@@ -364,7 +379,7 @@ impl MessagingUI {
     }
 
     pub fn part(&mut self, nick: &str, ts: Option<Timestamp>) {
-        Rc::get_mut(&mut self.nicks).unwrap().remove(nick);
+        self.nicks.remove(nick);
 
         if let Some(ts) = ts {
             let line_idx = self.get_activity_line_idx(ts);
@@ -379,8 +394,8 @@ impl MessagingUI {
     }
 
     pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
-        Rc::get_mut(&mut self.nicks).unwrap().remove(old_nick);
-        Rc::get_mut(&mut self.nicks).unwrap().insert(new_nick);
+        self.nicks.remove(old_nick);
+        self.nicks.insert(new_nick);
 
         let line_idx = self.get_activity_line_idx(ts);
         self.msg_area.modify_line(line_idx, |line| {

@@ -2,9 +2,7 @@ use term_input::Key;
 use termbox_simple::Termbox;
 
 use config::Colors;
-use tui::widget::{WidgetRet, Widget};
-
-use std::any::Any;
+use tui::widget::WidgetRet;
 
 pub struct ExitDialogue {
     width : i32,
@@ -20,12 +18,12 @@ impl ExitDialogue {
 
 static MSG : &'static str = "Really quit?";
 
-impl Widget for ExitDialogue {
-    fn resize(&mut self, width: i32, _: i32) {
+impl ExitDialogue {
+    pub fn resize(&mut self, width: i32) {
         self.width = width;
     }
 
-    fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         tb.hide_cursor();
 
         let mut col = 0;
@@ -42,14 +40,10 @@ impl Widget for ExitDialogue {
         }
     }
 
-    fn keypressed(&mut self, key: Key) -> WidgetRet {
+    pub fn keypressed(&self, key: Key) -> WidgetRet {
         match key {
             Key::Char('y') | Key::Enter => WidgetRet::Abort,
             _ => WidgetRet::Remove,
         }
-    }
-
-    fn event(&mut self, _: Box<Any>) -> WidgetRet {
-        WidgetRet::KeyIgnored
     }
 }

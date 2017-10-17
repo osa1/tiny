@@ -322,7 +322,7 @@ impl Tabbed {
         }
     }
 
-    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<Rc<Trie>> {
+    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
         match self.find_chan_tab_idx(serv_name, chan_name) {
             None => None,
             Some(i) => Some(self.tabs[i].widget.get_nicks())

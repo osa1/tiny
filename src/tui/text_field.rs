@@ -1,7 +1,5 @@
-use std::any::Any;
 use std::cmp::{max, min};
 use std::mem;
-use std::rc::Rc;
 
 use term_input::{Key, Arrow};
 use termbox_simple::Termbox;
@@ -9,7 +7,7 @@ use termbox_simple::Termbox;
 use config::Colors;
 use trie::Trie;
 use tui::termbox;
-use tui::widget::{WidgetRet, Widget};
+use tui::widget::WidgetRet;
 use utils;
 
 // TODO: Make these settings
@@ -66,12 +64,12 @@ impl TextField {
         }
     }
 
-    pub fn resize_(&mut self, width : i32, _ : i32) {
+    pub fn resize(&mut self, width: i32) {
         self.width = width;
         self.move_cursor_to_end();
     }
 
-    pub fn draw_(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         match self.mode {
             Mode::Edit => {
                 draw_line(tb, colors,
@@ -124,7 +122,7 @@ impl TextField {
         }
     }
 
-    pub fn keypressed_(&mut self, key : Key) -> WidgetRet {
+    pub fn keypressed(&mut self, key : Key) -> WidgetRet {
         match key {
             Key::Char(ch) => {
                 self.modify();
@@ -495,68 +493,48 @@ fn draw_line(tb: &mut Termbox, colors: &Colors,
     tb.set_cursor(pos_x + cursor - scroll, pos_y);
 }
 
-impl Widget for TextField {
-    fn resize(&mut self, width : i32, height : i32) {
-        self.resize_(width, height);
-    }
+impl TextField {
+    pub fn autocomplete(&mut self, dict: &Trie) {
+        if self.in_autocomplete() {
+            // AWFUL CODE YO
+            self.keypressed(Key::Arrow(Arrow::Up));
+            return;
+        }
 
-    fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
-        self.draw_(tb, colors, pos_x, pos_y);
-    }
+        let cursor_right = self.cursor;
+        let mut cursor_left = max(0, cursor_right - 1);
 
-    fn keypressed(&mut self, key : Key) -> WidgetRet {
-        self.keypressed_(key)
-    }
+        let completions = {
+            let line = self.shown_line();
 
-    // fn autocomplete(&mut self, dict : &Trie) {
-    fn event(&mut self, ev: Box<Any>) -> WidgetRet {
-        match ev.downcast_ref::<Rc<Trie>>() {
-            None => WidgetRet::KeyIgnored,
-            Some(dict) => {
-                if self.in_autocomplete() {
-                    // AWFUL CODE YO
-                    self.keypressed(Key::Arrow(Arrow::Up));
-                    return WidgetRet::KeyHandled;
+            while cursor_left >= 0
+                && line.get(cursor_left as usize).map(|c| is_nick_char(*c)).unwrap_or(false) {
+                    cursor_left -= 1;
                 }
 
-                let cursor_right = self.cursor;
-                let mut cursor_left = max(0, cursor_right - 1);
-
-                let completions = {
-                    let line = self.shown_line();
-
-                    while cursor_left >= 0
-                        && line.get(cursor_left as usize).map(|c| is_nick_char(*c)).unwrap_or(false) {
-                            cursor_left -= 1;
-                        }
-
-                    let word = {
-                        if cursor_left == cursor_right {
-                            &[]
-                        } else {
-                            cursor_left += 1;
-                            &line[ (cursor_left as usize) .. (cursor_right as usize) ]
-                        }
-                    };
-
-                    dict.drop_pfx(&mut word.iter().cloned())
-                };
-
-                if !completions.is_empty() {
-                    let completion_len = completions[0].len();
-                    self.mode = Mode::Autocomplete {
-                        original_buffer: self.shown_line().to_owned(),
-                        insertion_point: self.cursor as usize,
-                        word_starts: cursor_left as usize,
-                        completions: completions,
-                        current_completion: 0,
-                    };
-                    let cursor = self.cursor;
-                    self.move_cursor(cursor + completion_len as i32);
+            let word = {
+                if cursor_left == cursor_right {
+                    &[]
+                } else {
+                    cursor_left += 1;
+                    &line[ (cursor_left as usize) .. (cursor_right as usize) ]
                 }
+            };
 
-                WidgetRet::KeyHandled
-            }
+            dict.drop_pfx(&mut word.iter().cloned())
+        };
+
+        if !completions.is_empty() {
+            let completion_len = completions[0].len();
+            self.mode = Mode::Autocomplete {
+                original_buffer: self.shown_line().to_owned(),
+                insertion_point: self.cursor as usize,
+                word_starts: cursor_left as usize,
+                completions: completions,
+                current_completion: 0,
+            };
+            let cursor = self.cursor;
+            self.move_cursor(cursor + completion_len as i32);
         }
     }
 }
