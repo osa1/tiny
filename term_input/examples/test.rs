@@ -44,16 +44,18 @@ fn main() {
     let mut events = Events::with_capacity(10);
     'mainloop:
     loop {
-        match poll.poll(&mut events, None) {
-            Err(_) => {}
-            Ok(_) => {
-                input.read_input_events(&mut evs);
-                println!("{:?}", evs);
-                for ev in evs.iter() {
-                    if ev == &Event::Key(Key::Esc) {
-                        break 'mainloop;
-                    }
-                }
+        let _poll_ret = poll.poll(&mut events, None);
+        // println!("poll ret: {:?}", _poll_ret);
+
+        // Err: probably SIGWINCH
+        // Ok: stdin available
+        //
+        // there are events to handle either way
+        input.read_input_events(&mut evs);
+        println!("{:?}", evs);
+        for ev in evs.iter() {
+            if ev == &Event::Key(Key::Esc) {
+                break 'mainloop;
             }
         }
     }
