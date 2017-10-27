@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 use std::mem;
 
-use term_input::{Key, Arrow};
+use term_input::{Arrow, Key};
 use termbox_simple::Termbox;
 
 use config::Colors;
@@ -11,28 +11,28 @@ use tui::widget::WidgetRet;
 use utils;
 
 // TODO: Make these settings
-const SCROLLOFF : i32 = 5;
-const HIST_SIZE : usize = 30;
+const SCROLLOFF: i32 = 5;
+const HIST_SIZE: usize = 30;
 
 pub struct TextField {
     /// The message that's currently being edited (not yet sent)
-    buffer : Vec<char>,
+    buffer: Vec<char>,
 
     /// Cursor in currently shown line
-    cursor : i32,
+    cursor: i32,
 
     /// Horizontal scroll
-    scroll : i32,
+    scroll: i32,
 
     /// Width of the widget
-    width : i32,
+    width: i32,
 
     /// A history of sent messages/commands. Once added messages are never
     /// modified. A modification attempt should result in a new buffer with a
     /// copy of the vector in history. (old contents of the buffer will be lost)
-    history : Vec<Vec<char>>,
+    history: Vec<Vec<char>>,
 
-    mode : Mode,
+    mode: Mode,
 }
 
 enum Mode {
@@ -49,11 +49,11 @@ enum Mode {
         word_starts: usize,
         completions: Vec<String>,
         current_completion: usize,
-    }
+    },
 }
 
 impl TextField {
-    pub fn new(width : i32) -> TextField {
+    pub fn new(width: i32) -> TextField {
         TextField {
             buffer: Vec::with_capacity(512),
             cursor: 0,
@@ -72,29 +72,51 @@ impl TextField {
     pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         match self.mode {
             Mode::Edit => {
-                draw_line(tb, colors,
-                          &self.buffer, pos_x, pos_y, self.scroll, self.width, self.cursor);
-            },
+                draw_line(
+                    tb,
+                    colors,
+                    &self.buffer,
+                    pos_x,
+                    pos_y,
+                    self.scroll,
+                    self.width,
+                    self.cursor,
+                );
+            }
             Mode::History(hist_curs) => {
-                draw_line(tb, colors,
-                          &self.history[hist_curs as usize],
-                          pos_x, pos_y, self.scroll, self.width, self.cursor);
-            },
+                draw_line(
+                    tb,
+                    colors,
+                    &self.history[hist_curs as usize],
+                    pos_x,
+                    pos_y,
+                    self.scroll,
+                    self.width,
+                    self.cursor,
+                );
+            }
             Mode::Autocomplete {
-                ref original_buffer, insertion_point, word_starts,
-                ref completions, current_completion
+                ref original_buffer,
+                insertion_point,
+                word_starts,
+                ref completions,
+                current_completion,
             } => {
                 // draw a placeholder for the cursor
-                tb.change_cell(pos_x + self.cursor - self.scroll, pos_y,
-                               ' ',
-                               colors.user_msg.fg, colors.user_msg.bg);
+                tb.change_cell(
+                    pos_x + self.cursor - self.scroll,
+                    pos_y,
+                    ' ',
+                    colors.user_msg.fg,
+                    colors.user_msg.bg,
+                );
 
-                let completion : &str = &completions[current_completion];
+                let completion: &str = &completions[current_completion];
 
                 let mut orig_buf_iter = original_buffer.iter().cloned();
                 let mut completion_iter = completion.chars();
 
-                let iter : utils::InsertIterator<char> =
+                let iter: utils::InsertIterator<char> =
                     utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
 
                 for (char_idx, char) in iter.enumerate() {
@@ -103,33 +125,40 @@ impl TextField {
                     }
 
                     if char_idx >= self.scroll as usize {
-                        if char_idx >= word_starts &&
-                                char_idx < insertion_point + completion.len() {
-                            tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
-                                           char,
-                                           colors.completion.fg, colors.completion.bg);
+                        if char_idx >= word_starts && char_idx < insertion_point + completion.len()
+                        {
+                            tb.change_cell(
+                                pos_x + (char_idx as i32) - self.scroll,
+                                pos_y,
+                                char,
+                                colors.completion.fg,
+                                colors.completion.bg,
+                            );
                         } else {
-                            tb.change_cell(pos_x + (char_idx as i32) - self.scroll, pos_y,
-                                           char,
-                                           colors.user_msg.fg, colors.user_msg.bg);
+                            tb.change_cell(
+                                pos_x + (char_idx as i32) - self.scroll,
+                                pos_y,
+                                char,
+                                colors.user_msg.fg,
+                                colors.user_msg.bg,
+                            );
                         }
-
                     }
                 }
 
                 tb.set_cursor(pos_x + self.cursor - self.scroll, pos_y);
-            },
+            }
         }
     }
 
-    pub fn keypressed(&mut self, key : Key) -> WidgetRet {
+    pub fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
             Key::Char(ch) => {
                 self.modify();
                 self.buffer.insert(self.cursor as usize, ch);
                 self.inc_cursor();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::Backspace => {
                 if self.cursor > 0 {
@@ -138,48 +167,39 @@ impl TextField {
                     self.dec_cursor();
                 }
                 WidgetRet::KeyHandled
-            },
+            }
 
-            Key::Ctrl(ch) => {
+            Key::Ctrl(ch) =>
                 if ch == 'a' {
                     self.move_cursor(0);
                     WidgetRet::KeyHandled
-                }
-
-                else if ch == 'e' {
+                } else if ch == 'e' {
                     self.move_cursor_to_end();
                     WidgetRet::KeyHandled
-                }
-
-                else if ch == 'k' {
+                } else if ch == 'k' {
                     if self.cursor != self.line_len() {
                         self.modify();
-                        self.buffer.drain(self.cursor as usize ..);
+                        self.buffer.drain(self.cursor as usize..);
                     }
                     WidgetRet::KeyHandled
-                }
-
-                else if ch == 'w' {
+                } else if ch == 'w' {
                     self.consume_word_before_curs();
                     WidgetRet::KeyHandled
-                }
-
-                else {
+                } else {
                     WidgetRet::KeyIgnored
-                }
-            },
+                },
 
             Key::Arrow(Arrow::Left) => {
                 self.dec_cursor();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::Arrow(Arrow::Right) => {
                 self.inc_cursor();
                 WidgetRet::KeyHandled
-            },
+            }
 
-            Key::Enter => {
+            Key::Enter =>
                 if self.line_len() > 0 {
                     self.modify();
 
@@ -198,8 +218,7 @@ impl TextField {
                     WidgetRet::Input(ret)
                 } else {
                     WidgetRet::KeyHandled
-                }
-            },
+                },
 
             Key::CtrlArrow(Arrow::Left) => {
                 if self.cursor > 0 {
@@ -243,34 +262,39 @@ impl TextField {
 
             ////////////////////////////////////////////////////////////////////
             // Scrolling in history or autocompletion list
-
             Key::Arrow(Arrow::Up) => {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit => {
+                    Mode::Edit =>
                         if !self.history.is_empty() {
                             self.mode = Mode::History((self.history.len() as i32) - 1);
                             self.move_cursor_to_end();
-                        }
-                    },
+                        },
                     Mode::History(hist_curs) => {
-                        self.mode = Mode::History(
-                            if hist_curs > 0 { hist_curs - 1 } else { hist_curs });
+                        self.mode = Mode::History(if hist_curs > 0 {
+                            hist_curs - 1
+                        } else {
+                            hist_curs
+                        });
                         self.move_cursor_to_end();
-                    },
+                    }
                     Mode::Autocomplete {
-                        original_buffer, insertion_point,
-                        word_starts, completions, current_completion, ..
+                        original_buffer,
+                        insertion_point,
+                        word_starts,
+                        completions,
+                        current_completion,
+                        ..
                     } => {
-                        let current_completion =
-                            if current_completion == completions.len() - 1 {
-                                0
-                            } else {
-                                current_completion + 1
-                            };
+                        let current_completion = if current_completion == completions.len() - 1 {
+                            0
+                        } else {
+                            current_completion + 1
+                        };
 
-                        let cursor = (insertion_point + completions[current_completion].len()) as i32;
+                        let cursor =
+                            (insertion_point + completions[current_completion].len()) as i32;
 
                         self.mode = Mode::Autocomplete {
                             original_buffer: original_buffer,
@@ -281,17 +305,18 @@ impl TextField {
                         };
 
                         self.move_cursor(cursor);
-                    },
+                    }
                 }
 
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::Arrow(Arrow::Down) => {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit => {},
+                    Mode::Edit =>
+                        {}
                     Mode::History(hist_curs) => {
                         if hist_curs != (self.history.len() - 1) as i32 {
                             self.mode = Mode::History(hist_curs + 1);
@@ -299,19 +324,23 @@ impl TextField {
                             self.mode = Mode::Edit;
                         }
                         self.move_cursor_to_end();
-                    },
+                    }
                     Mode::Autocomplete {
-                        original_buffer, insertion_point,
-                        word_starts, completions, current_completion, ..
+                        original_buffer,
+                        insertion_point,
+                        word_starts,
+                        completions,
+                        current_completion,
+                        ..
                     } => {
-                        let current_completion =
-                            if current_completion == 0 {
-                                completions.len() - 1
-                            } else {
-                                current_completion - 1
-                            };
+                        let current_completion = if current_completion == 0 {
+                            completions.len() - 1
+                        } else {
+                            current_completion - 1
+                        };
 
-                        let cursor = (insertion_point + completions[current_completion].len()) as i32;
+                        let cursor =
+                            (insertion_point + completions[current_completion].len()) as i32;
 
                         self.mode = Mode::Autocomplete {
                             original_buffer: original_buffer,
@@ -322,15 +351,15 @@ impl TextField {
                         };
 
                         self.move_cursor(cursor);
-                    },
+                    }
                 }
 
                 WidgetRet::KeyHandled
-            },
+            }
 
             ////////////////////////////////////////////////////////////////////
-
-            _ => WidgetRet::KeyIgnored,
+            _ =>
+                WidgetRet::KeyIgnored,
         }
     }
 
@@ -352,7 +381,8 @@ impl TextField {
             let char = self.buffer[(self.cursor - 1) as usize];
             if char.is_alphanumeric() {
                 self.consume_before(char::is_alphanumeric);
-            } else if self.cursor != 0 { // consume at least one char
+            } else if self.cursor != 0 {
+                // consume at least one char
                 let cursor = self.cursor;
                 self.buffer.remove(cursor as usize - 1);
                 self.move_cursor(cursor - 1);
@@ -360,35 +390,42 @@ impl TextField {
         }
     }
 
-    fn consume_before<F>(&mut self, f : F) where F : Fn(char) -> bool {
+    fn consume_before<F>(&mut self, f: F)
+    where
+        F: Fn(char) -> bool,
+    {
         let end_range = self.cursor as usize;
         let mut begin_range = self.cursor - 1;
         while begin_range >= 0 && f(self.buffer[begin_range as usize]) {
             begin_range -= 1;
         }
-        self.buffer.drain(((begin_range + 1) as usize) .. end_range);
+        self.buffer.drain(((begin_range + 1) as usize)..end_range);
         self.move_cursor(begin_range + 1);
     }
 
     // Ignoring auto-completions
     fn shown_line(&self) -> &Vec<char> {
         match self.mode {
-            Mode::Edit | Mode::Autocomplete { .. } => &self.buffer,
-            Mode::History(hist_curs) => &self.history[hist_curs as usize],
+            Mode::Edit | Mode::Autocomplete { .. } =>
+                &self.buffer,
+            Mode::History(hist_curs) =>
+                &self.history[hist_curs as usize],
         }
     }
 
     fn line_len(&self) -> i32 {
         match self.mode {
-            Mode::Edit => {
-                self.buffer.len() as i32
-            },
-            Mode::History(hist_curs) => {
-                self.history[hist_curs as usize].len() as i32
-            },
-            Mode::Autocomplete { ref original_buffer, ref completions, current_completion, .. } => {
-                (original_buffer.len() + completions[current_completion].len()) as i32
-            },
+            Mode::Edit =>
+                self.buffer.len() as i32,
+            Mode::History(hist_curs) =>
+                self.history[hist_curs as usize].len() as i32,
+            Mode::Autocomplete {
+                ref original_buffer,
+                ref completions,
+                current_completion,
+                ..
+            } =>
+                (original_buffer.len() + completions[current_completion].len()) as i32,
         }
     }
 
@@ -396,18 +433,22 @@ impl TextField {
 
     fn in_autocomplete(&self) -> bool {
         match self.mode {
-            Mode::Autocomplete { .. } => true,
-            _ => false
+            Mode::Autocomplete { .. } =>
+                true,
+            _ =>
+                false,
         }
     }
 
     fn modify(&mut self) {
         match self.mode {
-            Mode::Edit => {},
+            Mode::Edit =>
+                {}
             Mode::History(hist_idx) => {
                 self.buffer.clear();
-                self.buffer.extend_from_slice(&self.history[hist_idx as usize]);
-            },
+                self.buffer
+                    .extend_from_slice(&self.history[hist_idx as usize]);
+            }
             Mode::Autocomplete {
                 ref mut original_buffer,
                 mut insertion_point,
@@ -415,8 +456,8 @@ impl TextField {
                 current_completion,
                 ..
             } => {
-                let mut buffer  : Vec<char>   = mem::replace(original_buffer, vec![]);
-                let completions : Vec<String> = mem::replace(completions, vec![]);
+                let mut buffer: Vec<char> = mem::replace(original_buffer, vec![]);
+                let completions: Vec<String> = mem::replace(completions, vec![]);
                 let word = &completions[current_completion];
 
                 // FIXME: This is inefficient
@@ -450,45 +491,63 @@ impl TextField {
         self.move_cursor(cursor);
     }
 
-    fn move_cursor(&mut self, cursor : i32) {
+    fn move_cursor(&mut self, cursor: i32) {
         assert!(cursor >= 0 && cursor <= self.line_len());
         self.cursor = cursor;
 
         if self.line_len() + 1 < self.width {
             self.scroll = 0;
         } else {
-            let scrolloff = { if self.width < 2 * SCROLLOFF + 1 { 0 } else { SCROLLOFF } };
+            let scrolloff = {
+                if self.width < 2 * SCROLLOFF + 1 {
+                    0
+                } else {
+                    SCROLLOFF
+                }
+            };
 
-            let left_end  = self.scroll;
+            let left_end = self.scroll;
             let right_end = self.scroll + self.width;
 
             if cursor - scrolloff < left_end {
                 self.scroll = max(0, cursor - scrolloff);
             } else if cursor + scrolloff >= right_end {
-                self.scroll = min(// +1 because cursor should be visible, i.e.
-                                  // right_end > cursor should hold after this
-                                  max(0, cursor + 1 + scrolloff - self.width),
-                                  // +1 because cursor goes one more character
-                                  // after the buffer, to be able to add chars
-                                  max(0, self.line_len() + 1 - self.width));
+                self.scroll = min(
+                    // +1 because cursor should be visible, i.e.
+                    // right_end > cursor should hold after this
+                    max(0, cursor + 1 + scrolloff - self.width),
+                    // +1 because cursor goes one more character
+                    // after the buffer, to be able to add chars
+                    max(0, self.line_len() + 1 - self.width),
+                );
             }
         }
     }
 }
 
-fn draw_line(tb: &mut Termbox, colors: &Colors,
-             line: &[char], pos_x: i32, pos_y: i32, scroll: i32, width: i32, cursor: i32)
-{
-    let slice: &[char] =
-        &line[ scroll as usize .. min(line.len(), (scroll + width) as usize) ];
+fn draw_line(
+    tb: &mut Termbox,
+    colors: &Colors,
+    line: &[char],
+    pos_x: i32,
+    pos_y: i32,
+    scroll: i32,
+    width: i32,
+    cursor: i32,
+) {
+    let slice: &[char] = &line[scroll as usize..min(line.len(), (scroll + width) as usize)];
     termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().cloned());
 
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
-        tb.change_cell(pos_x + cursor - scroll, pos_y,
-                       ' ',
-                       colors.cursor.fg, colors.cursor.bg);
+        tb.change_cell(
+            pos_x + cursor - scroll,
+            pos_y,
+            ' ',
+            colors.cursor.fg,
+            colors.cursor.bg,
+        );
     }
     tb.set_cursor(pos_x + cursor - scroll, pos_y);
 }
@@ -508,16 +567,19 @@ impl TextField {
             let line = self.shown_line();
 
             while cursor_left >= 0
-                && line.get(cursor_left as usize).map(|c| is_nick_char(*c)).unwrap_or(false) {
-                    cursor_left -= 1;
-                }
+                && line.get(cursor_left as usize)
+                    .map(|c| is_nick_char(*c))
+                    .unwrap_or(false)
+            {
+                cursor_left -= 1;
+            }
 
             let word = {
                 if cursor_left == cursor_right {
                     &[]
                 } else {
                     cursor_left += 1;
-                    &line[ (cursor_left as usize) .. (cursor_right as usize) ]
+                    &line[(cursor_left as usize)..(cursor_right as usize)]
                 }
             };
 
@@ -548,9 +610,7 @@ fn is_nick_char(c: char) -> bool {
     //
     // we use a simpler check here (allows strictly more nicks)
 
-    c.is_alphanumeric() ||
-        (c as i32 >= 0x5B && c as i32 <= 0x60) ||
-        (c as i32 >= 0x7B && c as i32 <= 0x7D) ||
-        c == '-' // not valid according to RFC 2812 but servers accept it and I've seen nicks with
-                 // this char in the wild
+    c.is_alphanumeric() || (c as i32 >= 0x5B && c as i32 <= 0x60)
+        || (c as i32 >= 0x7B && c as i32 <= 0x7D) || c == '-' // not valid according to RFC 2812 but servers accept it and I've seen nicks with
+                                                              // this char in the wild
 }

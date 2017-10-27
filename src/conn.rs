@@ -100,9 +100,7 @@ enum ConnStatus {
         /// move to `PingPong` state. On timeout we reset the connection.
         ticks_passed: u8,
     },
-    Disconnected {
-        ticks_passed: u8,
-    },
+    Disconnected { ticks_passed: u8 },
 }
 
 #[derive(Debug)]
@@ -134,21 +132,19 @@ fn init_stream(serv_addr: &str, serv_port: u16) -> TcpStream {
     // FIXME: This part is really horrible. No way to report errors. The `Conn`
     // will just try to reconnect in case of an error.
     match (serv_addr, serv_port).to_socket_addrs() {
-        Err(_) => {
-            mk_useless_stream()
-        },
+        Err(_) =>
+            mk_useless_stream(),
         Ok(mut addr_iter) => {
             match addr_iter.next() {
-                None => {
-                    mk_useless_stream()
-                }
+                None =>
+                    mk_useless_stream(),
                 Some(SocketAddr::V4(addr)) => {
                     let stream = TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap();
                     stream.set_nonblocking(true).unwrap();
                     // This will fail with EINPROGRESS
                     let _ = stream.connect(SocketAddr::V4(addr));
                     stream
-                },
+                }
                 Some(SocketAddr::V6(addr)) => {
                     let stream = TcpBuilder::new_v6().unwrap().to_tcp_stream().unwrap();
                     stream.set_nonblocking(true).unwrap();
@@ -168,7 +164,8 @@ fn reregister_for_rw(poll: &Poll, fd: RawFd) {
         &EventedFd(&fd),
         Token(fd as usize),
         Ready::readable() | Ready::writable(),
-        PollOpt::level());
+        PollOpt::level(),
+    );
 }
 
 fn reregister_for_r(poll: &Poll, fd: RawFd) {
@@ -178,7 +175,8 @@ fn reregister_for_r(poll: &Poll, fd: RawFd) {
         &EventedFd(&fd),
         Token(fd as usize),
         Ready::readable(),
-        PollOpt::level());
+        PollOpt::level(),
+    );
 }
 
 impl<'poll> Conn<'poll> {
@@ -232,11 +230,14 @@ impl<'poll> Conn<'poll> {
     /// Register self to the Poll for read events.
     fn register_for_r(&self) {
         let fd = self.get_raw_fd();
-        self.poll.register(
-            &EventedFd(&fd),
-            Token(fd as usize),
-            Ready::readable(),
-            PollOpt::level()).unwrap();
+        self.poll
+            .register(
+                &EventedFd(&fd),
+                Token(fd as usize),
+                Ready::readable(),
+                PollOpt::level(),
+            )
+            .unwrap();
     }
 
     /// Re-register self to the Poll for read events.
@@ -309,42 +310,46 @@ impl<'poll> Conn<'poll> {
 }
 
 impl<'poll> Conn<'poll> {
-
     ////////////////////////////////////////////////////////////////////////////
     // Tick handling
 
     pub fn tick(&mut self, evs: &mut Vec<ConnEv>, mut debug_out: LogFile) {
         match self.status {
-            ConnStatus::Introduce => {},
-            ConnStatus::PingPong { ticks_passed } => {
+            ConnStatus::Introduce =>
+                {}
+            ConnStatus::PingPong { ticks_passed } =>
                 if ticks_passed + 1 == PING_TICKS {
                     match self.servername {
                         None => {
-                            debug_out.write_line(
-                                format_args!("{}: Can't send PING, servername unknown",
-                                             self.serv_addr));
+                            debug_out.write_line(format_args!(
+                                "{}: Can't send PING, servername unknown",
+                                self.serv_addr
+                            ));
                         }
                         Some(ref host_) => {
-                            debug_out.write_line(
-                                format_args!("{}: Ping timeout, sending PING",
-                                             self.serv_addr));
+                            debug_out.write_line(format_args!(
+                                "{}: Ping timeout, sending PING",
+                                self.serv_addr
+                            ));
                             wire::ping(&mut self.out_buf, host_).unwrap();
                             reregister_for_rw(self.poll, self.get_raw_fd());
                         }
                     }
                     self.status = ConnStatus::WaitPong { ticks_passed: 0 };
                 } else {
-                    self.status = ConnStatus::PingPong { ticks_passed: ticks_passed + 1 };
-                }
-            }
-            ConnStatus::WaitPong { ticks_passed } => {
+                    self.status = ConnStatus::PingPong {
+                        ticks_passed: ticks_passed + 1,
+                    };
+                },
+            ConnStatus::WaitPong { ticks_passed } =>
                 if ticks_passed + 1 == PONG_TICKS {
                     evs.push(ConnEv::Disconnected);
                     self.enter_disconnect_state();
                 } else {
-                    self.status = ConnStatus::WaitPong { ticks_passed: ticks_passed + 1 };
-                }
-            }
+                    self.status = ConnStatus::WaitPong {
+                        ticks_passed: ticks_passed + 1,
+                    };
+                },
             ConnStatus::Disconnected { ticks_passed } => {
                 if ticks_passed + 1 == RECONNECT_TICKS {
                     // *sigh* it's slightly annoying that we can't reconnect here, we need to
@@ -352,7 +357,9 @@ impl<'poll> Conn<'poll> {
                     evs.push(ConnEv::WantReconnect);
                     self.reset_nick();
                 }
-                self.status = ConnStatus::Disconnected { ticks_passed: ticks_passed + 1 };
+                self.status = ConnStatus::Disconnected {
+                    ticks_passed: ticks_passed + 1,
+                };
             }
         }
     }
@@ -364,8 +371,11 @@ impl<'poll> Conn<'poll> {
 
     fn reset_ticks(&mut self) {
         match self.status {
-            ConnStatus::Introduce => {},
-            _ => { self.status = ConnStatus::PingPong { ticks_passed: 0 }; }
+            ConnStatus::Introduce =>
+                {}
+            _ => {
+                self.status = ConnStatus::PingPong { ticks_passed: 0 };
+            }
         }
     }
 
@@ -386,20 +396,20 @@ impl<'poll> Conn<'poll> {
         // Max msg len calculation adapted from hexchat
         // (src/common/outbound.c:split_up_text)
         let mut max: i32 = 512; // RFC 2812
-        max -= 3;               // :, !, @
-        max -= 13;              // " PRIVMSG ", " ", :, \r, \n
+        max -= 3; // :, !, @
+        max -= 13; // " PRIVMSG ", " ", :, \r, \n
         max -= self.get_nick().len() as i32;
         max -= target.len() as i32;
         match self.usermask {
             None => {
-                max -= 9;  // max username
+                max -= 9; // max username
                 max -= 64; // max possible hostname (63) + '@'
                            // NOTE(osa): I think hexchat has an error here, it
                            // uses 65
-            },
+            }
             Some(ref usermask) => {
                 max -= usermask.len() as i32;
-            },
+            }
         }
 
         assert!(max > 0);
@@ -443,7 +453,7 @@ impl<'poll> Conn<'poll> {
                 evs.push(ConnEv::Err(err));
             }
             Ok(bytes_sent) => {
-                self.out_buf.drain(0 .. bytes_sent);
+                self.out_buf.drain(0..bytes_sent);
                 if self.out_buf.is_empty() {
                     self.reregister_for_r();
                 }
@@ -464,7 +474,7 @@ impl<'poll> Conn<'poll> {
             }
             Ok(bytes_read) => {
                 self.reset_ticks();
-                self.in_buf.extend(&read_buf[ 0 .. bytes_read ]);
+                self.in_buf.extend(&read_buf[0..bytes_read]);
                 self.handle_msgs(evs, logger);
                 if bytes_read == 0 {
                     evs.push(ConnEv::Disconnected);
@@ -475,15 +485,20 @@ impl<'poll> Conn<'poll> {
     }
 
     fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
-        while let Some(msg) = Msg::read(&mut self.in_buf,
-                                        Some(logger.get_raw_serv_logs(&self.serv_addr)))
-        {
+        while let Some(msg) = Msg::read(
+            &mut self.in_buf,
+            Some(logger.get_raw_serv_logs(&self.serv_addr)),
+        ) {
             self.handle_msg(msg, evs, logger);
         }
     }
 
     fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
-        if let Msg { cmd: Cmd::PING { ref server }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::PING { ref server },
+            ..
+        } = msg
+        {
             wire::pong(&mut self.out_buf, server).unwrap();
             self.reregister_for_rw();
         }
@@ -494,26 +509,47 @@ impl<'poll> Conn<'poll> {
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
-        if let Msg { cmd: Cmd::JOIN { .. }, pfx: Some(Pfx::User { ref nick, ref user }) } = msg {
+        if let Msg {
+            cmd: Cmd::JOIN { .. },
+            pfx: Some(Pfx::User { ref nick, ref user }),
+        } = msg
+        {
             if nick == self.get_nick() {
                 let usermask = format!("{}!{}", nick, user);
-                logger.get_debug_logs().write_line(
-                    format_args!("usermask set: {}", usermask));
+                logger
+                    .get_debug_logs()
+                    .write_line(format_args!("usermask set: {}", usermask));
                 self.usermask = Some(usermask);
             }
         }
 
-        if let Msg { cmd: Cmd::Reply { num: 396, ref params }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::Reply {
+                num: 396,
+                ref params,
+            },
+            ..
+        } = msg
+        {
             // :hobana.freenode.net 396 osa1 haskell/developer/osa1
             // :is now your hidden host (set by services.)
             if params.len() == 3 {
                 let usermask = format!("{}!~{}@{}", self.get_nick(), self.hostname, params[1]);
-                logger.get_debug_logs().write_line(format_args!("usermask set: {}", usermask));
+                logger
+                    .get_debug_logs()
+                    .write_line(format_args!("usermask set: {}", usermask));
                 self.usermask = Some(usermask);
             }
         }
 
-        if let Msg { cmd: Cmd::Reply { num: 302, ref params }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::Reply {
+                num: 302,
+                ref params,
+            },
+            ..
+        } = msg
+        {
             // 302 RPL_USERHOST
             // :ircd.stealth.net 302 yournick :syrk=+syrk@millennium.stealth.net
             //
@@ -525,27 +561,42 @@ impl<'poll> Conn<'poll> {
             let param = &params[1];
             match wire::find_byte(param.as_bytes(), b'=') {
                 None => {
-                    logger.get_debug_logs().write_line(
-                        format_args!("can't parse RPL_USERHOST: {}", params[1]));
+                    logger
+                        .get_debug_logs()
+                        .write_line(format_args!("can't parse RPL_USERHOST: {}", params[1]));
                 }
                 Some(mut i) => {
                     if param.as_bytes().get(i + 1) == Some(&b'+')
-                            || param.as_bytes().get(i + 1) == Some(&b'-') {
+                        || param.as_bytes().get(i + 1) == Some(&b'-')
+                    {
                         i += 1;
                     }
-                    let usermask = (&param[i ..]).trim();
+                    let usermask = (&param[i..]).trim();
                     self.usermask = Some(usermask.to_owned());
-                    logger.get_debug_logs().write_line(format_args!("usermask set: {}", usermask));
+                    logger
+                        .get_debug_logs()
+                        .write_line(format_args!("usermask set: {}", usermask));
                 }
             }
         }
 
-        if let Msg { cmd: Cmd::Reply { num: 001, .. }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::Reply { num: 001, .. },
+            ..
+        } = msg
+        {
             // 001 RPL_WELCOME is how we understand that the registration was successful
             evs.push(ConnEv::Connected);
         }
 
-        if let Msg { cmd: Cmd::Reply { num: 002, ref params }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::Reply {
+                num: 002,
+                ref params,
+            },
+            ..
+        } = msg
+        {
             // 002    RPL_YOURHOST
             //        "Your host is <servername>, running version <ver>"
 
@@ -553,26 +604,37 @@ impl<'poll> Conn<'poll> {
 
             match parse_servername(params) {
                 None => {
-                    logger.get_debug_logs().write_line(
-                        format_args!("{} Can't parse hostname from params: {:?}",
-                                     self.serv_addr, params));
+                    logger.get_debug_logs().write_line(format_args!(
+                        "{} Can't parse hostname from params: {:?}",
+                        self.serv_addr,
+                        params
+                    ));
                 }
                 Some(servername) => {
-                    logger.get_debug_logs().write_line(
-                        format_args!("{} host: {}", self.serv_addr, servername));
+                    logger
+                        .get_debug_logs()
+                        .write_line(format_args!("{} host: {}", self.serv_addr, servername));
                     self.servername = Some(servername);
                 }
             }
         }
 
-        if let Msg { cmd: Cmd::Reply { num: 433, .. }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::Reply { num: 433, .. },
+            ..
+        } = msg
+        {
             // ERR_NICKNAMEINUSE
             self.next_nick();
             self.send_nick();
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
-        if let Msg { cmd: Cmd::Reply { num: 376, .. }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::Reply { num: 376, .. },
+            ..
+        } = msg
+        {
             // RPL_ENDOFMOTD. Join auto-join channels.
             for chan in &self.auto_join {
                 wire::join(&mut self.out_buf, chan).unwrap();
@@ -586,7 +648,14 @@ impl<'poll> Conn<'poll> {
             }
         }
 
-        if let Msg { cmd: Cmd::Reply { num: 332, ref params }, .. } = msg {
+        if let Msg {
+            cmd: Cmd::Reply {
+                num: 332,
+                ref params,
+            },
+            ..
+        } = msg
+        {
             if params.len() == 2 || params.len() == 3 {
                 // RPL_TOPIC. We've successfully joined a channel, add the channel to
                 // self.auto_join to be able to auto-join next time we connect
@@ -603,9 +672,10 @@ impl<'poll> Conn<'poll> {
 fn parse_servername(params: &[String]) -> Option<String> {
     let msg = try_opt!(params.get(1).or_else(|| params.get(0)));
     let slice1 = &msg[13..];
-    let servername_ends =
-        try_opt!(wire::find_byte(slice1.as_bytes(), b'[')
-                 .or_else(|| wire::find_byte(slice1.as_bytes(), b',')));
+    let servername_ends = try_opt!(
+        wire::find_byte(slice1.as_bytes(), b'[')
+            .or_else(|| wire::find_byte(slice1.as_bytes(), b','))
+    );
     Some((&slice1[..servername_ends]).to_owned())
 }
 
@@ -617,17 +687,27 @@ mod tests {
 
     #[test]
     fn test_parse_servername_1() {
-        let args = vec!["tiny_test".to_owned(),
-                        "Your host is adams.freenode.net[94.125.182.252/8001], \
-                         running version ircd-seven-1.1.4".to_owned()];
-        assert_eq!(parse_servername(&args), Some("adams.freenode.net".to_owned()));
+        let args = vec![
+            "tiny_test".to_owned(),
+            "Your host is adams.freenode.net[94.125.182.252/8001], \
+             running version ircd-seven-1.1.4"
+                .to_owned(),
+        ];
+        assert_eq!(
+            parse_servername(&args),
+            Some("adams.freenode.net".to_owned())
+        );
     }
 
     #[test]
     fn test_parse_servername_2() {
-        let args =
-            vec!["tiny_test".to_owned(),
-                 "Your host is belew.mozilla.org, running version InspIRCd-2.0".to_owned()];
-        assert_eq!(parse_servername(&args), Some("belew.mozilla.org".to_owned()));
+        let args = vec![
+            "tiny_test".to_owned(),
+            "Your host is belew.mozilla.org, running version InspIRCd-2.0".to_owned(),
+        ];
+        assert_eq!(
+            parse_servername(&args),
+            Some("belew.mozilla.org".to_owned())
+        );
     }
 }

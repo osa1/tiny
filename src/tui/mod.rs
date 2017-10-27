@@ -11,11 +11,11 @@ use std::rc::Rc;
 use std::str;
 
 use config::Colors;
-use self::tabbed::{Tabbed, TabbedRet, TabStyle, MsgSource};
+use self::tabbed::{MsgSource, TabStyle, Tabbed, TabbedRet};
 pub use self::messaging::Timestamp;
 
 use term_input::{Event, Key};
-use termbox_simple::{Termbox, OutputMode};
+use termbox_simple::{OutputMode, Termbox};
 use trie::Trie;
 
 pub struct TUI {
@@ -39,10 +39,7 @@ pub enum TUIRet {
     /// INVARIANT: The vec will have at least one char.
     // Can't make MsgSource a ref because of this weird error:
     // https://users.rust-lang.org/t/borrow-checker-bug/5165
-    Input {
-        msg  : Vec<char>,
-        from : MsgSource,
-    },
+    Input { msg: Vec<char>, from: MsgSource },
 }
 
 impl TUI {
@@ -61,7 +58,8 @@ impl TUI {
     }
 
     pub fn set_colors(&mut self, colors: Colors) {
-        self.termbox.set_clear_attributes(colors.clear.fg, colors.clear.bg);
+        self.termbox
+            .set_clear_attributes(colors.clear.fg, colors.clear.bg);
         self.colors = colors;
     }
 }
@@ -103,7 +101,12 @@ impl TUI {
     }
 
     pub fn set_nick(&mut self, serv_name: &str, nick: Rc<String>) {
-        self.ui.set_nick(nick, &MsgTarget::AllServTabs { serv_name: serv_name });
+        self.ui.set_nick(
+            nick,
+            &MsgTarget::AllServTabs {
+                serv_name: serv_name,
+            },
+        );
     }
 
     pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
@@ -115,28 +118,29 @@ impl TUI {
 // Event handling
 
 impl TUI {
-    pub fn handle_input_event(&mut self, ev : Event) -> TUIRet {
+    pub fn handle_input_event(&mut self, ev: Event) -> TUIRet {
         match ev {
             Event::Resize => {
                 // This never happens, probably because the our select() loop,
                 // termbox can't really get resize signals.
                 self.resize();
                 TUIRet::KeyHandled
-            },
+            }
 
-            Event::Key(key) => {
+            Event::Key(key) =>
                 match self.ui.keypressed(key) {
-                    TabbedRet::KeyHandled => TUIRet::KeyHandled,
-                    TabbedRet::KeyIgnored => TUIRet::KeyIgnored(key),
-                    TabbedRet::Input { msg, from } => {
+                    TabbedRet::KeyHandled =>
+                        TUIRet::KeyHandled,
+                    TabbedRet::KeyIgnored =>
+                        TUIRet::KeyIgnored(key),
+                    TabbedRet::Input { msg, from } =>
                         TUIRet::Input {
                             msg: msg,
                             from: from.clone(),
-                        }
-                    },
-                    TabbedRet::Abort => TUIRet::Abort,
-                }
-            },
+                        },
+                    TabbedRet::Abort =>
+                        TUIRet::Abort,
+                },
 
             Event::String(str) => {
                 // For some reason on my terminal newlines in text are
@@ -152,11 +156,10 @@ impl TUI {
                     // TODO: Paste with newlines
                     TUIRet::EventIgnored(Event::String(str.to_owned()))
                 }
-            },
+            }
 
-            ev => {
-                TUIRet::EventIgnored(ev)
-            },
+            ev =>
+                TUIRet::EventIgnored(ev),
         }
     }
 
@@ -167,22 +170,6 @@ impl TUI {
         let h = self.termbox.height();
         self.ui.resize(w, h);
     }
-
-/*
-    /// Loop until something's entered to the user input field. Useful for
-    /// waiting for a command when there's no connection yet.
-    pub fn idle_loop(&mut self) -> TUIRet {
-        loop {
-            self.draw();
-
-            match self.keypressed_poll() {
-                ret @ TUIRet::Abort => { return ret; },
-                ret @ TUIRet::Input { .. } => { return ret; },
-                _ => {}
-            }
-        }
-    }
-*/
 
     pub fn draw(&mut self) {
         self.termbox.clear();
@@ -199,7 +186,10 @@ impl TUI {
 #[derive(Debug)]
 pub enum MsgTarget<'a> {
     Server { serv_name: &'a str },
-    Chan { serv_name: &'a str, chan_name: &'a str },
+    Chan {
+        serv_name: &'a str,
+        chan_name: &'a str,
+    },
     User { serv_name: &'a str, nick: &'a str },
 
     /// Show the message in all tabs of a server.
@@ -239,20 +229,24 @@ impl TUI {
 
     /// Similar to `add_privmsg`, except the whole message is highlighted.
     pub fn add_privmsg_highlight(
-        &mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget)
-    {
+        &mut self,
+        sender: &str,
+        msg: &str,
+        ts: Timestamp,
+        target: &MsgTarget,
+    ) {
         self.ui.add_privmsg_highlight(sender, msg, ts, target);
     }
 
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
-    pub fn add_msg(&mut self, msg: &str, ts: Timestamp, target : &MsgTarget) {
+    pub fn add_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.ui.add_msg(msg, ts, target);
     }
 
     /// Error messages related with the protocol - e.g. can't join a channel,
     /// nickname is in use etc. Timestamped and logged.
-    pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp, target : &MsgTarget) {
+    pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
         self.ui.add_err_msg(msg, ts, target);
     }
 
@@ -268,11 +262,17 @@ impl TUI {
         self.ui.add_nick(nick, ts, target);
     }
 
-    pub fn remove_nick(&mut self, nick : &str, ts: Option<Timestamp>, target: &MsgTarget) {
+    pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
         self.ui.remove_nick(nick, ts, target);
     }
 
-    pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp, target: &MsgTarget) {
+    pub fn rename_nick(
+        &mut self,
+        old_nick: &str,
+        new_nick: &str,
+        ts: Timestamp,
+        target: &MsgTarget,
+    ) {
         self.ui.rename_nick(old_nick, new_nick, ts, target);
     }
 

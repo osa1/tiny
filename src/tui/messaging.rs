@@ -64,7 +64,10 @@ impl Timestamp {
 
 impl From<Tm> for Timestamp {
     fn from(tm: Tm) -> Timestamp {
-        Timestamp { hour: tm.tm_hour, min: tm.tm_min }
+        Timestamp {
+            hour: tm.tm_hour,
+            min: tm.tm_min,
+        }
     }
 }
 
@@ -77,7 +80,7 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub fn new(width : i32, height : i32) -> MessagingUI {
+    pub fn new(width: i32, height: i32) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
             input_field: TextField::new(width),
@@ -109,7 +112,7 @@ impl MessagingUI {
             Some(ref exit_dialogue) =>
                 exit_dialogue.draw(tb, colors, pos_x, pos_y),
             None =>
-                self.input_field.draw(tb, colors, pos_x, pos_y)
+                self.input_field.draw(tb, colors, pos_x, pos_y),
         }
     }
 
@@ -118,25 +121,25 @@ impl MessagingUI {
 
         if let Some(ref nick) = self.current_nick {
             if self.draw_current_nick {
-                let nick_color =
-                    colors.nick[self.get_nick_color(nick) % colors.nick.len()];
-                let style = Style { fg: nick_color as u16, bg: colors.user_msg.bg };
-                termbox::print_chars(
-                    tb,
-                    pos_x,
-                    pos_y + self.height - 1,
-                    style,
-                    nick.chars());
+                let nick_color = colors.nick[self.get_nick_color(nick) % colors.nick.len()];
+                let style = Style {
+                    fg: nick_color as u16,
+                    bg: colors.user_msg.bg,
+                };
+                termbox::print_chars(tb, pos_x, pos_y + self.height - 1, style, nick.chars());
                 tb.change_cell(
                     pos_x + nick.len() as i32,
                     pos_y + self.height - 1,
                     ':',
                     colors.user_msg.fg | config::TB_BOLD,
-                    colors.user_msg.bg);
+                    colors.user_msg.bg,
+                );
                 self.draw_input_field(
-                    tb, colors,
+                    tb,
+                    colors,
                     pos_x + nick.len() as i32 + 2,
-                    pos_y + self.height - 1);
+                    pos_y + self.height - 1,
+                );
             } else {
                 self.draw_input_field(tb, colors, pos_x, pos_y + self.height - 1);
             }
@@ -145,49 +148,49 @@ impl MessagingUI {
         }
     }
 
-    pub fn keypressed(&mut self, key : Key) -> WidgetRet {
+    pub fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
             Key::Ctrl('c') => {
                 self.toggle_exit_dialogue();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::Ctrl('u') | Key::PageUp => {
                 self.msg_area.page_up();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::Ctrl('d') | Key::PageDown => {
                 self.msg_area.page_down();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::ShiftUp => {
                 self.msg_area.scroll_up();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::ShiftDown => {
                 self.msg_area.scroll_down();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::Tab => {
                 if self.exit_dialogue.is_none() {
                     self.input_field.autocomplete(&self.nicks);
                 }
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::Home => {
                 self.msg_area.scroll_top();
                 WidgetRet::KeyHandled
-            },
+            }
 
             Key::End => {
                 self.msg_area.scroll_bottom();
                 WidgetRet::KeyHandled
-            },
+            }
 
             key => {
                 let ret = {
@@ -204,7 +207,7 @@ impl MessagingUI {
                 } else {
                     ret
                 }
-            },
+            }
         }
     }
 
@@ -221,11 +224,13 @@ impl MessagingUI {
                 rc.len() as i32 + 2,
         };
 
-        self.draw_current_nick =
-            (nick_width as f32) <= (width as f32) * (30f32 / 100f32);
+        self.draw_current_nick = (nick_width as f32) <= (width as f32) * (30f32 / 100f32);
 
-        let widget_width =
-            if self.draw_current_nick { width - nick_width } else { width };
+        let widget_width = if self.draw_current_nick {
+            width - nick_width
+        } else {
+            width
+        };
 
         self.input_field.resize(widget_width);
         for exit_dialogue in &mut self.exit_dialogue {
@@ -249,7 +254,6 @@ impl MessagingUI {
 // Adding new messages
 
 impl MessagingUI {
-
     fn add_timestamp(&mut self, ts: Timestamp) {
         if let Some(ts_) = self.last_activity_ts {
             if ts_ != ts {
@@ -257,7 +261,6 @@ impl MessagingUI {
             }
         } else {
             ts.stamp(&mut self.msg_area);
-
         }
         self.last_activity_ts = Some(ts);
     }
@@ -265,24 +268,27 @@ impl MessagingUI {
     pub fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
-        self.msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::Topic));
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::Topic));
         self.msg_area.add_text(topic);
 
         self.msg_area.flush_line();
     }
 
-    pub fn add_client_err_msg(&mut self, msg : &str) {
+    pub fn add_client_err_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
 
-    pub fn add_client_msg(&mut self, msg : &str) {
+    pub fn add_client_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
         self.reset_activity_line();
@@ -299,15 +305,15 @@ impl MessagingUI {
             self.msg_area.add_text(sender);
         }
 
-        self.msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
         self.msg_area.add_text(": ");
 
-        self.msg_area.set_style(SegStyle::SchemeStyle(
-            if highlight {
-                SchemeStyle::Highlight
-            } else {
-                SchemeStyle::UserMsg
-            }));
+        self.msg_area.set_style(SegStyle::SchemeStyle(if highlight {
+            SchemeStyle::Highlight
+        } else {
+            SchemeStyle::UserMsg
+        }));
 
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
@@ -317,7 +323,8 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -326,7 +333,8 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -399,7 +407,7 @@ impl MessagingUI {
         });
     }
 
-    pub fn has_nick(&self, nick : &str) -> bool {
+    pub fn has_nick(&self, nick: &str) -> bool {
         self.nicks.contains(nick)
     }
 

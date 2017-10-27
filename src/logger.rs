@@ -43,14 +43,17 @@ fn init_log_file(file: &mut Write) {
 }
 
 impl Logger {
-
     pub fn new(log_dir: PathBuf) -> Logger {
         let _ = fs::create_dir(&log_dir);
 
         let debug_logs = {
             let mut log_dir = log_dir.clone();
             log_dir.push("debug.log");
-            let mut file = OpenOptions::new().append(true).create(true).open(log_dir).unwrap();
+            let mut file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(log_dir)
+                .unwrap();
             init_log_file(&mut file);
             file
         };
@@ -65,7 +68,7 @@ impl Logger {
     // Stupid code below because of
     // https://users.rust-lang.org/t/weird-borrow-checker-error-for-loop-keeps-references-after-its-scope-ends/10929
 
-/*
+    /*
     pub fn get_serv_logs(&mut self, serv_: &str) -> LogFile {
         let pos = self.fds.iter().position(|&(ref dest, _)| {
             if let &LogDest::Server(ref serv) = dest {
@@ -100,15 +103,30 @@ impl Logger {
         });
 
         match pos {
-            Some(idx) => LogFile { fd: &mut self.fds[idx].1 },
+            Some(idx) =>
+                LogFile {
+                    fd: &mut self.fds[idx].1,
+                },
             None => {
                 let mut log_path = self.log_dir.clone();
                 log_path.push(format!("{}_{}.log", serv_, chan_));
-                let mut file = OpenOptions::new().append(true).create(true).open(log_path).unwrap();
+                let mut file = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(log_path)
+                    .unwrap();
                 init_log_file(&mut file);
                 let idx = self.fds.len();
-                self.fds.push((LogDest::Chan { serv: serv_.to_owned(), chan: chan_.to_owned() }, file));
-                LogFile { fd: &mut self.fds[idx].1 }
+                self.fds.push((
+                    LogDest::Chan {
+                        serv: serv_.to_owned(),
+                        chan: chan_.to_owned(),
+                    },
+                    file,
+                ));
+                LogFile {
+                    fd: &mut self.fds[idx].1,
+                }
             }
         }
     }
@@ -123,20 +141,31 @@ impl Logger {
         });
 
         match pos {
-            Some(idx) => LogFile { fd: &mut self.fds[idx].1 },
+            Some(idx) =>
+                LogFile {
+                    fd: &mut self.fds[idx].1,
+                },
             None => {
                 let mut log_path = self.log_dir.clone();
                 log_path.push(format!("{}_raw.log", serv_));
-                let mut file = OpenOptions::new().append(true).create(true).open(log_path).unwrap();
+                let mut file = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(log_path)
+                    .unwrap();
                 init_log_file(&mut file);
                 let idx = self.fds.len();
                 self.fds.push((LogDest::ServerRaw(serv_.to_owned()), file));
-                LogFile { fd: &mut self.fds[idx].1 }
+                LogFile {
+                    fd: &mut self.fds[idx].1,
+                }
             }
         }
     }
 
     pub fn get_debug_logs(&mut self) -> LogFile {
-        LogFile { fd: &mut self.debug_fd }
+        LogFile {
+            fd: &mut self.debug_fd,
+        }
     }
 }

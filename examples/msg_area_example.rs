@@ -12,9 +12,9 @@ use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
 
-use term_input::{Input, Event};
+use term_input::{Event, Input};
 use tiny::config::Colors;
-use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
+use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
 
 fn main() {
     let mut tui = TUI::new(Colors::default());
@@ -26,13 +26,13 @@ fn main() {
         &EventedFd(&libc::STDIN_FILENO),
         Token(libc::STDIN_FILENO as usize),
         Ready::readable(),
-        PollOpt::level()).unwrap();
+        PollOpt::level(),
+    ).unwrap();
 
     let mut ev_buffer: Vec<Event> = Vec::new();
     let mut input = Input::new();
     let mut events = Events::with_capacity(10);
-    'mainloop:
-    loop {
+    'mainloop: loop {
         match poll.poll(&mut events, None) {
             Err(_) => {
                 // usually SIGWINCH, which is caught by term_input
@@ -44,14 +44,17 @@ fn main() {
                 for ev in ev_buffer.drain(0..) {
                     match tui.handle_input_event(ev) {
                         TUIRet::Input { msg, .. } => {
-                            tui.add_msg(&msg.into_iter().collect::<String>(),
-                            Timestamp::now(),
-                            &MsgTarget::Server { serv_name: "debug" });
-                        },
+                            tui.add_msg(
+                                &msg.into_iter().collect::<String>(),
+                                Timestamp::now(),
+                                &MsgTarget::Server { serv_name: "debug" },
+                            );
+                        }
                         TUIRet::Abort => {
                             break 'mainloop;
-                        },
-                        _ => {}
+                        }
+                        _ =>
+                            {}
                     }
                 }
                 tui.draw();

@@ -1,6 +1,6 @@
 pub mod line;
 
-use std::cmp::{max};
+use std::cmp::max;
 use std::mem;
 use std::str;
 
@@ -26,7 +26,7 @@ pub struct MsgArea {
 
     /// Cached total rendered height of all lines. Invalidate on resize, update
     /// when adding new lines.
-    lines_height: Option<i32>
+    lines_height: Option<i32>,
 }
 
 impl MsgArea {
@@ -129,7 +129,7 @@ impl MsgArea {
     }
 
     pub fn page_up(&mut self) {
-        for _ in 0 .. 10 {
+        for _ in 0..10 {
             self.scroll_up();
         }
     }
@@ -147,17 +147,18 @@ impl MsgArea {
         self.line_buf.set_style(style);
     }
 
-    pub fn add_text(&mut self, str : &str) {
+    pub fn add_text(&mut self, str: &str) {
         self.line_buf.add_text(str);
     }
 
-    pub fn add_char(&mut self, char : char) {
+    pub fn add_char(&mut self, char: char) {
         self.line_buf.add_char(char);
     }
 
     pub fn flush_line(&mut self) -> usize {
         let line_height = self.line_buf.rendered_height(self.width);
-        self.lines.push(mem::replace(&mut self.line_buf, Line::new()));
+        self.lines
+            .push(mem::replace(&mut self.line_buf, Line::new()));
         if self.scroll != 0 {
             self.scroll += line_height;
         }
@@ -168,7 +169,10 @@ impl MsgArea {
     }
 
     #[inline]
-    pub fn modify_line<F>(&mut self, idx : usize, f : F) where F : Fn(&mut Line) {
+    pub fn modify_line<F>(&mut self, idx: usize, f: F)
+    where
+        F: Fn(&mut Line),
+    {
         f(&mut self.lines[idx]);
     }
 

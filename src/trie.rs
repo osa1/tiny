@@ -1,6 +1,6 @@
 pub struct Trie {
-    vec : Vec<(char, Box<Trie>)>,
-    word : bool,
+    vec: Vec<(char, Box<Trie>)>,
+    word: bool,
 }
 
 impl Trie {
@@ -16,16 +16,18 @@ impl Trie {
         self.word = false;
     }
 
-    pub fn insert(&mut self, str : &str) {
-        let mut trie_ptr : *mut Trie = &mut *self;
+    pub fn insert(&mut self, str: &str) {
+        let mut trie_ptr: *mut Trie = &mut *self;
         for char in str.chars() {
             trie_ptr = get_char_node_for_insert(trie_ptr, char);
         }
 
-        unsafe { (*trie_ptr).word = true; }
+        unsafe {
+            (*trie_ptr).word = true;
+        }
     }
 
-    pub fn contains(&self, str : &str) -> bool {
+    pub fn contains(&self, str: &str) -> bool {
         let mut trie = self;
         for char in str.chars() {
             if let Some(trie_) = get_char_node_for_lookup(trie, char) {
@@ -39,10 +41,10 @@ impl Trie {
 
     // TODO: This needs garbage collection. We may want to trim the branches
     // that doesn't have any words.
-    pub fn remove(&mut self, str : &str) {
+    pub fn remove(&mut self, str: &str) {
         let mut chars = str.chars();
         if let Some(char) = chars.next() {
-            if let Ok(idx) = self.vec.binary_search_by(|&(char_,_)| char_.cmp(&char)) {
+            if let Ok(idx) = self.vec.binary_search_by(|&(char_, _)| char_.cmp(&char)) {
                 self.vec[idx].1.remove(chars.as_str());
             }
         } else {
@@ -51,7 +53,7 @@ impl Trie {
     }
 
     // TODO: We need an Iterator instance instead.
-    pub fn to_strings(&self, prefix : &str) -> Vec<String> {
+    pub fn to_strings(&self, prefix: &str) -> Vec<String> {
         let mut ret = {
             if self.word {
                 vec![prefix.to_owned()]
@@ -70,7 +72,7 @@ impl Trie {
     }
 
     // TODO: We need an Iterator instance instead.
-    pub fn drop_pfx(&self, prefix : &mut Iterator<Item=char>) -> Vec<String> {
+    pub fn drop_pfx(&self, prefix: &mut Iterator<Item = char>) -> Vec<String> {
         let mut trie = self;
         for char in prefix {
             if let Some(trie_) = get_char_node_for_lookup(trie, char) {
@@ -83,124 +85,138 @@ impl Trie {
     }
 }
 
-fn get_char_node_for_insert(trie : *mut Trie, char : char) -> *mut Trie {
-    let trie_ref : &mut Trie = unsafe { &mut *trie };
-    match trie_ref.vec.binary_search_by(|&(char_,_)| char_.cmp(&char)) {
-        Ok(idx) => &mut *trie_ref.vec[idx].1,
+fn get_char_node_for_insert(trie: *mut Trie, char: char) -> *mut Trie {
+    let trie_ref: &mut Trie = unsafe { &mut *trie };
+    match trie_ref
+        .vec
+        .binary_search_by(|&(char_, _)| char_.cmp(&char))
+    {
+        Ok(idx) =>
+            &mut *trie_ref.vec[idx].1,
         Err(idx) => {
-            trie_ref.vec.insert(idx, (char, Box::new(Trie { vec: vec![], word: false })));
+            trie_ref.vec.insert(
+                idx,
+                (
+                    char,
+                    Box::new(Trie {
+                        vec: vec![],
+                        word: false,
+                    }),
+                ),
+            );
             &mut *trie_ref.vec[idx].1
-        },
+        }
     }
 }
 
-fn get_char_node_for_lookup(trie : &Trie, char : char) -> Option<&Trie> {
-    match trie.vec.binary_search_by(|&(char_,_)| char_.cmp(&char)) {
-        Ok(idx) => Some(&trie.vec[idx].1),
-        Err(_) => None,
+fn get_char_node_for_lookup(trie: &Trie, char: char) -> Option<&Trie> {
+    match trie.vec.binary_search_by(|&(char_, _)| char_.cmp(&char)) {
+        Ok(idx) =>
+            Some(&trie.vec[idx].1),
+        Err(_) =>
+            None,
     }
 }
 
 #[cfg(test)]
 mod tests {
 
-extern crate test;
+    extern crate test;
 
-use super::*;
+    use super::*;
 
-#[test]
-fn trie_test_1() {
-    let mut trie = Trie::new();
-    trie.insert("yada yada");
-    assert_eq!(vec!["yada yada"], trie.to_strings(""));
-}
+    #[test]
+    fn trie_test_1() {
+        let mut trie = Trie::new();
+        trie.insert("yada yada");
+        assert_eq!(vec!["yada yada"], trie.to_strings(""));
+    }
 
-#[test]
-fn trie_test_2() {
-    let mut trie = Trie::new();
-    trie.insert("foo");
-    assert!(trie.contains("foo"));
-    trie.insert("bar");
-    assert!(trie.contains("foo"));
-    assert!(trie.contains("bar"));
-    trie.insert("baz");
-    assert!(trie.contains("foo"));
-    assert!(trie.contains("bar"));
-    assert!(trie.contains("baz"));
-    assert_eq!(vec!["bar", "baz", "foo"], trie.to_strings(""));
-}
+    #[test]
+    fn trie_test_2() {
+        let mut trie = Trie::new();
+        trie.insert("foo");
+        assert!(trie.contains("foo"));
+        trie.insert("bar");
+        assert!(trie.contains("foo"));
+        assert!(trie.contains("bar"));
+        trie.insert("baz");
+        assert!(trie.contains("foo"));
+        assert!(trie.contains("bar"));
+        assert!(trie.contains("baz"));
+        assert_eq!(vec!["bar", "baz", "foo"], trie.to_strings(""));
+    }
 
-#[test]
-fn trie_test_3() {
-    let mut trie = Trie::new();
-    trie.insert("foo");
-    trie.insert("bar");
-    trie.insert("baz");
-    assert_eq!(vec!["ar", "az"], trie.drop_pfx(&mut "b".chars()));
-}
+    #[test]
+    fn trie_test_3() {
+        let mut trie = Trie::new();
+        trie.insert("foo");
+        trie.insert("bar");
+        trie.insert("baz");
+        assert_eq!(vec!["ar", "az"], trie.drop_pfx(&mut "b".chars()));
+    }
 
-#[test]
-fn trie_test_insert_remove() {
-    let mut trie = Trie::new();
-    trie.insert("foo");
-    trie.insert("bar");
-    trie.insert("baz");
-    trie.remove("bar");
-    assert!(trie.contains("foo"));
-    assert!(!trie.contains("bar"));
-    assert!(trie.contains("baz"));
-    assert_eq!(vec!["az"], trie.drop_pfx(&mut "b".chars()));
-}
+    #[test]
+    fn trie_test_insert_remove() {
+        let mut trie = Trie::new();
+        trie.insert("foo");
+        trie.insert("bar");
+        trie.insert("baz");
+        trie.remove("bar");
+        assert!(trie.contains("foo"));
+        assert!(!trie.contains("bar"));
+        assert!(trie.contains("baz"));
+        assert_eq!(vec!["az"], trie.drop_pfx(&mut "b".chars()));
+    }
 
 } // tests
 
 #[cfg(test)]
 mod benchs {
 
-extern crate test;
+    extern crate test;
 
-use self::test::Bencher;
-use std::fs::File;
-use std::io::Read;
-use super::*;
+    use self::test::Bencher;
+    use std::fs::File;
+    use std::io::Read;
+    use super::*;
 
-#[bench]
-fn bench_trie_build(b : &mut Bencher) {
+    #[bench]
+    fn bench_trie_build(b: &mut Bencher) {
+        // Total words: 305,089
+        // 117,701,680 ns (0.1 seconds)
+        // (before reversing the list: 116,795,268 ns (0.1 seconds))
 
-    // Total words: 305,089
-    // 117,701,680 ns (0.1 seconds)
-    // (before reversing the list: 116,795,268 ns (0.1 seconds))
-
-    let mut contents = String::new();
-    let mut words : Vec<&str> = vec![];
-    {
-        match File::open("/usr/share/dict/american") {
-            Err(_) => {
-                println!("Can't open dictionary file, aborting benchmark.");
-                return;
-            }
-            Ok(mut file) => {
-                file.read_to_string(&mut contents).unwrap();
-                words.extend(contents.lines());
+        let mut contents = String::new();
+        let mut words: Vec<&str> = vec![];
+        {
+            match File::open("/usr/share/dict/american") {
+                Err(_) => {
+                    println!("Can't open dictionary file, aborting benchmark.");
+                    return;
+                }
+                Ok(mut file) => {
+                    file.read_to_string(&mut contents).unwrap();
+                    words.extend(contents.lines());
+                }
             }
         }
+
+        b.iter(|| {
+            let mut trie = Trie::new();
+            // Note that we insert the words in reverse order here. Since the
+            // dictionary is already sorted, we end up benchmarking the best case.
+            // Since that best case is never really happens in practice, the number
+            // is practically useless. Worst case is at least giving an upper bound.
+            for word in words.iter().rev() {
+                trie.insert(word);
+            }
+            trie
+        });
     }
 
-    b.iter(|| {
-        let mut trie = Trie::new();
-        // Note that we insert the words in reverse order here. Since the
-        // dictionary is already sorted, we end up benchmarking the best case.
-        // Since that best case is never really happens in practice, the number
-        // is practically useless. Worst case is at least giving an upper bound.
-        for word in words.iter().rev() {
-            trie.insert(word);
-        }
-        trie
-    });
-}
 
-
-/*
+    /*
 #[bench]
 fn bench_hashset_build(b : &mut Bencher) {
 
@@ -227,68 +243,62 @@ fn bench_hashset_build(b : &mut Bencher) {
 }
 */
 
-#[bench]
-fn bench_trie_lookup(b : &mut Bencher) {
+    #[bench]
+    fn bench_trie_lookup(b: &mut Bencher) {
+        // Total:     305,089 words
+        // Returning:     235 words
+        // 140,717 ns (0.14 ms)
 
-    // Total:     305,089 words
-    // Returning:     235 words
-    // 140,717 ns (0.14 ms)
-
-    let mut contents = String::new();
-    let mut words : Vec<&str> = vec![];
-    {
-        match File::open("/usr/share/dict/american") {
-            Err(_) => {
-                println!("Can't open dictionary file, aborting benchmark.");
-                return;
-            }
-            Ok(mut file) => {
-                file.read_to_string(&mut contents).unwrap();
-                words.extend(contents.lines());
-            }
-        }
-    }
-
-    let mut trie = Trie::new();
-    for word in words {
-        trie.insert(word);
-    }
-
-    b.iter(|| {
-        trie.drop_pfx(&mut "abs".chars())
-    });
-}
-
-#[bench]
-fn bench_trie_list_all(b : &mut Bencher) {
-
-    // Total:     305,089 words
-    // Returning: 305,089 words
-    // 205,946,060 ns (0.2 s)
-
-    let mut contents = String::new();
-    let mut words : Vec<&str> = vec![];
-    {
-        match File::open("/usr/share/dict/american") {
-            Err(_) => {
-                println!("Can't open dictionary file, aborting benchmark.");
-                return;
-            }
-            Ok(mut file) => {
-                file.read_to_string(&mut contents).unwrap();
-                words.extend(contents.lines());
+        let mut contents = String::new();
+        let mut words: Vec<&str> = vec![];
+        {
+            match File::open("/usr/share/dict/american") {
+                Err(_) => {
+                    println!("Can't open dictionary file, aborting benchmark.");
+                    return;
+                }
+                Ok(mut file) => {
+                    file.read_to_string(&mut contents).unwrap();
+                    words.extend(contents.lines());
+                }
             }
         }
+
+        let mut trie = Trie::new();
+        for word in words {
+            trie.insert(word);
+        }
+
+        b.iter(|| trie.drop_pfx(&mut "abs".chars()));
     }
 
-    let mut trie = Trie::new();
-    for word in words {
-        trie.insert(word);
-    }
+    #[bench]
+    fn bench_trie_list_all(b: &mut Bencher) {
+        // Total:     305,089 words
+        // Returning: 305,089 words
+        // 205,946,060 ns (0.2 s)
 
-    b.iter(|| {
-        trie.drop_pfx(&mut "".chars())
-    });
-}
+        let mut contents = String::new();
+        let mut words: Vec<&str> = vec![];
+        {
+            match File::open("/usr/share/dict/american") {
+                Err(_) => {
+                    println!("Can't open dictionary file, aborting benchmark.");
+                    return;
+                }
+                Ok(mut file) => {
+                    file.read_to_string(&mut contents).unwrap();
+                    words.extend(contents.lines());
+                }
+            }
+        }
+
+        let mut trie = Trie::new();
+        for word in words {
+            trie.insert(word);
+        }
+
+        b.iter(|| trie.drop_pfx(&mut "".chars()));
+    }
 
 } // benchs

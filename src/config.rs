@@ -33,15 +33,14 @@ pub struct Defaults {
     pub nicks: Vec<String>,
     pub hostname: String,
     pub realname: String,
-    pub auto_cmds: Vec<String>
+    pub auto_cmds: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub servers: Vec<Server>,
     pub defaults: Defaults,
-    #[serde(default)]
-    pub colors: Colors,
+    #[serde(default)] pub colors: Colors,
     pub log_dir: String,
 }
 
@@ -54,7 +53,8 @@ pub fn get_config_path() -> PathBuf {
 pub fn get_default_config_yaml() -> String {
     let mut log_dir = home_dir().unwrap();
     log_dir.push("tiny_logs");
-    format!("\
+    format!(
+        "\
 # Servers to auto-connect
 servers:
     - addr: irc.mozilla.org
@@ -163,7 +163,9 @@ colors:
     tab_highlight:
         fg: red
         bg: default
-        attrs: [bold]\n", log_dir.as_path().to_str().unwrap())
+        attrs: [bold]\n",
+        log_dir.as_path().to_str().unwrap()
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,7 +173,7 @@ colors:
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub use termbox_simple::*;
-use serde::de::{self, Deserializer, Visitor, MapAccess};
+use serde::de::{self, Deserializer, MapAccess, Visitor};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
@@ -209,24 +211,63 @@ pub struct Colors {
 impl Default for Colors {
     fn default() -> Self {
         Colors {
-            nick: vec![ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ],
-            clear: Style { fg: TB_DEFAULT, bg: TB_DEFAULT },
-            user_msg: Style { fg: 0, bg: TB_DEFAULT },
+            nick: vec![1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14],
+            clear: Style {
+                fg: TB_DEFAULT,
+                bg: TB_DEFAULT,
+            },
+            user_msg: Style {
+                fg: 0,
+                bg: TB_DEFAULT,
+            },
             err_msg: Style { fg: TB_BOLD, bg: 1 },
-            topic: Style { fg: 14 | TB_BOLD, bg: TB_DEFAULT },
-            cursor: Style { fg: 0, bg: TB_DEFAULT },
-            join: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
-            part: Style { fg: 1 | TB_BOLD, bg: TB_DEFAULT },
-            nick_change: Style { fg: 10 | TB_BOLD, bg: TB_DEFAULT },
-            faded: Style { fg: 242, bg: TB_DEFAULT },
-            exit_dialogue: Style { fg: TB_DEFAULT, bg: 4 },
-            highlight: Style { fg: 9 | TB_BOLD, bg: TB_DEFAULT },
-            completion: Style { fg: 84, bg: TB_DEFAULT },
-            timestamp: Style { fg: 242, bg: TB_DEFAULT },
+            topic: Style {
+                fg: 14 | TB_BOLD,
+                bg: TB_DEFAULT,
+            },
+            cursor: Style {
+                fg: 0,
+                bg: TB_DEFAULT,
+            },
+            join: Style {
+                fg: 10 | TB_BOLD,
+                bg: TB_DEFAULT,
+            },
+            part: Style {
+                fg: 1 | TB_BOLD,
+                bg: TB_DEFAULT,
+            },
+            nick_change: Style {
+                fg: 10 | TB_BOLD,
+                bg: TB_DEFAULT,
+            },
+            faded: Style {
+                fg: 242,
+                bg: TB_DEFAULT,
+            },
+            exit_dialogue: Style {
+                fg: TB_DEFAULT,
+                bg: 4,
+            },
+            highlight: Style {
+                fg: 9 | TB_BOLD,
+                bg: TB_DEFAULT,
+            },
+            completion: Style {
+                fg: 84,
+                bg: TB_DEFAULT,
+            },
+            timestamp: Style {
+                fg: 242,
+                bg: TB_DEFAULT,
+            },
             tab_active: Style { fg: TB_BOLD, bg: 0 },
             tab_normal: Style { fg: 8, bg: 0 },
             tab_new_msg: Style { fg: 5, bg: 0 },
-            tab_highlight: Style { fg: 9 | TB_BOLD, bg: 0 },
+            tab_highlight: Style {
+                fg: 9 | TB_BOLD,
+                bg: 0,
+            },
         }
     }
 }
@@ -236,32 +277,27 @@ impl Default for Colors {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Color names are taken from https://en.wikipedia.org/wiki/List_of_software_palettes
-const COLORS: [(&'static str, u16); 17] =
-[
+const COLORS: [(&'static str, u16); 17] = [
     ("default", TB_DEFAULT), // Default fg/bg color of the terminal
-    ("black",   0),
-    ("maroon",  1),
-    ("green",   2),
-    ("olive",   3),
-    ("navy",    4),
-    ("purple",  5),
-    ("teal",    6),
-    ("silver",  7),
-    ("gray",    8),
-    ("red",     9),
-    ("lime",    10),
-    ("yellow",  11),
-    ("blue",    12),
+    ("black", 0),
+    ("maroon", 1),
+    ("green", 2),
+    ("olive", 3),
+    ("navy", 4),
+    ("purple", 5),
+    ("teal", 6),
+    ("silver", 7),
+    ("gray", 8),
+    ("red", 9),
+    ("lime", 10),
+    ("yellow", 11),
+    ("blue", 12),
     ("magenta", 13),
-    ("cyan",    14),
-    ("white",   15)
+    ("cyan", 14),
+    ("white", 15),
 ];
 
-const ATTRS: [(&'static str, u16); 2] =
-[
-    ("bold",      TB_BOLD),
-    ("underline", TB_UNDERLINE)
-];
+const ATTRS: [(&'static str, u16); 2] = [("bold", TB_BOLD), ("underline", TB_UNDERLINE)];
 
 fn parse_color(val: String) -> Option<u16> {
     for &(name, color) in &COLORS {
@@ -285,11 +321,16 @@ fn parse_attr(val: String) -> u16 {
 
 impl<'de> Deserialize<'de> for Style {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
         #[serde(field_identifier, rename_all = "lowercase")]
-        enum Field { Fg, Bg, Attrs }
+        enum Field {
+            Fg,
+            Bg,
+            Attrs,
+        }
 
         use std::fmt;
 
@@ -298,18 +339,31 @@ impl<'de> Deserialize<'de> for Style {
             type Value = Style;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                let colors = COLORS.iter().map(|&(name, _)| name).collect::<Vec<&str>>().join(", ");
-                let attrs = ATTRS.iter().map(|&(name, _)| name).collect::<Vec<&str>>().join(", ");
+                let colors = COLORS
+                    .iter()
+                    .map(|&(name, _)| name)
+                    .collect::<Vec<&str>>()
+                    .join(", ");
+                let attrs = ATTRS
+                    .iter()
+                    .map(|&(name, _)| name)
+                    .collect::<Vec<&str>>()
+                    .join(", ");
 
-                writeln!(formatter,
-                         "fg: 0-255 or color name\n\
-                         bg: 0-255 or color name\n\
-                         attrs: [{}]\n\n\
-                         color names: {}", attrs, colors)
+                writeln!(
+                    formatter,
+                    "fg: 0-255 or color name\n\
+                     bg: 0-255 or color name\n\
+                     attrs: [{}]\n\n\
+                     color names: {}",
+                    attrs,
+                    colors
+                )
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
-                where M: MapAccess<'de>
+            where
+                M: MapAccess<'de>,
             {
                 let mut fg: Option<u16> = None;
                 let mut bg: Option<u16> = None;
@@ -318,22 +372,25 @@ impl<'de> Deserialize<'de> for Style {
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Fg => {
-                             let color = parse_color(map.next_value()?)
-                                 .ok_or_else(|| de::Error::invalid_value(de::Unexpected::UnitVariant, &self))?;
+                            let color = parse_color(map.next_value()?).ok_or_else(|| {
+                                de::Error::invalid_value(de::Unexpected::UnitVariant, &self)
+                            })?;
 
-                             fg = Some(color);
-                        },
+                            fg = Some(color);
+                        }
 
                         Field::Bg => {
-                            let color = parse_color(map.next_value()?)
-                                .ok_or_else(|| de::Error::invalid_value(de::Unexpected::UnitVariant, &self))?;
+                            let color = parse_color(map.next_value()?).ok_or_else(|| {
+                                de::Error::invalid_value(de::Unexpected::UnitVariant, &self)
+                            })?;
 
                             bg = Some(color);
-                        },
+                        }
 
                         Field::Attrs => {
                             let attrs: Vec<String> = map.next_value()?;
-                            attr = attrs.into_iter()
+                            attr = attrs
+                                .into_iter()
                                 .map(parse_attr)
                                 .fold(0, |style, a| style | a);
                         }
@@ -363,7 +420,8 @@ mod tests {
                 println!("{}", yaml_err);
                 assert!(false);
             }
-            Ok(Config { .. }) => {}
+            Ok(Config { .. }) =>
+                {}
         }
     }
 
@@ -397,7 +455,8 @@ log_dir: path";
                 println!("{}", yaml_err);
                 assert!(false);
             }
-            Ok(Config { .. }) => {}
+            Ok(Config { .. }) =>
+                {}
         }
     }
 }

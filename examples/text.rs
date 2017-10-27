@@ -15,7 +15,7 @@ use std::io::Read;
 // use std::io::Write;
 // use std::io;
 
-use term_input::{Input, Event, Key};
+use term_input::{Event, Input, Key};
 use termbox_simple::*;
 
 use tiny::config::Colors;
@@ -57,7 +57,8 @@ fn main() {
         &EventedFd(&libc::STDIN_FILENO),
         Token(libc::STDIN_FILENO as usize),
         Ready::readable(),
-        PollOpt::level()).unwrap();
+        PollOpt::level(),
+    ).unwrap();
 
     tui.clear();
     msg_area.draw(&mut tui, &colors, 0, 0);
@@ -66,8 +67,7 @@ fn main() {
     let mut ev_buffer: Vec<Event> = Vec::new();
     let mut input = Input::new();
     let mut events = Events::with_capacity(10);
-    'mainloop:
-    loop {
+    'mainloop: loop {
         match poll.poll(&mut events, None) {
             Err(_) => {
                 tui.resize();
@@ -79,27 +79,27 @@ fn main() {
             }
             Ok(_) => {
                 input.read_input_events(&mut ev_buffer);
-                for ev in ev_buffer.drain(0 ..) {
+                for ev in ev_buffer.drain(0..) {
                     match ev {
                         Event::Key(Key::Esc) => {
                             break 'mainloop;
-                        },
+                        }
 
                         Event::Key(Key::Ctrl('p')) => {
                             msg_area.scroll_up();
-                        },
+                        }
 
                         Event::Key(Key::Ctrl('n')) => {
                             msg_area.scroll_down();
-                        },
+                        }
 
                         Event::Key(Key::PageUp) => {
                             msg_area.page_up();
-                        },
+                        }
 
                         Event::Key(Key::PageDown) => {
                             msg_area.page_down();
-                        },
+                        }
 
                         // Ok(Event::KeyEvent(Key::Char(ch))) => {
                         // }
@@ -109,8 +109,8 @@ fn main() {
                         //     ctx.0.resize();
                         //     ctx.1.resize(ctx.0.width(), ctx.0.height());
                         // }
-
-                        _ => {}
+                        _ =>
+                            {}
                     }
                 }
 

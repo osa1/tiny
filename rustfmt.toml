@@ -1,0 +1,4 @@
+error_on_line_overflow = false
+error_on_line_overflow_comments = false
+match_arm_forces_newline = true
+wrap_match_arms = false

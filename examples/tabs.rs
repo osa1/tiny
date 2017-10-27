@@ -12,30 +12,36 @@ use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
-use term_input::{Input, Event};
+use term_input::{Event, Input};
 use tiny::config::Colors;
 use tiny::tui::tabbed::MsgSource;
 use tiny::tui::tabbed::TabStyle;
-use tiny::tui::{TUI, TUIRet, MsgTarget, Timestamp};
+use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
 
 fn main() {
     let mut tui = TUI::new(Colors::default());
 
-    for serv_idx in 0 .. 10 {
+    for serv_idx in 0..10 {
         let server = format!("server_{}", serv_idx);
         tui.new_server_tab(&server);
 
         tui.new_chan_tab(&server, "chan_0");
-        tui.set_tab_style(TabStyle::NewMsg, &MsgTarget::Chan {
-            serv_name: &server,
-            chan_name: "chan_0"
-        });
+        tui.set_tab_style(
+            TabStyle::NewMsg,
+            &MsgTarget::Chan {
+                serv_name: &server,
+                chan_name: "chan_0",
+            },
+        );
 
         tui.new_chan_tab(&server, "chan_1");
-        tui.set_tab_style(TabStyle::Highlight, &MsgTarget::Chan {
-            serv_name: &server,
-            chan_name: "chan_1"
-        });
+        tui.set_tab_style(
+            TabStyle::Highlight,
+            &MsgTarget::Chan {
+                serv_name: &server,
+                chan_name: "chan_1",
+            },
+        );
 
         tui.new_chan_tab(&server, "chan_2");
     }
@@ -47,13 +53,13 @@ fn main() {
         &EventedFd(&libc::STDIN_FILENO),
         Token(libc::STDIN_FILENO as usize),
         Ready::readable(),
-        PollOpt::level()).unwrap();
+        PollOpt::level(),
+    ).unwrap();
 
     let mut ev_buffer: Vec<Event> = Vec::new();
     let mut input = Input::new();
     let mut events = Events::with_capacity(10);
-    'mainloop:
-    loop {
+    'mainloop: loop {
         match poll.poll(&mut events, None) {
             Err(_) => {
                 tui.resize();
@@ -66,27 +72,37 @@ fn main() {
                         TUIRet::Input { msg, from } => {
                             let msg_string = msg.iter().cloned().collect::<String>();
                             match from {
-                                MsgSource::Chan { serv_name, chan_name } => {
+                                MsgSource::Chan {
+                                    serv_name,
+                                    chan_name,
+                                } => {
                                     tui.add_privmsg(
                                         "me",
                                         &msg_string,
                                         Timestamp::now(),
-                                        &MsgTarget::Chan { serv_name: &serv_name, chan_name: &chan_name });
+                                        &MsgTarget::Chan {
+                                            serv_name: &serv_name,
+                                            chan_name: &chan_name,
+                                        },
+                                    );
                                 }
 
                                 MsgSource::Serv { .. } => {
                                     tui.add_client_err_msg(
                                         "Can't send PRIVMSG to a server.",
-                                        &MsgTarget::CurrentTab);
+                                        &MsgTarget::CurrentTab,
+                                    );
                                 }
 
-                                _ => {}
+                                _ =>
+                                    {}
                             }
                         }
                         TUIRet::Abort => {
                             break 'mainloop;
                         }
-                        _ => {}
+                        _ =>
+                            {}
                     }
                 }
                 tui.draw();
