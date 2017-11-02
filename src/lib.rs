@@ -972,7 +972,25 @@ impl<'poll> Tiny<'poll> {
                             nick: nick,
                         },
                     );
-                } else {
+                }
+                // Not in any of the RFCs. Also known as ERR_BANONCHAN on the internets.
+                // Sent by freenode when nick change failed. See issue #29.
+                else if n == 435 && params.len() == 4 {
+                    // 0: old nick
+                    // 1: new nick
+                    let chan = &params[2];
+                    let msg = &params[3];
+                    let serv_name = self.conns[conn_idx].get_serv_name();
+                    self.tui.add_err_msg(
+                        &format!("{}: {}", chan, msg),
+                        Timestamp::now(),
+                        &MsgTarget::Server {
+                            serv_name: serv_name,
+                        },
+                    );
+                }
+                // add everything else to debug file
+                else {
                     self.logger.get_debug_logs().write_line(format_args!(
                         "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
                         pfx,
