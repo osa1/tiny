@@ -204,8 +204,6 @@ pub enum MsgTarget<'a> {
 
     /// Show the message in currently active tab.
     CurrentTab,
-
-    MultipleTabs(Vec<MsgTarget<'a>>),
 }
 
 impl TUI {

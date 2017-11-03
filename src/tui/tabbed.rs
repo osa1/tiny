@@ -664,11 +664,6 @@ impl Tabbed {
             MsgTarget::CurrentTab => {
                 target_idxs.push(self.active_idx);
             }
-
-            MsgTarget::MultipleTabs(ref targets) =>
-                for target in targets.iter() {
-                    self.apply_to_target(target, f);
-                },
         }
 
         // Create server/chan/user tab when necessary
@@ -707,12 +702,6 @@ impl Tabbed {
 
             MsgTarget::User { serv_name, nick } =>
                 opt_to_vec(self.new_user_tab(serv_name, nick)),
-
-            MsgTarget::MultipleTabs(ref targets) =>
-                targets
-                    .iter()
-                    .flat_map(|t: &MsgTarget| self.maybe_create_tab(t))
-                    .collect(),
 
             _ =>
                 vec![],
