@@ -136,7 +136,7 @@ struct Tiny<'poll> {
     logger: Logger,
 }
 
-static STDIN_TOKEN: Token = Token(libc::STDIN_FILENO as usize);
+const STDIN_TOKEN: Token = Token(libc::STDIN_FILENO as usize);
 
 impl<'poll> Tiny<'poll> {
     pub fn run(

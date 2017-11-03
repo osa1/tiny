@@ -68,10 +68,6 @@ impl TUI {
 // Tab stuff
 
 impl TUI {
-    pub fn count_tabs(&self) -> usize {
-        self.ui.count_tabs()
-    }
-
     pub fn new_server_tab(&mut self, serv_name: &str) {
         self.ui.new_server_tab(serv_name);
     }
@@ -154,7 +150,7 @@ impl TUI {
                     TUIRet::KeyHandled
                 } else {
                     // TODO: Paste with newlines
-                    TUIRet::EventIgnored(Event::String(str.to_owned()))
+                    TUIRet::EventIgnored(Event::String(str))
                 }
             }
 
@@ -183,7 +179,6 @@ impl TUI {
 
 /// Target of a message coming from an IRC server.
 /// `size_of::<MsgTarget>() == 40`. Good idea to pass by reference.
-#[derive(Debug)]
 pub enum MsgTarget<'a> {
     Server { serv_name: &'a str },
     Chan {
@@ -198,9 +193,6 @@ pub enum MsgTarget<'a> {
     /// Show the message all server tabs that have the user. (i.e. channels,
     /// privmsg tabs)
     AllUserTabs { serv_name: &'a str, nick: &'a str },
-
-    /// Show the message in all tabs.
-    AllTabs,
 
     /// Show the message in currently active tab.
     CurrentTab,

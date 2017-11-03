@@ -12,8 +12,8 @@ use tui::MsgTarget;
 use tui::termbox;
 use tui::widget::WidgetRet;
 
-static LEFT_ARROW: char = '<';
-static RIGHT_ARROW: char = '>';
+const LEFT_ARROW: char = '<';
+const RIGHT_ARROW: char = '>';
 
 // TODO: How to reorder tabs?
 // TODO: How to report errors?
@@ -159,10 +159,6 @@ impl Tabbed {
             height: height,
             h_scroll: 0,
         }
-    }
-
-    pub fn count_tabs(&self) -> usize {
-        self.tabs.len()
     }
 
     /// Returns index of the new tab if a new tab is created.
@@ -654,11 +650,6 @@ impl Tabbed {
                                 target_idxs.push(tab_idx);
                             },
                     }
-                },
-
-            MsgTarget::AllTabs =>
-                for tab_idx in 0..self.tabs.len() {
-                    target_idxs.push(tab_idx);
                 },
 
             MsgTarget::CurrentTab => {
