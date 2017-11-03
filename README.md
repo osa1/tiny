@@ -267,10 +267,6 @@ start, open an issue and I'd love to help.
 
 - SSL support
 
-- There's currently no way to see all nicks in a channel. (currently to see if
-  someone's online in a channel you can do `<nick><TAB>` and see if auto
-  completion works)
-
 - Only a small subset of IRC messages are implemented. I don't moderate
   channels, so my needs are simple. For moderation commands or other commands
   that tiny currently doesn't support, maybe we should implement a "send raw
