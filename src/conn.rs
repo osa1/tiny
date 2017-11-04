@@ -392,14 +392,16 @@ impl<'poll> Conn<'poll> {
         self.reregister_for_rw();
     }
 
-    pub fn split_privmsg<'a>(&self, target: &'a str, msg: &'a str) -> utils::SplitIterator<'a> {
+    /// `extra_len`: Size (in bytes) for a prefix/suffix etc. that'll be added to each line.
+    /// Strings returned by the iterator will have enough room for that.
+    pub fn split_privmsg<'a>(&self, extra_len: i32, msg: &'a str) -> utils::SplitIterator<'a> {
         // Max msg len calculation adapted from hexchat
         // (src/common/outbound.c:split_up_text)
         let mut max: i32 = 512; // RFC 2812
         max -= 3; // :, !, @
         max -= 13; // " PRIVMSG ", " ", :, \r, \n
         max -= self.get_nick().len() as i32;
-        max -= target.len() as i32;
+        max -= extra_len;
         match self.usermask {
             None => {
                 max -= 9; // max username
@@ -422,6 +424,11 @@ impl<'poll> Conn<'poll> {
     // this.
     pub fn privmsg(&mut self, target: &str, msg: &str) {
         wire::privmsg(&mut self.out_buf, target, msg).unwrap();
+        self.reregister_for_rw();
+    }
+
+    pub fn ctcp_action(&mut self, target: &str, msg: &str) {
+        wire::ctcp_action(&mut self.out_buf, target, msg).unwrap();
         self.reregister_for_rw();
     }
 

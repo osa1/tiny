@@ -294,9 +294,22 @@ impl MessagingUI {
         self.reset_activity_line();
     }
 
-    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, highlight: bool) {
+    pub fn add_privmsg(
+        &mut self,
+        sender: &str,
+        msg: &str,
+        ts: Timestamp,
+        highlight: bool,
+        ctcp_action: bool,
+    ) {
         self.reset_activity_line();
         self.add_timestamp(ts);
+
+        if ctcp_action {
+            self.msg_area
+                .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+            self.msg_area.add_text("** ");
+        }
 
         {
             let nick_color = self.get_nick_color(sender);
@@ -307,13 +320,16 @@ impl MessagingUI {
 
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
-        self.msg_area.add_text(": ");
 
-        self.msg_area.set_style(SegStyle::SchemeStyle(if highlight {
-            SchemeStyle::Highlight
-        } else {
-            SchemeStyle::UserMsg
-        }));
+        if !ctcp_action {
+            self.msg_area.add_char(':');
+        }
+        self.msg_area.add_char(' ');
+
+        if highlight {
+            self.msg_area
+                .set_style(SegStyle::SchemeStyle(SchemeStyle::Highlight));
+        }
 
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
@@ -400,7 +416,7 @@ impl MessagingUI {
             line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
             line.add_text(old_nick);
             line.set_style(SegStyle::SchemeStyle(SchemeStyle::Nick));
-            line.add_text(">");
+            line.add_char('>');
             line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
             line.add_text(new_nick);
             line.add_char(' ');

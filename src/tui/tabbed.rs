@@ -720,9 +720,16 @@ impl Tabbed {
         });
     }
 
-    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
+    pub fn add_privmsg(
+        &mut self,
+        sender: &str,
+        msg: &str,
+        ts: Timestamp,
+        target: &MsgTarget,
+        ctcp_action: bool,
+    ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_privmsg(sender, msg, ts, false);
+            tab.widget.add_privmsg(sender, msg, ts, false, ctcp_action);
         });
     }
 
@@ -732,9 +739,10 @@ impl Tabbed {
         msg: &str,
         ts: Timestamp,
         target: &MsgTarget,
+        ctcp_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_privmsg(sender, msg, ts, true);
+            tab.widget.add_privmsg(sender, msg, ts, true, ctcp_action);
         });
     }
 

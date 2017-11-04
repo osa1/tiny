@@ -4,6 +4,8 @@
 - Tab completion now wraps after reaching the end/beginning (when navigating
   with TAB or arrow keys).
 - Numeric reply 435 (aka. ERR_BANONCHAN) is now handled (#29).
+- tiny now properly renders ACTION messages.
+- `/me` command added for sending ACTION messages.
 
 # 2017/10/15: 0.2.5
 

@@ -254,7 +254,7 @@ impl<'poll> Tiny<'poll> {
                         let msg_str: String = (&msg[1..]).into_iter().cloned().collect();
                         self.handle_cmd(poll, from, &msg_str);
                     } else {
-                        self.send_msg(from, &msg.into_iter().collect::<String>());
+                        self.send_msg(from, &msg.into_iter().collect::<String>(), false);
                     }
                 }
                 TUIRet::KeyHandled =>
@@ -308,10 +308,21 @@ impl<'poll> Tiny<'poll> {
                         nick: words[1].to_owned(),
                     },
                     msg,
+                    false,
                 );
             } else {
                 self.tui
                     .add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
+            }
+        } else if words[0] == "me" {
+            let mut word_indices = utils::split_whitespace_indices(msg);
+            word_indices.next(); // "/me"
+            if let Some(msg_begins) = word_indices.next() {
+                let msg = &msg[msg_begins..];
+                self.send_msg(src, msg, true);
+            } else {
+                self.tui
+                    .add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
             }
         } else if words[0] == "away" {
             let mut word_indices = utils::split_whitespace_indices(msg);
@@ -496,7 +507,7 @@ impl<'poll> Tiny<'poll> {
         conn.part(chan);
     }
 
-    fn send_msg(&mut self, from: MsgSource, msg: &str) {
+    fn send_msg(&mut self, from: MsgSource, msg: &str, ctcp_action: bool) {
         // `tui_target`: Where to show the message on TUI
         // `msg_target`: Actual PRIVMSG target to send to the server
         // `serv_name`: Server name to find connection in `self.conns`
@@ -551,9 +562,20 @@ impl<'poll> Tiny<'poll> {
 
         let conn = find_conn(&mut self.conns, serv_name).unwrap();
         let ts = Timestamp::now();
-        for msg in conn.split_privmsg(msg_target, msg) {
-            conn.privmsg(msg_target, msg);
-            self.tui.add_privmsg(conn.get_nick(), msg, ts, &tui_target);
+        let extra_len = msg_target.len() as i32 + if ctcp_action {
+            9 // "\0x1ACTION \0x1".len()
+        } else {
+            0
+        };
+        let send_fn = if ctcp_action {
+            Conn::ctcp_action
+        } else {
+            Conn::privmsg
+        };
+        for msg in conn.split_privmsg(extra_len, msg) {
+            send_fn(conn, msg_target, msg);
+            self.tui
+                .add_privmsg(conn.get_nick(), msg, ts, &tui_target, ctcp_action);
         }
     }
 
@@ -697,6 +719,9 @@ impl<'poll> Tiny<'poll> {
                     Pfx::User { ref nick, .. } =>
                         nick,
                 };
+
+                let (msg, is_ctcp_action) = wire::check_ctcp_action_msg(&msg);
+
                 match target {
                     wire::MsgTarget::Chan(chan) => {
                         self.logger
@@ -708,8 +733,13 @@ impl<'poll> Tiny<'poll> {
                         };
                         // highlight the message if it mentions us
                         if msg.find(conn.get_nick()).is_some() {
-                            self.tui
-                                .add_privmsg_highlight(origin, &msg, ts, &msg_target);
+                            self.tui.add_privmsg_highlight(
+                                origin,
+                                &msg,
+                                ts,
+                                &msg_target,
+                                is_ctcp_action,
+                            );
                             self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
                             let mentions_target = MsgTarget::Server {
                                 serv_name: "mentions",
@@ -728,7 +758,8 @@ impl<'poll> Tiny<'poll> {
                             self.tui
                                 .set_tab_style(TabStyle::Highlight, &mentions_target);
                         } else {
-                            self.tui.add_privmsg(origin, &msg, ts, &msg_target);
+                            self.tui
+                                .add_privmsg(origin, &msg, ts, &msg_target, is_ctcp_action);
                             self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                         }
                     }
@@ -749,7 +780,8 @@ impl<'poll> Tiny<'poll> {
                                     nick: nick,
                                 },
                         };
-                        self.tui.add_privmsg(origin, &msg, ts, &msg_target);
+                        self.tui
+                            .add_privmsg(origin, &msg, ts, &msg_target, is_ctcp_action);
                         if target == conn.get_nick() {
                             self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
                         } else {

@@ -213,8 +213,15 @@ impl TUI {
 
     /// privmsg is a message coming from a server or client. Shown with sender's
     /// nick/name and receive time and logged.
-    pub fn add_privmsg(&mut self, sender: &str, msg: &str, ts: Timestamp, target: &MsgTarget) {
-        self.ui.add_privmsg(sender, msg, ts, target);
+    pub fn add_privmsg(
+        &mut self,
+        sender: &str,
+        msg: &str,
+        ts: Timestamp,
+        target: &MsgTarget,
+        ctcp_action: bool,
+    ) {
+        self.ui.add_privmsg(sender, msg, ts, target, ctcp_action);
     }
 
     /// Similar to `add_privmsg`, except the whole message is highlighted.
@@ -224,8 +231,10 @@ impl TUI {
         msg: &str,
         ts: Timestamp,
         target: &MsgTarget,
+        ctcp_action: bool,
     ) {
-        self.ui.add_privmsg_highlight(sender, msg, ts, target);
+        self.ui
+            .add_privmsg_highlight(sender, msg, ts, target, ctcp_action);
     }
 
     /// A message without any explicit sender info. Useful for e.g. in server

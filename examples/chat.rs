@@ -42,7 +42,7 @@ fn main() {
             let now = Timestamp::now();
             let nick = format!("nick_{}", line_idx);
             tui.add_nick(&nick, Some(now), &chan_target);
-            tui.add_privmsg(&nick, line, now, &chan_target);
+            tui.add_privmsg(&nick, line, now, &chan_target, false);
         }
     }
 

@@ -35,6 +35,11 @@ pub fn privmsg<W: Write>(mut sink: W, msgtarget: &str, msg: &str) -> std::io::Re
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
+pub fn ctcp_action<W: Write>(mut sink: W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
+    assert!(msgtarget.len() + msg.len() + 21 <= 512);
+    write!(sink, "PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
+}
+
 pub fn away<W: Write>(mut sink: W, msg: Option<&str>) -> std::io::Result<()> {
     match msg {
         None =>
@@ -330,6 +335,24 @@ pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
     None
 }
 
+static CTCP_PREFIX: &'static str = "\x01ACTION ";
+
+pub fn check_ctcp_action_msg(msg: &str) -> (&str, bool) {
+    let msg_bytes = msg.as_bytes();
+    if msg_bytes.len() >= 8 && &msg_bytes[..8] == CTCP_PREFIX.as_bytes() {
+        (
+            if msg_bytes[msg.len() - 1] == 0x01 {
+                &msg[8..msg.len() - 1]
+            } else {
+                &msg[8..]
+            },
+            true,
+        )
+    } else {
+        (msg, false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,5 +479,29 @@ mod tests {
             })
         );
         assert_eq!(buf.len(), 0);
+    }
+
+    #[test]
+    fn test_ctcp_action_parsing() {
+        assert_eq!(
+            check_ctcp_action_msg("\x01ACTION msg contents\x01"),
+            ("msg contents", true)
+        );
+
+        // From https://modern.ircdocs.horse/ctcp.html:
+        //
+        // > The final <delim> MUST be sent, but parsers SHOULD accept incoming messages which lack
+        // > it (particularly for CTCP ACTION). This is due to how some software incorrectly
+        // > implements message splitting.
+        assert_eq!(
+            check_ctcp_action_msg("\x01ACTION msg contents"),
+            ("msg contents", true)
+        );
+
+        assert_eq!(check_ctcp_action_msg(""), ("", false));
+
+        assert_eq!(check_ctcp_action_msg("\x01ACTION "), ("", true));
+
+        assert_eq!(check_ctcp_action_msg("\x01ACTION"), ("\x01ACTION", false));
     }
 }
