@@ -1,6 +1,10 @@
 extern crate gcc;
 
 fn main() {
-    gcc::compile_library("libtermbox.a", &["cbits/termbox.c"]);
+    gcc::Build::new()
+        .file("cbits/termbox.c")
+        .include("cbits")
+        .define("_XOPEN_SOURCE", None)
+        .compile("libtermbox.a");
     println!("cargo:rustc-flags=-l static=termbox");
 }

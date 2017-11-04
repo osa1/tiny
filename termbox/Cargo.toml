@@ -12,7 +12,7 @@ build = "build.rs"
 libc = "0.2"
 
 [build-dependencies]
-gcc = "0.3.35"
+gcc = "0.3.54"
 
 [dev-dependencies]
 mio = "0.6.9"
