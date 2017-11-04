@@ -1,13 +1,19 @@
 #![cfg_attr(test, feature(test))]
 #![feature(alloc_system)]
+#![feature(allocator_api)]
 #![feature(ascii_ctype)]
-#![feature(offset_to)]
 #![feature(const_fn)]
+#![feature(global_allocator)]
+#![feature(offset_to)]
+
+extern crate alloc_system;
+
+#[global_allocator]
+static ALLOC: alloc_system::System = alloc_system::System;
 
 #[cfg(test)]
 extern crate quickcheck;
 
-extern crate alloc_system;
 extern crate libc;
 extern crate mio;
 extern crate net2;
