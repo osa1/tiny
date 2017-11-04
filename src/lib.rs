@@ -497,57 +497,63 @@ impl<'poll> Tiny<'poll> {
     }
 
     fn send_msg(&mut self, from: MsgSource, msg: &str) {
-        match from {
-            MsgSource::Serv { ref serv_name } =>
-                if serv_name == "mentions" {
-                    self.tui.add_client_err_msg(
-                        "Use `/connect <server>` to connect to a server",
-                        &MsgTarget::CurrentTab,
-                    );
-                } else {
-                    self.tui.add_client_err_msg(
-                        "Can't send PRIVMSG to a server.",
-                        &MsgTarget::CurrentTab,
-                    );
-                },
+        // `tui_target`: Where to show the message on TUI
+        // `msg_target`: Actual PRIVMSG target to send to the server
+        // `serv_name`: Server name to find connection in `self.conns`
+        let (tui_target, msg_target, serv_name) = {
+            match from {
+                MsgSource::Serv { ref serv_name } => {
+                    if serv_name == "mentions" {
+                        self.tui.add_client_err_msg(
+                            "Use `/connect <server>` to connect to a server",
+                            &MsgTarget::CurrentTab,
+                        );
+                    } else {
+                        self.tui.add_client_err_msg(
+                            "Can't send message to a server.",
+                            &MsgTarget::CurrentTab,
+                        );
+                    }
+                    return;
+                }
 
-            MsgSource::Chan {
-                serv_name,
-                chan_name,
-            } => {
-                let conn = find_conn(&mut self.conns, &serv_name).unwrap();
-                for msg in conn.split_privmsg(&chan_name, msg) {
-                    conn.privmsg(&chan_name, msg);
-                    self.tui.add_privmsg(
-                        conn.get_nick(),
-                        msg,
-                        Timestamp::now(),
-                        &MsgTarget::Chan {
-                            serv_name: &serv_name,
-                            chan_name: &chan_name,
+                MsgSource::Chan {
+                    ref serv_name,
+                    ref chan_name,
+                } =>
+                    (
+                        MsgTarget::Chan {
+                            serv_name: serv_name,
+                            chan_name: chan_name,
                         },
-                    );
-                }
-            }
+                        chan_name,
+                        serv_name,
+                    ),
 
-            MsgSource::User { serv_name, nick } => {
-                let conn = find_conn(&mut self.conns, &serv_name).unwrap();
-                let msg_target = if nick.eq_ignore_ascii_case("nickserv") {
-                    MsgTarget::Server {
-                        serv_name: &serv_name,
-                    }
-                } else {
-                    MsgTarget::User {
-                        serv_name: &serv_name,
-                        nick: &nick,
-                    }
-                };
-                for msg in conn.split_privmsg(&nick, msg) {
-                    conn.privmsg(&nick, msg);
-                    self.tui
-                        .add_privmsg(conn.get_nick(), msg, Timestamp::now(), &msg_target);
+                MsgSource::User {
+                    ref serv_name,
+                    ref nick,
+                } => {
+                    let msg_target = if nick.eq_ignore_ascii_case("nickserv") {
+                        MsgTarget::Server {
+                            serv_name: serv_name,
+                        }
+                    } else {
+                        MsgTarget::User {
+                            serv_name: serv_name,
+                            nick: nick,
+                        }
+                    };
+                    (msg_target, nick, serv_name)
                 }
             }
+        };
+
+        let conn = find_conn(&mut self.conns, serv_name).unwrap();
+        let ts = Timestamp::now();
+        for msg in conn.split_privmsg(msg_target, msg) {
+            conn.privmsg(msg_target, msg);
+            self.tui.add_privmsg(conn.get_nick(), msg, ts, &tui_target);
         }
     }
 
