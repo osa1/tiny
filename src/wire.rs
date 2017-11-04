@@ -168,7 +168,7 @@ impl Msg {
                     // drop the : from pfx
                     pfx = &pfx[1..];
                     slice = &slice_[1..]; // drop the space
-                    Some(parse_pfx(&pfx))
+                    Some(parse_pfx(pfx))
                 } else {
                     None
                 }

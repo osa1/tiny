@@ -741,7 +741,7 @@ impl<'poll> Tiny<'poll> {
                         if msg.find(conn.get_nick()).is_some() {
                             self.tui.add_privmsg_highlight(
                                 origin,
-                                &msg,
+                                msg,
                                 ts,
                                 &msg_target,
                                 is_ctcp_action,
@@ -765,7 +765,7 @@ impl<'poll> Tiny<'poll> {
                                 .set_tab_style(TabStyle::Highlight, &mentions_target);
                         } else {
                             self.tui
-                                .add_privmsg(origin, &msg, ts, &msg_target, is_ctcp_action);
+                                .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
                             self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                         }
                     }
@@ -787,7 +787,7 @@ impl<'poll> Tiny<'poll> {
                                 },
                         };
                         self.tui
-                            .add_privmsg(origin, &msg, ts, &msg_target, is_ctcp_action);
+                            .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
                         if target == conn.get_nick() {
                             self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
                         } else {
