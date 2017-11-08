@@ -16,6 +16,7 @@ extern crate quickcheck;
 
 extern crate libc;
 extern crate mio;
+extern crate native_tls;
 extern crate net2;
 extern crate serde;
 #[macro_use]
@@ -23,6 +24,7 @@ extern crate serde_derive;
 extern crate serde_yaml;
 extern crate time;
 
+extern crate take_mut;
 extern crate term_input;
 extern crate termbox_simple;
 
@@ -31,6 +33,7 @@ mod utils;
 
 mod conn;
 mod logger;
+mod stream;
 mod wire;
 pub mod config;
 pub mod trie;
@@ -894,10 +897,12 @@ impl<'poll> Tiny<'poll> {
                 },
 
             Cmd::PING { .. } =>
-                {} // ignore
+                {}
+            // ignore
             Cmd::Other { ref cmd, .. } if cmd == "PONG" =>
-                {} // ignore
+                {}
 
+            // ignore
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                         || n == 251 /* RPL_LUSERCLIENT */
