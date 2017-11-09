@@ -224,11 +224,11 @@ impl TextField {
                 if self.cursor > 0 {
                     let mut cur = self.cursor as usize;
                     let mut skipped = false;
-                    while cur > 0 && self.buffer[cur - 1].is_whitespace() {
+                    while cur > 0 && self.char_at(cur - 1).is_whitespace() {
                         cur -= 1;
                         skipped = true;
                     }
-                    while cur > 0 && self.buffer[cur - 1].is_alphanumeric() {
+                    while cur > 0 && self.char_at(cur - 1).is_alphanumeric() {
                         cur -= 1;
                         skipped = true;
                     }
@@ -241,14 +241,15 @@ impl TextField {
             }
 
             Key::CtrlArrow(Arrow::Right) => {
-                if (self.cursor as usize) < self.buffer.len() {
+                let len = self.line_len() as usize;
+                if (self.cursor as usize) < len {
                     let mut cur = self.cursor as usize;
                     let mut skipped = false;
-                    while cur < self.buffer.len() && self.buffer[cur].is_alphanumeric() {
+                    while cur < len && self.char_at(cur).is_alphanumeric() {
                         cur += 1;
                         skipped = true;
                     }
-                    while cur < self.buffer.len() && self.buffer[cur].is_whitespace() {
+                    while cur < len && self.char_at(cur).is_whitespace() {
                         cur += 1;
                         skipped = true;
                     }
@@ -426,6 +427,34 @@ impl TextField {
                 ..
             } =>
                 (original_buffer.len() + completions[current_completion].len()) as i32,
+        }
+    }
+
+    fn char_at(&self, idx: usize) -> char {
+        match self.mode {
+            Mode::Edit =>
+                self.buffer[idx],
+            Mode::History(hist_curs) =>
+                self.history[hist_curs as usize][idx],
+            Mode::Autocomplete {
+                ref original_buffer,
+                insertion_point,
+                ref completions,
+                current_completion,
+                ..
+            } =>
+                if idx < insertion_point {
+                    original_buffer[idx]
+                } else if idx >= insertion_point
+                    && idx < insertion_point + completions[current_completion].len()
+                {
+                    completions[current_completion]
+                        .chars()
+                        .nth(idx - insertion_point)
+                        .unwrap()
+                } else {
+                    original_buffer[idx - completions[current_completion].len()]
+                },
         }
     }
 
@@ -613,4 +642,33 @@ fn is_nick_char(c: char) -> bool {
     c.is_alphanumeric() || (c as i32 >= 0x5B && c as i32 <= 0x60)
         || (c as i32 >= 0x7B && c as i32 <= 0x7D) || c == '-' // not valid according to RFC 2812 but servers accept it and I've seen nicks with
                                                               // this char in the wild
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+
+    extern crate test;
+
+    use super::*;
+    use term_input::{Arrow, Key};
+
+    #[test]
+    fn text_field_bug() {
+        let mut text_field = TextField::new(10);
+        text_field.keypressed(Key::Char('a'));
+        text_field.keypressed(Key::Char(' '));
+        text_field.keypressed(Key::Char('b'));
+        text_field.keypressed(Key::Char(' '));
+        text_field.keypressed(Key::Char('c'));
+        text_field.keypressed(Key::Enter);
+        text_field.keypressed(Key::Arrow(Arrow::Up));
+        // this panics:
+        text_field.keypressed(Key::CtrlArrow(Arrow::Left));
+        // a b ^c
+        assert_eq!(text_field.cursor, 4);
+        text_field.keypressed(Key::CtrlArrow(Arrow::Right));
+        assert_eq!(text_field.cursor, 5);
+    }
 }

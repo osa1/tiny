@@ -6,6 +6,7 @@
 - Numeric reply 435 (aka. ERR_BANONCHAN) is now handled (#29).
 - tiny now properly renders ACTION messages.
 - `/me` command added for sending ACTION messages.
+- A bug in the input field that caused crashes fixed.
 
 # 2017/10/15: 0.2.5
 
