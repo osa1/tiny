@@ -1,4 +1,5 @@
 use mio::Poll;
+use mio::Token;
 use net2::TcpBuilder;
 use net2::TcpStreamExt;
 use std::io::Read;
@@ -81,6 +82,10 @@ impl<'poll> TcpStream<'poll> {
             }
         }
     }
+
+    pub fn get_tok(&self) -> Token {
+        Token(self.inner.as_raw_fd() as usize)
+    }
 }
 
 // Drop just deregisters the socket
@@ -100,6 +105,7 @@ impl<'poll> Write for TcpStream<'poll> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         // TODO inefficient when the socket is already ready for writing
         self.out_buf.extend(buf);
+        reregister_for_rw(&self.poll, self.inner.as_raw_fd());
         Ok(buf.len())
     }
 

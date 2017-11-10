@@ -6,10 +6,12 @@
 #![feature(global_allocator)]
 #![feature(offset_to)]
 
+/*
 extern crate alloc_system;
 
 #[global_allocator]
 static ALLOC: alloc_system::System = alloc_system::System;
+*/
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -165,7 +167,7 @@ impl<'poll> Tiny<'poll> {
 
         let mut conns = Vec::with_capacity(servers.len());
         for server in servers.iter().cloned() {
-            let conn = Conn::from_server(server, &poll);
+            let conn = Conn::from_server(server, &poll).unwrap();
             conns.push(conn);
         }
 
@@ -477,7 +479,7 @@ impl<'poll> Tiny<'poll> {
         let new_conn = {
             match find_conn(&mut self.conns, src.serv_name()) {
                 Some(current_conn) =>
-                    Conn::from_conn(current_conn, serv_name, serv_port),
+                    Conn::from_conn(current_conn, serv_name, serv_port).unwrap(),
                 None => {
                     self.logger
                         .get_debug_logs()
@@ -492,7 +494,7 @@ impl<'poll> Tiny<'poll> {
                             auto_cmds: self.defaults.auto_cmds.clone(),
                         },
                         poll,
-                    )
+                    ).unwrap()
                 }
             }
         };
