@@ -6,41 +6,41 @@ use std;
 
 use logger::LogFile;
 
-pub fn user<W: Write>(mut sink: W, hostname: &str, realname: &str) -> std::io::Result<()> {
+pub fn user<W: Write>(sink: &mut W, hostname: &str, realname: &str) -> std::io::Result<()> {
     write!(sink, "USER {} 8 * :{}\r\n", hostname, realname)
 }
 
-pub fn nick<W: Write>(mut sink: W, arg: &str) -> std::io::Result<()> {
+pub fn nick<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "NICK {}\r\n", arg)
 }
 
-pub fn ping<W: Write>(mut sink: W, arg: &str) -> std::io::Result<()> {
+pub fn ping<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "PING {}\r\n", arg)
 }
 
-pub fn pong<W: Write>(mut sink: W, arg: &str) -> std::io::Result<()> {
+pub fn pong<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "PONG {}\r\n", arg)
 }
 
-pub fn join<W: Write>(mut sink: W, channel: &str) -> std::io::Result<()> {
+pub fn join<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
     write!(sink, "JOIN {}\r\n", channel)
 }
 
-pub fn part<W: Write>(mut sink: W, channel: &str) -> std::io::Result<()> {
+pub fn part<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
     write!(sink, "PART {}\r\n", channel)
 }
 
-pub fn privmsg<W: Write>(mut sink: W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
+pub fn privmsg<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
     assert!(msgtarget.len() + msg.len() + 12 <= 512);
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
-pub fn ctcp_action<W: Write>(mut sink: W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
+pub fn ctcp_action<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
     assert!(msgtarget.len() + msg.len() + 21 <= 512);
     write!(sink, "PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
 }
 
-pub fn away<W: Write>(mut sink: W, msg: Option<&str>) -> std::io::Result<()> {
+pub fn away<W: Write>(sink: &mut W, msg: Option<&str>) -> std::io::Result<()> {
     match msg {
         None =>
             write!(sink, "AWAY\r\n"),

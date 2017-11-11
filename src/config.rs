@@ -12,6 +12,10 @@ pub struct Server {
     /// Port of the server
     pub port: u16,
 
+    /// Use tls
+    #[serde(default)]
+    pub tls: bool,
+
     /// Hostname to be used in connection registration
     pub hostname: String,
 
@@ -34,6 +38,7 @@ pub struct Defaults {
     pub hostname: String,
     pub realname: String,
     pub auto_cmds: Vec<String>,
+    #[serde(default)] pub tls: bool,
 }
 
 #[derive(Debug, Deserialize)]

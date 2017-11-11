@@ -16,6 +16,7 @@ extern crate quickcheck;
 
 extern crate libc;
 extern crate mio;
+extern crate native_tls;
 extern crate net2;
 extern crate serde;
 #[macro_use]
@@ -26,11 +27,14 @@ extern crate time;
 extern crate term_input;
 extern crate termbox_simple;
 
+extern crate take_mut;
+
 #[macro_use]
 mod utils;
 
 mod conn;
 mod logger;
+mod stream;
 mod wire;
 pub mod config;
 pub mod trie;
@@ -53,7 +57,7 @@ use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
 
-use conn::{Conn, ConnEv};
+use conn::{Conn, ConnErr, ConnEv};
 use logger::Logger;
 use term_input::Input;
 use tui::tabbed::MsgSource;
@@ -161,21 +165,43 @@ impl<'poll> Tiny<'poll> {
         ).unwrap();
 
         let mut conns = Vec::with_capacity(servers.len());
+
+        let mut tui = TUI::new(colors);
+
+        // init "mentions" tab
+        tui.new_server_tab("mentions");
+        tui.add_client_msg(
+            "Any mentions to you will be listed here.",
+            &MsgTarget::Server {
+                serv_name: "mentions",
+            },
+        );
+
+        tui.draw();
+
         for server in servers.iter().cloned() {
-            let conn = Conn::from_server(server, &poll);
-            conns.push(conn);
+            let msg_target = MsgTarget::Server {
+                serv_name: &server.addr.clone(),
+            };
+            match Conn::from_server(server, &poll) {
+                Ok(conn) => {
+                    conns.push(conn);
+                }
+                Err(err) => {
+                    tui.add_err_msg(&connect_err_msg(&err), Timestamp::now(), &msg_target);
+                }
+            }
         }
 
         let mut tiny = Tiny {
             conns: conns,
             defaults: defaults,
             servers: servers,
-            tui: TUI::new(colors),
+            tui: tui,
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from(log_dir)),
         };
 
-        tiny.init_mentions_tab();
         tiny.tui.draw();
 
         let mut last_tick = Instant::now();
@@ -229,16 +255,6 @@ impl<'poll> Tiny<'poll> {
         }
     }
 
-    fn init_mentions_tab(&mut self) {
-        self.tui.new_server_tab("mentions");
-        self.tui.add_client_msg(
-            "Any mentions to you will be listed here.",
-            &MsgTarget::Server {
-                serv_name: "mentions",
-            },
-        );
-    }
-
     fn handle_stdin(&mut self, poll: &'poll Poll) -> bool {
         let mut ev_buffer = Vec::with_capacity(10);
         let mut abort = false;
@@ -289,9 +305,20 @@ impl<'poll> Tiny<'poll> {
                 },
             );
             match find_conn(&mut self.conns, src.serv_name()) {
-                Some(conn) => {
-                    conn.reconnect(None);
-                }
+                Some(conn) =>
+                    match conn.reconnect(None) {
+                        Ok(()) =>
+                            {}
+                        Err(err) => {
+                            self.tui.add_err_msg(
+                                &reconnect_err_msg(&err),
+                                Timestamp::now(),
+                                &MsgTarget::AllServTabs {
+                                    serv_name: conn.get_serv_name(),
+                                },
+                            );
+                        }
+                    },
                 None => {
                     self.logger
                         .get_debug_logs()
@@ -444,56 +471,69 @@ impl<'poll> Tiny<'poll> {
                     },
             }
         };
-
-        let mut reconnect = false; // borrowchk workaround
-                                   // see if we already have a Conn for this server
         if let Some(conn) = find_conn(&mut self.conns, serv_name) {
-            conn.reconnect(Some((serv_name, serv_port)));
-            reconnect = true;
-        }
-
-        if reconnect {
             self.tui.add_client_msg(
                 "Connecting...",
                 &MsgTarget::AllServTabs {
                     serv_name: serv_name,
                 },
             );
+            match conn.reconnect(Some((serv_name, serv_port))) {
+                Ok(()) =>
+                    {}
+                Err(err) => {
+                    self.tui.add_err_msg(
+                        &reconnect_err_msg(&err),
+                        Timestamp::now(),
+                        &MsgTarget::AllServTabs {
+                            serv_name: conn.get_serv_name(),
+                        },
+                    );
+                }
+            }
             return;
         }
 
+        // can't move the rest to an else branch because of borrowchk
+
         // otherwise create a new Conn, tab etc.
         self.tui.new_server_tab(serv_name);
-        self.tui.add_client_msg(
-            "Connecting...",
-            &MsgTarget::Server {
-                serv_name: serv_name,
-            },
-        );
+        let msg_target = MsgTarget::Server {
+            serv_name: serv_name,
+        };
+        self.tui.add_client_msg("Connecting...", &msg_target);
 
-        let new_conn = {
-            match find_conn(&mut self.conns, src.serv_name()) {
-                Some(current_conn) =>
-                    Conn::from_conn(current_conn, serv_name, serv_port),
-                None => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("connecting to {} {}", serv_name, serv_port));
+        let conn_ret = {
+            match find_conn_idx(&mut self.conns, src.serv_name()) {
+                Some(conn_idx) => {
+                    let old_conn = self.conns.remove(conn_idx);
+                    Conn::from_conn(old_conn, serv_name, serv_port)
+                }
+                None =>
                     Conn::from_server(
                         config::Server {
                             addr: serv_name.to_owned(),
                             port: serv_port,
+                            tls: self.defaults.tls,
                             hostname: self.defaults.hostname.clone(),
                             realname: self.defaults.realname.clone(),
                             nicks: self.defaults.nicks.clone(),
                             auto_cmds: self.defaults.auto_cmds.clone(),
                         },
                         poll,
-                    )
-                }
+                    ),
             }
         };
-        self.conns.push(new_conn);
+
+        match conn_ret {
+            Ok(conn) => {
+                self.conns.push(conn);
+            }
+            Err(err) => {
+                self.tui
+                    .add_err_msg(&connect_err_msg(&err), Timestamp::now(), &msg_target);
+            }
+        }
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {
@@ -592,10 +632,10 @@ impl<'poll> Tiny<'poll> {
         {
             let conn = &mut self.conns[conn_idx];
             if readiness.is_readable() {
-                conn.recv(&mut evs, &mut self.logger);
+                conn.read_ready(&mut evs, &mut self.logger);
             }
             if readiness.is_writable() {
-                conn.send(&mut evs);
+                conn.write_ready(&mut evs);
             }
             if readiness.contains(UnixReady::hup()) {
                 conn.enter_disconnect_state();
@@ -678,20 +718,25 @@ impl<'poll> Tiny<'poll> {
                         serv_name: conn.get_serv_name(),
                     },
                 );
-                conn.reconnect(None);
+                match conn.reconnect(None) {
+                    Ok(()) =>
+                        {}
+                    Err(err) => {
+                        self.tui.add_err_msg(
+                            &reconnect_err_msg(&err),
+                            Timestamp::now(),
+                            &MsgTarget::AllServTabs {
+                                serv_name: conn.get_serv_name(),
+                            },
+                        );
+                    }
+                }
             }
             ConnEv::Err(err) => {
-                // TODO: Some of these errors should not cause a disconnect,
-                // e.g. EAGAIN, EWOULDBLOCK ...
                 let conn = &mut self.conns[conn_idx];
                 conn.enter_disconnect_state();
                 self.tui.add_err_msg(
-                    &format!(
-                        "Connection error: {}. \
-                         Will try to reconnect in {} seconds.",
-                        err.description(),
-                        conn::RECONNECT_TICKS
-                    ),
+                    &reconnect_err_msg(&err),
                     Timestamp::now(),
                     &MsgTarget::AllServTabs {
                         serv_name: conn.get_serv_name(),
@@ -894,10 +939,12 @@ impl<'poll> Tiny<'poll> {
                 },
 
             Cmd::PING { .. } =>
-                {} // ignore
+                {}
+            // ignore
             Cmd::Other { ref cmd, .. } if cmd == "PONG" =>
-                {} // ignore
+                {}
 
+            // ignore
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                         || n == 251 /* RPL_LUSERCLIENT */
@@ -1057,7 +1104,7 @@ impl<'poll> Tiny<'poll> {
 
 fn find_token_conn_idx(conns: &[Conn], token: Token) -> Option<usize> {
     for (conn_idx, conn) in conns.iter().enumerate() {
-        if conn.get_conn_tok() == token {
+        if conn.get_conn_tok() == Some(token) {
             return Some(conn_idx);
         }
     }
@@ -1083,4 +1130,17 @@ fn find_conn_idx(conns: &[Conn], serv_name: &str) -> Option<usize> {
         }
     }
     None
+}
+
+fn connect_err_msg(err: &ConnErr) -> String {
+    format!("Connection error: {}", err.description())
+}
+
+fn reconnect_err_msg(err: &ConnErr) -> String {
+    format!(
+        "Connection error: {}. \
+         Will try to reconnect in {} seconds.",
+        err.description(),
+        conn::RECONNECT_TICKS
+    )
 }

@@ -7,6 +7,8 @@
 - tiny now properly renders ACTION messages.
 - `/me` command added for sending ACTION messages.
 - A bug in the input field that caused crashes fixed.
+- tiny now supports TLS! Add `tls: true` to your server setting in
+  `.tinyrc.yml` to use. The field is optional and the default is `false`.
 
 # 2017/10/15: 0.2.5
 
