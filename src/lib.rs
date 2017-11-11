@@ -6,12 +6,10 @@
 #![feature(global_allocator)]
 #![feature(offset_to)]
 
-/*
 extern crate alloc_system;
 
 #[global_allocator]
 static ALLOC: alloc_system::System = alloc_system::System;
-*/
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -68,8 +66,6 @@ use tui::{MsgTarget, TUIRet, Timestamp, TUI};
 use wire::{Cmd, Msg, Pfx};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// pub fn run() {}
 
 pub fn run() {
     let config_path = config::get_config_path();
