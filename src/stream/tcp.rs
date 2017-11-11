@@ -41,12 +41,18 @@ impl<'poll> TcpStream<'poll> {
         let stream = {
             match addr {
                 SocketAddr::V4(_) =>
-                    TcpBuilder::new_v4().unwrap().to_tcp_stream().unwrap(),
+                    TcpBuilder::new_v4()
+                        .map_err(TcpError::IoError)?
+                        .to_tcp_stream()
+                        .map_err(TcpError::IoError)?,
                 SocketAddr::V6(_) =>
-                    TcpBuilder::new_v6().unwrap().to_tcp_stream().unwrap(),
+                    TcpBuilder::new_v6()
+                        .map_err(TcpError::IoError)?
+                        .to_tcp_stream()
+                        .map_err(TcpError::IoError)?,
             }
         };
-        stream.set_nonblocking(true).unwrap();
+        stream.set_nonblocking(true).map_err(TcpError::IoError)?;
         // This will fail with EINPROGRESS
         let _ = stream.connect(addr);
         register_for_r(poll, stream.as_raw_fd());
