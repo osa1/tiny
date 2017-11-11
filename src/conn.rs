@@ -441,8 +441,10 @@ impl<'poll> Conn<'poll> {
     pub fn write_ready(&mut self, evs: &mut Vec<ConnEv>) {
         if let Some(stream) = self.status.get_stream_mut() {
             match stream.write_ready() {
-                Err(tcp_err) =>
-                    evs.push(ConnEv::Err(StreamErr::from(tcp_err))),
+                Err(err) =>
+                    if !err.is_would_block() {
+                        evs.push(ConnEv::Err(StreamErr::from(err)));
+                    },
                 Ok(()) =>
                     {}
             }
@@ -461,7 +463,9 @@ impl<'poll> Conn<'poll> {
                 Some(stream) =>
                     match stream.read_ready(&mut read_buf) {
                         Err(err) => {
-                            evs.push(ConnEv::Err(StreamErr::from(err)));
+                            if !err.is_would_block() {
+                                evs.push(ConnEv::Err(StreamErr::from(err)));
+                            }
                             None
                         }
                         Ok(bytes_read) =>
@@ -476,10 +480,6 @@ impl<'poll> Conn<'poll> {
             self.reset_ticks();
             self.in_buf.extend(&read_buf[0..bytes_read]);
             self.handle_msgs(evs, logger);
-            if bytes_read == 0 {
-                evs.push(ConnEv::Disconnected);
-                self.status = ConnStatus::Disconnected { ticks_passed: 0 };
-            }
         }
     }
 

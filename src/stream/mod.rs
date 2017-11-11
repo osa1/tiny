@@ -29,6 +29,17 @@ pub enum StreamErr {
     ConnectionClosed,
 }
 
+impl StreamErr {
+    pub fn is_would_block(&self) -> bool {
+        match *self {
+            StreamErr::IoError(ref err) =>
+                err.kind() == io::ErrorKind::WouldBlock,
+            _ =>
+                false,
+        }
+    }
+}
+
 pub type Result<T> = result::Result<T, StreamErr>;
 
 impl From<TcpError> for StreamErr {
@@ -38,6 +49,8 @@ impl From<TcpError> for StreamErr {
                 StreamErr::IoError(io_err),
             TcpError::CantResolveAddr =>
                 StreamErr::CantResolveAddr,
+            TcpError::ConnectionClosed =>
+                StreamErr::ConnectionClosed,
         }
     }
 }
@@ -49,8 +62,6 @@ impl From<TlsError> for StreamErr {
                 StreamErr::from(err),
             TlsError::TlsError(err) =>
                 StreamErr::TlsError(err),
-            TlsError::ConnectionClosed =>
-                StreamErr::ConnectionClosed,
         }
     }
 }

@@ -25,7 +25,6 @@ pub enum TlsStream<'poll> {
 pub enum TlsError {
     TcpError(TcpError),
     TlsError(tls::Error),
-    ConnectionClosed,
 }
 
 impl<'poll> TlsStream<'poll> {
@@ -86,9 +85,6 @@ impl<'poll> TlsStream<'poll> {
                 },
             TlsStream::Connected { mut stream } => {
                 match stream.read(buf) {
-                    Ok(0) => {
-                        ret = Err(TlsError::ConnectionClosed);
-                    }
                     Ok(n) => {
                         ret = Ok(n);
                     }

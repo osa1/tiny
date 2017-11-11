@@ -26,6 +26,7 @@ pub struct TcpStream<'poll> {
 pub enum TcpError {
     IoError(io::Error),
     CantResolveAddr,
+    ConnectionClosed,
 }
 
 impl<'poll> TcpStream<'poll> {
@@ -79,18 +80,21 @@ impl<'poll> TcpStream<'poll> {
             }
             Err(err) => {
                 reregister_for_rw(&self.poll, self.inner.as_raw_fd());
-                if err.kind() == io::ErrorKind::WouldBlock {
-                    Ok(())
-                } else {
-                    Err(err)
-                }
+                Err(err)
             }
         }
     }
 
     /// Call when the stream is ready for writing.
-    pub fn read_ready(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.read(buf)
+    pub fn read_ready(&mut self, buf: &mut [u8]) -> Result<usize, TcpError> {
+        match self.read(buf) {
+            Ok(0) =>
+                Err(TcpError::ConnectionClosed),
+            Ok(n) =>
+                Ok(n),
+            Err(err) =>
+                Err(TcpError::IoError(err)),
+        }
     }
 
     pub fn get_tok(&self) -> Token {
