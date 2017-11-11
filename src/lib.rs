@@ -507,6 +507,7 @@ impl<'poll> Tiny<'poll> {
                         config::Server {
                             addr: serv_name.to_owned(),
                             port: serv_port,
+                            tls: self.defaults.tls,
                             hostname: self.defaults.hostname.clone(),
                             realname: self.defaults.realname.clone(),
                             nicks: self.defaults.nicks.clone(),

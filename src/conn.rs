@@ -15,6 +15,7 @@ use stream::{Stream, StreamErr};
 pub struct Conn<'poll> {
     serv_addr: String,
     serv_port: u16,
+    tls: bool,
     hostname: String,
     realname: String,
     nicks: Vec<String>,
@@ -137,10 +138,16 @@ pub enum ConnEv {
 
 impl<'poll> Conn<'poll> {
     pub fn from_server(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
-        let stream = Stream::new_tcp(poll, &server.addr, server.port).map_err(StreamErr::from)?;
+        let mk_stream = if server.tls {
+            Stream::new_tls
+        } else {
+            Stream::new_tcp
+        };
+        let stream = mk_stream(poll, &server.addr, server.port).map_err(StreamErr::from)?;
         Ok(Conn {
             serv_addr: server.addr,
             serv_port: server.port,
+            tls: server.tls,
             hostname: server.hostname,
             realname: server.realname,
             nicks: server.nicks,
@@ -164,9 +171,15 @@ impl<'poll> Conn<'poll> {
         new_serv_addr: &str,
         new_serv_port: u16,
     ) -> Result<Conn<'poll>> {
+        let mk_stream = if conn.tls {
+            Stream::new_tls
+        } else {
+            Stream::new_tcp
+        };
         Ok(Conn {
             serv_addr: new_serv_addr.to_owned(),
             serv_port: new_serv_port,
+            tls: conn.tls,
             hostname: conn.hostname.clone(),
             realname: conn.realname.clone(),
             nicks: conn.nicks.clone(),
@@ -178,7 +191,7 @@ impl<'poll> Conn<'poll> {
             poll: conn.poll,
             status: ConnStatus::Introduce {
                 ticks_passed: 0,
-                stream: Stream::new_tcp(conn.poll, new_serv_addr, new_serv_port)
+                stream: mk_stream(conn.poll, new_serv_addr, new_serv_port)
                     .map_err(StreamErr::from)?,
             },
             in_buf: vec![],
