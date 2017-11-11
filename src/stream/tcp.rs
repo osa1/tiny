@@ -62,13 +62,12 @@ impl<'poll> TcpStream<'poll> {
         let to_send = self.out_buf.len();
         match self.inner.write(&self.out_buf) {
             Ok(bytes_sent) => {
-                self.out_buf.drain(0 .. bytes_sent);
-                let register =
-                    if bytes_sent == to_send {
-                        reregister_for_r
-                    } else {
-                        reregister_for_rw
-                    };
+                self.out_buf.drain(0..bytes_sent);
+                let register = if bytes_sent == to_send {
+                    reregister_for_r
+                } else {
+                    reregister_for_rw
+                };
                 register(&self.poll, self.inner.as_raw_fd());
                 Ok(())
             }

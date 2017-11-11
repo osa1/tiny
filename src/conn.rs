@@ -3,6 +3,7 @@ use mio::Token;
 use std::collections::HashSet;
 use std::io::Read;
 use std::io;
+use std::result;
 use std::str;
 
 use config;
@@ -11,7 +12,7 @@ use logger::Logger;
 use utils;
 use wire::{Cmd, Msg, Pfx};
 use wire;
-use stream::tcp;
+use stream::tcp::{TcpError, TcpStream};
 
 pub struct Conn<'poll> {
     serv_addr: String,
@@ -41,17 +42,16 @@ pub struct Conn<'poll> {
     /// don't parse USERHOST responses to set this field.
     usermask: Option<String>,
 
-    /// The TCP connection to the server.
-    stream: tcp::TcpStream<'poll>,
-
     poll: &'poll Poll,
 
-    status: ConnStatus,
+    status: ConnStatus<'poll>,
 
     /// Incoming message buffer
     in_buf: Vec<u8>,
 }
 
+/// How many ticks to wait before assuming disconnect in introduce state.
+const INTRO_TICKS: u8 = 30;
 /// How many ticks to wait before sending a ping to the server.
 const PING_TICKS: u8 = 60;
 /// How many ticks to wait after sending a ping to the server to consider a
@@ -60,22 +60,86 @@ const PONG_TICKS: u8 = 60;
 /// How many ticks to wait after a disconnect or a socket error.
 pub const RECONNECT_TICKS: u8 = 30;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum ConnStatus {
+enum ConnStatus<'poll> {
     /// Need to introduce self
-    Introduce,
+    Introduce {
+        ticks_passed: u8,
+        stream: TcpStream<'poll>,
+    },
     PingPong {
         /// Ticks passed since last time we've heard from the server. Reset on
         /// each message. After `PING_TICKS` ticks we send a PING message and
         /// move to `WaitPong` state.
         ticks_passed: u8,
+        stream: TcpStream<'poll>,
     },
     WaitPong {
         /// Ticks passed since we sent a PING to the server. After a message
         /// move to `PingPong` state. On timeout we reset the connection.
         ticks_passed: u8,
+        stream: TcpStream<'poll>,
     },
     Disconnected { ticks_passed: u8 },
+}
+
+macro_rules! update_status {
+    ($self:ident, $v:ident, $code:expr) => {{
+        // temporarily putting `Disconnected` to `self.status`
+        let $v = ::std::mem::replace(&mut $self.status, ConnStatus::Disconnected { ticks_passed: 0 });
+        let new_status = $code;
+        $self.status = new_status;
+    }}
+}
+
+impl<'poll> ConnStatus<'poll> {
+    fn get_stream(&self) -> Option<&TcpStream<'poll>> {
+        use self::ConnStatus::*;
+        match *self {
+            Introduce { ref stream, .. } |
+            PingPong { ref stream, .. } |
+            WaitPong { ref stream, .. } =>
+                Some(stream),
+            Disconnected { .. } =>
+                None,
+        }
+    }
+
+    fn get_stream_mut(&mut self) -> Option<&mut TcpStream<'poll>> {
+        use self::ConnStatus::*;
+        match *self {
+            Introduce { ref mut stream, .. } |
+            PingPong { ref mut stream, .. } |
+            WaitPong { ref mut stream, .. } =>
+                Some(stream),
+            Disconnected { .. } =>
+                None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ConnErr {
+    IoError(io::Error),
+    CantResolveAddr,
+}
+
+pub type Result<T> = result::Result<T, ConnErr>;
+
+impl From<TcpError> for ConnErr {
+    fn from(tcp_err: TcpError) -> ConnErr {
+        match tcp_err {
+            TcpError::IoError(io_err) =>
+                ConnErr::IoError(io_err),
+            TcpError::CantResolveAddr =>
+                ConnErr::CantResolveAddr,
+        }
+    }
+}
+
+impl From<io::Error> for ConnErr {
+    fn from(io_err: io::Error) -> ConnErr {
+        ConnErr::IoError(io_err)
+    }
 }
 
 #[derive(Debug)]
@@ -87,7 +151,7 @@ pub enum ConnEv {
     /// Hack to return the main loop that the Conn wants reconnect()
     WantReconnect,
     /// Network error happened
-    Err(io::Error),
+    Err(ConnErr),
     /// An incoming message
     Msg(Msg),
     /// Nick changed
@@ -95,8 +159,8 @@ pub enum ConnEv {
 }
 
 impl<'poll> Conn<'poll> {
-    pub fn from_server(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>, tcp::TcpError> {
-        let stream = tcp::TcpStream::new(poll, &server.addr, server.port)?;
+    pub fn from_server(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
+        let stream = TcpStream::new(poll, &server.addr, server.port).map_err(ConnErr::from)?;
         Ok(Conn {
             serv_addr: server.addr,
             serv_port: server.port,
@@ -108,16 +172,21 @@ impl<'poll> Conn<'poll> {
             away_status: None,
             servername: None,
             usermask: None,
-            stream: stream,
             poll: poll,
-            status: ConnStatus::Introduce,
+            status: ConnStatus::Introduce {
+                ticks_passed: 0,
+                stream: stream,
+            },
             in_buf: vec![],
         })
     }
 
     /// Clone an existing connection, but update the server address.
-    pub fn from_conn(conn: &Conn<'poll>, new_serv_addr: &str, new_serv_port: u16) -> Result<Conn<'poll>, tcp::TcpError> {
-        let stream = tcp::TcpStream::new(conn.poll, new_serv_addr, new_serv_port)?;
+    pub fn from_conn(
+        conn: &Conn<'poll>,
+        new_serv_addr: &str,
+        new_serv_port: u16,
+    ) -> Result<Conn<'poll>> {
         Ok(Conn {
             serv_addr: new_serv_addr.to_owned(),
             serv_port: new_serv_port,
@@ -129,25 +198,39 @@ impl<'poll> Conn<'poll> {
             away_status: None,
             servername: None,
             usermask: None,
-            stream: stream,
             poll: conn.poll,
-            status: ConnStatus::Introduce,
+            status: ConnStatus::Introduce {
+                ticks_passed: 0,
+                stream: TcpStream::new(conn.poll, new_serv_addr, new_serv_port)
+                    .map_err(ConnErr::from)?,
+            },
             in_buf: vec![],
         })
     }
 
-    pub fn reconnect(&mut self, new_serv: Option<(&str, u16)>) {
+    pub fn reconnect(&mut self, new_serv: Option<(&str, u16)>) -> Result<()> {
         if let Some((new_name, new_port)) = new_serv {
             self.serv_addr = new_name.to_owned();
             self.serv_port = new_port;
         }
-        self.stream = tcp::TcpStream::new(self.poll, &self.serv_addr, self.serv_port).unwrap();
-        self.status = ConnStatus::Introduce;
-        self.current_nick_idx = 0;
+        match TcpStream::new(self.poll, &self.serv_addr, self.serv_port) {
+            Err(tcp_err) => {
+                self.status = ConnStatus::Disconnected { ticks_passed: 0 };
+                Err(ConnErr::from(tcp_err))
+            }
+            Ok(tcp_stream) => {
+                self.status = ConnStatus::Introduce {
+                    ticks_passed: 0,
+                    stream: tcp_stream,
+                };
+                self.current_nick_idx = 0;
+                Ok(())
+            }
+        }
     }
 
-    pub fn get_conn_tok(&self) -> Token {
-        self.stream.get_tok()
+    pub fn get_conn_tok(&self) -> Option<Token> {
+        self.status.get_stream().map(|s| s.get_tok())
     }
 
     pub fn get_serv_name(&self) -> &str {
@@ -168,10 +251,6 @@ impl<'poll> Conn<'poll> {
         self.send_nick();
     }
 
-    fn reset_nick(&mut self) {
-        self.current_nick_idx = 0;
-    }
-
     fn next_nick(&mut self) {
         if self.current_nick_idx + 1 == self.nicks.len() {
             let mut new_nick = self.nicks.last().unwrap().to_string();
@@ -183,83 +262,123 @@ impl<'poll> Conn<'poll> {
 }
 
 impl<'poll> Conn<'poll> {
-    ////////////////////////////////////////////////////////////////////////////
-    // Tick handling
-
-    pub fn tick(&mut self, evs: &mut Vec<ConnEv>, mut debug_out: LogFile) {
-        match self.status {
-            ConnStatus::Introduce =>
-                {}
-            ConnStatus::PingPong { ticks_passed } =>
-                if ticks_passed + 1 == PING_TICKS {
-                    match self.servername {
-                        None => {
-                            debug_out.write_line(format_args!(
-                                "{}: Can't send PING, servername unknown",
-                                self.serv_addr
-                            ));
-                        }
-                        Some(ref host_) => {
-                            debug_out.write_line(format_args!(
-                                "{}: Ping timeout, sending PING",
-                                self.serv_addr
-                            ));
-                            wire::ping(&mut self.stream, host_).unwrap();
-                        }
-                    }
-                    self.status = ConnStatus::WaitPong { ticks_passed: 0 };
-                } else {
-                    self.status = ConnStatus::PingPong {
-                        ticks_passed: ticks_passed + 1,
-                    };
-                },
-            ConnStatus::WaitPong { ticks_passed } =>
-                if ticks_passed + 1 == PONG_TICKS {
-                    evs.push(ConnEv::Disconnected);
-                    self.enter_disconnect_state();
-                } else {
-                    self.status = ConnStatus::WaitPong {
-                        ticks_passed: ticks_passed + 1,
-                    };
-                },
-            ConnStatus::Disconnected { ticks_passed } => {
-                if ticks_passed + 1 == RECONNECT_TICKS {
-                    // *sigh* it's slightly annoying that we can't reconnect here, we need to
-                    // update the event loop
-                    evs.push(ConnEv::WantReconnect);
-                    self.reset_nick();
-                }
-                self.status = ConnStatus::Disconnected {
-                    ticks_passed: ticks_passed + 1,
-                };
-            }
-        }
-    }
-
     pub fn enter_disconnect_state(&mut self) {
         self.status = ConnStatus::Disconnected { ticks_passed: 0 };
     }
 
-    fn reset_ticks(&mut self) {
-        match self.status {
-            ConnStatus::Introduce =>
-                {}
-            _ => {
-                self.status = ConnStatus::PingPong { ticks_passed: 0 };
+    ////////////////////////////////////////////////////////////////////////////
+    // Tick handling
+
+    pub fn tick(&mut self, evs: &mut Vec<ConnEv>, mut debug_out: LogFile) {
+        update_status!(
+            self,
+            status,
+            match status {
+                ConnStatus::Introduce {
+                    stream,
+                    ticks_passed,
+                } => {
+                    let ticks = ticks_passed + 1;
+                    if ticks == INTRO_TICKS {
+                        evs.push(ConnEv::Disconnected);
+                        ConnStatus::Disconnected { ticks_passed: 0 }
+                    } else {
+                        ConnStatus::Introduce {
+                            stream,
+                            ticks_passed: ticks,
+                        }
+                    }
+                }
+                ConnStatus::PingPong {
+                    mut stream,
+                    ticks_passed,
+                } => {
+                    let ticks = ticks_passed + 1;
+                    if ticks == PING_TICKS {
+                        match self.servername {
+                            None => {
+                                debug_out.write_line(format_args!(
+                                    "{}: Can't send PING, servername unknown",
+                                    self.serv_addr
+                                ));
+                            }
+                            Some(ref host_) => {
+                                debug_out.write_line(format_args!(
+                                    "{}: Ping timeout, sending PING",
+                                    self.serv_addr
+                                ));
+                                wire::ping(&mut stream, host_).unwrap();
+                            }
+                        }
+                        ConnStatus::WaitPong {
+                            stream,
+                            ticks_passed: 0,
+                        }
+                    } else {
+                        ConnStatus::PingPong {
+                            stream,
+                            ticks_passed: ticks,
+                        }
+                    }
+                }
+                ConnStatus::WaitPong {
+                    stream,
+                    ticks_passed,
+                } => {
+                    let ticks = ticks_passed + 1;
+                    if ticks == PONG_TICKS {
+                        evs.push(ConnEv::Disconnected);
+                        ConnStatus::Disconnected { ticks_passed: 0 }
+                    } else {
+                        ConnStatus::WaitPong {
+                            stream,
+                            ticks_passed: ticks,
+                        }
+                    }
+                }
+                ConnStatus::Disconnected { ticks_passed } => {
+                    let ticks = ticks_passed + 1;
+                    if ticks_passed + 1 == RECONNECT_TICKS {
+                        // *sigh* it's slightly annoying that we can't reconnect here, we need to
+                        // update the event loop
+                        evs.push(ConnEv::WantReconnect);
+                        self.current_nick_idx = 0;
+                    }
+                    ConnStatus::Disconnected {
+                        ticks_passed: ticks,
+                    }
+                }
             }
-        }
+        );
+    }
+
+    fn reset_ticks(&mut self) {
+        update_status!(
+            self,
+            status,
+            match status {
+                ConnStatus::Introduce { stream, .. } =>
+                    ConnStatus::Introduce { ticks_passed: 0, stream },
+                ConnStatus::PingPong { stream, .. } =>
+                    ConnStatus::PingPong { ticks_passed: 0, stream },
+                ConnStatus::WaitPong { stream, .. } =>
+                    // no bug: we heard something from the server, whether it was a pong or not
+                    // doesn't matter that much, connectivity is fine.
+                    ConnStatus::PingPong { ticks_passed: 0, stream },
+                ConnStatus::Disconnected { .. } =>
+                    status,
+            }
+        );
     }
 
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
 
-    fn introduce(&mut self) {
-        wire::user(&mut self.stream, &self.hostname, &self.realname).unwrap();
-        self.send_nick();
-    }
-
     fn send_nick(&mut self) {
-        wire::nick(&mut self.stream, &self.nicks[self.current_nick_idx]).unwrap();
+        let nick = &self.nicks[self.current_nick_idx];
+        self.status.get_stream_mut().map(|stream| {
+            wire::nick(stream, nick).unwrap();
+        });
     }
 
     /// `extra_len`: Size (in bytes) for a prefix/suffix etc. that'll be added to each line.
@@ -293,60 +412,85 @@ impl<'poll> Conn<'poll> {
     // to fit into 512 bytes. Need to make sure `split_privmsg` is called before
     // this.
     pub fn privmsg(&mut self, target: &str, msg: &str) {
-        wire::privmsg(&mut self.stream, target, msg).unwrap();
+        self.status.get_stream_mut().map(|stream| {
+            wire::privmsg(stream, target, msg).unwrap();
+        });
     }
 
     pub fn ctcp_action(&mut self, target: &str, msg: &str) {
-        wire::ctcp_action(&mut self.stream, target, msg).unwrap();
+        self.status.get_stream_mut().map(|stream| {
+            wire::ctcp_action(stream, target, msg).unwrap();
+        });
     }
 
     pub fn join(&mut self, chan: &str) {
-        wire::join(&mut self.stream, chan).unwrap();
+        self.status.get_stream_mut().map(|stream| {
+            wire::join(stream, chan).unwrap();
+        });
         // the channel will be added to auto-join list on successful join (i.e.
         // after RPL_TOPIC)
     }
 
     pub fn part(&mut self, chan: &str) {
-        wire::part(&mut self.stream, chan).unwrap();
+        self.status.get_stream_mut().map(|stream| {
+            wire::part(stream, chan).unwrap();
+        });
         self.auto_join.remove(chan);
     }
 
     pub fn away(&mut self, msg: Option<&str>) {
         self.away_status = msg.map(|s| s.to_string());
-        wire::away(&mut self.stream, msg).unwrap();
+        self.status.get_stream_mut().map(|stream| {
+            wire::away(stream, msg).unwrap();
+        });
     }
 
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
 
-    pub fn send(&mut self, evs: &mut Vec<ConnEv>) {
-        match self.stream.write_ready() {
-            Err(err) => {
-                evs.push(ConnEv::Err(err));
+    pub fn write_ready(&mut self, evs: &mut Vec<ConnEv>) {
+        if let Some(stream) = self.status.get_stream_mut() {
+            match stream.write_ready() {
+                Err(tcp_err) =>
+                    evs.push(ConnEv::Err(ConnErr::from(tcp_err))),
+                Ok(()) =>
+                    {}
             }
-            Ok(()) => {}
         }
     }
 
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
-    pub fn recv(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
+    pub fn read_ready(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
         let mut read_buf: [u8; 512] = [0; 512];
 
-        // Handle disconnects
-        match self.stream.read(&mut read_buf) {
-            Err(err) => {
-                evs.push(ConnEv::Err(err));
+        // borrowchk workaround
+        let read_ret = {
+            match self.status.get_stream_mut() {
+                Some(stream) =>
+                    match stream.read(&mut read_buf) {
+                        Err(err) => {
+                            if err.kind() != io::ErrorKind::WouldBlock {
+                                evs.push(ConnEv::Err(ConnErr::from(err)));
+                            }
+                            None
+                        }
+                        Ok(bytes_read) =>
+                            Some(bytes_read),
+                    },
+                None =>
+                    None,
             }
-            Ok(bytes_read) => {
-                self.reset_ticks();
-                self.in_buf.extend(&read_buf[0..bytes_read]);
-                self.handle_msgs(evs, logger);
-                if bytes_read == 0 {
-                    evs.push(ConnEv::Disconnected);
-                    self.enter_disconnect_state();
-                }
+        };
+
+        if let Some(bytes_read) = read_ret {
+            self.reset_ticks();
+            self.in_buf.extend(&read_buf[0..bytes_read]);
+            self.handle_msgs(evs, logger);
+            if bytes_read == 0 {
+                evs.push(ConnEv::Disconnected);
+                self.status = ConnStatus::Disconnected { ticks_passed: 0 };
             }
         }
     }
@@ -366,14 +510,28 @@ impl<'poll> Conn<'poll> {
             ..
         } = msg
         {
-            wire::pong(&mut self.stream, server).unwrap();
+            self.status.get_stream_mut().map(|stream| {
+                wire::pong(stream, server).unwrap();
+            });
         }
 
-        if let ConnStatus::Introduce = self.status {
-            self.introduce();
-            self.status = ConnStatus::PingPong { ticks_passed: 0 };
-            evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
-        }
+        update_status!(
+            self,
+            status,
+            match status {
+                ConnStatus::Introduce { mut stream, .. } => {
+                    wire::user(&mut stream, &self.hostname, &self.realname).unwrap();
+                    wire::nick(&mut stream, &self.nicks[self.current_nick_idx]).unwrap();
+                    evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
+                    ConnStatus::PingPong {
+                        ticks_passed: 0,
+                        stream: stream,
+                    }
+                }
+                _ =>
+                    status,
+            }
+        );
 
         if let Msg {
             cmd: Cmd::JOIN { .. },
@@ -501,14 +659,16 @@ impl<'poll> Conn<'poll> {
             ..
         } = msg
         {
-            // RPL_ENDOFMOTD. Join auto-join channels.
-            for chan in &self.auto_join {
-                wire::join(&mut self.stream, chan).unwrap();
-            }
+            if let Some(mut stream) = self.status.get_stream_mut() {
+                // RPL_ENDOFMOTD. Join auto-join channels.
+                for chan in &self.auto_join {
+                    wire::join(&mut stream, chan).unwrap();
+                }
 
-            // Set away mode
-            if let &Some(ref reason) = &self.away_status {
-                wire::away(&mut self.stream, Some(reason)).unwrap();
+                // Set away mode
+                if let Some(ref reason) = self.away_status {
+                    wire::away(stream, Some(reason)).unwrap();
+                }
             }
         }
 
