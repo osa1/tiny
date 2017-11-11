@@ -165,21 +165,47 @@ impl<'poll> Tiny<'poll> {
         ).unwrap();
 
         let mut conns = Vec::with_capacity(servers.len());
+
+        let mut tui = TUI::new(colors);
+
+        // init "mentions" tab
+        tui.new_server_tab("mentions");
+        tui.add_client_msg(
+            "Any mentions to you will be listed here.",
+            &MsgTarget::Server {
+                serv_name: "mentions",
+            },
+        );
+
+        tui.draw();
+
         for server in servers.iter().cloned() {
-            let conn = Conn::from_server(server, &poll).unwrap();
-            conns.push(conn);
+            let msg_target = MsgTarget::Server {
+                serv_name: &server.addr.clone(),
+            };
+            match Conn::from_server(server, &poll) {
+                Ok(conn) => {
+                    conns.push(conn);
+                }
+                Err(err) => {
+                    tui.add_err_msg(
+                        &format!("Can't connect: {:?}", err),
+                        Timestamp::now(),
+                        &msg_target,
+                    );
+                }
+            }
         }
 
         let mut tiny = Tiny {
             conns: conns,
             defaults: defaults,
             servers: servers,
-            tui: TUI::new(colors),
+            tui: tui,
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from(log_dir)),
         };
 
-        tiny.init_mentions_tab();
         tiny.tui.draw();
 
         let mut last_tick = Instant::now();
@@ -231,16 +257,6 @@ impl<'poll> Tiny<'poll> {
 
             tiny.tui.draw();
         }
-    }
-
-    fn init_mentions_tab(&mut self) {
-        self.tui.new_server_tab("mentions");
-        self.tui.add_client_msg(
-            "Any mentions to you will be listed here.",
-            &MsgTarget::Server {
-                serv_name: "mentions",
-            },
-        );
     }
 
     fn handle_stdin(&mut self, poll: &'poll Poll) -> bool {
@@ -486,21 +502,18 @@ impl<'poll> Tiny<'poll> {
 
         // otherwise create a new Conn, tab etc.
         self.tui.new_server_tab(serv_name);
-        self.tui.add_client_msg(
-            "Connecting...",
-            &MsgTarget::Server {
-                serv_name: serv_name,
-            },
-        );
+        let msg_target = MsgTarget::Server {
+            serv_name: serv_name,
+        };
+        self.tui.add_client_msg("Connecting...", &msg_target);
 
-        let new_conn = {
-            match find_conn(&mut self.conns, src.serv_name()) {
-                Some(current_conn) =>
-                    Conn::from_conn(current_conn, serv_name, serv_port).unwrap(),
-                None => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("connecting to {} {}", serv_name, serv_port));
+        let conn_ret = {
+            match find_conn_idx(&mut self.conns, src.serv_name()) {
+                Some(conn_idx) => {
+                    let old_conn = self.conns.remove(conn_idx);
+                    Conn::from_conn(old_conn, serv_name, serv_port)
+                }
+                None =>
                     Conn::from_server(
                         config::Server {
                             addr: serv_name.to_owned(),
@@ -512,11 +525,22 @@ impl<'poll> Tiny<'poll> {
                             auto_cmds: self.defaults.auto_cmds.clone(),
                         },
                         poll,
-                    ).unwrap()
-                }
+                    ),
             }
         };
-        self.conns.push(new_conn);
+
+        match conn_ret {
+            Ok(conn) => {
+                self.conns.push(conn);
+            }
+            Err(err) => {
+                self.tui.add_err_msg(
+                    &format!("Can't connect: {:?}", err),
+                    Timestamp::now(),
+                    &msg_target,
+                );
+            }
+        }
     }
 
     fn join(&mut self, src: MsgSource, chan: &str) {

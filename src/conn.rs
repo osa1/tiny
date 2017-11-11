@@ -163,7 +163,7 @@ impl<'poll> Conn<'poll> {
 
     /// Clone an existing connection, but update the server address.
     pub fn from_conn(
-        conn: &Conn<'poll>,
+        conn: Conn<'poll>,
         new_serv_addr: &str,
         new_serv_port: u16,
     ) -> Result<Conn<'poll>> {
@@ -171,8 +171,8 @@ impl<'poll> Conn<'poll> {
             serv_addr: new_serv_addr.to_owned(),
             serv_port: new_serv_port,
             tls: conn.tls,
-            hostname: conn.hostname.clone(),
-            realname: conn.realname.clone(),
+            hostname: conn.hostname,
+            realname: conn.realname,
             nicks: conn.nicks.clone(),
             current_nick_idx: 0,
             auto_join: HashSet::new(),
