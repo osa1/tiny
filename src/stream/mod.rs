@@ -68,13 +68,8 @@ impl<'poll> Stream<'poll> {
             .map(Stream::Tcp)
     }
 
-    pub fn new_tls(
-        poll: &'poll Poll,
-        serv_addr: &str,
-        serv_port: u16,
-        domain: &str,
-    ) -> Result<Stream<'poll>> {
-        TlsStream::new(poll, serv_addr, serv_port, domain)
+    pub fn new_tls(poll: &'poll Poll, serv_addr: &str, serv_port: u16) -> Result<Stream<'poll>> {
+        TlsStream::new(poll, serv_addr, serv_port)
             .map_err(StreamErr::from)
             .map(Stream::Tls)
     }

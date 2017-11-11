@@ -33,14 +33,13 @@ impl<'poll> TlsStream<'poll> {
         poll: &'poll Poll,
         serv_addr: &str,
         serv_port: u16,
-        domain: &str,
     ) -> Result<TlsStream<'poll>, TlsError> {
         let connector = tls::TlsConnector::builder()
             .map_err(TlsError::TlsError)?
             .build()
             .map_err(TlsError::TlsError)?;
         let tcp_stream = TcpStream::new(poll, serv_addr, serv_port).map_err(TlsError::TcpError)?;
-        match connector.connect(domain, tcp_stream) {
+        match connector.connect(serv_addr, tcp_stream) {
             Ok(tls_stream) =>
                 Ok(TlsStream::Connected { stream: tls_stream }),
             Err(tls::HandshakeError::Interrupted(mid)) =>
