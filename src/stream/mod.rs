@@ -8,6 +8,7 @@ pub use self::tcp::TcpStream;
 pub use self::tls::TlsStream;
 pub use std::io::Error as IoError;
 use mio::Poll;
+use std::error::Error;
 use mio::Token;
 use native_tls;
 use self::tcp::TcpError;
@@ -36,6 +37,20 @@ impl StreamErr {
                 err.kind() == io::ErrorKind::WouldBlock,
             _ =>
                 false,
+        }
+    }
+
+    pub fn description(&self) -> &str {
+        use self::StreamErr::*;
+        match *self {
+            IoError(ref io_err) =>
+                io_err.description(),
+            CantResolveAddr =>
+                "Can't resolve address",
+            TlsError(ref tls_err) =>
+                tls_err.description(),
+            ConnectionClosed =>
+                "Connection closed",
         }
     }
 }

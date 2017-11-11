@@ -188,11 +188,7 @@ impl<'poll> Tiny<'poll> {
                     conns.push(conn);
                 }
                 Err(err) => {
-                    tui.add_err_msg(
-                        &format!("Can't connect: {:?}", err),
-                        Timestamp::now(),
-                        &msg_target,
-                    );
+                    tui.add_err_msg(&connect_err_msg(&err), Timestamp::now(), &msg_target);
                 }
             }
         }
@@ -534,11 +530,8 @@ impl<'poll> Tiny<'poll> {
                 self.conns.push(conn);
             }
             Err(err) => {
-                self.tui.add_err_msg(
-                    &format!("Can't connect: {:?}", err),
-                    Timestamp::now(),
-                    &msg_target,
-                );
+                self.tui
+                    .add_err_msg(&connect_err_msg(&err), Timestamp::now(), &msg_target);
             }
         }
     }
@@ -1139,12 +1132,15 @@ fn find_conn_idx(conns: &[Conn], serv_name: &str) -> Option<usize> {
     None
 }
 
+fn connect_err_msg(err: &ConnErr) -> String {
+    format!("Connection error: {}", err.description())
+}
+
 fn reconnect_err_msg(err: &ConnErr) -> String {
-    // TODO: using debug string here for now
     format!(
-        "Connection error: {:?}. \
+        "Connection error: {}. \
          Will try to reconnect in {} seconds.",
-        err,
+        err.description(),
         conn::RECONNECT_TICKS
     )
 }
