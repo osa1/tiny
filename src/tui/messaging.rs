@@ -33,6 +33,9 @@ pub struct MessagingUI {
     width: i32,
     height: i32,
 
+    // Option to disable status messages ( join/part )
+    show_status: bool,
+
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
     nicks: Trie,
@@ -87,6 +90,7 @@ impl MessagingUI {
             exit_dialogue: None,
             width: width,
             height: height,
+            show_status: true,
             nicks: Trie::new(),
             current_nick: None,
             draw_current_nick: true,
@@ -380,31 +384,39 @@ impl MessagingUI {
     pub fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
         self.nicks.insert(nick);
 
-        if let Some(ts) = ts {
-            let line_idx = self.get_activity_line_idx(ts);
-            self.msg_area.modify_line(line_idx, |line| {
-                line.set_style(SegStyle::SchemeStyle(SchemeStyle::Join));
-                line.add_char('+');
-                line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-                line.add_text(nick);
-                line.add_char(' ');
-            });
+        if self.show_status {
+            if let Some(ts) = ts {
+                let line_idx = self.get_activity_line_idx(ts);
+                self.msg_area.modify_line(line_idx, |line| {
+                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Join));
+                    line.add_char('+');
+                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
+                    line.add_text(nick);
+                    line.add_char(' ');
+                });
+            }
         }
     }
 
     pub fn part(&mut self, nick: &str, ts: Option<Timestamp>) {
         self.nicks.remove(nick);
 
-        if let Some(ts) = ts {
-            let line_idx = self.get_activity_line_idx(ts);
-            self.msg_area.modify_line(line_idx, |line| {
-                line.set_style(SegStyle::SchemeStyle(SchemeStyle::Part));
-                line.add_char('-');
-                line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-                line.add_text(nick);
-                line.add_char(' ');
-            });
+        if self.show_status {
+            if let Some(ts) = ts {
+                let line_idx = self.get_activity_line_idx(ts);
+                self.msg_area.modify_line(line_idx, |line| {
+                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Part));
+                    line.add_char('-');
+                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
+                    line.add_text(nick);
+                    line.add_char(' ');
+                });
+            }
         }
+    }
+
+    pub fn ignore(&mut self) {
+        self.show_status = !self.show_status;
     }
 
     pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
