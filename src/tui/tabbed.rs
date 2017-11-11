@@ -810,6 +810,12 @@ impl Tabbed {
         self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.clear());
     }
 
+    pub fn toggle_ignore(&mut self, target: &MsgTarget) {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
+            tab.widget.ignore();
+        });
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
 

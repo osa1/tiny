@@ -410,6 +410,35 @@ impl<'poll> Tiny<'poll> {
             }
         } else if words[0] == "clear" {
             self.tui.clear(&src.to_target());
+        } else if words[0] == "ignore" {
+            match src {
+                MsgSource::Serv { serv_name } => {
+                    self.tui.toggle_ignore(
+                        &MsgTarget::AllServTabs{
+                            serv_name: &serv_name,
+                        }
+                    );
+                }
+                MsgSource::Chan {
+                    serv_name,
+                    chan_name,
+                } => {
+                    self.tui.toggle_ignore(
+                        &MsgTarget::Chan{
+                            serv_name: &serv_name,
+                            chan_name: &chan_name,
+                        }
+                    );
+                }
+                MsgSource::User { serv_name, nick } => {
+                    self.tui.toggle_ignore(
+                        &MsgTarget::User{
+                            serv_name: &serv_name,
+                            nick: &nick
+                        }
+                    );
+                }
+            }
         } else {
             self.tui.add_client_err_msg(
                 &format!("Unsupported command: \"/{}\"", msg),
