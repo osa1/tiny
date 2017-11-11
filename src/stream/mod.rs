@@ -73,16 +73,21 @@ impl From<IoError> for StreamErr {
 }
 
 impl<'poll> Stream<'poll> {
-    pub fn new_tcp(poll: &'poll Poll, serv_addr: &str, serv_port: u16) -> Result<Stream<'poll>> {
-        TcpStream::new(poll, serv_addr, serv_port)
-            .map_err(StreamErr::from)
-            .map(Stream::Tcp)
-    }
-
-    pub fn new_tls(poll: &'poll Poll, serv_addr: &str, serv_port: u16) -> Result<Stream<'poll>> {
-        TlsStream::new(poll, serv_addr, serv_port)
-            .map_err(StreamErr::from)
-            .map(Stream::Tls)
+    pub fn new(
+        poll: &'poll Poll,
+        serv_addr: &str,
+        serv_port: u16,
+        tls: bool,
+    ) -> Result<Stream<'poll>> {
+        if tls {
+            TlsStream::new(poll, serv_addr, serv_port)
+                .map_err(StreamErr::from)
+                .map(Stream::Tls)
+        } else {
+            TcpStream::new(poll, serv_addr, serv_port)
+                .map_err(StreamErr::from)
+                .map(Stream::Tcp)
+        }
     }
 
     pub fn write_ready(&mut self) -> Result<()> {

@@ -138,12 +138,8 @@ pub enum ConnEv {
 
 impl<'poll> Conn<'poll> {
     pub fn from_server(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
-        let mk_stream = if server.tls {
-            Stream::new_tls
-        } else {
-            Stream::new_tcp
-        };
-        let stream = mk_stream(poll, &server.addr, server.port).map_err(StreamErr::from)?;
+        let stream =
+            Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
         Ok(Conn {
             serv_addr: server.addr,
             serv_port: server.port,
@@ -171,11 +167,6 @@ impl<'poll> Conn<'poll> {
         new_serv_addr: &str,
         new_serv_port: u16,
     ) -> Result<Conn<'poll>> {
-        let mk_stream = if conn.tls {
-            Stream::new_tls
-        } else {
-            Stream::new_tcp
-        };
         Ok(Conn {
             serv_addr: new_serv_addr.to_owned(),
             serv_port: new_serv_port,
@@ -191,7 +182,7 @@ impl<'poll> Conn<'poll> {
             poll: conn.poll,
             status: ConnStatus::Introduce {
                 ticks_passed: 0,
-                stream: mk_stream(conn.poll, new_serv_addr, new_serv_port)
+                stream: Stream::new(conn.poll, new_serv_addr, new_serv_port, conn.tls)
                     .map_err(StreamErr::from)?,
             },
             in_buf: vec![],
@@ -199,12 +190,6 @@ impl<'poll> Conn<'poll> {
     }
 
     pub fn reconnect(&mut self, new_serv: Option<(&str, u16)>) -> Result<()> {
-        let mk_stream = if self.tls {
-            Stream::new_tls
-        } else {
-            Stream::new_tcp
-        };
-
         // drop existing connection first
         let old_stream = ::std::mem::replace(
             &mut self.status,
@@ -216,7 +201,7 @@ impl<'poll> Conn<'poll> {
             self.serv_addr = new_name.to_owned();
             self.serv_port = new_port;
         }
-        match mk_stream(self.poll, &self.serv_addr, self.serv_port) {
+        match Stream::new(self.poll, &self.serv_addr, self.serv_port, self.tls) {
             Err(err) =>
                 Err(StreamErr::from(err)),
             Ok(stream) => {
