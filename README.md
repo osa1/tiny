@@ -59,7 +59,9 @@ this:
 # Servers to auto-connect
 servers:
     - addr: irc.mozilla.org
-      port: 6667
+      port: 6697
+      # optional field, defaults to false:
+      tls: true
       hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
@@ -264,8 +266,6 @@ start, open an issue and I'd love to help.
 - Logging should be improved. Currently messages are logged in raw form in
   `<log dir>/server_raw.log`, but outgoing message are not logged. Channel logs
   are printed in a weird format etc.
-
-- SSL support
 
 - Only a small subset of IRC messages are implemented. I don't moderate
   channels, so my needs are simple. For moderation commands or other commands
