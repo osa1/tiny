@@ -6,10 +6,12 @@
 #![feature(global_allocator)]
 #![feature(offset_to)]
 
+/*
 extern crate alloc_system;
 
 #[global_allocator]
 static ALLOC: alloc_system::System = alloc_system::System;
+*/
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -26,6 +28,8 @@ extern crate time;
 
 extern crate term_input;
 extern crate termbox_simple;
+
+extern crate take_mut;
 
 #[macro_use]
 mod utils;

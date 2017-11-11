@@ -88,6 +88,11 @@ impl<'poll> TcpStream<'poll> {
         }
     }
 
+    /// Call when the stream is ready for writing.
+    pub fn read_ready(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.read(buf)
+    }
+
     pub fn get_tok(&self) -> Token {
         Token(self.inner.as_raw_fd() as usize)
     }

@@ -1,8 +1,6 @@
 use mio::Poll;
 use mio::Token;
 use std::collections::HashSet;
-use std::io::Read;
-use std::io;
 use std::result;
 use std::str;
 
@@ -12,7 +10,7 @@ use logger::Logger;
 use utils;
 use wire::{Cmd, Msg, Pfx};
 use wire;
-use stream::tcp::{TcpError, TcpStream};
+use stream::{Stream, StreamErr};
 
 pub struct Conn<'poll> {
     serv_addr: String,
@@ -50,6 +48,8 @@ pub struct Conn<'poll> {
     in_buf: Vec<u8>,
 }
 
+pub type ConnErr = StreamErr;
+
 /// How many ticks to wait before assuming disconnect in introduce state.
 const INTRO_TICKS: u8 = 30;
 /// How many ticks to wait before sending a ping to the server.
@@ -64,20 +64,20 @@ enum ConnStatus<'poll> {
     /// Need to introduce self
     Introduce {
         ticks_passed: u8,
-        stream: TcpStream<'poll>,
+        stream: Stream<'poll>,
     },
     PingPong {
         /// Ticks passed since last time we've heard from the server. Reset on
         /// each message. After `PING_TICKS` ticks we send a PING message and
         /// move to `WaitPong` state.
         ticks_passed: u8,
-        stream: TcpStream<'poll>,
+        stream: Stream<'poll>,
     },
     WaitPong {
         /// Ticks passed since we sent a PING to the server. After a message
         /// move to `PingPong` state. On timeout we reset the connection.
         ticks_passed: u8,
-        stream: TcpStream<'poll>,
+        stream: Stream<'poll>,
     },
     Disconnected { ticks_passed: u8 },
 }
@@ -92,7 +92,7 @@ macro_rules! update_status {
 }
 
 impl<'poll> ConnStatus<'poll> {
-    fn get_stream(&self) -> Option<&TcpStream<'poll>> {
+    fn get_stream(&self) -> Option<&Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
             Introduce { ref stream, .. } |
@@ -104,7 +104,7 @@ impl<'poll> ConnStatus<'poll> {
         }
     }
 
-    fn get_stream_mut(&mut self) -> Option<&mut TcpStream<'poll>> {
+    fn get_stream_mut(&mut self) -> Option<&mut Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
             Introduce { ref mut stream, .. } |
@@ -117,30 +117,7 @@ impl<'poll> ConnStatus<'poll> {
     }
 }
 
-#[derive(Debug)]
-pub enum ConnErr {
-    IoError(io::Error),
-    CantResolveAddr,
-}
-
-pub type Result<T> = result::Result<T, ConnErr>;
-
-impl From<TcpError> for ConnErr {
-    fn from(tcp_err: TcpError) -> ConnErr {
-        match tcp_err {
-            TcpError::IoError(io_err) =>
-                ConnErr::IoError(io_err),
-            TcpError::CantResolveAddr =>
-                ConnErr::CantResolveAddr,
-        }
-    }
-}
-
-impl From<io::Error> for ConnErr {
-    fn from(io_err: io::Error) -> ConnErr {
-        ConnErr::IoError(io_err)
-    }
-}
+pub type Result<T> = result::Result<T, StreamErr>;
 
 #[derive(Debug)]
 pub enum ConnEv {
@@ -151,7 +128,7 @@ pub enum ConnEv {
     /// Hack to return the main loop that the Conn wants reconnect()
     WantReconnect,
     /// Network error happened
-    Err(ConnErr),
+    Err(StreamErr),
     /// An incoming message
     Msg(Msg),
     /// Nick changed
@@ -160,7 +137,7 @@ pub enum ConnEv {
 
 impl<'poll> Conn<'poll> {
     pub fn from_server(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
-        let stream = TcpStream::new(poll, &server.addr, server.port).map_err(ConnErr::from)?;
+        let stream = Stream::new_tcp(poll, &server.addr, server.port).map_err(StreamErr::from)?;
         Ok(Conn {
             serv_addr: server.addr,
             serv_port: server.port,
@@ -201,8 +178,8 @@ impl<'poll> Conn<'poll> {
             poll: conn.poll,
             status: ConnStatus::Introduce {
                 ticks_passed: 0,
-                stream: TcpStream::new(conn.poll, new_serv_addr, new_serv_port)
-                    .map_err(ConnErr::from)?,
+                stream: Stream::new_tcp(conn.poll, new_serv_addr, new_serv_port)
+                    .map_err(StreamErr::from)?,
             },
             in_buf: vec![],
         })
@@ -213,10 +190,10 @@ impl<'poll> Conn<'poll> {
             self.serv_addr = new_name.to_owned();
             self.serv_port = new_port;
         }
-        match TcpStream::new(self.poll, &self.serv_addr, self.serv_port) {
+        match Stream::new_tcp(self.poll, &self.serv_addr, self.serv_port) {
             Err(tcp_err) => {
                 self.status = ConnStatus::Disconnected { ticks_passed: 0 };
-                Err(ConnErr::from(tcp_err))
+                Err(StreamErr::from(tcp_err))
             }
             Ok(tcp_stream) => {
                 self.status = ConnStatus::Introduce {
@@ -452,7 +429,7 @@ impl<'poll> Conn<'poll> {
         if let Some(stream) = self.status.get_stream_mut() {
             match stream.write_ready() {
                 Err(tcp_err) =>
-                    evs.push(ConnEv::Err(ConnErr::from(tcp_err))),
+                    evs.push(ConnEv::Err(StreamErr::from(tcp_err))),
                 Ok(()) =>
                     {}
             }
@@ -469,11 +446,9 @@ impl<'poll> Conn<'poll> {
         let read_ret = {
             match self.status.get_stream_mut() {
                 Some(stream) =>
-                    match stream.read(&mut read_buf) {
+                    match stream.read_ready(&mut read_buf) {
                         Err(err) => {
-                            if err.kind() != io::ErrorKind::WouldBlock {
-                                evs.push(ConnEv::Err(ConnErr::from(err)));
-                            }
+                            evs.push(ConnEv::Err(StreamErr::from(err)));
                             None
                         }
                         Ok(bytes_read) =>
