@@ -467,9 +467,8 @@ impl<'poll> Tiny<'poll> {
                 },
             );
             match conn.reconnect(Some((serv_name, serv_port))) {
-                Ok(()) => {
-                    return;
-                }
+                Ok(()) =>
+                    {}
                 Err(err) => {
                     self.tui.add_err_msg(
                         &reconnect_err_msg(&err),
@@ -480,7 +479,10 @@ impl<'poll> Tiny<'poll> {
                     );
                 }
             }
+            return;
         }
+
+        // can't move the rest to an else branch because of borrowchk
 
         // otherwise create a new Conn, tab etc.
         self.tui.new_server_tab(serv_name);

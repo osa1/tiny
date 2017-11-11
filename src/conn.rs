@@ -199,19 +199,30 @@ impl<'poll> Conn<'poll> {
     }
 
     pub fn reconnect(&mut self, new_serv: Option<(&str, u16)>) -> Result<()> {
+        let mk_stream = if self.tls {
+            Stream::new_tls
+        } else {
+            Stream::new_tcp
+        };
+
+        // drop existing connection first
+        let old_stream = ::std::mem::replace(
+            &mut self.status,
+            ConnStatus::Disconnected { ticks_passed: 0 },
+        );
+        drop(old_stream);
+
         if let Some((new_name, new_port)) = new_serv {
             self.serv_addr = new_name.to_owned();
             self.serv_port = new_port;
         }
-        match Stream::new_tcp(self.poll, &self.serv_addr, self.serv_port) {
-            Err(tcp_err) => {
-                self.status = ConnStatus::Disconnected { ticks_passed: 0 };
-                Err(StreamErr::from(tcp_err))
-            }
-            Ok(tcp_stream) => {
+        match mk_stream(self.poll, &self.serv_addr, self.serv_port) {
+            Err(err) =>
+                Err(StreamErr::from(err)),
+            Ok(stream) => {
                 self.status = ConnStatus::Introduce {
                     ticks_passed: 0,
-                    stream: tcp_stream,
+                    stream: stream,
                 };
                 self.current_nick_idx = 0;
                 Ok(())
