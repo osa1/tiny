@@ -1,4 +1,6 @@
-# WIP
+# Unreleased
+
+# 2017/11/12: 0.3.0
 
 - Fixed a bug that caused wrong scrolling in input field after changing nick.
 - Tab completion now wraps after reaching the end/beginning (when navigating
