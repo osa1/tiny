@@ -581,30 +581,31 @@ impl<'poll> Tiny<'poll> {
     }
 
     fn send_msg(&mut self, from: MsgSource, msg: &str, ctcp_action: bool) {
+        if from.serv_name() == "mentions" {
+            self.tui.add_client_err_msg(
+                "Use `/connect <server>` to connect to a server",
+                &MsgTarget::CurrentTab,
+            );
+            return;
+        }
+
         // `tui_target`: Where to show the message on TUI
         // `msg_target`: Actual PRIVMSG target to send to the server
         // `serv_name`: Server name to find connection in `self.conns`
         let (tui_target, msg_target, serv_name) = {
             match from {
                 MsgSource::Serv { ref serv_name } => {
-                    if serv_name == "mentions" {
+                    // we don't split raw messages to 512-bytes long chunks
+                    if let Some(conn) = self.conns
+                        .iter_mut()
+                        .find(|conn| conn.get_serv_name() == serv_name)
+                    {
+                        conn.raw_msg(msg);
+                    } else {
                         self.tui.add_client_err_msg(
-                            "Use `/connect <server>` to connect to a server",
+                            &format!("Can't find server: {}", serv_name),
                             &MsgTarget::CurrentTab,
                         );
-                    } else {
-                        // we don't split raw messages to 512-bytes long chunks
-                        if let Some(conn) = self.conns
-                            .iter_mut()
-                            .find(|conn| conn.get_serv_name() == serv_name)
-                        {
-                            conn.raw_msg(msg);
-                        } else {
-                            self.tui.add_client_err_msg(
-                                &format!("Can't find server: {}", serv_name),
-                                &MsgTarget::CurrentTab,
-                            );
-                        }
                     }
                     return;
                 }
