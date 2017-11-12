@@ -638,6 +638,30 @@ impl<'poll> Conn<'poll> {
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
+        // Not in any of the RFCs. Also known as ERR_BANONCHAN on the internets.
+        // Sent by freenode when nick change failed. See issue #29.
+        if let Msg {
+            cmd: Cmd::Reply {
+                num: 435,
+                ref params,
+            },
+            ..
+        } = msg
+        {
+            if params.len() == 4 {
+                // args: [old_nick, new_nick, chan, msg]
+                let old_nick = &params[0];
+                // make current nick 'old_nick'
+                for (nick_idx, nick) in self.nicks.iter().enumerate() {
+                    if nick == old_nick {
+                        self.current_nick_idx = nick_idx;
+                        evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
+                        break;
+                    }
+                }
+            }
+        }
+
         if let Msg {
             cmd: Cmd::Reply { num: 376, .. },
             ..
