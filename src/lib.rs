@@ -880,7 +880,7 @@ impl<'poll> Tiny<'poll> {
                             .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
                     }
                     Pfx::User { nick, .. } => {
-                        let serv_name = self.conns[conn_idx].get_serv_name();
+                        let serv_name = conn.get_serv_name();
                         self.logger
                             .get_chan_logs(serv_name, &chan)
                             .write_line(format_args!("JOIN: {}", nick));
@@ -908,7 +908,7 @@ impl<'poll> Tiny<'poll> {
                     }
                     Pfx::User { nick, .. } =>
                         if nick != conn.get_nick() {
-                            let serv_name = self.conns[conn_idx].get_serv_name();
+                            let serv_name = conn.get_serv_name();
                             self.logger
                                 .get_chan_logs(serv_name, &chan)
                                 .write_line(format_args!("PART: {}", nick));
@@ -931,7 +931,7 @@ impl<'poll> Tiny<'poll> {
                             .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
                     }
                     Pfx::User { ref nick, .. } => {
-                        let serv_name = self.conns[conn_idx].get_serv_name();
+                        let serv_name = conn.get_serv_name();
                         self.tui.remove_nick(
                             nick,
                             Some(Timestamp::now()),
@@ -954,7 +954,7 @@ impl<'poll> Tiny<'poll> {
                         nick: ref old_nick, ..
                     } => {
                         let serv_name =
-                            unsafe { self.conns.get_unchecked(conn_idx) }.get_serv_name();
+                            conn.get_serv_name();
                         self.tui.rename_nick(
                             old_nick,
                             &nick,
@@ -984,7 +984,6 @@ impl<'poll> Tiny<'poll> {
                 /* RPL_ENDOFMOTD */
                 {
                     debug_assert_eq!(params.len(), 2);
-                    let conn = &self.conns[conn_idx];
                     let msg = &params[1];
                     self.tui.add_msg(
                         msg,
@@ -999,7 +998,6 @@ impl<'poll> Tiny<'poll> {
                 /* RPL_LUSEROP, RPL_LUSERUNKNOWN, */
                 /* RPL_LUSERCHANNELS */
                 {
-                    let conn = &self.conns[conn_idx];
                     let msg = params.into_iter().collect::<Vec<String>>().join(" ");
                     self.tui.add_msg(
                         &msg,
@@ -1009,7 +1007,6 @@ impl<'poll> Tiny<'poll> {
                         },
                     );
                 } else if n == 265 || n == 266 || n == 250 {
-                    let conn = &self.conns[conn_idx];
                     let msg = &params[params.len() - 1];
                     self.tui.add_msg(
                         msg,
@@ -1024,7 +1021,6 @@ impl<'poll> Tiny<'poll> {
                     // FIXME: RFC 2812 says this will have 2 arguments, but freenode
                     // sends 3 arguments (extra one being our nick).
                     assert!(params.len() == 3 || params.len() == 2);
-                    let conn = &self.conns[conn_idx];
                     let chan = &params[params.len() - 2];
                     let topic = &params[params.len() - 1];
                     self.tui.show_topic(
@@ -1038,7 +1034,6 @@ impl<'poll> Tiny<'poll> {
                 }
                 // RPL_NAMREPLY: List of users in a channel
                 else if n == 353 {
-                    let conn = unsafe { &self.conns.get_unchecked(conn_idx) };
                     let chan = &params[2];
                     let chan_target = MsgTarget::Chan {
                         serv_name: conn.get_serv_name(),
@@ -1065,7 +1060,7 @@ impl<'poll> Tiny<'poll> {
                     self.tui.add_client_msg(
                         msg,
                         &MsgTarget::AllServTabs {
-                            serv_name: self.conns[conn_idx].get_serv_name(),
+                            serv_name: conn.get_serv_name(),
                         },
                     );
                 }
@@ -1073,7 +1068,7 @@ impl<'poll> Tiny<'poll> {
                 else if n == 401 {
                     let nick = &params[1];
                     let msg = &params[2];
-                    let serv_name = self.conns[conn_idx].get_serv_name();
+                    let serv_name = conn.get_serv_name();
                     self.tui.add_client_msg(
                         msg,
                         &MsgTarget::User {
@@ -1084,7 +1079,7 @@ impl<'poll> Tiny<'poll> {
                 } else {
                     match pfx {
                         Pfx::Server(msg_serv_name) => {
-                            let conn_serv_name = self.conns[conn_idx].get_serv_name();
+                            let conn_serv_name = conn.get_serv_name();
                             self.tui.add_privmsg(
                                 &msg_serv_name,
                                 &params.join(" "),
@@ -1111,7 +1106,7 @@ impl<'poll> Tiny<'poll> {
             Cmd::Other { cmd, params } => {
                 match pfx {
                     Pfx::Server(msg_serv_name) => {
-                        let conn_serv_name = self.conns[conn_idx].get_serv_name();
+                        let conn_serv_name = conn.get_serv_name();
                         self.tui.add_privmsg(
                             &msg_serv_name,
                             &params.join(" "),
