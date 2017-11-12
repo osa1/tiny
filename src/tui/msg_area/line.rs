@@ -348,7 +348,10 @@ fn translate_irc_control_chars(str: &str) -> String {
         ret.push(TERMBOX_COLOR_PREFIX);
         ret.push(0 as char); // style
         ret.push(irc_color_to_termbox(irc_fg) as char);
-        ret.push(irc_color_to_termbox(irc_bg.unwrap_or(termbox_simple::TB_DEFAULT as u8)) as char);
+        ret.push(irc_bg
+            .map(irc_color_to_termbox)
+            .unwrap_or(termbox_simple::TB_DEFAULT as u8)
+            as char);
     }
 
     while let Some(char) = iter.next() {
@@ -426,7 +429,7 @@ fn irc_color_to_termbox(irc_color: u8) -> u8 {
         15 =>
             7, // light gray
         _ =>
-            panic!("Unknown irc color: {}", irc_color),
+            termbox_simple::TB_DEFAULT as u8,
     }
 }
 

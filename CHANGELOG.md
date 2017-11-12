@@ -9,6 +9,8 @@
 - A bug in the input field that caused crashes fixed.
 - tiny now supports TLS! Add `tls: true` to your server setting in
   `.tinyrc.yml` to use. The field is optional and the default is `false`.
+- Color code parser now returns default rather than panicking when color code
+  is greater than 16 (#34).
 
 # 2017/10/15: 0.2.5
 
