@@ -327,22 +327,26 @@ impl<'poll> Tiny<'poll> {
             }
         } else if words[0] == "join" && words.len() == 2 {
             self.join(src, words[1]);
-        } else if words[0] == "msg" {
+        } else if words[0] == "msg" && words.len() >= 3 {
             // need to find index of the third word
             let mut word_indices = utils::split_whitespace_indices(msg);
             word_indices.next(); // "/msg"
             word_indices.next(); // target
             if let Some(msg_begins) = word_indices.next() {
+                let target = words[1];
                 let msg = &msg[msg_begins..];
-                let serv = src.serv_name();
-                self.send_msg(
+                let source = if self.conns.iter().any(|conn| conn.get_serv_name() == target) {
+                    MsgSource::Serv {
+                        serv_name: target.to_owned(),
+                    }
+                } else {
+                    let serv = src.serv_name();
                     MsgSource::User {
                         serv_name: serv.to_owned(),
-                        nick: words[1].to_owned(),
-                    },
-                    msg,
-                    false,
-                );
+                        nick: target.to_owned(),
+                    }
+                };
+                self.send_msg(source, msg, false);
             } else {
                 self.tui
                     .add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
@@ -589,10 +593,18 @@ impl<'poll> Tiny<'poll> {
                             &MsgTarget::CurrentTab,
                         );
                     } else {
-                        self.tui.add_client_err_msg(
-                            "Can't send message to a server.",
-                            &MsgTarget::CurrentTab,
-                        );
+                        // we don't split raw messages to 512-bytes long chunks
+                        if let Some(conn) = self.conns
+                            .iter_mut()
+                            .find(|conn| conn.get_serv_name() == serv_name)
+                        {
+                            conn.raw_msg(msg);
+                        } else {
+                            self.tui.add_client_err_msg(
+                                &format!("Can't find server: {}", serv_name),
+                                &MsgTarget::CurrentTab,
+                            );
+                        }
                     }
                     return;
                 }
