@@ -11,6 +11,11 @@
   `.tinyrc.yml` to use. The field is optional and the default is `false`.
 - Color code parser now returns default rather than panicking when color code
   is greater than 16 (#34).
+- It is now possible to send messages to servers. Any messages sent to a server
+  tabs will be sent to the server directly. `/msg <serv_addr> <msg>` can be used
+  in `auto_cmds`, where `<serv_addr>` is the `addr` field of the server
+  (specified in `.tinyrc.yml`). This can be used for e.g. server-specific login
+  methods.
 
 # 2017/10/15: 0.2.5
 
