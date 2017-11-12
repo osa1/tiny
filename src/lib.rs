@@ -1056,17 +1056,6 @@ impl<'poll> Tiny<'poll> {
                         self.tui.add_nick(nick, None, &chan_target);
                     }
                 }
-                // ERR_NICKNAMEINUSE
-                else if n == 433 {
-                    // TODO
-                    self.tui.add_err_msg(
-                        &format!("Nick already in use: {:?}", params[1]),
-                        Timestamp::now(),
-                        &MsgTarget::Server {
-                            serv_name: self.conns[conn_idx].get_serv_name(),
-                        },
-                    );
-                }
                 // RPL_ENDOFNAMES: End of NAMES list
                 else if n == 366 {
                 }
