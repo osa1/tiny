@@ -1108,24 +1108,56 @@ impl<'poll> Tiny<'poll> {
                             serv_name: serv_name,
                         },
                     );
-                }
-                // add everything else to debug file
-                else {
-                    self.logger.get_debug_logs().write_line(format_args!(
-                        "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
-                        pfx,
-                        n,
-                        params
-                    ));
+                } else {
+                    match pfx {
+                        Pfx::Server(msg_serv_name) => {
+                            let conn_serv_name = self.conns[conn_idx].get_serv_name();
+                            self.tui.add_privmsg(
+                                &msg_serv_name,
+                                &params.join(" "),
+                                Timestamp::now(),
+                                &MsgTarget::Server {
+                                    serv_name: conn_serv_name,
+                                },
+                                false,
+                            );
+                        }
+                        _ => {
+                            // add everything else to debug file
+                            self.logger.get_debug_logs().write_line(format_args!(
+                                "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
+                                pfx,
+                                n,
+                                params
+                            ));
+                        }
+                    }
                 }
             }
 
-            _ => {
-                self.logger.get_debug_logs().write_line(format_args!(
-                    "Ignoring msg:\nPfx: {:?}, msg: {:?}",
-                    pfx,
-                    msg.cmd
-                ));
+            Cmd::Other { cmd, params } => {
+                match pfx {
+                    Pfx::Server(msg_serv_name) => {
+                        let conn_serv_name = self.conns[conn_idx].get_serv_name();
+                        self.tui.add_privmsg(
+                            &msg_serv_name,
+                            &params.join(" "),
+                            Timestamp::now(),
+                            &MsgTarget::Server {
+                                serv_name: conn_serv_name,
+                            },
+                            false,
+                        );
+                    }
+                    _ => {
+                        self.logger.get_debug_logs().write_line(format_args!(
+                            "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
+                            pfx,
+                            cmd,
+                            params.join(" "),
+                        ));
+                    }
+                }
             }
         }
     }
