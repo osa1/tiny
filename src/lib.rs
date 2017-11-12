@@ -1086,15 +1086,17 @@ impl<'poll> Tiny<'poll> {
                     match pfx {
                         Pfx::Server(msg_serv_name) => {
                             let conn_serv_name = conn.get_serv_name();
+                            let msg_target = MsgTarget::Server {
+                                serv_name: conn_serv_name,
+                            };
                             self.tui.add_privmsg(
                                 &msg_serv_name,
                                 &params.join(" "),
                                 Timestamp::now(),
-                                &MsgTarget::Server {
-                                    serv_name: conn_serv_name,
-                                },
+                                &msg_target,
                                 false,
                             );
+                            self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                         }
                         _ => {
                             // add everything else to debug file
@@ -1113,15 +1115,17 @@ impl<'poll> Tiny<'poll> {
                 match pfx {
                     Pfx::Server(msg_serv_name) => {
                         let conn_serv_name = conn.get_serv_name();
+                        let msg_target = MsgTarget::Server {
+                            serv_name: conn_serv_name,
+                        };
                         self.tui.add_privmsg(
                             &msg_serv_name,
                             &params.join(" "),
                             Timestamp::now(),
-                            &MsgTarget::Server {
-                                serv_name: conn_serv_name,
-                            },
+                            &msg_target,
                             false,
                         );
+                        self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
                     _ => {
                         self.logger.get_debug_logs().write_line(format_args!(
