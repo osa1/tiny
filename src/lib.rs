@@ -440,30 +440,24 @@ impl<'poll> Tiny<'poll> {
         } else if words[0] == "ignore" {
             match src {
                 MsgSource::Serv { serv_name } => {
-                    self.tui.toggle_ignore(
-                        &MsgTarget::AllServTabs{
-                            serv_name: &serv_name,
-                        }
-                    );
+                    self.tui.toggle_ignore(&MsgTarget::AllServTabs {
+                        serv_name: &serv_name,
+                    });
                 }
                 MsgSource::Chan {
                     serv_name,
                     chan_name,
                 } => {
-                    self.tui.toggle_ignore(
-                        &MsgTarget::Chan{
-                            serv_name: &serv_name,
-                            chan_name: &chan_name,
-                        }
-                    );
+                    self.tui.toggle_ignore(&MsgTarget::Chan {
+                        serv_name: &serv_name,
+                        chan_name: &chan_name,
+                    });
                 }
                 MsgSource::User { serv_name, nick } => {
-                    self.tui.toggle_ignore(
-                        &MsgTarget::User{
-                            serv_name: &serv_name,
-                            nick: &nick
-                        }
-                    );
+                    self.tui.toggle_ignore(&MsgTarget::User {
+                        serv_name: &serv_name,
+                        nick: &nick,
+                    });
                 }
             }
         } else {
@@ -968,12 +962,12 @@ impl<'poll> Tiny<'poll> {
                 },
 
             Cmd::PING { .. } =>
+                // ignore
                 {}
-            // ignore
             Cmd::Other { ref cmd, .. } if cmd == "PONG" =>
+                // ignore
                 {}
 
-            // ignore
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                         || n == 251 /* RPL_LUSERCLIENT */
