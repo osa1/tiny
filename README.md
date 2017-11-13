@@ -42,9 +42,7 @@ tiny is an IRC client written in Rust.
 ## Installation
 
 Install the Rust nightly toolchain, clone the repo, and run `cargo install` (or
-`cargo install --force` if you already have an older version installed). There's
-currently no way to publish a crate on crates.io without publishing all the
-dependencies, so tiny won't be on crates.io for a while.
+`cargo install --force` if you already have an older version installed).
 
 tiny is tested on Linux and OSX.
 
