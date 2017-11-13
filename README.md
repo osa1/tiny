@@ -44,6 +44,11 @@ tiny is an IRC client written in Rust.
 Install the Rust nightly toolchain, clone the repo, and run `cargo install` (or
 `cargo install --force` if you already have an older version installed).
 
+Since version 0.3.0 tiny needs OpenSSL or LibreSSL headers and runtime
+libraries. See [rust-openssl's
+README](https://github.com/sfackler/rust-openssl#linux) for instructions on
+installing them.
+
 tiny is tested on Linux and OSX.
 
 ## Configuration
