@@ -44,7 +44,7 @@ fn init_log_file(file: &mut Write) {
 
 impl Logger {
     pub fn new(log_dir: PathBuf) -> Logger {
-        let _ = fs::create_dir(&log_dir);
+        let _ = fs::create_dir_all(&log_dir);
 
         let debug_logs = {
             let mut log_dir = log_dir.clone();
