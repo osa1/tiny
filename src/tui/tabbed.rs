@@ -166,7 +166,7 @@ impl Tabbed {
         match self.find_serv_tab_idx(serv_name) {
             None => {
                 self.tabs.push(Tab {
-                    widget: MessagingUI::new(self.width, self.height - 1),
+                    widget: MessagingUI::new(self.width, self.height - 1, true),
                     src: MsgSource::Serv {
                         serv_name: serv_name.to_owned(),
                     },
@@ -201,11 +201,20 @@ impl Tabbed {
                         self.new_chan_tab(serv_name, chan_name)
                     }
                     Some(serv_tab_idx) => {
+                        let mut status_val: bool = true;
+                        for tab in self.tabs.iter() {
+                            if let MsgSource::Serv{ serv_name: ref serv_name_ } = tab.src {
+                                if serv_name == serv_name_ {
+                                    status_val = tab.widget.get_ignore_state();
+                                    break
+                                }
+                            }
+                        }
                         let chan_tab_idx = serv_tab_idx + 1;
                         self.tabs.insert(
                             chan_tab_idx,
                             Tab {
-                                widget: MessagingUI::new(self.width, self.height - 1),
+                                widget: MessagingUI::new(self.width, self.height - 1, status_val),
                                 src: MsgSource::Chan {
                                     serv_name: serv_name.to_owned(),
                                     chan_name: chan_name.to_owned(),
@@ -249,7 +258,7 @@ impl Tabbed {
                         self.tabs.insert(
                             tab_idx + 1,
                             Tab {
-                                widget: MessagingUI::new(self.width, self.height - 1),
+                                widget: MessagingUI::new(self.width, self.height - 1, true),
                                 src: MsgSource::User {
                                     serv_name: serv_name.to_owned(),
                                     nick: nick.to_owned(),

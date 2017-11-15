@@ -83,14 +83,14 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub fn new(width: i32, height: i32) -> MessagingUI {
+    pub fn new(width: i32, height: i32, status: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
             input_field: TextField::new(width),
             exit_dialogue: None,
             width: width,
             height: height,
-            show_status: true,
+            show_status: status,
             nicks: Trie::new(),
             current_nick: None,
             draw_current_nick: true,
