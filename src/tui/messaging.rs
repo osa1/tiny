@@ -415,8 +415,17 @@ impl MessagingUI {
         }
     }
 
-    pub fn ignore(&mut self) {
-        self.show_status = !self.show_status;
+    pub fn ignore(&mut self, toggle: bool, state: Option<bool>) {
+        if toggle {
+            self.show_status = !self.show_status;
+        }
+        else{
+            self.show_status = state.unwrap();
+        }
+    }
+
+    pub fn get_ignore_state(&self) -> bool{
+        return self.show_status;
     }
 
     pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {

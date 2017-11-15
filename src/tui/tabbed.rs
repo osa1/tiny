@@ -811,9 +811,25 @@ impl Tabbed {
     }
 
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.ignore();
-        });
+        if let MsgTarget::AllServTabs { serv_name } = *target {
+            let mut status_val: bool = false;
+            for tab in self.tabs.iter() {
+                if let MsgSource::Serv{ serv_name: ref serv_name_ } = tab.src {
+                    if serv_name == serv_name_ {
+                        status_val = tab.widget.get_ignore_state();
+                        break
+                    }
+                }
+            }
+            self.apply_to_target(target, &|tab: &mut Tab, _| {
+                tab.widget.ignore(false, Some(!status_val));
+            });
+        }
+        else{
+            self.apply_to_target(target, &|tab: &mut Tab, _| {
+                tab.widget.ignore(true, None);
+            });
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
