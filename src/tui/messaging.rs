@@ -288,6 +288,16 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
+    pub fn add_client_notify_msg(&mut self, msg: &str) {
+        self.reset_activity_line();
+
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
+        self.msg_area.add_text(msg);
+        self.msg_area.flush_line();
+        self.reset_activity_line();
+    }
+
     pub fn add_client_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
@@ -421,6 +431,11 @@ impl MessagingUI {
         }
         else{
             self.show_status = state.unwrap();
+        }
+        if self.show_status {
+            self.add_client_notify_msg("Ignore disabled");
+        } else{
+            self.add_client_notify_msg("Ignore enabled");
         }
     }
 
