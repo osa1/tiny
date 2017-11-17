@@ -441,6 +441,8 @@ impl<'poll> Tiny<'poll> {
             }
         } else if words[0] == "clear" {
             self.tui.clear(&src.to_target());
+        } else if words[0] == "switch" && words.len() == 2{
+            self.tui.switch(words[1]);
         } else if words[0] == "ignore" {
             match src {
                 MsgSource::Serv { serv_name } => {

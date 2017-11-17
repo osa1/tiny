@@ -1,5 +1,7 @@
 # Unreleased
 
+- `/switch` command added to quickly switch to a different tab using a substring
+
 # 2017/11/12: 0.3.0
 
 - Fixed a bug that caused wrong scrolling in input field after changing nick.

@@ -220,7 +220,7 @@ Commands start with `/` character.
 
 - `/join <channel>`: Join to a channel
 
-- `/close`: close the current tab. Leaves the channel if the current tab is a
+- `/close`: Close the current tab. Leaves the channel if the current tab is a
   channel. Leaves the server if the tab is a server.
 
 - `/connect <hostname>:<port>`: Connect to a server. Uses `defaults` in the
@@ -240,6 +240,8 @@ Commands start with `/` character.
 - `/reload`: Reload configuration
 
 - `/clear`: Clears tab contents
+
+- `/switch <string>`: Switch to the first tab which has the given string in the name.
 
 ## Development
 
