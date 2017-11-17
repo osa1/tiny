@@ -283,7 +283,7 @@ impl TUI {
         self.ui.clear(target);
     }
 
-    pub fn switch(&mut self, string: &str){
+    pub fn switch(&mut self, string: &str) {
         self.ui.switch(string)
     }
 }

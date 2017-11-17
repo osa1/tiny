@@ -47,7 +47,6 @@ use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
 use mio::unix::UnixReady;
-use std::ascii::AsciiExt;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
@@ -441,7 +440,7 @@ impl<'poll> Tiny<'poll> {
             }
         } else if words[0] == "clear" {
             self.tui.clear(&src.to_target());
-        } else if words[0] == "switch" && words.len() == 2{
+        } else if words[0] == "switch" && words.len() == 2 {
             self.tui.switch(words[1]);
         } else if words[0] == "ignore" {
             match src {
