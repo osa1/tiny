@@ -138,6 +138,9 @@ impl Tab {
         };
 
         termbox::print(tb, pos_x, pos_y, style, self.visible_name());
+        if !self.widget.get_ignore_state() {
+            termbox::print(tb, pos_x + self.width(), pos_y, colors.faded, "|i");
+        }
     }
 }
 
@@ -492,6 +495,9 @@ impl Tabbed {
             );
             // len() is OK since server, chan and nick names are ascii
             pos_x += tab.visible_name().len() as i32 + 1; // +1 for margin
+            if !tab.widget.get_ignore_state() {
+                pos_x += 2;
+            }
         }
 
         if right_arr {
