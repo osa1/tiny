@@ -169,6 +169,14 @@ impl TextField {
                 WidgetRet::KeyHandled
             }
 
+            Key::Del => {
+                if self.cursor < self.line_len() {
+                    self.modify();
+                    self.buffer.remove(self.cursor as usize);
+                }
+                WidgetRet::KeyHandled
+            }
+
             Key::Ctrl(ch) =>
                 if ch == 'a' {
                     self.move_cursor(0);

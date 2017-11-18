@@ -538,6 +538,32 @@ impl Tabbed {
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
 
+    pub fn switch(&mut self, string: &str) {
+        let mut next_idx = self.active_idx;
+        for (tab_idx, tab) in self.tabs.iter().enumerate() {
+            match tab.src {
+                MsgSource::Serv { ref serv_name } =>
+                    if serv_name.contains(string) {
+                        next_idx = tab_idx;
+                        break;
+                    },
+                MsgSource::Chan { ref chan_name, .. } =>
+                    if chan_name.contains(string) {
+                        next_idx = tab_idx;
+                        break;
+                    },
+                MsgSource::User { ref nick, .. } =>
+                    if nick.contains(string) {
+                        next_idx = tab_idx;
+                        break;
+                    },
+            }
+        }
+        if next_idx != self.active_idx {
+            self.select_tab(next_idx);
+        }
+    }
+
     fn next_tab_(&mut self) {
         if self.active_idx == self.tabs.len() - 1 {
             self.active_idx = 0;

@@ -1,7 +1,6 @@
 // use std::io;
 // use std::io::Write;
 
-use std::ascii::AsciiExt;
 use std::iter::Peekable;
 use std::mem;
 use std::str::Chars;
