@@ -241,6 +241,9 @@ Commands start with `/` character.
 
 - `/clear`: Clears tab contents
 
+- `/ignore`: Ignore `join/quit` messages in a channel. When enabled channel
+  will have `|i` added to the end to show that it is enabled.
+
 ## Development
 
 tiny is in early stages of development. Some of features that you might think
