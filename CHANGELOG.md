@@ -1,6 +1,7 @@
 # Unreleased
 
 - `/switch` command added to quickly switch to a different tab using a substring
+- Handle 'Del' key
 
 # 2017/11/12: 0.3.0
 
