@@ -1,7 +1,8 @@
 # Unreleased
 
-- `/switch` command added to quickly switch to a different tab using a substring
-- Handle 'Del' key
+- `/switch` command added to quickly switch to a different tab using a
+  substring of the tab name.
+- `Del` key is now handled. It deletes character under the cursor.
 
 # 2017/11/12: 0.3.0
 
