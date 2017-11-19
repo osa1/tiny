@@ -342,6 +342,20 @@ impl Tabbed {
         for tab in &mut self.tabs {
             tab.widget.resize(width, height - 1);
         }
+        // scroll the tab bar so that currently active tab is still visible
+        loop {
+            let (tab_left, tab_right) = self.rendered_tabs();
+            if (self.active_idx >= tab_left && self.active_idx < tab_right) || (tab_left == tab_right) {
+                break;
+            }
+            if self.active_idx >= tab_right {
+                // scroll right
+                self.h_scroll += self.tabs[tab_left].width() + 1;
+            } else if self.active_idx < tab_left {
+                // scroll left
+                self.h_scroll -= self.tabs[tab_left].width() + 1;
+            }
+        }
     }
 
     pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
@@ -559,7 +573,9 @@ impl Tabbed {
             let next_active = self.active_idx + 1;
             loop {
                 let (tab_left, tab_right) = self.rendered_tabs();
-                if next_active >= tab_left && next_active < tab_right {
+                if (next_active >= tab_left && next_active < tab_right)
+                    || (next_active == tab_left && tab_left == tab_right)
+                {
                     break;
                 }
                 self.h_scroll += self.tabs[tab_left].width() + 1;
@@ -578,7 +594,9 @@ impl Tabbed {
             let next_active = self.active_idx - 1;
             loop {
                 let (tab_left, tab_right) = self.rendered_tabs();
-                if next_active >= tab_left && next_active < tab_right {
+                if (next_active >= tab_left && next_active < tab_right)
+                    || (next_active == tab_left && tab_left == tab_right)
+                {
                     break;
                 }
                 self.h_scroll -= self.tabs[tab_right - 1].width() + 1;

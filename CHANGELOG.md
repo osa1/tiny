@@ -3,6 +3,8 @@
 - `/switch` command added to quickly switch to a different tab using a
   substring of the tab name.
 - `Del` key is now handled. It deletes character under the cursor.
+- Some tweaks and a bug fix (#45) in tab bar rendering. Selected tab is now
+  stays visible in the tab bar after resizing.
 
 # 2017/11/12: 0.3.0
 
