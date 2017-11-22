@@ -343,18 +343,55 @@ impl Tabbed {
             tab.widget.resize(width, height - 1);
         }
         // scroll the tab bar so that currently active tab is still visible
-        loop {
-            let (tab_left, tab_right) = self.rendered_tabs();
-            if (self.active_idx >= tab_left && self.active_idx < tab_right) || (tab_left == tab_right) {
-                break;
-            }
+        let (mut tab_left, mut tab_right) = self.rendered_tabs();
+        if tab_left == tab_right {
+            // nothing to show
+            return;
+        }
+        while self.active_idx < tab_left || self.active_idx >= tab_right {
             if self.active_idx >= tab_right {
                 // scroll right
                 self.h_scroll += self.tabs[tab_left].width() + 1;
             } else if self.active_idx < tab_left {
                 // scroll left
-                self.h_scroll -= self.tabs[tab_left].width() + 1;
+                self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
             }
+            let (tab_left_, tab_right_) = self.rendered_tabs();
+            tab_left = tab_left_;
+            tab_right = tab_right_;
+        }
+        // the selected tab is visible. scroll to the left as much as possible
+        // to make more tabs visible.
+        let mut num_visible = tab_right - tab_left;
+        if num_visible == self.tabs.len() {
+            // all visible
+            return;
+        }
+        // scroll as long as we can show more tabs than what's already visible
+        loop {
+            if tab_left == 0 {
+                break;
+            }
+            // save current scroll value
+            let scroll_orig = self.h_scroll;
+            // scoll to the left
+            self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
+            // get new bounds
+            let (tab_left_, tab_right_) = self.rendered_tabs();
+            // commit if these two conditions hold
+            let num_visible_ = tab_right_ - tab_left_;
+            let more_tabs_visible = num_visible_ > num_visible;
+            let selected_tab_visible =
+                self.active_idx >= tab_left_ && self.active_idx < tab_right_;
+            if !(more_tabs_visible && selected_tab_visible) {
+                // revert scroll value and abort
+                self.h_scroll = scroll_orig;
+                break;
+            }
+            // otherwise commit
+            tab_left = tab_left_;
+            tab_right = tab_right_;
+            num_visible = num_visible_;
         }
     }
 
@@ -599,7 +636,7 @@ impl Tabbed {
                 {
                     break;
                 }
-                self.h_scroll -= self.tabs[tab_right - 1].width() + 1;
+                self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
             }
             if self.h_scroll < 0 {
                 self.h_scroll = 0
