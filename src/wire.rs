@@ -257,7 +257,7 @@ impl Msg {
                     Cmd::PING {
                         server: params[0].to_owned(),
                     },
-                MsgType::Cmd("PONG") if params.len() == 1 =>
+                MsgType::Cmd("PONG") if params.len() >= 1 =>
                     Cmd::PONG {
                         server: params[0].to_owned(),
                     },
