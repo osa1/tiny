@@ -751,30 +751,22 @@ impl Tabbed {
         }
     }
 
-    fn maybe_create_tab(&mut self, target: &MsgTarget) -> Vec<usize> {
-        fn opt_to_vec<T>(opt: Option<T>) -> Vec<T> {
-            match opt {
-                None =>
-                    vec![],
-                Some(t) =>
-                    vec![t],
-            }
-        }
+    fn maybe_create_tab(&mut self, target: &MsgTarget) -> Option<usize> {
         match *target {
             MsgTarget::Server { serv_name } | MsgTarget::AllServTabs { serv_name } =>
-                opt_to_vec(self.new_server_tab(serv_name)),
+                self.new_server_tab(serv_name),
 
             MsgTarget::Chan {
                 serv_name,
                 chan_name,
             } =>
-                opt_to_vec(self.new_chan_tab(serv_name, chan_name)),
+                self.new_chan_tab(serv_name, chan_name),
 
             MsgTarget::User { serv_name, nick } =>
-                opt_to_vec(self.new_user_tab(serv_name, nick)),
+                self.new_user_tab(serv_name, nick),
 
             _ =>
-                vec![],
+                None,
         }
     }
 
