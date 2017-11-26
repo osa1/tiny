@@ -58,7 +58,7 @@ use std::time::Instant;
 
 use conn::{Conn, ConnErr, ConnEv};
 use logger::Logger;
-use term_input::Input;
+use term_input::{Event, Input};
 use tui::tabbed::MsgSource;
 use tui::tabbed::TabStyle;
 use tui::{MsgTarget, TUIRet, Timestamp, TUI};
@@ -280,7 +280,8 @@ impl<'poll> Tiny<'poll> {
                 }
                 TUIRet::KeyHandled =>
                     {}
-                // TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
+                TUIRet::EventIgnored(Event::FocusGained) | TUIRet::EventIgnored(Event::FocusLost) =>
+                    {}
                 ev => {
                     self.logger
                         .get_debug_logs()
