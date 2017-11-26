@@ -390,7 +390,6 @@ impl Tabbed {
             }
             // otherwise commit
             tab_left = tab_left_;
-            tab_right = tab_right_;
             num_visible = num_visible_;
         }
     }
