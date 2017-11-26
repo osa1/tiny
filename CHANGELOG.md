@@ -5,6 +5,7 @@
 - `Del` key is now handled. It deletes character under the cursor.
 - Some tweaks and a bug fix (#45) in tab bar rendering. Selected tab is now
   stays visible in the tab bar after resizing.
+- Connection closure on remote side when TLS is enabled is now handled (#48).
 
 # 2017/11/12: 0.3.0
 

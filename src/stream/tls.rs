@@ -85,6 +85,9 @@ impl<'poll> TlsStream<'poll> {
                 },
             TlsStream::Connected { mut stream } => {
                 match stream.read(buf) {
+                    Ok(0) => {
+                        ret = Err(TlsError::TcpError(TcpError::ConnectionClosed));
+                    }
                     Ok(n) => {
                         ret = Ok(n);
                     }
