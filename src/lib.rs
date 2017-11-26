@@ -628,7 +628,8 @@ impl<'poll> Tiny<'poll> {
                     ref serv_name,
                     ref nick,
                 } => {
-                    let msg_target = if nick.eq_ignore_ascii_case("nickserv") {
+                    let msg_target = if nick.eq_ignore_ascii_case("nickserv") ||
+                                        nick.eq_ignore_ascii_case("chanserv") {
                         MsgTarget::Server {
                             serv_name: serv_name,
                         }
@@ -858,7 +859,8 @@ impl<'poll> Tiny<'poll> {
                                 MsgTarget::Server {
                                     serv_name: serv_name,
                                 },
-                            Pfx::User { ref nick, .. } if nick.eq_ignore_ascii_case("nickserv") =>
+                            Pfx::User { ref nick, .. } if nick.eq_ignore_ascii_case("nickserv") ||
+                                                          nick.eq_ignore_ascii_case("chanserv") =>
                                 MsgTarget::Server {
                                     serv_name: serv_name,
                                 },
