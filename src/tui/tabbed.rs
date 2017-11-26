@@ -1,5 +1,5 @@
 use term_input::Key;
-use termbox_simple::Termbox;
+use termbox_simple::{Termbox, TB_UNDERLINE};
 
 use std::rc::Rc;
 
@@ -9,7 +9,6 @@ use trie::Trie;
 use tui::messaging::MessagingUI;
 use tui::messaging::Timestamp;
 use tui::MsgTarget;
-use tui::termbox;
 use tui::widget::WidgetRet;
 
 const LEFT_ARROW: char = '<';
@@ -30,6 +29,8 @@ struct Tab {
     widget: MessagingUI,
     src: MsgSource,
     style: TabStyle,
+    /// Alt-character to use to switch to this tab.
+    switch: Option<char>,
 }
 
 // NOTE: Keep the variants sorted in increasing significance, to avoid updating
@@ -100,11 +101,9 @@ impl MsgSource {
                 MsgTarget::User { serv_name, nick },
         }
     }
-}
 
-impl Tab {
     pub fn visible_name(&self) -> &str {
-        match self.src {
+        match *self {
             MsgSource::Serv { ref serv_name, .. } =>
                 serv_name,
             MsgSource::Chan { ref chan_name, .. } =>
@@ -112,6 +111,12 @@ impl Tab {
             MsgSource::User { ref nick, .. } =>
                 nick,
         }
+    }
+}
+
+impl Tab {
+    pub fn visible_name(&self) -> &str {
+        self.src.visible_name()
     }
 
     fn set_style(&mut self, style: TabStyle) {
@@ -130,14 +135,30 @@ impl Tab {
         self.visible_name().len() as i32
     }
 
-    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32, active: bool) {
+    pub fn draw(
+        &self,
+        tb: &mut Termbox,
+        colors: &Colors,
+        mut pos_x: i32,
+        pos_y: i32,
+        active: bool,
+    ) {
         let style: Style = if active {
             colors.tab_active
         } else {
             self.style.get_style(colors)
         };
 
-        termbox::print(tb, pos_x, pos_y, style, self.visible_name());
+        let mut switch_drawn = false;
+        for ch in self.visible_name().chars() {
+            if Some(ch) == self.switch && !switch_drawn {
+                tb.change_cell(pos_x, pos_y, ch, style.fg | TB_UNDERLINE, style.bg);
+                switch_drawn = true;
+            } else {
+                tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
+            }
+            pos_x += 1;
+        }
     }
 }
 
@@ -161,18 +182,60 @@ impl Tabbed {
         }
     }
 
+    fn new_tab(&mut self, idx: usize, src: MsgSource) {
+        use std::collections::HashMap;
+
+        let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
+        for tab in &self.tabs {
+            if let Some(key) = tab.switch {
+                switch_keys.entry(key).and_modify(|e| *e += 1).or_insert(1);
+            }
+        }
+
+        let switch = {
+            let mut ret = None;
+            let mut n = 0;
+            for ch in src.visible_name().chars() {
+                if !ch.is_alphabetic() {
+                    continue;
+                }
+                match switch_keys.get(&ch) {
+                    None => {
+                        ret = Some(ch);
+                        break;
+                    }
+                    Some(n_) =>
+                        if ret == None || n > *n_ {
+                            ret = Some(ch);
+                            n = *n_;
+                        },
+                }
+            }
+            ret
+        };
+
+        self.tabs.insert(
+            idx,
+            Tab {
+                widget: MessagingUI::new(self.width, self.height - 1),
+                src,
+                style: TabStyle::Normal,
+                switch,
+            },
+        );
+    }
+
     /// Returns index of the new tab if a new tab is created.
     pub fn new_server_tab(&mut self, serv_name: &str) -> Option<usize> {
         match self.find_serv_tab_idx(serv_name) {
             None => {
-                self.tabs.push(Tab {
-                    widget: MessagingUI::new(self.width, self.height - 1),
-                    src: MsgSource::Serv {
+                let tab_idx = self.tabs.len();
+                self.new_tab(
+                    tab_idx,
+                    MsgSource::Serv {
                         serv_name: serv_name.to_owned(),
                     },
-                    style: TabStyle::Normal,
-                });
-                let tab_idx = self.tabs.len() - 1;
+                );
                 Some(tab_idx)
             }
             Some(_) =>
@@ -201,25 +264,21 @@ impl Tabbed {
                         self.new_chan_tab(serv_name, chan_name)
                     }
                     Some(serv_tab_idx) => {
-                        let chan_tab_idx = serv_tab_idx + 1;
-                        self.tabs.insert(
-                            chan_tab_idx,
-                            Tab {
-                                widget: MessagingUI::new(self.width, self.height - 1),
-                                src: MsgSource::Chan {
-                                    serv_name: serv_name.to_owned(),
-                                    chan_name: chan_name.to_owned(),
-                                },
-                                style: TabStyle::Normal,
+                        let tab_idx = serv_tab_idx + 1;
+                        self.new_tab(
+                            tab_idx,
+                            MsgSource::Chan {
+                                serv_name: serv_name.to_owned(),
+                                chan_name: chan_name.to_owned(),
                             },
                         );
-                        if self.active_idx >= chan_tab_idx {
+                        if self.active_idx >= tab_idx {
                             self.active_idx += 1;
                         }
                         if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick() {
-                            self.tabs[chan_tab_idx].widget.set_nick(nick);
+                            self.tabs[tab_idx].widget.set_nick(nick);
                         }
-                        Some(chan_tab_idx)
+                        Some(tab_idx)
                     }
                 },
             Some(_) =>
@@ -246,15 +305,11 @@ impl Tabbed {
                         self.new_user_tab(serv_name, nick)
                     }
                     Some(tab_idx) => {
-                        self.tabs.insert(
+                        self.new_tab(
                             tab_idx + 1,
-                            Tab {
-                                widget: MessagingUI::new(self.width, self.height - 1),
-                                src: MsgSource::User {
-                                    serv_name: serv_name.to_owned(),
-                                    nick: nick.to_owned(),
-                                },
-                                style: TabStyle::Normal,
+                            MsgSource::User {
+                                serv_name: serv_name.to_owned(),
+                                nick: nick.to_owned(),
                             },
                         );
                         if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
@@ -309,8 +364,6 @@ impl Tabbed {
 
             Key::AltChar(c) =>
                 match c.to_digit(10) {
-                    None =>
-                        TabbedRet::KeyIgnored,
                     Some(i) => {
                         let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
                             self.tabs.len() - 1
@@ -327,6 +380,18 @@ impl Tabbed {
                             }
                         }
                         self.tabs[self.active_idx].set_style(TabStyle::Normal);
+                        TabbedRet::KeyHandled
+                    }
+                    None => {
+                        // multiple tabs can have same switch character so scan
+                        // forwards instead of starting from the first tab
+                        for i in 1..=self.tabs.len() {
+                            let idx = (self.active_idx + i) % self.tabs.len();
+                            if self.tabs[idx].switch == Some(c) {
+                                self.select_tab(idx);
+                                break;
+                            }
+                        }
                         TabbedRet::KeyHandled
                     }
                 },

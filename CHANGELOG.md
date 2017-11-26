@@ -6,6 +6,7 @@
 - Some tweaks and a bug fix (#45) in tab bar rendering. Selected tab is now
   stays visible in the tab bar after resizing.
 - Connection closure on remote side when TLS is enabled is now handled (#48).
+- `alt-char` bindings implemented to switching between tabs.
 
 # 2017/11/12: 0.3.0
 
