@@ -115,6 +115,10 @@ pub enum Cmd {
 
     PING { server: String },
 
+    PONG { server: String },
+
+    ERROR { msg: String },
+
     /// An IRC message other than the ones listed above.
     Other { cmd: String, params: Vec<String> },
 
@@ -252,6 +256,14 @@ impl Msg {
                 MsgType::Cmd("PING") if params.len() == 1 =>
                     Cmd::PING {
                         server: params[0].to_owned(),
+                    },
+                MsgType::Cmd("PONG") if params.len() == 1 =>
+                    Cmd::PONG {
+                        server: params[0].to_owned(),
+                    },
+                MsgType::Cmd("ERROR") if params.len() == 1 =>
+                    Cmd::ERROR {
+                        msg: params[0].to_owned(),
                     },
                 MsgType::Num(n) =>
                     Cmd::Reply {
@@ -503,5 +515,23 @@ mod tests {
         assert_eq!(check_ctcp_action_msg("\x01ACTION "), ("", true));
 
         assert_eq!(check_ctcp_action_msg("\x01ACTION"), ("\x01ACTION", false));
+    }
+
+    #[test]
+    fn test_error_parsing() {
+        let mut buf = vec![];
+        write!(
+            &mut buf,
+            "ERROR :Closing Link: 212.252.143.51 (Excess Flood)\r\n"
+        ).unwrap();
+        assert_eq!(
+            Msg::read(&mut buf, None),
+            Some(Msg {
+                pfx: None,
+                cmd: Cmd::ERROR {
+                    msg: "Closing Link: 212.252.143.51 (Excess Flood)".to_owned(),
+                },
+            }),
+        );
     }
 }

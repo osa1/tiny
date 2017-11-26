@@ -794,15 +794,20 @@ impl<'poll> Tiny<'poll> {
 
     fn handle_msg(&mut self, conn_idx: usize, msg: Msg, ts: Timestamp) {
         let conn = &self.conns[conn_idx];
-        let pfx = match msg.pfx {
-            None => {
-                return; /* TODO: log this */
-            }
-            Some(pfx) =>
-                pfx,
-        };
+        let pfx = msg.pfx;
         match msg.cmd {
             Cmd::PRIVMSG { target, msg } | Cmd::NOTICE { target, msg } => {
+                let pfx = match pfx {
+                    Some(pfx) =>
+                        pfx,
+                    None => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("PRIVMSG or NOTICE without prefix \
+                                                     target: {:?} msg: {:?}", target, msg));
+                        return;
+                    }
+                };
                 let origin = match pfx {
                     Pfx::Server(_) =>
                         conn.get_serv_name(),
@@ -885,12 +890,7 @@ impl<'poll> Tiny<'poll> {
 
             Cmd::JOIN { chan } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
-                    }
-                    Pfx::User { nick, .. } => {
+                    Some(Pfx::User { nick, .. }) => {
                         let serv_name = conn.get_serv_name();
                         self.logger
                             .get_chan_logs(serv_name, &chan)
@@ -908,16 +908,16 @@ impl<'poll> Tiny<'poll> {
                             );
                         }
                     }
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
+                    }
                 },
 
             Cmd::PART { chan, .. } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird PART message pfx {:?}", pfx));
-                    }
-                    Pfx::User { nick, .. } =>
+                    Some(Pfx::User { nick, .. }) =>
                         if nick != conn.get_nick() {
                             let serv_name = conn.get_serv_name();
                             self.logger
@@ -932,16 +932,16 @@ impl<'poll> Tiny<'poll> {
                                 },
                             );
                         },
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird PART message pfx {:?}", pfx));
+                    }
                 },
 
             Cmd::QUIT { .. } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
-                    }
-                    Pfx::User { ref nick, .. } => {
+                    Some(Pfx::User { ref nick, .. }) => {
                         let serv_name = conn.get_serv_name();
                         self.tui.remove_nick(
                             nick,
@@ -951,19 +951,19 @@ impl<'poll> Tiny<'poll> {
                                 nick: nick,
                             },
                         );
+                    },
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
                     }
                 },
 
             Cmd::NICK { nick } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird NICK message pfx {:?}", pfx));
-                    }
-                    Pfx::User {
+                    Some(Pfx::User {
                         nick: ref old_nick, ..
-                    } => {
+                    }) => {
                         let serv_name =
                             conn.get_serv_name();
                         self.tui.rename_nick(
@@ -975,15 +975,28 @@ impl<'poll> Tiny<'poll> {
                                 nick: old_nick,
                             },
                         );
+                    },
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird NICK message pfx {:?}", pfx));
                     }
                 },
 
-            Cmd::PING { .. } =>
+            Cmd::PING { .. } | Cmd::PONG { .. } =>
                 // ignore
                 {}
-            Cmd::Other { ref cmd, .. } if cmd == "PONG" =>
-                // ignore
-                {}
+
+            Cmd::ERROR { ref msg } => {
+                let serv_name = conn.get_serv_name();
+                self.tui.add_err_msg(
+                    msg,
+                    Timestamp::now(),
+                    &MsgTarget::AllServTabs {
+                        serv_name: serv_name,
+                    },
+                );
+            }
 
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
@@ -1089,7 +1102,7 @@ impl<'poll> Tiny<'poll> {
                     );
                 } else {
                     match pfx {
-                        Pfx::Server(msg_serv_name) => {
+                        Some(Pfx::Server(msg_serv_name)) => {
                             let conn_serv_name = conn.get_serv_name();
                             let msg_target = MsgTarget::Server {
                                 serv_name: conn_serv_name,
@@ -1103,7 +1116,7 @@ impl<'poll> Tiny<'poll> {
                             );
                             self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                         }
-                        _ => {
+                        pfx => {
                             // add everything else to debug file
                             self.logger.get_debug_logs().write_line(format_args!(
                                 "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
@@ -1118,7 +1131,7 @@ impl<'poll> Tiny<'poll> {
 
             Cmd::Other { cmd, params } => {
                 match pfx {
-                    Pfx::Server(msg_serv_name) => {
+                    Some(Pfx::Server(msg_serv_name)) => {
                         let conn_serv_name = conn.get_serv_name();
                         let msg_target = MsgTarget::Server {
                             serv_name: conn_serv_name,
@@ -1132,7 +1145,7 @@ impl<'poll> Tiny<'poll> {
                         );
                         self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
-                    _ => {
+                    pfx => {
                         self.logger.get_debug_logs().write_line(format_args!(
                             "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
                             pfx,
