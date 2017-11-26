@@ -381,8 +381,7 @@ impl Tabbed {
             // commit if these two conditions hold
             let num_visible_ = tab_right_ - tab_left_;
             let more_tabs_visible = num_visible_ > num_visible;
-            let selected_tab_visible =
-                self.active_idx >= tab_left_ && self.active_idx < tab_right_;
+            let selected_tab_visible = self.active_idx >= tab_left_ && self.active_idx < tab_right_;
             if !(more_tabs_visible && selected_tab_visible) {
                 // revert scroll value and abort
                 self.h_scroll = scroll_orig;

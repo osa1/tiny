@@ -280,7 +280,8 @@ impl<'poll> Tiny<'poll> {
                 }
                 TUIRet::KeyHandled =>
                     {}
-                TUIRet::EventIgnored(Event::FocusGained) | TUIRet::EventIgnored(Event::FocusLost) =>
+                TUIRet::EventIgnored(Event::FocusGained) |
+                TUIRet::EventIgnored(Event::FocusLost) =>
                     {}
                 ev => {
                     self.logger
@@ -629,8 +630,9 @@ impl<'poll> Tiny<'poll> {
                     ref serv_name,
                     ref nick,
                 } => {
-                    let msg_target = if nick.eq_ignore_ascii_case("nickserv") ||
-                                        nick.eq_ignore_ascii_case("chanserv") {
+                    let msg_target = if nick.eq_ignore_ascii_case("nickserv")
+                        || nick.eq_ignore_ascii_case("chanserv")
+                    {
                         MsgTarget::Server {
                             serv_name: serv_name,
                         }
