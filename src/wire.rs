@@ -95,7 +95,10 @@ pub enum Cmd {
         msg: String,
     },
 
-    NOTICE { target: MsgTarget, msg: String },
+    NOTICE {
+        target: MsgTarget,
+        msg: String,
+    },
 
     JOIN {
         // TODO: Same as above, this should be a list ...
@@ -109,22 +112,38 @@ pub enum Cmd {
         msg: Option<String>,
     },
 
-    QUIT { msg: Option<String> },
+    QUIT {
+        msg: Option<String>,
+    },
 
-    NICK { nick: String },
+    NICK {
+        nick: String,
+    },
 
-    PING { server: String },
+    PING {
+        server: String,
+    },
 
-    PONG { server: String },
+    PONG {
+        server: String,
+    },
 
-    ERROR { msg: String },
+    ERROR {
+        msg: String,
+    },
 
     /// An IRC message other than the ones listed above.
-    Other { cmd: String, params: Vec<String> },
+    Other {
+        cmd: String,
+        params: Vec<String>,
+    },
 
     /// Numeric replies are kept generic as there are just too many replies and we probably only
     /// need to handle a small subset of them.
-    Reply { num: u16, params: Vec<String> },
+    Reply {
+        num: u16,
+        params: Vec<String>,
+    },
 }
 
 /// An intermediate type used during parsing.

@@ -282,8 +282,8 @@ impl<'poll> Tiny<'poll> {
                 }
                 TUIRet::KeyHandled =>
                     {}
-                TUIRet::EventIgnored(Event::FocusGained) |
-                TUIRet::EventIgnored(Event::FocusLost) =>
+                TUIRet::EventIgnored(Event::FocusGained)
+                | TUIRet::EventIgnored(Event::FocusLost) =>
                     {}
                 ev => {
                     self.logger

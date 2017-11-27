@@ -80,7 +80,9 @@ enum ConnStatus<'poll> {
         ticks_passed: u8,
         stream: Stream<'poll>,
     },
-    Disconnected { ticks_passed: u8 },
+    Disconnected {
+        ticks_passed: u8,
+    },
 }
 
 macro_rules! update_status {
@@ -96,9 +98,9 @@ impl<'poll> ConnStatus<'poll> {
     fn get_stream(&self) -> Option<&Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
-            Introduce { ref stream, .. } |
-            PingPong { ref stream, .. } |
-            WaitPong { ref stream, .. } =>
+            Introduce { ref stream, .. }
+            | PingPong { ref stream, .. }
+            | WaitPong { ref stream, .. } =>
                 Some(stream),
             Disconnected { .. } =>
                 None,
@@ -108,9 +110,9 @@ impl<'poll> ConnStatus<'poll> {
     fn get_stream_mut(&mut self) -> Option<&mut Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
-            Introduce { ref mut stream, .. } |
-            PingPong { ref mut stream, .. } |
-            WaitPong { ref mut stream, .. } =>
+            Introduce { ref mut stream, .. }
+            | PingPong { ref mut stream, .. }
+            | WaitPong { ref mut stream, .. } =>
                 Some(stream),
             Disconnected { .. } =>
                 None,

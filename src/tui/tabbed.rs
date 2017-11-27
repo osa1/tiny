@@ -75,9 +75,9 @@ pub enum MsgSource {
 impl MsgSource {
     pub fn serv_name(&self) -> &str {
         match *self {
-            MsgSource::Serv { ref serv_name } |
-            MsgSource::Chan { ref serv_name, .. } |
-            MsgSource::User { ref serv_name, .. } =>
+            MsgSource::Serv { ref serv_name }
+            | MsgSource::Chan { ref serv_name, .. }
+            | MsgSource::User { ref serv_name, .. } =>
                 serv_name,
         }
     }

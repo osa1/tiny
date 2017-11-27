@@ -39,7 +39,10 @@ pub enum TUIRet {
     /// INVARIANT: The vec will have at least one char.
     // Can't make MsgSource a ref because of this weird error:
     // https://users.rust-lang.org/t/borrow-checker-bug/5165
-    Input { msg: Vec<char>, from: MsgSource },
+    Input {
+        msg: Vec<char>,
+        from: MsgSource,
+    },
 }
 
 impl TUI {
@@ -180,19 +183,29 @@ impl TUI {
 /// Target of a message coming from an IRC server.
 /// `size_of::<MsgTarget>() == 40`. Good idea to pass by reference.
 pub enum MsgTarget<'a> {
-    Server { serv_name: &'a str },
+    Server {
+        serv_name: &'a str,
+    },
     Chan {
         serv_name: &'a str,
         chan_name: &'a str,
     },
-    User { serv_name: &'a str, nick: &'a str },
+    User {
+        serv_name: &'a str,
+        nick: &'a str,
+    },
 
     /// Show the message in all tabs of a server.
-    AllServTabs { serv_name: &'a str },
+    AllServTabs {
+        serv_name: &'a str,
+    },
 
     /// Show the message all server tabs that have the user. (i.e. channels,
     /// privmsg tabs)
-    AllUserTabs { serv_name: &'a str, nick: &'a str },
+    AllUserTabs {
+        serv_name: &'a str,
+        nick: &'a str,
+    },
 
     /// Show the message in currently active tab.
     CurrentTab,
