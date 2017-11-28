@@ -139,7 +139,7 @@ pub enum ConnEv {
 }
 
 impl<'poll> Conn<'poll> {
-    pub fn from_server(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
+    pub fn new(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
         let stream =
             Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
         Ok(Conn {

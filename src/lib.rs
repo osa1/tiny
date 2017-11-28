@@ -184,7 +184,7 @@ impl<'poll> Tiny<'poll> {
             let msg_target = MsgTarget::Server {
                 serv_name: &server.addr.clone(),
             };
-            match Conn::from_server(server, &poll) {
+            match Conn::new(server, &poll) {
                 Ok(conn) => {
                     conns.push(conn);
                 }
@@ -539,7 +539,7 @@ impl<'poll> Tiny<'poll> {
         };
         self.tui.add_client_msg("Connecting...", &msg_target);
 
-        let conn_ret = Conn::from_server(
+        let conn_ret = Conn::new(
             config::Server {
                 addr: serv_name.to_owned(),
                 port: serv_port,
