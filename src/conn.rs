@@ -163,34 +163,6 @@ impl<'poll> Conn<'poll> {
         })
     }
 
-    /// Clone an existing connection, but update the server address.
-    pub fn from_conn(
-        conn: Conn<'poll>,
-        new_serv_addr: &str,
-        new_serv_port: u16,
-    ) -> Result<Conn<'poll>> {
-        Ok(Conn {
-            serv_addr: new_serv_addr.to_owned(),
-            serv_port: new_serv_port,
-            tls: conn.tls,
-            hostname: conn.hostname,
-            realname: conn.realname,
-            nicks: conn.nicks.clone(),
-            current_nick_idx: 0,
-            auto_join: HashSet::new(),
-            away_status: None,
-            servername: None,
-            usermask: None,
-            poll: conn.poll,
-            status: ConnStatus::Introduce {
-                ticks_passed: 0,
-                stream: Stream::new(conn.poll, new_serv_addr, new_serv_port, conn.tls)
-                    .map_err(StreamErr::from)?,
-            },
-            in_buf: vec![],
-        })
-    }
-
     pub fn reconnect(&mut self, new_serv: Option<(&str, u16)>) -> Result<()> {
         // drop existing connection first
         let old_stream = ::std::mem::replace(

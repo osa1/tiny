@@ -299,7 +299,7 @@ impl<'poll> Tiny<'poll> {
         let words: Vec<&str> = msg.split_whitespace().into_iter().collect();
 
         if words[0] == "connect" && words.len() == 2 {
-            self.connect(poll, src, words[1]);
+            self.connect(poll, words[1]);
         } else if words[0] == "connect" && words.len() == 1 {
             self.tui.add_client_msg(
                 "Reconnecting...",
@@ -477,11 +477,12 @@ impl<'poll> Tiny<'poll> {
         }
     }
 
-    fn connect(&mut self, poll: &'poll Poll, src: MsgSource, serv_addr: &str) {
+    fn connect(&mut self, poll: &'poll Poll, serv_addr: &str) {
         fn split_port(s: &str) -> Option<(&str, &str)> {
             s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
         }
 
+        // parse host name and port
         let (serv_name, serv_port) = {
             match split_port(serv_addr) {
                 None => {
@@ -503,6 +504,8 @@ impl<'poll> Tiny<'poll> {
                     },
             }
         };
+
+        // if we already connected to this server reconnect using new port
         if let Some(conn) = find_conn(&mut self.conns, serv_name) {
             self.tui.add_client_msg(
                 "Connecting...",
@@ -526,6 +529,7 @@ impl<'poll> Tiny<'poll> {
             return;
         }
 
+        // otherwise create a new connection
         // can't move the rest to an else branch because of borrowchk
 
         // otherwise create a new Conn, tab etc.
@@ -535,27 +539,18 @@ impl<'poll> Tiny<'poll> {
         };
         self.tui.add_client_msg("Connecting...", &msg_target);
 
-        let conn_ret = {
-            match find_conn_idx(&mut self.conns, src.serv_name()) {
-                Some(conn_idx) => {
-                    let old_conn = self.conns.remove(conn_idx);
-                    Conn::from_conn(old_conn, serv_name, serv_port)
-                }
-                None =>
-                    Conn::from_server(
-                        config::Server {
-                            addr: serv_name.to_owned(),
-                            port: serv_port,
-                            tls: self.defaults.tls,
-                            hostname: self.defaults.hostname.clone(),
-                            realname: self.defaults.realname.clone(),
-                            nicks: self.defaults.nicks.clone(),
-                            auto_cmds: self.defaults.auto_cmds.clone(),
-                        },
-                        poll,
-                    ),
-            }
-        };
+        let conn_ret = Conn::from_server(
+            config::Server {
+                addr: serv_name.to_owned(),
+                port: serv_port,
+                tls: self.defaults.tls,
+                hostname: self.defaults.hostname.clone(),
+                realname: self.defaults.realname.clone(),
+                nicks: self.defaults.nicks.clone(),
+                auto_cmds: self.defaults.auto_cmds.clone(),
+            },
+            poll,
+        );
 
         match conn_ret {
             Ok(conn) => {
