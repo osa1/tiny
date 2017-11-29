@@ -3,6 +3,7 @@
 #![feature(allocator_api)]
 #![feature(ascii_ctype)]
 #![feature(const_fn)]
+#![feature(drain_filter)]
 #![feature(entry_and_modify)]
 #![feature(global_allocator)]
 #![feature(inclusive_range_syntax)]
@@ -519,6 +520,7 @@ impl<'poll> Tiny<'poll> {
                 realname: self.defaults.realname.clone(),
                 nicks: self.defaults.nicks.clone(),
                 auto_cmds: self.defaults.auto_cmds.clone(),
+                join: self.defaults.join.clone(),
             },
             poll,
         );
@@ -536,7 +538,8 @@ impl<'poll> Tiny<'poll> {
 
     fn join(&mut self, src: MsgSource, chan: &str) {
         if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
-            conn.join(chan);
+            let chans: [&str; 1] = [chan];
+            conn.join(&chans);
             return;
         }
 

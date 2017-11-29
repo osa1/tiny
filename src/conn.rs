@@ -1,6 +1,5 @@
 use mio::Poll;
 use mio::Token;
-use std::collections::HashSet;
 use std::result;
 use std::str;
 
@@ -23,9 +22,9 @@ pub struct Conn<'poll> {
     /// Always in range of `nicks`
     current_nick_idx: usize,
 
-    /// Channels to auto-join. Initially empty, every channel we join will be
-    /// added here to be able to re-join automatically on reconnect.
-    auto_join: HashSet<String>,
+    /// Channels to auto-join. Every channel we join will be added here to be able to re-join
+    /// automatically on reconnect and channels we leave will be removed.
+    auto_join: Vec<String>,
 
     /// Away reason if away mode is on. `None` otherwise.
     away_status: Option<String>,
@@ -150,7 +149,7 @@ impl<'poll> Conn<'poll> {
             realname: server.realname,
             nicks: server.nicks,
             current_nick_idx: 0,
-            auto_join: HashSet::new(),
+            auto_join: server.join,
             away_status: None,
             servername: None,
             usermask: None,
@@ -383,9 +382,9 @@ impl<'poll> Conn<'poll> {
         });
     }
 
-    pub fn join(&mut self, chan: &str) {
+    pub fn join(&mut self, chans: &[&str]) {
         self.status.get_stream_mut().map(|stream| {
-            wire::join(stream, chan).unwrap();
+            wire::join(stream, chans).unwrap();
         });
         // the channel will be added to auto-join list on successful join (i.e.
         // after RPL_TOPIC)
@@ -395,7 +394,7 @@ impl<'poll> Conn<'poll> {
         self.status.get_stream_mut().map(|stream| {
             wire::part(stream, chan).unwrap();
         });
-        self.auto_join.remove(chan);
+        self.auto_join.drain_filter(|chan_| chan_ == chan);
     }
 
     pub fn away(&mut self, msg: Option<&str>) {
@@ -650,9 +649,14 @@ impl<'poll> Conn<'poll> {
         {
             if let Some(mut stream) = self.status.get_stream_mut() {
                 // RPL_ENDOFMOTD. Join auto-join channels.
-                for chan in &self.auto_join {
-                    wire::join(&mut stream, chan).unwrap();
-                }
+                wire::join(
+                    &mut stream,
+                    self.auto_join
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<&str>>()
+                        .as_slice(),
+                ).unwrap();
 
                 // Set away mode
                 if let Some(ref reason) = self.away_status {
@@ -673,7 +677,9 @@ impl<'poll> Conn<'poll> {
                 // RPL_TOPIC. We've successfully joined a channel, add the channel to
                 // self.auto_join to be able to auto-join next time we connect
                 let chan = &params[params.len() - 2];
-                self.auto_join.insert(chan.to_owned());
+                if !self.auto_join.contains(chan) {
+                    self.auto_join.push(chan.to_owned());
+                }
             }
         }
 

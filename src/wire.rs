@@ -22,8 +22,8 @@ pub fn pong<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "PONG {}\r\n", arg)
 }
 
-pub fn join<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
-    write!(sink, "JOIN {}\r\n", channel)
+pub fn join<W: Write>(sink: &mut W, chans: &[&str]) -> std::io::Result<()> {
+    write!(sink, "JOIN {}\r\n", chans.join(","))
 }
 
 pub fn part<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {

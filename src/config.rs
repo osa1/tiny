@@ -33,6 +33,10 @@ pub struct Server {
     /// Commands to automatically run after joining to the server. Useful for e.g. registering the
     /// nick via nickserv or joining channels. Uses tiny command syntax.
     pub auto_cmds: Vec<String>,
+
+    /// Channels to automatically join. Any `/join` commands in `auto_cmds` will be moved here.
+    #[serde(default)]
+    pub join: Vec<String>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
@@ -42,16 +46,15 @@ pub struct Defaults {
     pub hostname: String,
     pub realname: String,
     pub auto_cmds: Vec<String>,
-    #[serde(default)]
-    pub tls: bool,
+    #[serde(default)] pub join: Vec<String>,
+    #[serde(default)] pub tls: bool,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub servers: Vec<Server>,
     pub defaults: Defaults,
-    #[serde(default)]
-    pub colors: Colors,
+    #[serde(default)] pub colors: Colors,
     pub log_dir: String,
 }
 
@@ -61,7 +64,7 @@ pub fn get_config_path() -> PathBuf {
     config_path
 }
 
-pub fn parse_config(config_path: PathBuf) -> serde_yaml::Result<Config> {
+pub fn parse_config(config_path: PathBuf) -> Result<Config, serde_yaml::Error> {
     let contents = {
         let mut str = String::new();
         let mut file = File::open(config_path).unwrap();
@@ -69,7 +72,41 @@ pub fn parse_config(config_path: PathBuf) -> serde_yaml::Result<Config> {
         str
     };
 
-    serde_yaml::from_str(&contents)
+    parse_config_str(&contents)
+}
+
+fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
+    let mut cfg: Config = serde_yaml::from_str(&contents)?;
+
+    fn parse_join_cmds(cmds: &mut Vec<String>, join: &mut Vec<String>) {
+        *join = cmds.drain_filter(|cmd| {
+            let mut chan = None;
+            {
+                let mut words = cmd.split_whitespace().into_iter();
+                if words.next() == Some("join") {
+                    if let Some(chan_) = words.next() {
+                        chan = Some(chan_.to_owned());
+                    }
+                }
+            }
+            match chan {
+                None =>
+                    false,
+                Some(chan) => {
+                    *cmd = chan;
+                    true
+                }
+            }
+        }).collect();
+    }
+
+    for mut server in &mut cfg.servers {
+        parse_join_cmds(&mut server.auto_cmds, &mut server.join);
+    }
+
+    parse_join_cmds(&mut cfg.defaults.auto_cmds, &mut cfg.defaults.join);
+
+    Ok(cfg)
 }
 
 pub fn generate_default_config() {
@@ -368,6 +405,7 @@ servers:
       auto_cmds:
           - 'msg NickServ identify hunter2'
           - 'join #tiny'
+          - 'join #rust'
 
 # Defaults used when connecting to servers via the /connect command
 defaults:
@@ -378,13 +416,21 @@ defaults:
 
 # Where to put log files
 log_dir: path";
-        match serde_yaml::from_str(config) {
+        match parse_config_str(config) {
             Err(yaml_err) => {
                 println!("{}", yaml_err);
                 assert!(false);
             }
-            Ok(Config { .. }) =>
-                {}
+            Ok(cfg) => {
+                assert_eq!(
+                    cfg.servers[0].join,
+                    vec!["#tiny".to_owned(), "#rust".to_owned()]
+                );
+                assert_eq!(
+                    cfg.servers[0].auto_cmds,
+                    vec!["msg NickServ identify hunter2"]
+                );
+            }
         }
     }
 }

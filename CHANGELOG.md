@@ -7,6 +7,7 @@
   stays visible in the tab bar after resizing.
 - Connection closure on remote side when TLS is enabled is now handled (#48).
 - `alt-char` bindings implemented to switching between tabs.
+- Fixed some bugs in `join` command used in `auto_cmds` (#49).
 
 # 2017/11/12: 0.3.0
 
