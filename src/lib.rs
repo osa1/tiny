@@ -50,9 +50,6 @@ use mio::Token;
 use mio::unix::EventedFd;
 use mio::unix::UnixReady;
 use std::error::Error;
-use std::fs::File;
-use std::io::Read;
-use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
@@ -71,9 +68,9 @@ use wire::{Cmd, Msg, Pfx};
 pub fn run() {
     let config_path = config::get_config_path();
     if !config_path.is_file() {
-        generate_default_config();
+        config::generate_default_config();
     } else {
-        match parse_config(config_path) {
+        match config::parse_config(config_path) {
             Err(yaml_err) => {
                 println!("Can't parse config file:");
                 println!("{}", yaml_err);
@@ -108,32 +105,6 @@ pub fn run() {
             }
         }
     }
-}
-
-fn parse_config(config_path: PathBuf) -> serde_yaml::Result<config::Config> {
-    let contents = {
-        let mut str = String::new();
-        let mut file = File::open(config_path).unwrap();
-        file.read_to_string(&mut str).unwrap();
-        str
-    };
-
-    serde_yaml::from_str(&contents)
-}
-
-fn generate_default_config() {
-    let config_path = config::get_config_path();
-    {
-        let mut file = File::create(&config_path).unwrap();
-        file.write_all(config::get_default_config_yaml().as_bytes())
-            .unwrap();
-    }
-    println!(
-        "\
-tiny couldn't find a config file at {0:?}, and created a config file with defaults.
-You may want to edit {0:?} before re-running tiny.",
-        config_path
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -406,7 +377,7 @@ impl<'poll> Tiny<'poll> {
                     .set_nick(conn.get_serv_name(), Rc::new(new_nick.to_owned()));
             }
         } else if words[0] == "reload" {
-            match parse_config(config::get_config_path()) {
+            match config::parse_config(config::get_config_path()) {
                 Ok(config::Config { colors, .. }) =>
                     self.tui.set_colors(colors),
                 Err(err) => {

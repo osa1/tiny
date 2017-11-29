@@ -1,7 +1,11 @@
 //! To see how color numbers map to actual colors in your terminal run
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
 use serde::Deserialize;
+use serde_yaml;
 use std::env::home_dir;
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -38,14 +42,16 @@ pub struct Defaults {
     pub hostname: String,
     pub realname: String,
     pub auto_cmds: Vec<String>,
-    #[serde(default)] pub tls: bool,
+    #[serde(default)]
+    pub tls: bool,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub servers: Vec<Server>,
     pub defaults: Defaults,
-    #[serde(default)] pub colors: Colors,
+    #[serde(default)]
+    pub colors: Colors,
     pub log_dir: String,
 }
 
@@ -55,10 +61,39 @@ pub fn get_config_path() -> PathBuf {
     config_path
 }
 
-pub fn get_default_config_yaml() -> String {
+pub fn parse_config(config_path: PathBuf) -> serde_yaml::Result<Config> {
+    let contents = {
+        let mut str = String::new();
+        let mut file = File::open(config_path).unwrap();
+        file.read_to_string(&mut str).unwrap();
+        str
+    };
+
+    serde_yaml::from_str(&contents)
+}
+
+pub fn generate_default_config() {
+    let config_path = get_config_path();
+    {
+        let mut file = File::create(&config_path).unwrap();
+        file.write_all(get_default_config_yaml().as_bytes())
+            .unwrap();
+    }
+    println!(
+        "\
+tiny couldn't find a config file at {0:?}, and created a config file with defaults.
+You may want to edit {0:?} before re-running tiny.",
+        config_path
+    );
+}
+
+fn get_default_config_yaml() -> String {
     let mut log_dir = home_dir().unwrap();
     log_dir.push("tiny_logs");
-    format!(include_str!("../tinyrc.yml"), log_dir.as_path().to_str().unwrap())
+    format!(
+        include_str!("../tinyrc.yml"),
+        log_dir.as_path().to_str().unwrap()
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
