@@ -1063,10 +1063,13 @@ impl<'poll> Tiny<'poll> {
                         chan_name: chan,
                     };
 
+                    static PREFIXES: [char; 5] = ['~', '&', '@', '%', '+'];
                     for nick in params[3].split_whitespace() {
-                        // Apparently some nicks have a '@' prefix (indicating ops)
-                        // TODO: Not sure where this is documented
-                        let nick = if nick.chars().nth(0) == Some('@') {
+                        // Nicks may have prefixes, indicating it is a operator, founder, or
+                        // something else.
+                        // Channel Membership Prefixes:
+                        // http://modern.ircdocs.horse/#channel-membership-prefixes
+                        let nick = if PREFIXES.contains(&nick.chars().nth(0).unwrap()) {
                             &nick[1..]
                         } else {
                             nick
