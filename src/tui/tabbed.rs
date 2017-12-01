@@ -472,23 +472,18 @@ impl Tabbed {
 // Rendering
 
 fn arrow_style(tabs: &[Tab], colors: &Colors) -> Style {
-    let mut arrow_style = colors.tab_normal;
-
-    for tab in tabs {
-        match tab.style {
-            TabStyle::Normal =>
-                {}
-            TabStyle::NewMsg => {
-                arrow_style = colors.tab_new_msg;
-                break;
-            }
-            TabStyle::Highlight => {
-                arrow_style = colors.tab_highlight;
-            }
-        }
+    let tab_style = tabs.iter()
+        .map(|tab| tab.style)
+        .max()
+        .unwrap_or(TabStyle::Normal);
+    match tab_style {
+        TabStyle::Normal =>
+            colors.tab_normal,
+        TabStyle::NewMsg =>
+            colors.tab_new_msg,
+        TabStyle::Highlight =>
+            colors.tab_highlight,
     }
-
-    arrow_style
 }
 
 impl Tabbed {
