@@ -898,7 +898,7 @@ impl<'poll> Tiny<'poll> {
                             self.tui.new_chan_tab(serv_name, &chan);
                         } else {
                             self.tui.add_nick(
-                                &nick,
+                                drop_nick_prefix(&nick),
                                 Some(Timestamp::now()),
                                 &MsgTarget::Chan {
                                     serv_name: serv_name,
@@ -1063,18 +1063,8 @@ impl<'poll> Tiny<'poll> {
                         chan_name: chan,
                     };
 
-                    static PREFIXES: [char; 5] = ['~', '&', '@', '%', '+'];
                     for nick in params[3].split_whitespace() {
-                        // Nicks may have prefixes, indicating it is a operator, founder, or
-                        // something else.
-                        // Channel Membership Prefixes:
-                        // http://modern.ircdocs.horse/#channel-membership-prefixes
-                        let nick = if PREFIXES.contains(&nick.chars().nth(0).unwrap()) {
-                            &nick[1..]
-                        } else {
-                            nick
-                        };
-                        self.tui.add_nick(nick, None, &chan_target);
+                        self.tui.add_nick(drop_nick_prefix(nick), None, &chan_target);
                     }
                 }
                 // RPL_ENDOFNAMES: End of NAMES list
@@ -1202,4 +1192,21 @@ fn reconnect_err_msg(err: &ConnErr) -> String {
         err.description(),
         conn::RECONNECT_TICKS
     )
+}
+
+
+/// Nicks may have prefixes, indicating it is a operator, founder, or
+/// something else.
+/// Channel Membership Prefixes:
+/// http://modern.ircdocs.horse/#channel-membership-prefixes
+///
+/// Returns the nick without prefix
+fn drop_nick_prefix(nick: &str) -> &str {
+    static PREFIXES: [char; 5] = ['~', '&', '@', '%', '+'];
+
+    if PREFIXES.contains(&nick.chars().nth(0).unwrap()) {
+        &nick[1..]
+    } else {
+        nick
+    }
 }
