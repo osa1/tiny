@@ -22,8 +22,8 @@ pub fn pong<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "PONG {}\r\n", arg)
 }
 
-pub fn join<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
-    write!(sink, "JOIN {}\r\n", channel)
+pub fn join<W: Write>(sink: &mut W, chans: &[&str]) -> std::io::Result<()> {
+    write!(sink, "JOIN {}\r\n", chans.join(","))
 }
 
 pub fn part<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
@@ -95,7 +95,10 @@ pub enum Cmd {
         msg: String,
     },
 
-    NOTICE { target: MsgTarget, msg: String },
+    NOTICE {
+        target: MsgTarget,
+        msg: String,
+    },
 
     JOIN {
         // TODO: Same as above, this should be a list ...
@@ -109,18 +112,38 @@ pub enum Cmd {
         msg: Option<String>,
     },
 
-    QUIT { msg: Option<String> },
+    QUIT {
+        msg: Option<String>,
+    },
 
-    NICK { nick: String },
+    NICK {
+        nick: String,
+    },
 
-    PING { server: String },
+    PING {
+        server: String,
+    },
+
+    PONG {
+        server: String,
+    },
+
+    ERROR {
+        msg: String,
+    },
 
     /// An IRC message other than the ones listed above.
-    Other { cmd: String, params: Vec<String> },
+    Other {
+        cmd: String,
+        params: Vec<String>,
+    },
 
     /// Numeric replies are kept generic as there are just too many replies and we probably only
     /// need to handle a small subset of them.
-    Reply { num: u16, params: Vec<String> },
+    Reply {
+        num: u16,
+        params: Vec<String>,
+    },
 }
 
 /// An intermediate type used during parsing.
@@ -252,6 +275,14 @@ impl Msg {
                 MsgType::Cmd("PING") if params.len() == 1 =>
                     Cmd::PING {
                         server: params[0].to_owned(),
+                    },
+                MsgType::Cmd("PONG") if params.len() >= 1 =>
+                    Cmd::PONG {
+                        server: params[0].to_owned(),
+                    },
+                MsgType::Cmd("ERROR") if params.len() == 1 =>
+                    Cmd::ERROR {
+                        msg: params[0].to_owned(),
                     },
                 MsgType::Num(n) =>
                     Cmd::Reply {
@@ -503,5 +534,23 @@ mod tests {
         assert_eq!(check_ctcp_action_msg("\x01ACTION "), ("", true));
 
         assert_eq!(check_ctcp_action_msg("\x01ACTION"), ("\x01ACTION", false));
+    }
+
+    #[test]
+    fn test_error_parsing() {
+        let mut buf = vec![];
+        write!(
+            &mut buf,
+            "ERROR :Closing Link: 212.252.143.51 (Excess Flood)\r\n"
+        ).unwrap();
+        assert_eq!(
+            Msg::read(&mut buf, None),
+            Some(Msg {
+                pfx: None,
+                cmd: Cmd::ERROR {
+                    msg: "Closing Link: 212.252.143.51 (Excess Flood)".to_owned(),
+                },
+            }),
+        );
     }
 }

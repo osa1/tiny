@@ -32,7 +32,10 @@ impl<'a> LogFile<'a> {
 /// Log message destination
 enum LogDest {
     // Server(String),
-    Chan { serv: String, chan: String },
+    Chan {
+        serv: String,
+        chan: String,
+    },
     /// For logging raw messages
     ServerRaw(String),
 }

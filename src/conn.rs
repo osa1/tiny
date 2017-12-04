@@ -1,6 +1,5 @@
 use mio::Poll;
 use mio::Token;
-use std::collections::HashSet;
 use std::result;
 use std::str;
 
@@ -23,9 +22,9 @@ pub struct Conn<'poll> {
     /// Always in range of `nicks`
     current_nick_idx: usize,
 
-    /// Channels to auto-join. Initially empty, every channel we join will be
-    /// added here to be able to re-join automatically on reconnect.
-    auto_join: HashSet<String>,
+    /// Channels to auto-join. Every channel we join will be added here to be able to re-join
+    /// automatically on reconnect and channels we leave will be removed.
+    auto_join: Vec<String>,
 
     /// Away reason if away mode is on. `None` otherwise.
     away_status: Option<String>,
@@ -80,7 +79,9 @@ enum ConnStatus<'poll> {
         ticks_passed: u8,
         stream: Stream<'poll>,
     },
-    Disconnected { ticks_passed: u8 },
+    Disconnected {
+        ticks_passed: u8,
+    },
 }
 
 macro_rules! update_status {
@@ -96,9 +97,9 @@ impl<'poll> ConnStatus<'poll> {
     fn get_stream(&self) -> Option<&Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
-            Introduce { ref stream, .. } |
-            PingPong { ref stream, .. } |
-            WaitPong { ref stream, .. } =>
+            Introduce { ref stream, .. }
+            | PingPong { ref stream, .. }
+            | WaitPong { ref stream, .. } =>
                 Some(stream),
             Disconnected { .. } =>
                 None,
@@ -108,9 +109,9 @@ impl<'poll> ConnStatus<'poll> {
     fn get_stream_mut(&mut self) -> Option<&mut Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
-            Introduce { ref mut stream, .. } |
-            PingPong { ref mut stream, .. } |
-            WaitPong { ref mut stream, .. } =>
+            Introduce { ref mut stream, .. }
+            | PingPong { ref mut stream, .. }
+            | WaitPong { ref mut stream, .. } =>
                 Some(stream),
             Disconnected { .. } =>
                 None,
@@ -137,7 +138,7 @@ pub enum ConnEv {
 }
 
 impl<'poll> Conn<'poll> {
-    pub fn from_server(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
+    pub fn new(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
         let stream =
             Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
         Ok(Conn {
@@ -148,7 +149,7 @@ impl<'poll> Conn<'poll> {
             realname: server.realname,
             nicks: server.nicks,
             current_nick_idx: 0,
-            auto_join: HashSet::new(),
+            auto_join: server.join,
             away_status: None,
             servername: None,
             usermask: None,
@@ -156,34 +157,6 @@ impl<'poll> Conn<'poll> {
             status: ConnStatus::Introduce {
                 ticks_passed: 0,
                 stream: stream,
-            },
-            in_buf: vec![],
-        })
-    }
-
-    /// Clone an existing connection, but update the server address.
-    pub fn from_conn(
-        conn: Conn<'poll>,
-        new_serv_addr: &str,
-        new_serv_port: u16,
-    ) -> Result<Conn<'poll>> {
-        Ok(Conn {
-            serv_addr: new_serv_addr.to_owned(),
-            serv_port: new_serv_port,
-            tls: conn.tls,
-            hostname: conn.hostname,
-            realname: conn.realname,
-            nicks: conn.nicks.clone(),
-            current_nick_idx: 0,
-            auto_join: HashSet::new(),
-            away_status: None,
-            servername: None,
-            usermask: None,
-            poll: conn.poll,
-            status: ConnStatus::Introduce {
-                ticks_passed: 0,
-                stream: Stream::new(conn.poll, new_serv_addr, new_serv_port, conn.tls)
-                    .map_err(StreamErr::from)?,
             },
             in_buf: vec![],
         })
@@ -409,9 +382,9 @@ impl<'poll> Conn<'poll> {
         });
     }
 
-    pub fn join(&mut self, chan: &str) {
+    pub fn join(&mut self, chans: &[&str]) {
         self.status.get_stream_mut().map(|stream| {
-            wire::join(stream, chan).unwrap();
+            wire::join(stream, chans).unwrap();
         });
         // the channel will be added to auto-join list on successful join (i.e.
         // after RPL_TOPIC)
@@ -421,7 +394,7 @@ impl<'poll> Conn<'poll> {
         self.status.get_stream_mut().map(|stream| {
             wire::part(stream, chan).unwrap();
         });
-        self.auto_join.remove(chan);
+        self.auto_join.drain_filter(|chan_| chan_ == chan);
     }
 
     pub fn away(&mut self, msg: Option<&str>) {
@@ -676,9 +649,14 @@ impl<'poll> Conn<'poll> {
         {
             if let Some(mut stream) = self.status.get_stream_mut() {
                 // RPL_ENDOFMOTD. Join auto-join channels.
-                for chan in &self.auto_join {
-                    wire::join(&mut stream, chan).unwrap();
-                }
+                wire::join(
+                    &mut stream,
+                    self.auto_join
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<Vec<&str>>()
+                        .as_slice(),
+                ).unwrap();
 
                 // Set away mode
                 if let Some(ref reason) = self.away_status {
@@ -699,7 +677,9 @@ impl<'poll> Conn<'poll> {
                 // RPL_TOPIC. We've successfully joined a channel, add the channel to
                 // self.auto_join to be able to auto-join next time we connect
                 let chan = &params[params.len() - 2];
-                self.auto_join.insert(chan.to_owned());
+                if !self.auto_join.contains(chan) {
+                    self.auto_join.push(chan.to_owned());
+                }
             }
         }
 

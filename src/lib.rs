@@ -3,7 +3,10 @@
 #![feature(allocator_api)]
 #![feature(ascii_ctype)]
 #![feature(const_fn)]
+#![feature(drain_filter)]
+#![feature(entry_and_modify)]
 #![feature(global_allocator)]
+#![feature(inclusive_range_syntax)]
 #![feature(offset_to)]
 
 extern crate alloc_system;
@@ -48,9 +51,6 @@ use mio::Token;
 use mio::unix::EventedFd;
 use mio::unix::UnixReady;
 use std::error::Error;
-use std::fs::File;
-use std::io::Read;
-use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
@@ -58,7 +58,7 @@ use std::time::Instant;
 
 use conn::{Conn, ConnErr, ConnEv};
 use logger::Logger;
-use term_input::Input;
+use term_input::{Event, Input};
 use tui::tabbed::MsgSource;
 use tui::tabbed::TabStyle;
 use tui::{MsgTarget, TUIRet, Timestamp, TUI};
@@ -69,9 +69,9 @@ use wire::{Cmd, Msg, Pfx};
 pub fn run() {
     let config_path = config::get_config_path();
     if !config_path.is_file() {
-        generate_default_config();
+        config::generate_default_config();
     } else {
-        match parse_config(config_path) {
+        match config::parse_config(config_path) {
             Err(yaml_err) => {
                 println!("Can't parse config file:");
                 println!("{}", yaml_err);
@@ -106,32 +106,6 @@ pub fn run() {
             }
         }
     }
-}
-
-fn parse_config(config_path: PathBuf) -> serde_yaml::Result<config::Config> {
-    let contents = {
-        let mut str = String::new();
-        let mut file = File::open(config_path).unwrap();
-        file.read_to_string(&mut str).unwrap();
-        str
-    };
-
-    serde_yaml::from_str(&contents)
-}
-
-fn generate_default_config() {
-    let config_path = config::get_config_path();
-    {
-        let mut file = File::create(&config_path).unwrap();
-        file.write_all(config::get_default_config_yaml().as_bytes())
-            .unwrap();
-    }
-    println!(
-        "\
-tiny couldn't find a config file at {0:?}, and created a config file with defaults.
-You may want to edit {0:?} before re-running tiny.",
-        config_path
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -182,7 +156,7 @@ impl<'poll> Tiny<'poll> {
             let msg_target = MsgTarget::Server {
                 serv_name: &server.addr.clone(),
             };
-            match Conn::from_server(server, &poll) {
+            match Conn::new(server, &poll) {
                 Ok(conn) => {
                     conns.push(conn);
                 }
@@ -280,7 +254,9 @@ impl<'poll> Tiny<'poll> {
                 }
                 TUIRet::KeyHandled =>
                     {}
-                // TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
+                TUIRet::EventIgnored(Event::FocusGained)
+                | TUIRet::EventIgnored(Event::FocusLost) =>
+                    {}
                 ev => {
                     self.logger
                         .get_debug_logs()
@@ -295,7 +271,7 @@ impl<'poll> Tiny<'poll> {
         let words: Vec<&str> = msg.split_whitespace().into_iter().collect();
 
         if words[0] == "connect" && words.len() == 2 {
-            self.connect(poll, src, words[1]);
+            self.connect(poll, words[1]);
         } else if words[0] == "connect" && words.len() == 1 {
             self.tui.add_client_msg(
                 "Reconnecting...",
@@ -402,7 +378,7 @@ impl<'poll> Tiny<'poll> {
                     .set_nick(conn.get_serv_name(), Rc::new(new_nick.to_owned()));
             }
         } else if words[0] == "reload" {
-            match parse_config(config::get_config_path()) {
+            match config::parse_config(config::get_config_path()) {
                 Ok(config::Config { colors, .. }) =>
                     self.tui.set_colors(colors),
                 Err(err) => {
@@ -473,11 +449,12 @@ impl<'poll> Tiny<'poll> {
         }
     }
 
-    fn connect(&mut self, poll: &'poll Poll, src: MsgSource, serv_addr: &str) {
+    fn connect(&mut self, poll: &'poll Poll, serv_addr: &str) {
         fn split_port(s: &str) -> Option<(&str, &str)> {
             s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
         }
 
+        // parse host name and port
         let (serv_name, serv_port) = {
             match split_port(serv_addr) {
                 None => {
@@ -499,6 +476,8 @@ impl<'poll> Tiny<'poll> {
                     },
             }
         };
+
+        // if we already connected to this server reconnect using new port
         if let Some(conn) = find_conn(&mut self.conns, serv_name) {
             self.tui.add_client_msg(
                 "Connecting...",
@@ -522,6 +501,7 @@ impl<'poll> Tiny<'poll> {
             return;
         }
 
+        // otherwise create a new connection
         // can't move the rest to an else branch because of borrowchk
 
         // otherwise create a new Conn, tab etc.
@@ -531,27 +511,19 @@ impl<'poll> Tiny<'poll> {
         };
         self.tui.add_client_msg("Connecting...", &msg_target);
 
-        let conn_ret = {
-            match find_conn_idx(&mut self.conns, src.serv_name()) {
-                Some(conn_idx) => {
-                    let old_conn = self.conns.remove(conn_idx);
-                    Conn::from_conn(old_conn, serv_name, serv_port)
-                }
-                None =>
-                    Conn::from_server(
-                        config::Server {
-                            addr: serv_name.to_owned(),
-                            port: serv_port,
-                            tls: self.defaults.tls,
-                            hostname: self.defaults.hostname.clone(),
-                            realname: self.defaults.realname.clone(),
-                            nicks: self.defaults.nicks.clone(),
-                            auto_cmds: self.defaults.auto_cmds.clone(),
-                        },
-                        poll,
-                    ),
-            }
-        };
+        let conn_ret = Conn::new(
+            config::Server {
+                addr: serv_name.to_owned(),
+                port: serv_port,
+                tls: self.defaults.tls,
+                hostname: self.defaults.hostname.clone(),
+                realname: self.defaults.realname.clone(),
+                nicks: self.defaults.nicks.clone(),
+                auto_cmds: self.defaults.auto_cmds.clone(),
+                join: self.defaults.join.clone(),
+            },
+            poll,
+        );
 
         match conn_ret {
             Ok(conn) => {
@@ -566,7 +538,8 @@ impl<'poll> Tiny<'poll> {
 
     fn join(&mut self, src: MsgSource, chan: &str) {
         if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
-            conn.join(chan);
+            let chans: [&str; 1] = [chan];
+            conn.join(&chans);
             return;
         }
 
@@ -628,7 +601,9 @@ impl<'poll> Tiny<'poll> {
                     ref serv_name,
                     ref nick,
                 } => {
-                    let msg_target = if nick.eq_ignore_ascii_case("nickserv") {
+                    let msg_target = if nick.eq_ignore_ascii_case("nickserv")
+                        || nick.eq_ignore_ascii_case("chanserv")
+                    {
                         MsgTarget::Server {
                             serv_name: serv_name,
                         }
@@ -792,15 +767,20 @@ impl<'poll> Tiny<'poll> {
 
     fn handle_msg(&mut self, conn_idx: usize, msg: Msg, ts: Timestamp) {
         let conn = &self.conns[conn_idx];
-        let pfx = match msg.pfx {
-            None => {
-                return; /* TODO: log this */
-            }
-            Some(pfx) =>
-                pfx,
-        };
+        let pfx = msg.pfx;
         match msg.cmd {
             Cmd::PRIVMSG { target, msg } | Cmd::NOTICE { target, msg } => {
+                let pfx = match pfx {
+                    Some(pfx) =>
+                        pfx,
+                    None => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("PRIVMSG or NOTICE without prefix \
+                                                     target: {:?} msg: {:?}", target, msg));
+                        return;
+                    }
+                };
                 let origin = match pfx {
                     Pfx::Server(_) =>
                         conn.get_serv_name(),
@@ -858,7 +838,8 @@ impl<'poll> Tiny<'poll> {
                                 MsgTarget::Server {
                                     serv_name: serv_name,
                                 },
-                            Pfx::User { ref nick, .. } if nick.eq_ignore_ascii_case("nickserv") =>
+                            Pfx::User { ref nick, .. } if nick.eq_ignore_ascii_case("nickserv") ||
+                                                          nick.eq_ignore_ascii_case("chanserv") =>
                                 MsgTarget::Server {
                                     serv_name: serv_name,
                                 },
@@ -882,12 +863,7 @@ impl<'poll> Tiny<'poll> {
 
             Cmd::JOIN { chan } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
-                    }
-                    Pfx::User { nick, .. } => {
+                    Some(Pfx::User { nick, .. }) => {
                         let serv_name = conn.get_serv_name();
                         self.logger
                             .get_chan_logs(serv_name, &chan)
@@ -896,7 +872,7 @@ impl<'poll> Tiny<'poll> {
                             self.tui.new_chan_tab(serv_name, &chan);
                         } else {
                             self.tui.add_nick(
-                                &nick,
+                                drop_nick_prefix(&nick),
                                 Some(Timestamp::now()),
                                 &MsgTarget::Chan {
                                     serv_name: serv_name,
@@ -905,16 +881,16 @@ impl<'poll> Tiny<'poll> {
                             );
                         }
                     }
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
+                    }
                 },
 
             Cmd::PART { chan, .. } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird PART message pfx {:?}", pfx));
-                    }
-                    Pfx::User { nick, .. } =>
+                    Some(Pfx::User { nick, .. }) =>
                         if nick != conn.get_nick() {
                             let serv_name = conn.get_serv_name();
                             self.logger
@@ -929,16 +905,16 @@ impl<'poll> Tiny<'poll> {
                                 },
                             );
                         },
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird PART message pfx {:?}", pfx));
+                    }
                 },
 
             Cmd::QUIT { .. } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
-                    }
-                    Pfx::User { ref nick, .. } => {
+                    Some(Pfx::User { ref nick, .. }) => {
                         let serv_name = conn.get_serv_name();
                         self.tui.remove_nick(
                             nick,
@@ -948,19 +924,19 @@ impl<'poll> Tiny<'poll> {
                                 nick: nick,
                             },
                         );
+                    },
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
                     }
                 },
 
             Cmd::NICK { nick } =>
                 match pfx {
-                    Pfx::Server(_) => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("Weird NICK message pfx {:?}", pfx));
-                    }
-                    Pfx::User {
+                    Some(Pfx::User {
                         nick: ref old_nick, ..
-                    } => {
+                    }) => {
                         let serv_name =
                             conn.get_serv_name();
                         self.tui.rename_nick(
@@ -972,15 +948,28 @@ impl<'poll> Tiny<'poll> {
                                 nick: old_nick,
                             },
                         );
+                    },
+                    pfx => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("Weird NICK message pfx {:?}", pfx));
                     }
                 },
 
-            Cmd::PING { .. } =>
+            Cmd::PING { .. } | Cmd::PONG { .. } =>
                 // ignore
                 {}
-            Cmd::Other { ref cmd, .. } if cmd == "PONG" =>
-                // ignore
-                {}
+
+            Cmd::ERROR { ref msg } => {
+                let serv_name = conn.get_serv_name();
+                self.tui.add_err_msg(
+                    msg,
+                    Timestamp::now(),
+                    &MsgTarget::AllServTabs {
+                        serv_name: serv_name,
+                    },
+                );
+            }
 
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
@@ -1049,14 +1038,7 @@ impl<'poll> Tiny<'poll> {
                     };
 
                     for nick in params[3].split_whitespace() {
-                        // Apparently some nicks have a '@' prefix (indicating ops)
-                        // TODO: Not sure where this is documented
-                        let nick = if nick.chars().nth(0) == Some('@') {
-                            &nick[1..]
-                        } else {
-                            nick
-                        };
-                        self.tui.add_nick(nick, None, &chan_target);
+                        self.tui.add_nick(drop_nick_prefix(nick), None, &chan_target);
                     }
                 }
                 // RPL_ENDOFNAMES: End of NAMES list
@@ -1086,7 +1068,7 @@ impl<'poll> Tiny<'poll> {
                     );
                 } else {
                     match pfx {
-                        Pfx::Server(msg_serv_name) => {
+                        Some(Pfx::Server(msg_serv_name)) => {
                             let conn_serv_name = conn.get_serv_name();
                             let msg_target = MsgTarget::Server {
                                 serv_name: conn_serv_name,
@@ -1100,7 +1082,7 @@ impl<'poll> Tiny<'poll> {
                             );
                             self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                         }
-                        _ => {
+                        pfx => {
                             // add everything else to debug file
                             self.logger.get_debug_logs().write_line(format_args!(
                                 "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
@@ -1115,7 +1097,7 @@ impl<'poll> Tiny<'poll> {
 
             Cmd::Other { cmd, params } => {
                 match pfx {
-                    Pfx::Server(msg_serv_name) => {
+                    Some(Pfx::Server(msg_serv_name)) => {
                         let conn_serv_name = conn.get_serv_name();
                         let msg_target = MsgTarget::Server {
                             serv_name: conn_serv_name,
@@ -1129,7 +1111,7 @@ impl<'poll> Tiny<'poll> {
                         );
                         self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
-                    _ => {
+                    pfx => {
                         self.logger.get_debug_logs().write_line(format_args!(
                             "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
                             pfx,
@@ -1184,4 +1166,21 @@ fn reconnect_err_msg(err: &ConnErr) -> String {
         err.description(),
         conn::RECONNECT_TICKS
     )
+}
+
+
+/// Nicks may have prefixes, indicating it is a operator, founder, or
+/// something else.
+/// Channel Membership Prefixes:
+/// http://modern.ircdocs.horse/#channel-membership-prefixes
+///
+/// Returns the nick without prefix
+fn drop_nick_prefix(nick: &str) -> &str {
+    static PREFIXES: [char; 5] = ['~', '&', '@', '%', '+'];
+
+    if PREFIXES.contains(&nick.chars().nth(0).unwrap()) {
+        &nick[1..]
+    } else {
+        nick
+    }
 }

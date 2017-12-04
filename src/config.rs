@@ -1,7 +1,11 @@
 //! To see how color numbers map to actual colors in your terminal run
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
 use serde::Deserialize;
+use serde_yaml;
 use std::env::home_dir;
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -29,6 +33,10 @@ pub struct Server {
     /// Commands to automatically run after joining to the server. Useful for e.g. registering the
     /// nick via nickserv or joining channels. Uses tiny command syntax.
     pub auto_cmds: Vec<String>,
+
+    /// Channels to automatically join. Any `/join` commands in `auto_cmds` will be moved here.
+    #[serde(default)]
+    pub join: Vec<String>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
@@ -38,6 +46,7 @@ pub struct Defaults {
     pub hostname: String,
     pub realname: String,
     pub auto_cmds: Vec<String>,
+    #[serde(default)] pub join: Vec<String>,
     #[serde(default)] pub tls: bool,
 }
 
@@ -55,120 +64,71 @@ pub fn get_config_path() -> PathBuf {
     config_path
 }
 
-pub fn get_default_config_yaml() -> String {
+pub fn parse_config(config_path: PathBuf) -> Result<Config, serde_yaml::Error> {
+    let contents = {
+        let mut str = String::new();
+        let mut file = File::open(config_path).unwrap();
+        file.read_to_string(&mut str).unwrap();
+        str
+    };
+
+    parse_config_str(&contents)
+}
+
+fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
+    let mut cfg: Config = serde_yaml::from_str(&contents)?;
+
+    fn parse_join_cmds(cmds: &mut Vec<String>, join: &mut Vec<String>) {
+        *join = cmds.drain_filter(|cmd| {
+            let mut chan = None;
+            {
+                let mut words = cmd.split_whitespace().into_iter();
+                if words.next() == Some("join") {
+                    if let Some(chan_) = words.next() {
+                        chan = Some(chan_.to_owned());
+                    }
+                }
+            }
+            match chan {
+                None =>
+                    false,
+                Some(chan) => {
+                    *cmd = chan;
+                    true
+                }
+            }
+        }).collect();
+    }
+
+    for mut server in &mut cfg.servers {
+        parse_join_cmds(&mut server.auto_cmds, &mut server.join);
+    }
+
+    parse_join_cmds(&mut cfg.defaults.auto_cmds, &mut cfg.defaults.join);
+
+    Ok(cfg)
+}
+
+pub fn generate_default_config() {
+    let config_path = get_config_path();
+    {
+        let mut file = File::create(&config_path).unwrap();
+        file.write_all(get_default_config_yaml().as_bytes())
+            .unwrap();
+    }
+    println!(
+        "\
+tiny couldn't find a config file at {0:?}, and created a config file with defaults.
+You may want to edit {0:?} before re-running tiny.",
+        config_path
+    );
+}
+
+fn get_default_config_yaml() -> String {
     let mut log_dir = home_dir().unwrap();
     log_dir.push("tiny_logs");
     format!(
-        "\
-# Servers to auto-connect
-servers:
-    - addr: irc.mozilla.org
-      port: 6667
-      hostname: yourhost
-      realname: yourname
-      nicks: [tiny_user]
-      auto_cmds:
-          - 'msg NickServ identify hunter2'
-          - 'join #tiny'
-
-# Defaults used when connecting to servers via the /connect command
-defaults:
-    nicks: [tiny_user]
-    hostname: yourhost
-    realname: yourname
-    auto_cmds: []
-
-# Where to put log files
-log_dir: '{}'
-
-# Color theme based on 256 colors (if supported). Colors can be defined as color
-# indices (0-255) or with their names.
-#
-# Accepted color names are:
-# default (0), black (0), maroon (1), green (2), olive (3), navy (4),
-# purple (5), teal (6), silver (7), gray (8), red (9), lime (10),
-# yellow (11), blue (12), magenta (13), cyan (14), white (15)
-#
-# Attributes can be combined (e.g [bold, underline]), and valid values are bold
-# and underline
-colors:
-    nick: [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ]
-
-    clear:
-        fg: default
-        bg: default
-
-    user_msg:
-        fg: black
-        bg: default
-
-    err_msg:
-        fg: black
-        bg: maroon
-        attrs: [bold]
-
-    topic:
-        fg: cyan
-        bg: default
-        attrs: [bold]
-
-    cursor:
-        fg: black
-        bg: default
-
-    join:
-        fg: lime
-        bg: default
-        attrs: [bold]
-
-    part:
-        fg: maroon
-        bg: default
-        attrs: [bold]
-
-    nick_change:
-        fg: lime
-        bg: default
-        attrs: [bold]
-
-    faded:
-        fg: 242
-        bg: default
-
-    exit_dialogue:
-        fg: default
-        bg: navy
-
-    highlight:
-        fg: red
-        bg: default
-        attrs: [bold]
-
-    completion:
-        fg: 84
-        bg: default
-
-    timestamp:
-        fg: 242
-        bg: default
-
-    tab_active:
-        fg: default
-        bg: default
-        attrs: [bold]
-
-    tab_normal:
-        fg: gray
-        bg: default
-
-    tab_new_msg:
-        fg: purple
-        bg: default
-
-    tab_highlight:
-        fg: red
-        bg: default
-        attrs: [bold]\n",
+        include_str!("../tinyrc.yml"),
         log_dir.as_path().to_str().unwrap()
     )
 }
@@ -445,6 +405,7 @@ servers:
       auto_cmds:
           - 'msg NickServ identify hunter2'
           - 'join #tiny'
+          - 'join #rust'
 
 # Defaults used when connecting to servers via the /connect command
 defaults:
@@ -455,13 +416,21 @@ defaults:
 
 # Where to put log files
 log_dir: path";
-        match serde_yaml::from_str(config) {
+        match parse_config_str(config) {
             Err(yaml_err) => {
                 println!("{}", yaml_err);
                 assert!(false);
             }
-            Ok(Config { .. }) =>
-                {}
+            Ok(cfg) => {
+                assert_eq!(
+                    cfg.servers[0].join,
+                    vec!["#tiny".to_owned(), "#rust".to_owned()]
+                );
+                assert_eq!(
+                    cfg.servers[0].auto_cmds,
+                    vec!["msg NickServ identify hunter2"]
+                );
+            }
         }
     }
 }

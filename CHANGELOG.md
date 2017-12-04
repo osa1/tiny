@@ -4,6 +4,11 @@
 - `/switch` command added to quickly switch to a different tab using a
   substring of the tab name.
 - `Del` key is now handled. It deletes character under the cursor.
+- Some tweaks and a bug fix (#45) in tab bar rendering. Selected tab is now
+  stays visible in the tab bar after resizing.
+- Connection closure on remote side when TLS is enabled is now handled (#48).
+- `alt-char` bindings implemented to switching between tabs.
+- Fixed some bugs in `join` command used in `auto_cmds` (#49, #38).
 
 # 2017/11/12: 0.3.0
 

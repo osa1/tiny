@@ -208,7 +208,9 @@ server by passing `freenode` as a command line argument.
 
 - `C-c enter` to quit.
 
-- `alt-{1,9}` switch to tab
+- `alt-{1,9}` switch to nth tab
+
+- `alt-{char}` switch to next tab with underlined `char`
 
 - `alt-0` switch to last tab
 
