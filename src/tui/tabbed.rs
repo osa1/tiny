@@ -164,7 +164,7 @@ impl Tab {
                 colors.tab_active_ignored
             }
             else{
-                colors.tab_underlined
+                colors.tab_active
             }
         } else {
             self.style.get_style(colors, ignore_state)

@@ -169,7 +169,6 @@ pub struct Colors {
     pub timestamp: Style,
     pub tab_active: Style,
     pub tab_active_ignored: Style,
-    pub tab_underlined: Style,
     pub tab_normal: Style,
     pub tab_normal_ignored: Style,
     pub tab_new_msg: Style,
@@ -231,9 +230,8 @@ impl Default for Colors {
                 fg: 242,
                 bg: TB_DEFAULT,
             },
-            tab_active_ignored: Style { fg: 242 | TB_UNDERLINE, bg: 0 },
-            tab_underlined: Style { fg: TB_UNDERLINE, bg: 0 },  // got to figure out why tab_active does not work
             tab_active: Style { fg: TB_UNDERLINE, bg: 0 },
+            tab_active_ignored: Style { fg: 242 | TB_UNDERLINE, bg: 0 },
             tab_normal: Style { fg: TB_DEFAULT, bg: 0 },
             tab_normal_ignored: Style { fg: 242, bg: 0 },
             tab_new_msg: Style { fg: 5, bg: 0 },
