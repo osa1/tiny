@@ -21,6 +21,8 @@ use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
 fn main() {
     let mut tui = TUI::new(Colors::default());
 
+    tui.new_server_tab("mentions");
+
     for serv_idx in 0..10 {
         let server = format!("server_{}", serv_idx);
         tui.new_server_tab(&server);

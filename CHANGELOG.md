@@ -8,6 +8,7 @@
 - Connection closure on remote side when TLS is enabled is now handled (#48).
 - `alt-char` bindings implemented to switching between tabs.
 - Fixed some bugs in `join` command used in `auto_cmds` (#49, #38).
+- Tabs can now be moved left/right with `alt-left/right` keys (#52).
 
 # 2017/11/12: 0.3.0
 
