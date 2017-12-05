@@ -428,11 +428,6 @@ impl Tabbed {
         // the selected tab is visible. scroll to the left as much as possible
         // to make more tabs visible.
         let mut num_visible = tab_right - tab_left;
-        if num_visible == self.tabs.len() {
-            // all visible
-            return;
-        }
-        // scroll as long as we can show more tabs than what's already visible
         loop {
             if tab_left == 0 {
                 break;
