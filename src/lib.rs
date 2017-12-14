@@ -1077,6 +1077,14 @@ impl<'poll> Tiny<'poll> {
                             nick: nick,
                         },
                     );
+                // RPL_AWAY
+                } else if n == 301 {
+                    let serv_name = conn.get_serv_name();
+                    let nick = &params[1];
+                    let msg = &params[2];
+                    self.tui.add_client_msg(
+                        &format!("{} is away: {}", nick, msg),
+                        &MsgTarget::User { serv_name, nick });
                 } else {
                     match pfx {
                         Some(Pfx::Server(msg_serv_name)) => {

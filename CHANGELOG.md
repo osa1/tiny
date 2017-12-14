@@ -11,6 +11,7 @@
 - Tabs can now be moved left/right with `alt-left/right` keys (#52).
 - Input field cursor location now preserved after resize.
 - `TOPIC` messages are now handled (#58).
+- `RPL_AWAY` is now handled (#55). Away message is shown in user tab.
 
 # 2017/11/12: 0.3.0
 
