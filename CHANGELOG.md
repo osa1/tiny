@@ -9,6 +9,7 @@
 - `alt-char` bindings implemented to switching between tabs.
 - Fixed some bugs in `join` command used in `auto_cmds` (#49, #38).
 - Tabs can now be moved left/right with `alt-left/right` keys (#52).
+- Input field cursor location now preserved after resize.
 
 # 2017/11/12: 0.3.0
 
