@@ -971,6 +971,17 @@ impl<'poll> Tiny<'poll> {
                 );
             }
 
+            Cmd::TOPIC { ref chan, ref topic } => {
+                self.tui.show_topic(
+                    topic,
+                    Timestamp::now(),
+                    &MsgTarget::Chan {
+                        serv_name: conn.get_serv_name(),
+                        chan_name: chan,
+                    },
+                );
+            }
+
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                         || n == 251 /* RPL_LUSERCLIENT */
