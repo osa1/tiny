@@ -156,7 +156,7 @@ colors:
     tab_active:
         fg: default
         bg: default
-        attrs: [underline]
+        attrs: [bold]
 
     tab_normal:
         fg: gray

@@ -44,29 +44,14 @@ pub enum TabStyle {
 }
 
 impl TabStyle {
-    pub fn get_style(self, colors: &Colors, ignore_state: bool) -> Style {
+    pub fn get_style(self, colors: &Colors) -> Style {
         match self {
-            TabStyle::Normal => {
-                if ignore_state{
-                    colors.tab_normal_ignored
-                } else {
-                    colors.tab_normal
-                }
-            },
-            TabStyle::NewMsg => {
-                if ignore_state {
-                    colors.tab_new_msg_ignored
-                } else {
-                    colors.tab_new_msg
-                }
-            },
-            TabStyle::Highlight => {
-                if ignore_state {
-                    colors.tab_highlight_ignored
-                } else {
-                    colors.tab_highlight
-                }
-            },
+            TabStyle::Normal =>
+                colors.tab_normal,
+            TabStyle::NewMsg =>
+                colors.tab_new_msg,
+            TabStyle::Highlight =>
+                colors.tab_highlight,
         }
     }
 }
@@ -158,18 +143,15 @@ impl Tab {
         pos_y: i32,
         active: bool,
     ) {
-        let ignore_state =  !self.widget.get_ignore_state();
         let style: Style = if active {
-            if ignore_state {
-                colors.tab_active_ignored
-            }
-            else{
-                colors.tab_active
-            }
+            colors.tab_active
         } else {
-            self.style.get_style(colors, ignore_state)
+            self.style.get_style(colors)
         };
 
+        // termbox::print(tb, pos_x, pos_y, style, self.visible_name());
+        // if !self.widget.get_ignore_state() {
+        //     termbox::print(tb, pos_x + self.width(), pos_y, colors.faded, "|i");
         let mut switch_drawn = false;
         for ch in self.visible_name().chars() {
             if Some(ch) == self.switch && !switch_drawn {
@@ -625,6 +607,9 @@ impl Tabbed {
             );
             // len() is OK since server, chan and nick names are ascii
             pos_x += tab.visible_name().len() as i32 + 1; // +1 for margin
+            if !tab.widget.get_ignore_state() {
+                pos_x += 2;
+            }
         }
 
         if right_arr {
