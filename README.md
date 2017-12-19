@@ -214,6 +214,8 @@ server by passing `freenode` as a command line argument.
 
 - `alt-0` switch to last tab
 
+- `alt-left/right` move tab to left/right
+
 ## Commands
 
 Commands start with `/` character.

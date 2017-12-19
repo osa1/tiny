@@ -66,7 +66,8 @@ impl TextField {
 
     pub fn resize(&mut self, width: i32) {
         self.width = width;
-        self.move_cursor_to_end();
+        let cursor = self.cursor;
+        self.move_cursor(cursor);
     }
 
     pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {

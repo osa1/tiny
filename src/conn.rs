@@ -153,7 +153,7 @@ impl<'poll> Conn<'poll> {
             away_status: None,
             servername: None,
             usermask: None,
-            poll: poll,
+            poll,
             status: ConnStatus::Introduce {
                 ticks_passed: 0,
                 stream: stream,

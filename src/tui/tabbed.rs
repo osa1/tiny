@@ -1,4 +1,4 @@
-use term_input::Key;
+use term_input::{Arrow, Key};
 use termbox_simple::{Termbox, TB_UNDERLINE};
 
 use std::rc::Rc;
@@ -411,6 +411,16 @@ impl Tabbed {
                     }
                 },
 
+            Key::AltArrow(Arrow::Left) => {
+                self.move_tab_left();
+                TabbedRet::KeyHandled
+            }
+
+            Key::AltArrow(Arrow::Right) => {
+                self.move_tab_right();
+                TabbedRet::KeyHandled
+            }
+
             _ =>
                 TabbedRet::KeyIgnored,
         }
@@ -443,11 +453,6 @@ impl Tabbed {
         // the selected tab is visible. scroll to the left as much as possible
         // to make more tabs visible.
         let mut num_visible = tab_right - tab_left;
-        if num_visible == self.tabs.len() {
-            // all visible
-            return;
-        }
-        // scroll as long as we can show more tabs than what's already visible
         loop {
             if tab_left == 0 {
                 break;
@@ -718,6 +723,52 @@ impl Tabbed {
                 self.h_scroll = 0
             };
             self.active_idx = next_active;
+        }
+    }
+
+    fn move_tab_left(&mut self) {
+        if self.active_idx == 0 {
+            return;
+        }
+        if self.is_server_tab(self.active_idx) {
+            // move all server tabs
+            let (left, right) = self.server_tab_range(self.active_idx);
+            if left > 0 {
+                let mut insert_idx = left - 1;
+                while insert_idx > 0 && !self.is_server_tab(insert_idx) {
+                    insert_idx -= 1;
+                }
+                let to_move: Vec<Tab> = self.tabs.drain(left .. right).collect();
+                self.tabs.splice(insert_idx..insert_idx, to_move.into_iter());
+                self.select_tab(insert_idx);
+            }
+        } else if !self.is_server_tab(self.active_idx - 1) {
+            let tab = self.tabs.remove(self.active_idx);
+            self.tabs.insert(self.active_idx - 1, tab);
+            let active_idx = self.active_idx - 1;
+            self.select_tab(active_idx);
+        }
+    }
+
+    fn move_tab_right(&mut self) {
+        if self.active_idx == self.tabs.len() - 1 {
+            return;
+        }
+        if self.is_server_tab(self.active_idx) {
+            // move all server tabs
+            let (left, right) = self.server_tab_range(self.active_idx);
+            if right < self.tabs.len() {
+                let right_next = self.server_tab_range(right).1;
+                let insert_idx = right_next - (right - left);
+                let to_move: Vec<Tab> = self.tabs.drain(left .. right).collect();
+                self.tabs.splice(insert_idx..insert_idx, to_move.into_iter());
+                self.select_tab(insert_idx);
+            }
+        } else if !self.is_server_tab(self.active_idx + 1) {
+            let tab = self.tabs.remove(self.active_idx);
+            self.tabs.insert(self.active_idx + 1, tab);
+            let active_idx = self.active_idx + 1;
+            self.select_tab(active_idx);
         }
     }
 
@@ -1033,5 +1084,28 @@ impl Tabbed {
             }
         }
         None
+    }
+
+    fn is_server_tab(&self, idx: usize) -> bool {
+        match self.tabs[idx].src {
+            MsgSource::Serv { .. } =>
+                true,
+            MsgSource::Chan { .. } | MsgSource::User { .. } =>
+                false,
+        }
+    }
+
+    /// Given a tab index return range of tabs for the server of this tab.
+    fn server_tab_range(&self, idx: usize) -> (usize, usize) {
+        debug_assert!(idx < self.tabs.len());
+        let mut left = idx;
+        while !self.is_server_tab(left) {
+            left -= 1;
+        }
+        let mut right = idx + 1;
+        while right < self.tabs.len() && !self.is_server_tab(right) {
+            right += 1;
+        }
+        (left, right)
     }
 }

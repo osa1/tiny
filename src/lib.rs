@@ -178,21 +178,23 @@ impl<'poll> Tiny<'poll> {
         tiny.tui.draw();
 
         let mut last_tick = Instant::now();
-        let mut events = Events::with_capacity(10);
+        let mut poll_evs = Events::with_capacity(10);
+        let mut conn_evs = Vec::with_capacity(10);
+        let mut input_evs = Vec::with_capacity(10);
         'mainloop: loop {
             // FIXME this will sometimes miss the tick deadline
-            match poll.poll(&mut events, Some(Duration::from_secs(1))) {
+            match poll.poll(&mut poll_evs, Some(Duration::from_secs(1))) {
                 Err(_) => {
                     // usually SIGWINCH, which is caught by term_input
-                    if tiny.handle_stdin(&poll) {
+                    if tiny.handle_stdin(&poll, &mut input_evs) {
                         break 'mainloop;
                     }
                 }
                 Ok(_) => {
-                    for event in events.iter() {
+                    for event in poll_evs.iter() {
                         let token = event.token();
                         if token == STDIN_TOKEN {
-                            if tiny.handle_stdin(&poll) {
+                            if tiny.handle_stdin(&poll, &mut input_evs) {
                                 break 'mainloop;
                             }
                         } else {
@@ -204,7 +206,7 @@ impl<'poll> Tiny<'poll> {
                                     ));
                                 }
                                 Some(conn_idx) => {
-                                    tiny.handle_socket(&poll, event.readiness(), conn_idx);
+                                    tiny.handle_socket(&poll, event.readiness(), conn_idx, &mut conn_evs);
                                 }
                             }
                         }
@@ -212,12 +214,11 @@ impl<'poll> Tiny<'poll> {
 
                     if last_tick.elapsed() >= Duration::from_secs(1) {
                         for conn_idx in 0..tiny.conns.len() {
-                            let mut evs = Vec::with_capacity(2);
                             {
                                 let conn = &mut tiny.conns[conn_idx];
-                                conn.tick(&mut evs, tiny.logger.get_debug_logs());
+                                conn.tick(&mut conn_evs, tiny.logger.get_debug_logs());
                             }
-                            tiny.handle_conn_evs(&poll, conn_idx, evs);
+                            tiny.handle_conn_evs(&poll, conn_idx, &mut conn_evs);
                         }
                         last_tick = Instant::now();
                     }
@@ -228,11 +229,10 @@ impl<'poll> Tiny<'poll> {
         }
     }
 
-    fn handle_stdin(&mut self, poll: &'poll Poll) -> bool {
-        let mut ev_buffer = Vec::with_capacity(10);
+    fn handle_stdin(&mut self, poll: &'poll Poll, evs: &mut Vec<Event>) -> bool {
         let mut abort = false;
-        self.input_ev_handler.read_input_events(&mut ev_buffer);
-        for ev in ev_buffer.drain(..) {
+        self.input_ev_handler.read_input_events(evs);
+        for ev in evs.drain(..) {
             match self.tui.handle_input_event(ev) {
                 TUIRet::Abort => {
                     abort = true;
@@ -639,15 +639,14 @@ impl<'poll> Tiny<'poll> {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_socket(&mut self, poll: &'poll Poll, readiness: Ready, conn_idx: usize) {
-        let mut evs = Vec::with_capacity(2);
+    fn handle_socket(&mut self, poll: &'poll Poll, readiness: Ready, conn_idx: usize, evs: &mut Vec<ConnEv>) {
         {
             let conn = &mut self.conns[conn_idx];
             if readiness.is_readable() {
-                conn.read_ready(&mut evs, &mut self.logger);
+                conn.read_ready(evs, &mut self.logger);
             }
             if readiness.is_writable() {
-                conn.write_ready(&mut evs);
+                conn.write_ready(evs);
             }
             if readiness.contains(UnixReady::hup()) {
                 conn.enter_disconnect_state();
@@ -667,8 +666,8 @@ impl<'poll> Tiny<'poll> {
         self.handle_conn_evs(poll, conn_idx, evs);
     }
 
-    fn handle_conn_evs(&mut self, poll: &'poll Poll, conn_idx: usize, evs: Vec<ConnEv>) {
-        for ev in evs {
+    fn handle_conn_evs(&mut self, poll: &'poll Poll, conn_idx: usize, evs: &mut Vec<ConnEv>) {
+        for ev in evs.drain(..) {
             self.handle_conn_ev(poll, conn_idx, ev);
         }
     }
@@ -971,6 +970,17 @@ impl<'poll> Tiny<'poll> {
                 );
             }
 
+            Cmd::TOPIC { ref chan, ref topic } => {
+                self.tui.show_topic(
+                    topic,
+                    Timestamp::now(),
+                    &MsgTarget::Chan {
+                        serv_name: conn.get_serv_name(),
+                        chan_name: chan,
+                    },
+                );
+            }
+
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                         || n == 251 /* RPL_LUSERCLIENT */
@@ -1066,6 +1076,14 @@ impl<'poll> Tiny<'poll> {
                             nick: nick,
                         },
                     );
+                // RPL_AWAY
+                } else if n == 301 {
+                    let serv_name = conn.get_serv_name();
+                    let nick = &params[1];
+                    let msg = &params[2];
+                    self.tui.add_client_msg(
+                        &format!("{} is away: {}", nick, msg),
+                        &MsgTarget::User { serv_name, nick });
                 } else {
                     match pfx {
                         Some(Pfx::Server(msg_serv_name)) => {

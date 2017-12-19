@@ -132,6 +132,11 @@ pub enum Cmd {
         msg: String,
     },
 
+    TOPIC {
+        chan: String,
+        topic: String,
+    },
+
     /// An IRC message other than the ones listed above.
     Other {
         cmd: String,
@@ -283,6 +288,11 @@ impl Msg {
                 MsgType::Cmd("ERROR") if params.len() == 1 =>
                     Cmd::ERROR {
                         msg: params[0].to_owned(),
+                    },
+                MsgType::Cmd("TOPIC") if params.len() == 2 =>
+                    Cmd::TOPIC {
+                        chan: params[0].to_owned(),
+                        topic: params[1].to_owned(),
                     },
                 MsgType::Num(n) =>
                     Cmd::Reply {
