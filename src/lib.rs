@@ -403,10 +403,21 @@ impl<'poll> Tiny<'poll> {
                         serv_name: serv_name,
                         chan_name: chan_name,
                     };
-                    self.tui.add_client_msg(
-                        &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
-                        &target,
-                    );
+                    if words.len() == 1 {
+                        self.tui.add_client_msg(
+                            &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
+                            &target,
+                        );
+                    } else if words.len() == 2 {
+                        if words[1].chars().nth(words[1].len() - 1).unwrap() == '?' {
+                            let nick: String = words[1].chars().take(words[1].len() - 1).collect();
+                            if nicks_vec.iter().any(|v| v == &nick) {
+                                self.tui.add_client_msg(&format!("{} is online", nick), &target);
+                            } else {
+                                self.tui.add_client_msg(&format!("{} is not in the channel", nick), &target);
+                            }
+                        }
+                    }
                 }
             } else {
                 self.tui.add_client_err_msg(

@@ -149,6 +149,9 @@ impl Tab {
             self.style.get_style(colors)
         };
 
+        // termbox::print(tb, pos_x, pos_y, style, self.visible_name());
+        // if !self.widget.get_ignore_state() {
+        //     termbox::print(tb, pos_x + self.width(), pos_y, colors.faded, "|i");
         let mut switch_drawn = false;
         for ch in self.visible_name().chars() {
             if Some(ch) == self.switch && !switch_drawn {
@@ -158,6 +161,12 @@ impl Tab {
                 tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
             }
             pos_x += 1;
+        }
+        if !self.widget.get_ignore_state() {
+            for ch in "[i]".chars() {
+                tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
+                pos_x += 1;
+            }
         }
     }
 }
@@ -182,7 +191,7 @@ impl Tabbed {
         }
     }
 
-    fn new_tab(&mut self, idx: usize, src: MsgSource) {
+    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool) {
         use std::collections::HashMap;
 
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
@@ -217,7 +226,7 @@ impl Tabbed {
         self.tabs.insert(
             idx,
             Tab {
-                widget: MessagingUI::new(self.width, self.height - 1),
+                widget: MessagingUI::new(self.width, self.height - 1, status),
                 src,
                 style: TabStyle::Normal,
                 switch,
@@ -235,6 +244,7 @@ impl Tabbed {
                     MsgSource::Serv {
                         serv_name: serv_name.to_owned(),
                     },
+                    true
                 );
                 Some(tab_idx)
             }
@@ -264,6 +274,15 @@ impl Tabbed {
                         self.new_chan_tab(serv_name, chan_name)
                     }
                     Some(serv_tab_idx) => {
+                        let mut status_val: bool = true;
+                        for tab in self.tabs.iter() {
+                            if let MsgSource::Serv{ serv_name: ref serv_name_ } = tab.src {
+                                if serv_name == serv_name_ {
+                                    status_val = tab.widget.get_ignore_state();
+                                    break
+                                }
+                            }
+                        }
                         let tab_idx = serv_tab_idx + 1;
                         self.new_tab(
                             tab_idx,
@@ -271,6 +290,7 @@ impl Tabbed {
                                 serv_name: serv_name.to_owned(),
                                 chan_name: chan_name.to_owned(),
                             },
+                            status_val
                         );
                         if self.active_idx >= tab_idx {
                             self.active_idx += 1;
@@ -311,6 +331,7 @@ impl Tabbed {
                                 serv_name: serv_name.to_owned(),
                                 nick: nick.to_owned(),
                             },
+                            true
                         );
                         if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
                             self.tabs[tab_idx + 1].widget.set_nick(nick);
@@ -597,6 +618,9 @@ impl Tabbed {
             );
             // len() is OK since server, chan and nick names are ascii
             pos_x += tab.visible_name().len() as i32 + 1; // +1 for margin
+            if !tab.widget.get_ignore_state() {
+                pos_x += 3;
+            }
         }
 
         if right_arr {
@@ -993,9 +1017,25 @@ impl Tabbed {
     }
 
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.ignore();
-        });
+        if let MsgTarget::AllServTabs { serv_name } = *target {
+            let mut status_val: bool = false;
+            for tab in self.tabs.iter() {
+                if let MsgSource::Serv{ serv_name: ref serv_name_ } = tab.src {
+                    if serv_name == serv_name_ {
+                        status_val = tab.widget.get_ignore_state();
+                        break
+                    }
+                }
+            }
+            self.apply_to_target(target, &|tab: &mut Tab, _| {
+                tab.widget.ignore(false, Some(!status_val));
+            });
+        }
+        else{
+            self.apply_to_target(target, &|tab: &mut Tab, _| {
+                tab.widget.ignore(true, None);
+            });
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////

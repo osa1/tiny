@@ -245,6 +245,8 @@ Commands start with `/` character.
 
 - `/clear`: Clears tab contents
 
+- `/ignore`: Ignore `join/quit` messages in a channel. When enabled channel
+  will have `|i` added to the end to show that it is enabled.
 - `/switch <string>`: Switch to the first tab which has the given string in the name.
 
 ## Development

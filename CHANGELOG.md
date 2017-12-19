@@ -1,5 +1,6 @@
 # Unreleased
 
+- `/ignore` command added to ignore `join/quit` messages in channel
 - `/switch` command added to quickly switch to a different tab using a
   substring of the tab name.
 - `Del` key is now handled. It deletes character under the cursor.

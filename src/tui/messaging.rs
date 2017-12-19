@@ -83,14 +83,14 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub fn new(width: i32, height: i32) -> MessagingUI {
+    pub fn new(width: i32, height: i32, status: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
             input_field: TextField::new(width),
             exit_dialogue: None,
             width: width,
             height: height,
-            show_status: true,
+            show_status: status,
             nicks: Trie::new(),
             current_nick: None,
             draw_current_nick: true,
@@ -288,6 +288,16 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
+    pub fn add_client_notify_msg(&mut self, msg: &str) {
+        self.reset_activity_line();
+
+        self.msg_area
+            .set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
+        self.msg_area.add_text(msg);
+        self.msg_area.flush_line();
+        self.reset_activity_line();
+    }
+
     pub fn add_client_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
@@ -415,8 +425,22 @@ impl MessagingUI {
         }
     }
 
-    pub fn ignore(&mut self) {
-        self.show_status = !self.show_status;
+    pub fn ignore(&mut self, toggle: bool, state: Option<bool>) {
+        if toggle {
+            self.show_status = !self.show_status;
+        }
+        else{
+            self.show_status = state.unwrap();
+        }
+        if self.show_status {
+            self.add_client_notify_msg("Ignore disabled");
+        } else{
+            self.add_client_notify_msg("Ignore enabled");
+        }
+    }
+
+    pub fn get_ignore_state(&self) -> bool{
+        return self.show_status;
     }
 
     pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
