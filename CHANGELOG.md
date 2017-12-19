@@ -1,6 +1,5 @@
 # Unreleased
 
-- `/ignore` command added to ignore `join/quit` messages in channel
 - `/switch` command added to quickly switch to a different tab using a
   substring of the tab name.
 - `Del` key is now handled. It deletes character under the cursor.
@@ -13,6 +12,7 @@
 - Input field cursor location now preserved after resize.
 - `TOPIC` messages are now handled (#58).
 - `RPL_AWAY` is now handled (#55). Away message is shown in user tab.
+- `/ignore` command added to ignore `join/quit` messages in channels.
 
 # 2017/11/12: 0.3.0
 

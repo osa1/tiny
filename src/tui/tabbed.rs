@@ -1020,20 +1020,19 @@ impl Tabbed {
         if let MsgTarget::AllServTabs { serv_name } = *target {
             let mut status_val: bool = false;
             for tab in self.tabs.iter() {
-                if let MsgSource::Serv{ serv_name: ref serv_name_ } = tab.src {
+                if let MsgSource::Serv { serv_name: ref serv_name_ } = tab.src {
                     if serv_name == serv_name_ {
                         status_val = tab.widget.get_ignore_state();
-                        break
+                        break;
                     }
                 }
             }
             self.apply_to_target(target, &|tab: &mut Tab, _| {
-                tab.widget.ignore(false, Some(!status_val));
+                tab.widget.set_ignore(Some(!status_val));
             });
-        }
-        else{
+        } else {
             self.apply_to_target(target, &|tab: &mut Tab, _| {
-                tab.widget.ignore(true, None);
+                tab.widget.set_ignore(None);
             });
         }
     }

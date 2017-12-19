@@ -409,13 +409,11 @@ impl<'poll> Tiny<'poll> {
                             &target,
                         );
                     } else if words.len() == 2 {
-                        if words[1].chars().nth(words[1].len() - 1).unwrap() == '?' {
-                            let nick: String = words[1].chars().take(words[1].len() - 1).collect();
-                            if nicks_vec.iter().any(|v| v == &nick) {
-                                self.tui.add_client_msg(&format!("{} is online", nick), &target);
-                            } else {
-                                self.tui.add_client_msg(&format!("{} is not in the channel", nick), &target);
-                            }
+                        let nick = words[1];
+                        if nicks_vec.iter().any(|v| v == nick) {
+                            self.tui.add_client_msg(&format!("{} is online", nick), &target);
+                        } else {
+                            self.tui.add_client_msg(&format!("{} is not in the channel", nick), &target);
                         }
                     }
                 }
