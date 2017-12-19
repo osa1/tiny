@@ -163,10 +163,7 @@ impl Tab {
             pos_x += 1;
         }
         if !self.widget.get_ignore_state() {
-            for ch in "[i]".chars() {
-                tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
-                pos_x += 1;
-            }
+            ::tui::termbox::print_chars(tb, pos_x, pos_y, style, "[i]".chars());
         }
     }
 }
