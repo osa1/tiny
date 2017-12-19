@@ -162,6 +162,12 @@ impl Tab {
             }
             pos_x += 1;
         }
+        if !self.widget.get_ignore_state() {
+            for ch in "[i]".chars() {
+                tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
+                pos_x += 1;
+            }
+        }
     }
 }
 
@@ -613,7 +619,7 @@ impl Tabbed {
             // len() is OK since server, chan and nick names are ascii
             pos_x += tab.visible_name().len() as i32 + 1; // +1 for margin
             if !tab.widget.get_ignore_state() {
-                pos_x += 2;
+                pos_x += 3;
             }
         }
 
