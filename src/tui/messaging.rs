@@ -2,7 +2,6 @@ use termbox_simple::Termbox;
 use term_input::Key;
 
 use std::convert::From;
-use std::rc::Rc;
 
 use time::Tm;
 use time;
@@ -40,7 +39,7 @@ pub struct MessagingUI {
     // properly highlight mentions.
     nicks: Trie,
 
-    current_nick: Option<Rc<String>>,
+    current_nick: Option<String>,
     draw_current_nick: bool,
 
     last_activity_line: Option<ActivityLine>,
@@ -99,7 +98,7 @@ impl MessagingUI {
         }
     }
 
-    pub fn set_nick(&mut self, nick: Rc<String>) {
+    pub fn set_nick(&mut self, nick: String) {
         self.current_nick = Some(nick);
         // update text field size
         let w = self.width;
@@ -107,8 +106,8 @@ impl MessagingUI {
         self.resize(w, h);
     }
 
-    pub fn get_nick(&self) -> Option<Rc<String>> {
-        self.current_nick.clone()
+    pub fn get_nick(&self) -> Option<&str> {
+        self.current_nick.as_ref().map(String::as_str)
     }
 
     fn draw_input_field(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {

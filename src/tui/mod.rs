@@ -7,7 +7,6 @@ pub mod text_field;
 pub mod widget;
 
 use std::fs;
-use std::rc::Rc;
 use std::str;
 
 use config::Colors;
@@ -99,7 +98,7 @@ impl TUI {
         self.ui.set_tab_style(style, target);
     }
 
-    pub fn set_nick(&mut self, serv_name: &str, nick: Rc<String>) {
+    pub fn set_nick(&mut self, serv_name: &str, nick: &str) {
         self.ui.set_nick(
             nick,
             &MsgTarget::AllServTabs {

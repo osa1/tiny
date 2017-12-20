@@ -52,7 +52,6 @@ use mio::unix::EventedFd;
 use mio::unix::UnixReady;
 use std::error::Error;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -374,8 +373,7 @@ impl<'poll> Tiny<'poll> {
             if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
                 let new_nick = words[1];
                 conn.set_nick(new_nick);
-                self.tui
-                    .set_nick(conn.get_serv_name(), Rc::new(new_nick.to_owned()));
+                self.tui.set_nick(conn.get_serv_name(), new_nick);
             }
         } else if words[0] == "reload" {
             match config::parse_config(config::get_config_path()) {
@@ -768,7 +766,7 @@ impl<'poll> Tiny<'poll> {
             }
             ConnEv::NickChange(new_nick) => {
                 let conn = &self.conns[conn_idx];
-                self.tui.set_nick(conn.get_serv_name(), Rc::new(new_nick));
+                self.tui.set_nick(conn.get_serv_name(), &new_nick);
             }
         }
     }

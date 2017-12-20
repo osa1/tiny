@@ -1,8 +1,6 @@
 use term_input::{Arrow, Key};
 use termbox_simple::{Termbox, TB_UNDERLINE};
 
-use std::rc::Rc;
-
 use config::Colors;
 use config::Style;
 use trie::Trie;
@@ -292,7 +290,7 @@ impl Tabbed {
                         if self.active_idx >= tab_idx {
                             self.active_idx += 1;
                         }
-                        if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick() {
+                        if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick().map(str::to_owned) {
                             self.tabs[tab_idx].widget.set_nick(nick);
                         }
                         Some(tab_idx)
@@ -330,7 +328,7 @@ impl Tabbed {
                             },
                             true
                         );
-                        if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
+                        if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
                             self.tabs[tab_idx + 1].widget.set_nick(nick);
                         }
                         Some(tab_idx + 1)
@@ -1003,9 +1001,9 @@ impl Tabbed {
         });
     }
 
-    pub fn set_nick(&mut self, new_nick: Rc<String>, target: &MsgTarget) {
+    pub fn set_nick(&mut self, new_nick: &str, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.set_nick(new_nick.clone())
+            tab.widget.set_nick(new_nick.to_owned())
         });
     }
 
