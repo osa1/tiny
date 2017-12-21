@@ -689,12 +689,11 @@ impl<'poll> Conn<'poll> {
 
 /// Try to parse servername in a 002 RPL_YOURHOST reply
 fn parse_servername(params: &[String]) -> Option<String> {
-    let msg = try_opt!(params.get(1).or_else(|| params.get(0)));
+    let msg = params.get(1).or_else(|| params.get(0))?;
     let slice1 = &msg[13..];
-    let servername_ends = try_opt!(
+    let servername_ends =
         wire::find_byte(slice1.as_bytes(), b'[')
-            .or_else(|| wire::find_byte(slice1.as_bytes(), b','))
-    );
+            .or_else(|| wire::find_byte(slice1.as_bytes(), b','))?;
     Some((&slice1[..servername_ends]).to_owned())
 }
 

@@ -312,7 +312,7 @@ fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
         ch.to_digit(10).map(|c| c as u8)
     }
 
-    let c1_char = *try_opt!(chars.peek());
+    let c1_char = *chars.peek()?;
     let c1_digit = match to_dec(c1_char) {
         None => {
             return None;

@@ -1,15 +1,3 @@
-#[macro_export]
-macro_rules! try_opt {
-    ($expr:expr) => (match $expr {
-        Option::Some(val) => val,
-        Option::None => {
-            return Option::None
-        }
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 pub struct InsertIterator<'iter, A: 'iter> {
     insert_point: usize,
     current_idx: usize,
