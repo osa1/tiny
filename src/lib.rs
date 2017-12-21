@@ -1181,16 +1181,32 @@ fn find_conn_idx(conns: &[Conn], serv_name: &str) -> Option<usize> {
 }
 
 fn connect_err_msg(err: &ConnErr) -> String {
-    format!("Connection error: {}", err.description())
+    match err.cause() {
+        Some(other_err) =>
+            format!("Connection error: {} ({})", err.description(), other_err.description()),
+        None =>
+            format!("Connection error: {}", err.description()),
+    }
 }
 
 fn reconnect_err_msg(err: &ConnErr) -> String {
-    format!(
-        "Connection error: {}. \
-         Will try to reconnect in {} seconds.",
-        err.description(),
-        conn::RECONNECT_TICKS
-    )
+    match err.cause() {
+        Some(other_err) =>
+            format!(
+                "Connection error: {} ({}). \
+                 Will try to reconnect in {} seconds.",
+                err.description(),
+                other_err.description(),
+                conn::RECONNECT_TICKS
+            ),
+        None =>
+            format!(
+                "Connection error: {}. \
+                 Will try to reconnect in {} seconds.",
+                err.description(),
+                conn::RECONNECT_TICKS
+            ),
+    }
 }
 
 
