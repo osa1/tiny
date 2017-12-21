@@ -1,5 +1,6 @@
 //! To see how color numbers map to actual colors in your terminal run
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
+use cmd::AutoCmd;
 use serde::Deserialize;
 use serde_yaml;
 use std::env::home_dir;
@@ -8,7 +9,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Server {
     /// Address of the server
     pub addr: String,
@@ -32,7 +33,7 @@ pub struct Server {
 
     /// Commands to automatically run after joining to the server. Useful for e.g. registering the
     /// nick via nickserv or joining channels. Uses tiny command syntax.
-    pub auto_cmds: Vec<String>,
+    pub auto_cmds: Vec<AutoCmd>,
 
     /// Channels to automatically join. Any `/join` commands in `auto_cmds` will be moved here.
     #[serde(default)]
@@ -40,17 +41,19 @@ pub struct Server {
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Defaults {
     pub nicks: Vec<String>,
     pub hostname: String,
     pub realname: String,
-    pub auto_cmds: Vec<String>,
-    #[serde(default)] pub join: Vec<String>,
-    #[serde(default)] pub tls: bool,
+    pub auto_cmds: Vec<AutoCmd>,
+    #[serde(default)]
+    pub join: Vec<String>,
+    #[serde(default)]
+    pub tls: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct Config {
     pub servers: Vec<Server>,
     pub defaults: Defaults,
@@ -78,26 +81,11 @@ pub fn parse_config(config_path: PathBuf) -> Result<Config, serde_yaml::Error> {
 fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
     let mut cfg: Config = serde_yaml::from_str(&contents)?;
 
-    fn parse_join_cmds(cmds: &mut Vec<String>, join: &mut Vec<String>) {
-        *join = cmds.drain_filter(|cmd| {
-            let mut chan = None;
-            {
-                let mut words = cmd.split_whitespace().into_iter();
-                if words.next() == Some("join") {
-                    if let Some(chan_) = words.next() {
-                        chan = Some(chan_.to_owned());
-                    }
-                }
-            }
-            match chan {
-                None =>
-                    false,
-                Some(chan) => {
-                    *cmd = chan;
-                    true
-                }
-            }
-        }).collect();
+    fn parse_join_cmds(cmds: &mut Vec<AutoCmd>, join: &mut Vec<String>) {
+        // couldn't write this using flat_map() because of borrowchk issues
+        for join_cmd in cmds.drain_filter(|cmd| cmd.cmd.name == "join").into_iter() {
+            join.extend(join_cmd.args.split_whitespace().map(str::to_owned));
+        }
     }
 
     for mut server in &mut cfg.servers {
@@ -285,7 +273,7 @@ fn parse_attr(val: String) -> u16 {
 }
 
 impl<'de> Deserialize<'de> for Style {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(d: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -369,7 +357,7 @@ impl<'de> Deserialize<'de> for Style {
             }
         }
 
-        deserializer.deserialize_map(StyleVisitor)
+        d.deserialize_map(StyleVisitor)
     }
 }
 
@@ -427,8 +415,16 @@ log_dir: path";
                     vec!["#tiny".to_owned(), "#rust".to_owned()]
                 );
                 assert_eq!(
-                    cfg.servers[0].auto_cmds,
-                    vec!["msg NickServ identify hunter2"]
+                    cfg.servers[0].auto_cmds.len(),
+                    1,
+                );
+                assert_eq!(
+                    cfg.servers[0].auto_cmds[0].cmd.name,
+                    "msg",
+                );
+                assert_eq!(
+                    cfg.servers[0].auto_cmds[0].args,
+                    "NickServ identify hunter2",
                 );
             }
         }

@@ -35,6 +35,7 @@ extern crate take_mut;
 #[macro_use]
 mod utils;
 
+mod cmd;
 mod conn;
 mod logger;
 mod stream;
@@ -50,7 +51,6 @@ use mio::Ready;
 use mio::Token;
 use mio::unix::EventedFd;
 use mio::unix::UnixReady;
-use std::error::Error;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::time::Instant;
@@ -59,6 +59,7 @@ use conn::{Conn, ConnErr, ConnEv};
 use logger::Logger;
 use term_input::{Event, Input};
 use tui::tabbed::MsgSource;
+use cmd::{parse_cmd, ParseCmdResult};
 use tui::tabbed::TabStyle;
 use tui::{MsgTarget, TUIRet, Timestamp, TUI};
 use wire::{Cmd, Msg, Pfx};
@@ -109,7 +110,7 @@ pub fn run() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Tiny<'poll> {
+pub struct Tiny<'poll> {
     conns: Vec<Conn<'poll>>,
     defaults: config::Defaults,
     servers: Vec<config::Server>,
@@ -267,293 +268,26 @@ impl<'poll> Tiny<'poll> {
     }
 
     fn handle_cmd(&mut self, poll: &'poll Poll, src: MsgSource, msg: &str) {
-        let words: Vec<&str> = msg.split_whitespace().into_iter().collect();
-
-        if words[0] == "connect" && words.len() == 2 {
-            self.connect(poll, words[1]);
-        } else if words[0] == "connect" && words.len() == 1 {
-            self.tui.add_client_msg(
-                "Reconnecting...",
-                &MsgTarget::AllServTabs {
-                    serv_name: src.serv_name(),
-                },
-            );
-            match find_conn(&mut self.conns, src.serv_name()) {
-                Some(conn) =>
-                    match conn.reconnect(None) {
-                        Ok(()) =>
-                            {}
-                        Err(err) => {
-                            self.tui.add_err_msg(
-                                &reconnect_err_msg(&err),
-                                Timestamp::now(),
-                                &MsgTarget::AllServTabs {
-                                    serv_name: conn.get_serv_name(),
-                                },
-                            );
-                        }
-                    },
-                None => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("Can't reconnect to {}", src.serv_name()));
-                }
-            }
-        } else if words[0] == "join" && words.len() == 2 {
-            self.join(src, words[1]);
-        } else if words[0] == "msg" && words.len() >= 3 {
-            // need to find index of the third word
-            let mut word_indices = utils::split_whitespace_indices(msg);
-            word_indices.next(); // "/msg"
-            word_indices.next(); // target
-            if let Some(msg_begins) = word_indices.next() {
-                let target = words[1];
-                let msg = &msg[msg_begins..];
-                let source = if self.conns.iter().any(|conn| conn.get_serv_name() == target) {
-                    MsgSource::Serv {
-                        serv_name: target.to_owned(),
-                    }
-                } else {
-                    let serv = src.serv_name();
-                    MsgSource::User {
-                        serv_name: serv.to_owned(),
-                        nick: target.to_owned(),
-                    }
-                };
-                self.send_msg(source, msg, false);
-            } else {
-                self.tui
-                    .add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
-            }
-        } else if words[0] == "me" {
-            let mut word_indices = utils::split_whitespace_indices(msg);
-            word_indices.next(); // "/me"
-            if let Some(msg_begins) = word_indices.next() {
-                let msg = &msg[msg_begins..];
-                self.send_msg(src, msg, true);
-            } else {
-                self.tui
-                    .add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
-            }
-        } else if words[0] == "away" {
-            let mut word_indices = utils::split_whitespace_indices(msg);
-            word_indices.next(); // "/away"
-            let msg = {
-                if let Some(msg_begins) = word_indices.next() {
-                    Some(&msg[msg_begins..])
-                } else {
-                    None
-                }
-            };
-            if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
-                conn.away(msg);
-            }
-        } else if words[0] == "close" {
-            match src {
-                MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
-                    // ignore
-                }
-                MsgSource::Serv { serv_name } => {
-                    self.tui.close_server_tab(&serv_name);
-                    let conn_idx = find_conn_idx(&self.conns, &serv_name).unwrap();
-                    self.conns.remove(conn_idx);
-                }
-                MsgSource::Chan {
-                    serv_name,
-                    chan_name,
-                } => {
-                    self.tui.close_chan_tab(&serv_name, &chan_name);
-                    self.part(&serv_name, &chan_name);
-                }
-                MsgSource::User { serv_name, nick } => {
-                    self.tui.close_user_tab(&serv_name, &nick);
-                }
-            }
-        } else if words[0] == "nick" && words.len() == 2 {
-            if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
-                let new_nick = words[1];
-                conn.set_nick(new_nick);
-                self.tui.set_nick(conn.get_serv_name(), new_nick);
-            }
-        } else if words[0] == "reload" {
-            match config::parse_config(config::get_config_path()) {
-                Ok(config::Config { colors, .. }) =>
-                    self.tui.set_colors(colors),
-                Err(err) => {
-                    self.tui
-                        .add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
-                    for line in err.description().lines() {
-                        self.tui.add_client_err_msg(line, &MsgTarget::CurrentTab);
-                    }
-                }
-            }
-        } else if words[0] == "names" {
-            if let MsgSource::Chan {
-                ref serv_name,
-                ref chan_name,
-            } = src
-            {
-                let nicks_vec = self.tui
-                    .get_nicks(serv_name, chan_name)
-                    .map(|nicks| nicks.to_strings(""));
-                if let Some(nicks_vec) = nicks_vec {
-                    let target = MsgTarget::Chan {
-                        serv_name: serv_name,
-                        chan_name: chan_name,
-                    };
-                    if words.len() == 1 {
-                        self.tui.add_client_msg(
-                            &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
-                            &target,
-                        );
-                    } else if words.len() == 2 {
-                        let nick = words[1];
-                        if nicks_vec.iter().any(|v| v == nick) {
-                            self.tui.add_client_msg(&format!("{} is online", nick), &target);
-                        } else {
-                            self.tui.add_client_msg(&format!("{} is not in the channel", nick), &target);
-                        }
-                    }
-                }
-            } else {
+        match parse_cmd(msg) {
+            ParseCmdResult::Ok { cmd, rest } => {
+                (cmd.cmd_fn)(rest, poll, self, src);
+            },
+            ParseCmdResult::Ambiguous(vec) => {
                 self.tui.add_client_err_msg(
-                    "/names only supported in chan tabs",
+                    &format!("Unsupported command: \"/{}\"", msg),
                     &MsgTarget::CurrentTab,
                 );
-            }
-        } else if words[0] == "clear" {
-            self.tui.clear(&src.to_target());
-        } else if words[0] == "switch" && words.len() == 2 {
-            self.tui.switch(words[1]);
-        } else if words[0] == "ignore" {
-            match src {
-                MsgSource::Serv { serv_name } => {
-                    self.tui.toggle_ignore(&MsgTarget::AllServTabs {
-                        serv_name: &serv_name,
-                    });
-                }
-                MsgSource::Chan {
-                    serv_name,
-                    chan_name,
-                } => {
-                    self.tui.toggle_ignore(&MsgTarget::Chan {
-                        serv_name: &serv_name,
-                        chan_name: &chan_name,
-                    });
-                }
-                MsgSource::User { serv_name, nick } => {
-                    self.tui.toggle_ignore(&MsgTarget::User {
-                        serv_name: &serv_name,
-                        nick: &nick,
-                    });
-                }
-            }
-        } else {
-            self.tui.add_client_err_msg(
-                &format!("Unsupported command: \"/{}\"", msg),
-                &MsgTarget::CurrentTab,
-            );
-        }
-    }
-
-    fn connect(&mut self, poll: &'poll Poll, serv_addr: &str) {
-        fn split_port(s: &str) -> Option<(&str, &str)> {
-            s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
-        }
-
-        // parse host name and port
-        let (serv_name, serv_port) = {
-            match split_port(serv_addr) {
-                None => {
-                    self.tui
-                        .add_client_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
-                    return;
-                }
-                Some((serv_name, serv_port)) =>
-                    match serv_port.parse::<u16>() {
-                        Err(err) => {
-                            self.tui.add_client_err_msg(
-                                &format!("connect: Can't parse port {}: {}", serv_port, err),
-                                &MsgTarget::CurrentTab,
-                            );
-                            return;
-                        }
-                        Ok(serv_port) =>
-                            (serv_name, serv_port),
-                    },
-            }
-        };
-
-        // if we already connected to this server reconnect using new port
-        if let Some(conn) = find_conn(&mut self.conns, serv_name) {
-            self.tui.add_client_msg(
-                "Connecting...",
-                &MsgTarget::AllServTabs {
-                    serv_name: serv_name,
-                },
-            );
-            match conn.reconnect(Some((serv_name, serv_port))) {
-                Ok(()) =>
-                    {}
-                Err(err) => {
-                    self.tui.add_err_msg(
-                        &reconnect_err_msg(&err),
-                        Timestamp::now(),
-                        &MsgTarget::AllServTabs {
-                            serv_name: conn.get_serv_name(),
-                        },
-                    );
-                }
-            }
-            return;
-        }
-
-        // otherwise create a new connection
-        // can't move the rest to an else branch because of borrowchk
-
-        // otherwise create a new Conn, tab etc.
-        self.tui.new_server_tab(serv_name);
-        let msg_target = MsgTarget::Server {
-            serv_name: serv_name,
-        };
-        self.tui.add_client_msg("Connecting...", &msg_target);
-
-        let conn_ret = Conn::new(
-            config::Server {
-                addr: serv_name.to_owned(),
-                port: serv_port,
-                tls: self.defaults.tls,
-                hostname: self.defaults.hostname.clone(),
-                realname: self.defaults.realname.clone(),
-                nicks: self.defaults.nicks.clone(),
-                auto_cmds: self.defaults.auto_cmds.clone(),
-                join: self.defaults.join.clone(),
+                self.tui.add_client_err_msg(
+                    &format!("Did you mean one of {:?} ?", vec),
+                    &MsgTarget::CurrentTab,
+                );
             },
-            poll,
-        );
-
-        match conn_ret {
-            Ok(conn) => {
-                self.conns.push(conn);
-            }
-            Err(err) => {
-                self.tui
-                    .add_err_msg(&connect_err_msg(&err), Timestamp::now(), &msg_target);
-            }
+            ParseCmdResult::Unknown =>
+                self.tui.add_client_err_msg(
+                    &format!("Unsupported command: \"/{}\"", msg),
+                    &MsgTarget::CurrentTab,
+                ),
         }
-    }
-
-    fn join(&mut self, src: MsgSource, chan: &str) {
-        if let Some(conn) = find_conn(&mut self.conns, src.serv_name()) {
-            let chans: [&str; 1] = [chan];
-            conn.join(&chans);
-            return;
-        }
-
-        self.tui.add_client_err_msg(
-            &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
-            &MsgTarget::CurrentTab,
-        );
     }
 
     fn part(&mut self, serv_name: &str, chan: &str) {
@@ -703,12 +437,12 @@ impl<'poll> Tiny<'poll> {
                 }
                 if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
                     for cmd in &auto_cmds {
-                        self.handle_cmd(
+                        cmd.run(
                             poll,
+                            self,
                             MsgSource::Serv {
                                 serv_name: serv_name.to_owned(),
                             },
-                            cmd,
                         );
                     }
                 }
@@ -1208,7 +942,6 @@ fn reconnect_err_msg(err: &ConnErr) -> String {
             ),
     }
 }
-
 
 /// Nicks may have prefixes, indicating it is a operator, founder, or
 /// something else.
