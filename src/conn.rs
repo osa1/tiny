@@ -649,14 +649,16 @@ impl<'poll> Conn<'poll> {
         {
             if let Some(mut stream) = self.status.get_stream_mut() {
                 // RPL_ENDOFMOTD. Join auto-join channels.
-                wire::join(
-                    &mut stream,
-                    self.auto_join
-                        .iter()
-                        .map(String::as_str)
-                        .collect::<Vec<&str>>()
-                        .as_slice(),
-                ).unwrap();
+                if !self.auto_join.is_empty() {
+                    wire::join(
+                        &mut stream,
+                        self.auto_join
+                            .iter()
+                            .map(String::as_str)
+                            .collect::<Vec<&str>>()
+                            .as_slice(),
+                    ).unwrap();
+                }
 
                 // Set away mode
                 if let Some(ref reason) = self.away_status {
