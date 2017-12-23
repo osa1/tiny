@@ -65,6 +65,8 @@ servers:
       port: 6697
       # optional field, defaults to false:
       tls: true
+      # optional field for server password:
+      # pass: 'server_pass'
       hostname: yourhost
       realname: yourname
       nicks: [tiny_user]

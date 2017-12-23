@@ -13,6 +13,8 @@
 - `TOPIC` messages are now handled (#58).
 - `RPL_AWAY` is now handled (#55). Away message is shown in user tab.
 - `/ignore` command added to ignore `join/quit` messages in channels.
+- New server config field `pass` added for connecting to password-protected
+  servers (e.g. znc).
 
 # 2017/11/12: 0.3.0
 

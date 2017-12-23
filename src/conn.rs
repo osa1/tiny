@@ -1,5 +1,6 @@
 use mio::Poll;
 use mio::Token;
+use std::io::Write;
 use std::result;
 use std::str;
 
@@ -17,6 +18,10 @@ pub struct Conn<'poll> {
     tls: bool,
     hostname: String,
     realname: String,
+
+    /// Server password
+    pass: Option<String>,
+
     nicks: Vec<String>,
 
     /// Always in range of `nicks`
@@ -128,13 +133,26 @@ pub enum ConnEv {
     NickChange(String),
 }
 
+fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str) {
+    if let Some(pass) = pass {
+        wire::pass(stream, pass).unwrap();
+    }
+    wire::nick(stream, nick).unwrap();
+    wire::user(stream, hostname, realname).unwrap();
+}
+
 impl<'poll> Conn<'poll> {
     pub fn new(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
         let mut stream =
             Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
 
-        wire::user(&mut stream, &server.hostname, &server.realname).unwrap();
-        wire::nick(&mut stream, &server.nicks[0]).unwrap();
+        introduce(
+            &mut stream,
+            server.pass.as_ref().map(String::as_str),
+            &server.hostname,
+            &server.realname,
+            &server.nicks[0],
+        );
 
         Ok(Conn {
             serv_addr: server.addr,
@@ -142,6 +160,7 @@ impl<'poll> Conn<'poll> {
             tls: server.tls,
             hostname: server.hostname,
             realname: server.realname,
+            pass: server.pass,
             nicks: server.nicks,
             current_nick_idx: 0,
             auto_join: server.join,
@@ -173,8 +192,13 @@ impl<'poll> Conn<'poll> {
             Err(err) =>
                 Err(StreamErr::from(err)),
             Ok(mut stream) => {
-                wire::user(&mut stream, &self.hostname, &self.realname).unwrap();
-                wire::nick(&mut stream, &self.nicks[self.current_nick_idx]).unwrap();
+                introduce(
+                    &mut stream,
+                    self.pass.as_ref().map(String::as_str),
+                    &self.hostname,
+                    &self.realname,
+                    self.get_nick()
+                );
                 self.status = ConnStatus::PingPong {
                     ticks_passed: 0,
                     stream: stream,

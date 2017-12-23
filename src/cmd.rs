@@ -215,7 +215,9 @@ fn connect<'a, 'b>(args: &str, poll: &'b Poll, tiny: &'a mut Tiny<'b>, src: MsgS
         0 =>
             reconnect(tiny, src),
         1 =>
-            connect_(words[0], poll, tiny),
+            connect_(words[0], None, poll, tiny),
+        2 =>
+            connect_(words[0], Some(words[1]), poll, tiny),
         _ =>
             // wat
             tiny.tui.add_client_err_msg(
@@ -255,7 +257,7 @@ fn reconnect(tiny: &mut Tiny, src: MsgSource) {
     }
 }
 
-fn connect_<'a, 'b>(serv_addr: &str, poll: &'b Poll, tiny: &'a mut Tiny<'b>) {
+fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &'a mut Tiny<'b>) {
     fn split_port(s: &str) -> Option<(&str, &str)> {
         s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
     }
@@ -322,6 +324,7 @@ fn connect_<'a, 'b>(serv_addr: &str, poll: &'b Poll, tiny: &'a mut Tiny<'b>) {
             tls: tiny.defaults.tls,
             hostname: tiny.defaults.hostname.clone(),
             realname: tiny.defaults.realname.clone(),
+            pass: pass.map(str::to_owned),
             nicks: tiny.defaults.nicks.clone(),
             auto_cmds: tiny.defaults.auto_cmds.clone(),
             join: tiny.defaults.join.clone(),

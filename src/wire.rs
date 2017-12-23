@@ -6,6 +6,10 @@ use std;
 
 use logger::LogFile;
 
+pub fn pass<W: Write>(sink: &mut W, pass: &str) -> std::io::Result<()> {
+    write!(sink, "PASS {}\r\n", pass)
+}
+
 pub fn user<W: Write>(sink: &mut W, hostname: &str, realname: &str) -> std::io::Result<()> {
     write!(sink, "USER {} 8 * :{}\r\n", hostname, realname)
 }

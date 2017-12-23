@@ -21,6 +21,10 @@ pub struct Server {
     #[serde(default)]
     pub tls: bool,
 
+    /// Server password (optional)
+    #[serde(default)]
+    pub pass: Option<String>,
+
     /// Hostname to be used in connection registration
     pub hostname: String,
 
