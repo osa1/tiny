@@ -50,8 +50,6 @@ pub struct Conn<'poll> {
 
 pub type ConnErr = StreamErr;
 
-/// How many ticks to wait before assuming disconnect in introduce state.
-const INTRO_TICKS: u8 = 30;
 /// How many ticks to wait before sending a ping to the server.
 const PING_TICKS: u8 = 60;
 /// How many ticks to wait after sending a ping to the server to consider a
@@ -61,11 +59,6 @@ const PONG_TICKS: u8 = 60;
 pub const RECONNECT_TICKS: u8 = 30;
 
 enum ConnStatus<'poll> {
-    /// Need to introduce self
-    Introduce {
-        ticks_passed: u8,
-        stream: Stream<'poll>,
-    },
     PingPong {
         /// Ticks passed since last time we've heard from the server. Reset on
         /// each message. After `PING_TICKS` ticks we send a PING message and
@@ -97,8 +90,7 @@ impl<'poll> ConnStatus<'poll> {
     fn get_stream(&self) -> Option<&Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
-            Introduce { ref stream, .. }
-            | PingPong { ref stream, .. }
+            PingPong { ref stream, .. }
             | WaitPong { ref stream, .. } =>
                 Some(stream),
             Disconnected { .. } =>
@@ -109,8 +101,7 @@ impl<'poll> ConnStatus<'poll> {
     fn get_stream_mut(&mut self) -> Option<&mut Stream<'poll>> {
         use self::ConnStatus::*;
         match *self {
-            Introduce { ref mut stream, .. }
-            | PingPong { ref mut stream, .. }
+            PingPong { ref mut stream, .. }
             | WaitPong { ref mut stream, .. } =>
                 Some(stream),
             Disconnected { .. } =>
@@ -139,8 +130,12 @@ pub enum ConnEv {
 
 impl<'poll> Conn<'poll> {
     pub fn new(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
-        let stream =
+        let mut stream =
             Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
+
+        wire::user(&mut stream, &server.hostname, &server.realname).unwrap();
+        wire::nick(&mut stream, &server.nicks[0]).unwrap();
+
         Ok(Conn {
             serv_addr: server.addr,
             serv_port: server.port,
@@ -154,7 +149,7 @@ impl<'poll> Conn<'poll> {
             servername: None,
             usermask: None,
             poll,
-            status: ConnStatus::Introduce {
+            status: ConnStatus::PingPong {
                 ticks_passed: 0,
                 stream: stream,
             },
@@ -177,8 +172,10 @@ impl<'poll> Conn<'poll> {
         match Stream::new(self.poll, &self.serv_addr, self.serv_port, self.tls) {
             Err(err) =>
                 Err(StreamErr::from(err)),
-            Ok(stream) => {
-                self.status = ConnStatus::Introduce {
+            Ok(mut stream) => {
+                wire::user(&mut stream, &self.hostname, &self.realname).unwrap();
+                wire::nick(&mut stream, &self.nicks[self.current_nick_idx]).unwrap();
+                self.status = ConnStatus::PingPong {
                     ticks_passed: 0,
                     stream: stream,
                 };
@@ -233,21 +230,6 @@ impl<'poll> Conn<'poll> {
             self,
             status,
             match status {
-                ConnStatus::Introduce {
-                    stream,
-                    ticks_passed,
-                } => {
-                    let ticks = ticks_passed + 1;
-                    if ticks == INTRO_TICKS {
-                        evs.push(ConnEv::Disconnected);
-                        ConnStatus::Disconnected { ticks_passed: 0 }
-                    } else {
-                        ConnStatus::Introduce {
-                            stream,
-                            ticks_passed: ticks,
-                        }
-                    }
-                }
                 ConnStatus::PingPong {
                     mut stream,
                     ticks_passed,
@@ -316,8 +298,6 @@ impl<'poll> Conn<'poll> {
             self,
             status,
             match status {
-                ConnStatus::Introduce { stream, .. } =>
-                    ConnStatus::Introduce { ticks_passed: 0, stream },
                 ConnStatus::PingPong { stream, .. } =>
                     ConnStatus::PingPong { ticks_passed: 0, stream },
                 ConnStatus::WaitPong { stream, .. } =>
@@ -479,24 +459,6 @@ impl<'poll> Conn<'poll> {
             });
         }
 
-        update_status!(
-            self,
-            status,
-            match status {
-                ConnStatus::Introduce { mut stream, .. } => {
-                    wire::user(&mut stream, &self.hostname, &self.realname).unwrap();
-                    wire::nick(&mut stream, &self.nicks[self.current_nick_idx]).unwrap();
-                    evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
-                    ConnStatus::PingPong {
-                        ticks_passed: 0,
-                        stream: stream,
-                    }
-                }
-                _ =>
-                    status,
-            }
-        );
-
         if let Msg {
             cmd: Cmd::JOIN { .. },
             pfx: Some(Pfx::User { ref nick, ref user }),
@@ -575,6 +537,7 @@ impl<'poll> Conn<'poll> {
         {
             // 001 RPL_WELCOME is how we understand that the registration was successful
             evs.push(ConnEv::Connected);
+            evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
         if let Msg {
