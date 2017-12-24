@@ -15,6 +15,8 @@
 - `/ignore` command added to ignore `join/quit` messages in channels.
 - New server config field `pass` added for connecting to password-protected
   servers (e.g. znc).
+- Fixed a bug that caused tiny to fail to connect via TLS on some systems
+  (#64).
 
 # 2017/11/12: 0.3.0
 

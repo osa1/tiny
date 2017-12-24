@@ -132,11 +132,6 @@ impl<'poll> Write for TlsStream<'poll> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        match *self {
-            TlsStream::Handshake { .. } | TlsStream::Broken =>
-                Ok(()),
-            TlsStream::Connected { ref mut stream } =>
-                stream.flush(),
-        }
+        Ok(())
     }
 }

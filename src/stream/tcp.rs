@@ -124,6 +124,6 @@ impl<'poll> Write for TcpStream<'poll> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.write_ready()
+        Ok(())
     }
 }
