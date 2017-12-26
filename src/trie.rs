@@ -65,7 +65,7 @@ impl Trie {
         for &(c, ref t) in &self.vec {
             let mut prefix_ = prefix.to_owned();
             prefix_.push(c);
-            ret.extend_from_slice(&t.to_strings(&prefix_));
+            ret.extend(t.to_strings(&prefix_));
         }
 
         ret
