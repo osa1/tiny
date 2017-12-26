@@ -39,13 +39,18 @@ impl Trie {
         trie.word
     }
 
-    // TODO: This needs garbage collection. We may want to trim the branches
-    // that doesn't have any words.
     pub fn remove(&mut self, str: &str) {
         let mut chars = str.chars();
         if let Some(char) = chars.next() {
             if let Ok(idx) = self.vec.binary_search_by(|&(char_, _)| char_.cmp(&char)) {
-                self.vec[idx].1.remove(chars.as_str());
+                let del = {
+                    let trie = &mut self.vec[idx].1;
+                    trie.remove(chars.as_str());
+                    !trie.word && trie.vec.len() == 0
+                };
+                if del {
+                    self.vec.remove(idx);
+                };
             }
         } else {
             self.word = false;
