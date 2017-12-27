@@ -1,4 +1,4 @@
-# Maintainer: Ömer Sinan Ağacan <omeragacan@gmail.com>
+# Maintainer: Nick Econopouly <wry@mm.st>
 pkgname=tiny-git
 pkgver="0.3.0"
 pkgrel=1
