@@ -241,7 +241,8 @@ Commands start with `/` character.
 
 - `/nick <nick>`: Change nick
 
-- `/names`: List all nicks in the current channel
+- `/names`: List all nicks in the current channel. You can use `/names <nick>` to
+  check if a specific nick is in the channel.
 
 - `/reload`: Reload configuration
 
