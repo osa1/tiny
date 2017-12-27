@@ -1,0 +1,25 @@
+# Maintainer: Nick Econopouly <wry@mm.st>
+pkgname=tiny-git
+pkgver="0.3.0"
+pkgrel=1
+pkgdesc="A console IRC client"
+arch=('x86_64')
+url="https://github.com/osa1/tiny"
+license=('MIT')
+depends=('openssl')
+makedepends=('git' 'rustup')
+
+build() {
+        return 0
+}
+
+package() {
+          rustup default nightly
+          git clone "$url.git"
+          cd tiny
+          cargo build --release
+          rustup default stable
+          install -Dm755 target/release/tiny "$pkgdir/usr/bin/tiny"
+          install -Dm644 LICENSE "$pkgdir/usr/share/licenses/tiny/LICENSE"
+
+}

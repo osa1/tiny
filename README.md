@@ -44,6 +44,11 @@ tiny is an IRC client written in Rust.
 Install the Rust nightly toolchain, clone the repo, and run `cargo install` (or
 `cargo install --force` if you already have an older version installed).
 
+Arch Linux users can use this
+[PKGBUILD](https://github.com/osa1/tiny/tree/master/pkg/archlinux/PKGBUILD)
+to install tiny as a package. Download it into an empty directory, run
+`makepkg` and install the resulting .pkg.tar.xz with `sudo pacman -U`.
+
 Since version 0.3.0 tiny needs OpenSSL or LibreSSL headers and runtime
 libraries. See [rust-openssl's
 README](https://github.com/sfackler/rust-openssl#linux) for instructions on
