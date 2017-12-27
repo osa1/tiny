@@ -7,18 +7,16 @@ arch=('x86_64')
 url="https://github.com/osa1/tiny"
 license=('MIT')
 depends=('openssl')
-makedepends=('git' 'rustup')
+makedepends=('git' 'rustup' 'pkg-config')
 
 build() {
         return 0
 }
 
 package() {
-          rustup default nightly
           git clone "$url.git"
           cd tiny
-          cargo build --release
-          rustup default stable
+          cargo +nightly build --release
           install -Dm755 target/release/tiny "$pkgdir/usr/bin/tiny"
           install -Dm644 LICENSE "$pkgdir/usr/share/licenses/tiny/LICENSE"
 
