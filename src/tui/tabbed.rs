@@ -9,6 +9,8 @@ use tui::messaging::Timestamp;
 use tui::MsgTarget;
 use tui::widget::WidgetRet;
 
+use notifier::Notifier;
+
 const LEFT_ARROW: char = '<';
 const RIGHT_ARROW: char = '>';
 
@@ -29,6 +31,7 @@ struct Tab {
     style: TabStyle,
     /// Alt-character to use to switch to this tab.
     switch: Option<char>,
+    notifier: Notifier,
 }
 
 // NOTE: Keep the variants sorted in increasing significance, to avoid updating
@@ -225,6 +228,7 @@ impl Tabbed {
                 src,
                 style: TabStyle::Normal,
                 switch,
+                notifier: Notifier::init("messages")
             },
         );
     }
@@ -930,6 +934,7 @@ impl Tabbed {
         ctcp_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
+            tab.notifier.notify_privmsg(sender, msg, target, tab.widget.get_nick());
             tab.widget.add_privmsg(sender, msg, ts, false, ctcp_action);
         });
     }
@@ -943,6 +948,7 @@ impl Tabbed {
         ctcp_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
+            tab.notifier.notify_privmsg(sender, msg, target, tab.widget.get_nick());
             tab.widget.add_privmsg(sender, msg, ts, true, ctcp_action);
         });
     }

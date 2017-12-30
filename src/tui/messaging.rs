@@ -112,10 +112,8 @@ impl MessagingUI {
 
     fn draw_input_field(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         match self.exit_dialogue {
-            Some(ref exit_dialogue) =>
-                exit_dialogue.draw(tb, colors, pos_x, pos_y),
-            None =>
-                self.input_field.draw(tb, colors, pos_x, pos_y),
+            Some(ref exit_dialogue) => exit_dialogue.draw(tb, colors, pos_x, pos_y),
+            None => self.input_field.draw(tb, colors, pos_x, pos_y),
         }
     }
 
@@ -271,8 +269,9 @@ impl MessagingUI {
     pub fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::Topic));
+        self.msg_area.set_style(
+            SegStyle::SchemeStyle(SchemeStyle::Topic),
+        );
         self.msg_area.add_text(topic);
 
         self.msg_area.flush_line();
@@ -281,8 +280,9 @@ impl MessagingUI {
     pub fn add_client_err_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
+        self.msg_area.set_style(
+            SegStyle::SchemeStyle(SchemeStyle::ErrMsg),
+        );
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -290,8 +290,9 @@ impl MessagingUI {
     pub fn add_client_notify_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
+        self.msg_area.set_style(
+            SegStyle::SchemeStyle(SchemeStyle::Faded),
+        );
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
         self.reset_activity_line();
@@ -300,8 +301,9 @@ impl MessagingUI {
     pub fn add_client_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+        self.msg_area.set_style(
+            SegStyle::SchemeStyle(SchemeStyle::UserMsg),
+        );
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
         self.reset_activity_line();
@@ -319,8 +321,9 @@ impl MessagingUI {
         self.add_timestamp(ts);
 
         if ctcp_action {
-            self.msg_area
-                .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+            self.msg_area.set_style(
+                SegStyle::SchemeStyle(SchemeStyle::UserMsg),
+            );
             self.msg_area.add_text("** ");
         }
 
@@ -331,8 +334,9 @@ impl MessagingUI {
             self.msg_area.add_text(sender);
         }
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+        self.msg_area.set_style(
+            SegStyle::SchemeStyle(SchemeStyle::UserMsg),
+        );
 
         if !ctcp_action {
             self.msg_area.add_char(':');
@@ -340,8 +344,9 @@ impl MessagingUI {
         self.msg_area.add_char(' ');
 
         if highlight {
-            self.msg_area
-                .set_style(SegStyle::SchemeStyle(SchemeStyle::Highlight));
+            self.msg_area.set_style(
+                SegStyle::SchemeStyle(SchemeStyle::Highlight),
+            );
         }
 
         self.msg_area.add_text(msg);
@@ -352,8 +357,9 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+        self.msg_area.set_style(
+            SegStyle::SchemeStyle(SchemeStyle::UserMsg),
+        );
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -362,8 +368,9 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
+        self.msg_area.set_style(
+            SegStyle::SchemeStyle(SchemeStyle::ErrMsg),
+        );
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -438,7 +445,7 @@ impl MessagingUI {
         }
     }
 
-    pub fn get_ignore_state(&self) -> bool{
+    pub fn get_ignore_state(&self) -> bool {
         return self.show_status;
     }
 

@@ -40,6 +40,7 @@ mod conn;
 mod logger;
 mod stream;
 mod wire;
+mod notifier;
 pub mod config;
 pub mod trie;
 pub mod tui;
