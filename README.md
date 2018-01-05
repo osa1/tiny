@@ -79,7 +79,7 @@ servers:
           - 'msg NickServ identify hunter2'
           - 'join #tiny'
 
-# Defaults used when connecting to servers via the /connect command
+# Defaults used when connecting to a server via the /connect command
 defaults:
     nicks: [tiny_user]
     hostname: yourhost
@@ -87,97 +87,17 @@ defaults:
     auto_cmds: []
 
 # Where to put log files
-log_dir: '/home/user/tiny_logs'
+log_dir: '/home/$USER/tiny_logs'
 
-# Color theme based on 256 colors (if supported). Colors can be defined as color
-# indices (0-255) or with their names.
-#
-# Accepted color names are:
-# default (0), black (0), maroon (1), green (2), olive (3), navy (4),
-# purple (5), teal (6), silver (7), gray (8), red (9), lime (10),
-# yellow (11), blue (12), magenta (13), cyan (14), white (15)
-#
-# Attributes can be combined (e.g [bold, underline]), and valid values are bold
-# and underline
-colors:
-    nick: [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ]
-
-    clear:
-        fg: default
-        bg: default
-
-    user_msg:
-        fg: black
-        bg: default
-
-    err_msg:
-        fg: black
-        bg: maroon
-        attrs: [bold]
-
-    topic:
-        fg: cyan
-        bg: default
-        attrs: [bold]
-
-    cursor:
-        fg: black
-        bg: default
-
-    join:
-        fg: lime
-        bg: default
-        attrs: [bold]
-
-    part:
-        fg: maroon
-        bg: default
-        attrs: [bold]
-
-    nick_change:
-        fg: lime
-        bg: default
-        attrs: [bold]
-
-    faded:
-        fg: 242
-        bg: default
-
-    exit_dialogue:
-        fg: default
-        bg: navy
-
-    highlight:
-        fg: red
-        bg: default
-        attrs: [bold]
-
-    completion:
-        fg: 84
-        bg: default
-
-    timestamp:
-        fg: 242
-        bg: default
-
-    tab_active:
-        fg: default
-        bg: default
-        attrs: [bold]
-
-    tab_normal:
-        fg: gray
-        bg: default
-
-    tab_new_msg:
-        fg: purple
-        bg: default
-
-    tab_highlight:
-        fg: red
-        bg: default
-        attrs: [bold]
+# <Color scheme configuration>
 ```
+
+**A note on nick identification:** Some IRC servers such as ircd-seven (used by
+Freenode) and InspIRCd (used by Mozilla) support identification via the `PASS`
+command. This way of identification (rather than sending a message to a service
+like `NickServ`) is better when some of the channels that you automatically join
+(by adding a `join` command to `auto_cmds`) require identification. To use this
+method enter your nick password to the `pass` field in servers.
 
 ## Command line arguments
 

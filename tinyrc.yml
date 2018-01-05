@@ -5,8 +5,13 @@ servers:
       hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
+      # Server or nick password (optional)
+      # pass: 'hunter2'
       auto_cmds:
+          # Identify nick by sending a message to NickServ:
+          # (useful when `pass` field above is not used)
           - 'msg NickServ identify hunter2'
+          # Join some channels:
           - 'join #tiny'
 
 # Defaults used when connecting to servers via the /connect command
