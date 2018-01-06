@@ -125,7 +125,7 @@ impl<'de> Deserialize<'de> for AutoCmd {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&'static Cmd; 13] = [
+static CMDS: [&'static Cmd; 14] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
@@ -139,6 +139,7 @@ static CMDS: [&'static Cmd; 13] = [
     &NICK_CMD,
     &RELOAD_CMD,
     &SWITCH_CMD,
+    &NOTIFY_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -569,6 +570,47 @@ fn switch(args: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
         );
     }
     tiny.tui.switch(words[0]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static NOTIFY_CMD: Cmd = Cmd {
+    name: "notify",
+    cmd_fn: notify,
+};
+
+fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+    let words: Vec<&str> = args.split_whitespace().collect();
+    if !(words.len() == 1  && ["off", "mentions", "messages"].contains(&words[0])) {
+        return tiny.tui.add_client_err_msg(
+            "/notify usage: /notify [off/mentions/messages]",
+            &MsgTarget::CurrentTab,
+        );
+    }
+    else {
+        match src {
+            MsgSource::Serv { serv_name } => {
+                tiny.tui.notify(&words[0], &MsgTarget::AllServTabs {
+                    serv_name: &serv_name,
+                });
+            }
+            MsgSource::Chan {
+                serv_name,
+                chan_name,
+            } => {
+                tiny.tui.notify(&words[0], &MsgTarget::Chan {
+                    serv_name: &serv_name,
+                    chan_name: &chan_name,
+                });
+            }
+            MsgSource::User { serv_name, nick } => {
+                tiny.tui.notify(&words[0], &MsgTarget::User {
+                    serv_name: &serv_name,
+                    nick: &nick,
+                });
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

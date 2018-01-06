@@ -277,6 +277,10 @@ impl TUI {
         self.ui.toggle_ignore(target);
     }
 
+    pub fn notify(&mut self, notify_for: &str, target: &MsgTarget) {
+        self.ui.notify(notify_for, target);
+    }
+
     pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
         self.ui.remove_nick(nick, ts, target);
     }
