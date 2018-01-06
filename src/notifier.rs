@@ -34,37 +34,24 @@ impl Notifier {
         sender: &str,
         msg: &str,
         target: &MsgTarget,
-        nick: Option<&str>,
+        nick: &str,
         mention: bool,
     ) {
         match *target {
             MsgTarget::Chan { chan_name, .. } => {
                 if self.notify_for == "messages" || (self.notify_for == "mentions" && mention) {
-                    match nick {
-                        Some(nick_) => {
-                            if nick_ != sender {
-                                self.notify(
-                                    &format!("{} in {}", sender, chan_name),
-                                    &format!("{}", msg),
-                                )
-                            }
-                        }
-                        None => {}  // Do we have to do this?
+                    if nick != sender {
+                        self.notify(&format!("{} in {}", sender, chan_name), &format!("{}", msg))
                     }
                 }
             }
             MsgTarget::User { nick: ref nick_sender, .. } => {
                 if self.notify_for != "off" {
-                    match nick {
-                        Some(nick_) => {
-                            if nick_ != sender {
-                                self.notify(
-                                    &format!("{} sent a private message", nick_sender),
-                                    &format!("{}", msg),
-                                )
-                            }
-                        }
-                        None => {}
+                    if nick != sender {
+                        self.notify(
+                            &format!("{} sent a private message", nick_sender),
+                            &format!("{}", msg),
+                        )
                     }
                 }
             }

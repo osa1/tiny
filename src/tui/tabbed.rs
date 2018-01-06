@@ -934,8 +934,11 @@ impl Tabbed {
         ctcp_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.notifier.notify_privmsg(sender, msg, target, tab.widget.get_nick(), false);
             tab.widget.add_privmsg(sender, msg, ts, false, ctcp_action);
+            let nick = tab.widget.get_nick();
+            if let Some(nick_) = nick {
+                tab.notifier.notify_privmsg(sender, msg, target, nick_, false);
+            }
         });
     }
 
@@ -948,8 +951,11 @@ impl Tabbed {
         ctcp_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.notifier.notify_privmsg(sender, msg, target, tab.widget.get_nick(), true);
             tab.widget.add_privmsg(sender, msg, ts, true, ctcp_action);
+            let nick = tab.widget.get_nick();
+            if let Some(nick_) = nick {
+                tab.notifier.notify_privmsg(sender, msg, target, nick_, true);
+            }
         });
     }
 
