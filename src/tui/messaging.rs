@@ -424,12 +424,9 @@ impl MessagingUI {
         }
     }
 
-    /// Set or toggle ignore state.
-    ///
     /// `state` == `None` means toggle
     /// `state` == `Some(state)` means set it to `state`
-    ///
-    pub fn set_ignore(&mut self, state: Option<bool>) {
+    pub fn set_or_toggle_ignore(&mut self, state: Option<bool>) {
         self.show_status = state.unwrap_or(!self.show_status);
         if self.show_status {
             self.add_client_notify_msg("Ignore disabled");

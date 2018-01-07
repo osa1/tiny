@@ -1023,11 +1023,11 @@ impl Tabbed {
                 }
             }
             self.apply_to_target(target, &|tab: &mut Tab, _| {
-                tab.widget.set_ignore(Some(!status_val));
+                tab.widget.set_or_toggle_ignore(Some(!status_val));
             });
         } else {
             self.apply_to_target(target, &|tab: &mut Tab, _| {
-                tab.widget.set_ignore(None);
+                tab.widget.set_or_toggle_ignore(None);
             });
         }
     }
