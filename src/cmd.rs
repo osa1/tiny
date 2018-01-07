@@ -9,6 +9,8 @@ use tui::{MsgTarget, Timestamp};
 use utils;
 use serde::de::{Deserializer, Visitor};
 
+use notifier::NotifyFor;
+
 pub struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
     pub name: &'static str,
@@ -588,9 +590,15 @@ fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         );
     }
     else {
+        let mut notify_for = NotifyFor::Off;
+        if words[0] == "messages" {
+            notify_for = NotifyFor::Messages;
+        } else if words[0] == "mentions" {
+            notify_for = NotifyFor::Mentions;
+        }
         match src {
             MsgSource::Serv { serv_name } => {
-                tiny.tui.notify(&words[0], &MsgTarget::AllServTabs {
+                tiny.tui.notify(notify_for, &MsgTarget::AllServTabs {
                     serv_name: &serv_name,
                 });
             }
@@ -598,13 +606,13 @@ fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
                 serv_name,
                 chan_name,
             } => {
-                tiny.tui.notify(&words[0], &MsgTarget::Chan {
+                tiny.tui.notify(notify_for, &MsgTarget::Chan {
                     serv_name: &serv_name,
                     chan_name: &chan_name,
                 });
             }
             MsgSource::User { serv_name, nick } => {
-                tiny.tui.notify(&words[0], &MsgTarget::User {
+                tiny.tui.notify(notify_for, &MsgTarget::User {
                     serv_name: &serv_name,
                     nick: &nick,
                 });

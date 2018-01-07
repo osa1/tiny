@@ -17,6 +17,8 @@ use term_input::{Event, Key};
 use termbox_simple::{OutputMode, Termbox};
 use trie::Trie;
 
+use notifier::NotifyFor;
+
 pub struct TUI {
     /// Termbox instance
     termbox: Termbox,
@@ -277,7 +279,7 @@ impl TUI {
         self.ui.toggle_ignore(target);
     }
 
-    pub fn notify(&mut self, notify_for: &str, target: &MsgTarget) {
+    pub fn notify(&mut self, notify_for: NotifyFor, target: &MsgTarget) {
         self.ui.notify(notify_for, target);
     }
 

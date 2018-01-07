@@ -10,6 +10,7 @@ use tui::MsgTarget;
 use tui::widget::WidgetRet;
 
 use notifier::Notifier;
+use notifier::NotifyFor;
 
 const LEFT_ARROW: char = '<';
 const RIGHT_ARROW: char = '>';
@@ -228,7 +229,7 @@ impl Tabbed {
                 src,
                 style: TabStyle::Normal,
                 switch,
-                notifier: Notifier::init("mentions")
+                notifier: Notifier::init(NotifyFor::Mentions)
             },
         );
     }
@@ -1044,7 +1045,7 @@ impl Tabbed {
         }
     }
 
-    pub fn notify(&mut self, notify_for: &str, target: &MsgTarget){
+    pub fn notify(&mut self, notify_for: NotifyFor, target: &MsgTarget){
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.notifier.set_notify_for(notify_for);
         });
