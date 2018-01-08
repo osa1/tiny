@@ -288,7 +288,7 @@ impl Tabbed {
                             status_val
                         );
                         if self.active_idx >= tab_idx {
-                            self.active_idx += 1;
+                            self.next_tab();
                         }
                         if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick().map(str::to_owned) {
                             self.tabs[tab_idx].widget.set_nick(nick);
