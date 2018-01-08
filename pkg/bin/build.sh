@@ -11,6 +11,6 @@ CC=clang ./config no-async &&
 make &&
 mkdir lib &&
 cp libcrypto.a libssl.a lib/ &&
-cd ../../.. &&
-OPENSSL_DIR=$PWD/pkg/bin/openssl-$openssl_release/ cargo +nightly build --release
+cd ../.. &&
+OPENSSL_DIR=$PWD/pkg/bin/openssl-$openssl_release/ cargo +nightly build --release --target=x86_64-unknown-linux-musl
 
