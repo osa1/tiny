@@ -6,7 +6,7 @@ pkgdesc="A console IRC client"
 arch=('x86_64')
 url="https://github.com/osa1/tiny"
 license=('MIT')
-depends=('openssl')
+depends=('openssl' 'dbus')
 makedepends=('git' 'rustup')
 
 build() {
