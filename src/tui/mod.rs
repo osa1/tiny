@@ -219,6 +219,12 @@ impl TUI {
         self.ui.add_client_err_msg(msg, target);
     }
 
+    /// An notify message coming from Tiny, usually shows a response of a command
+    /// Eg: "Notifications enabled"
+    pub fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
+        self.ui.add_client_notify_msg(msg, target);
+    }
+
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
     pub fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {

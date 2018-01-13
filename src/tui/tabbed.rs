@@ -920,6 +920,12 @@ impl Tabbed {
         });
     }
 
+    pub fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
+            tab.widget.add_client_notify_msg(msg);
+        });
+    }
+
     pub fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_client_msg(msg);

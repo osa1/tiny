@@ -593,8 +593,21 @@ fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         let mut notify_for = NotifyFor::Off;
         if words[0] == "messages" {
             notify_for = NotifyFor::Messages;
+            tiny.tui.add_client_notify_msg(
+                "Notifications enabled for all messages",
+                &MsgTarget::CurrentTab,
+            );
         } else if words[0] == "mentions" {
             notify_for = NotifyFor::Mentions;
+            tiny.tui.add_client_notify_msg(
+                "Notifications enabled for mentions",
+                &MsgTarget::CurrentTab,
+            );
+        } else {
+            tiny.tui.add_client_notify_msg(
+                "Notifications turned off",
+                &MsgTarget::CurrentTab,
+            );
         }
         match src {
             MsgSource::Serv { serv_name } => {
