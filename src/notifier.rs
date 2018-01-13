@@ -22,6 +22,10 @@ impl Notifier {
         self.notify_for = notify_for_;
     }
 
+    pub fn get_notify_for(&mut self) -> NotifyFor {
+        return self.notify_for;
+    }
+
     fn notify(&mut self, summary: &str, body: &str) {
         Notification::new()
             .summary(summary)

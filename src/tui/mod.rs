@@ -289,6 +289,10 @@ impl TUI {
         self.ui.notify(notify_for, target);
     }
 
+    pub fn show_notify_mode(&mut self, target: &MsgTarget){
+        self.ui.show_notify_mode(target);
+    }
+
     pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
         self.ui.remove_nick(nick, ts, target);
     }

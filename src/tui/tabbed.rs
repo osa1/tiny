@@ -1057,6 +1057,22 @@ impl Tabbed {
         });
     }
 
+    pub fn show_notify_mode(&mut self, target: &MsgTarget){
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
+            let notify_for = tab.notifier.get_notify_for();
+            if notify_for == NotifyFor::Off {
+                tab.widget.add_client_notify_msg("Notifications are off");
+            }
+            else if notify_for == NotifyFor::Mentions {
+                tab.widget.add_client_notify_msg("Notifications enabled for mentions");
+            }
+            else if notify_for == NotifyFor::Messages {
+                tab.widget.add_client_notify_msg("Notifications enabled for all messages");
+            }
+        });
+    }
+
+
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
 

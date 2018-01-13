@@ -583,7 +583,10 @@ static NOTIFY_CMD: Cmd = Cmd {
 
 fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
-    if !(words.len() == 1  && ["off", "mentions", "messages"].contains(&words[0])) {
+    if words.len() == 0 {
+        tiny.tui.show_notify_mode(&MsgTarget::CurrentTab);
+    }
+    else if !(words.len() == 1  && ["off", "mentions", "messages"].contains(&words[0])) {
         return tiny.tui.add_client_err_msg(
             "/notify usage: /notify [off/mentions/messages]",
             &MsgTarget::CurrentTab,
