@@ -6,7 +6,6 @@ pub mod termbox;
 pub mod text_field;
 pub mod widget;
 
-use std::fs;
 use std::str;
 
 use config::Colors;
@@ -49,8 +48,6 @@ impl TUI {
         let mut tui = Termbox::init().unwrap(); // TODO: check errors
         tui.set_output_mode(OutputMode::Output256);
         tui.set_clear_attributes(colors.clear.fg, colors.clear.bg);
-
-        let _ = fs::create_dir("logs");
 
         TUI {
             ui: Tabbed::new(tui.width() as i32, tui.height() as i32),
