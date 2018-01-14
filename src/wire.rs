@@ -415,6 +415,7 @@ mod tests {
                 cmd: Cmd::PRIVMSG {
                     target: MsgTarget::User("tiny".to_owned()),
                     msg: "a b c".to_owned(),
+                    is_notice: false,
                 },
             })
         );
@@ -432,9 +433,10 @@ mod tests {
             Msg::read(&mut buf, None),
             Some(Msg {
                 pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
-                cmd: Cmd::NOTICE {
+                cmd: Cmd::PRIVMSG {
                     target: MsgTarget::User("*".to_owned()),
                     msg: "*** Looking up your hostname...".to_owned(),
+                    is_notice: true,
                 },
             })
         );
