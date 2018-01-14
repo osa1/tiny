@@ -92,16 +92,13 @@ pub struct Msg {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd {
+    /// A PRIVMSG or NOTICE. Check `is_notice` field.
     PRIVMSG {
         // TODO: In theory this should be a list of targets, but in practice I've never
         // encountered that case.
         target: MsgTarget,
         msg: String,
-    },
-
-    NOTICE {
-        target: MsgTarget,
-        msg: String,
+        is_notice: bool,
     },
 
     JOIN {
@@ -224,7 +221,8 @@ impl Msg {
 
             let params: Vec<&str> = parse_params(unsafe { str::from_utf8_unchecked(slice) });
             let cmd = match msg_ty {
-                MsgType::Cmd("PRIVMSG") if params.len() == 2 => {
+                MsgType::Cmd("PRIVMSG") | MsgType::Cmd("NOTICE") if params.len() == 2 => {
+                    let is_notice = if let MsgType::Cmd("NOTICE") = msg_ty { true } else { false };
                     let target = params[0];
                     let msg = params[1];
                     let target = if target.chars().nth(0) == Some('#') {
@@ -233,21 +231,9 @@ impl Msg {
                         MsgTarget::User(target.to_owned())
                     };
                     Cmd::PRIVMSG {
-                        target: target,
+                        target,
                         msg: msg.to_owned(),
-                    }
-                }
-                MsgType::Cmd("NOTICE") if params.len() == 2 => {
-                    let target = params[0];
-                    let msg = params[1];
-                    let target = if target.chars().nth(0) == Some('#') {
-                        MsgTarget::Chan(target.to_owned())
-                    } else {
-                        MsgTarget::User(target.to_owned())
-                    };
-                    Cmd::NOTICE {
-                        target: target,
-                        msg: msg.to_owned(),
+                        is_notice,
                     }
                 }
                 MsgType::Cmd("JOIN") if params.len() == 1 => {

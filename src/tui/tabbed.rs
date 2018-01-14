@@ -1032,6 +1032,17 @@ impl Tabbed {
         }
     }
 
+    pub fn does_user_tab_exist(&self, serv_name_: &str, nick_: &str) -> bool {
+        for tab in &self.tabs {
+            if let MsgSource::User { ref serv_name, ref nick } = tab.src {
+                if serv_name_ == serv_name && nick_ == nick {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
 

@@ -107,6 +107,10 @@ impl TUI {
     pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
         self.ui.get_nicks(serv_name, chan_name)
     }
+
+    pub fn does_user_tab_exist(&self, serv_name: &str, nick: &str) -> bool {
+        self.ui.does_user_tab_exist(serv_name, nick)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -177,7 +181,6 @@ impl TUI {
 // Showing messages
 
 /// Target of a message coming from an IRC server.
-/// `size_of::<MsgTarget>() == 40`. Good idea to pass by reference.
 pub enum MsgTarget<'a> {
     Server {
         serv_name: &'a str,

@@ -20,6 +20,9 @@
 - Fixed a bug that caused incorrect tab bar rendering in some cases (#76).
 - tiny no longer creates `~/logs` directory. This directory was used for debug
   logs in the past (#82).
+- `NOTICE` messages (used by services like `NickServ`, `MemoServ`, `Global`
+  etc.) are now shown in server tabs unless there's already a tab for the sender
+  (#21).
 
 # 2017/11/12: 0.3.0
 

@@ -341,21 +341,8 @@ impl<'poll> Tiny<'poll> {
                 MsgSource::User {
                     ref serv_name,
                     ref nick,
-                } => {
-                    let msg_target = if nick.eq_ignore_ascii_case("nickserv")
-                        || nick.eq_ignore_ascii_case("chanserv")
-                    {
-                        MsgTarget::Server {
-                            serv_name: serv_name,
-                        }
-                    } else {
-                        MsgTarget::User {
-                            serv_name: serv_name,
-                            nick: nick,
-                        }
-                    };
-                    (msg_target, nick, serv_name)
-                }
+                } =>
+                    (MsgTarget::User { serv_name, nick }, nick, serv_name),
             }
         };
 
@@ -509,7 +496,7 @@ impl<'poll> Tiny<'poll> {
         let conn = &self.conns[conn_idx];
         let pfx = msg.pfx;
         match msg.cmd {
-            Cmd::PRIVMSG { target, msg } | Cmd::NOTICE { target, msg } => {
+            Cmd::PRIVMSG { target, msg, is_notice } => {
                 let pfx = match pfx {
                     Some(pfx) =>
                         pfx,
@@ -521,6 +508,8 @@ impl<'poll> Tiny<'poll> {
                         return;
                     }
                 };
+
+                // sender to be shown in the UI
                 let origin = match pfx {
                     Pfx::Server(_) =>
                         conn.get_serv_name(),
@@ -573,21 +562,20 @@ impl<'poll> Tiny<'poll> {
                     }
                     wire::MsgTarget::User(target) => {
                         let serv_name = conn.get_serv_name();
-                        let msg_target = match pfx {
-                            Pfx::Server(_) =>
-                                MsgTarget::Server {
-                                    serv_name: serv_name,
-                                },
-                            Pfx::User { ref nick, .. } if nick.eq_ignore_ascii_case("nickserv") ||
-                                                          nick.eq_ignore_ascii_case("chanserv") =>
-                                MsgTarget::Server {
-                                    serv_name: serv_name,
-                                },
-                            Pfx::User { ref nick, .. } =>
-                                MsgTarget::User {
-                                    serv_name: serv_name,
-                                    nick: nick,
-                                },
+                        let msg_target = {
+                            match pfx {
+                                Pfx::Server(_) =>
+                                    MsgTarget::Server { serv_name },
+                                Pfx::User { ref nick, .. } => {
+                                    // show NOTICE messages in server tabs if we don't have a tab
+                                    // for the sender already (see #21)
+                                    if is_notice && !self.tui.does_user_tab_exist(serv_name, nick) {
+                                        MsgTarget::Server { serv_name }
+                                    } else {
+                                        MsgTarget::User { serv_name, nick }
+                                    }
+                                }
+                            }
                         };
                         self.tui
                             .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
