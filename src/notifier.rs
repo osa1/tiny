@@ -10,7 +10,7 @@ pub enum NotifyFor { Off, Mentions, Messages }
 
 // Destktop notification handler
 pub struct Notifier {
-    notify_for: NotifyFor,
+    pub notify_for: NotifyFor,
 }
 
 impl Notifier {
@@ -20,10 +20,6 @@ impl Notifier {
 
     pub fn set_notify_for(&mut self, notify_for_: NotifyFor) {
         self.notify_for = notify_for_;
-    }
-
-    pub fn get_notify_for(&mut self) -> NotifyFor {
-        return self.notify_for;
     }
 
     fn notify(&mut self, summary: &str, body: &str) {

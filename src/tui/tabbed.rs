@@ -151,9 +151,6 @@ impl Tab {
             self.style.get_style(colors)
         };
 
-        // termbox::print(tb, pos_x, pos_y, style, self.visible_name());
-        // if !self.widget.get_ignore_state() {
-        //     termbox::print(tb, pos_x + self.width(), pos_y, colors.faded, "|i");
         let mut switch_drawn = false;
         for ch in self.visible_name().chars() {
             if Some(ch) == self.switch && !switch_drawn {
@@ -190,7 +187,7 @@ impl Tabbed {
         }
     }
 
-    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool) {
+    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool, notify_for: NotifyFor) {
         use std::collections::HashMap;
 
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
@@ -229,7 +226,7 @@ impl Tabbed {
                 src,
                 style: TabStyle::Normal,
                 switch,
-                notifier: Notifier::init(NotifyFor::Mentions)
+                notifier: Notifier::init(notify_for)
             },
         );
     }
@@ -244,7 +241,8 @@ impl Tabbed {
                     MsgSource::Serv {
                         serv_name: serv_name.to_owned(),
                     },
-                    true
+                    true,
+                    NotifyFor::Mentions
                 );
                 Some(tab_idx)
             }
@@ -275,10 +273,12 @@ impl Tabbed {
                     }
                     Some(serv_tab_idx) => {
                         let mut status_val: bool = true;
+                        let mut notify_for: NotifyFor = NotifyFor::Mentions;
                         for tab in self.tabs.iter() {
                             if let MsgSource::Serv{ serv_name: ref serv_name_ } = tab.src {
                                 if serv_name == serv_name_ {
                                     status_val = tab.widget.get_ignore_state();
+                                    notify_for = tab.notifier.notify_for;
                                     break
                                 }
                             }
@@ -290,7 +290,8 @@ impl Tabbed {
                                 serv_name: serv_name.to_owned(),
                                 chan_name: chan_name.to_owned(),
                             },
-                            status_val
+                            status_val,
+                            notify_for
                         );
                         if self.active_idx >= tab_idx {
                             self.active_idx += 1;
@@ -331,7 +332,8 @@ impl Tabbed {
                                 serv_name: serv_name.to_owned(),
                                 nick: nick.to_owned(),
                             },
-                            true
+                            true,
+                            NotifyFor::Messages
                         );
                         if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
                             self.tabs[tab_idx + 1].widget.set_nick(nick);
@@ -1059,7 +1061,7 @@ impl Tabbed {
 
     pub fn show_notify_mode(&mut self, target: &MsgTarget){
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            let notify_for = tab.notifier.get_notify_for();
+            let notify_for = tab.notifier.notify_for;
             if notify_for == NotifyFor::Off {
                 tab.widget.add_client_notify_msg("Notifications are off");
             }
