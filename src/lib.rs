@@ -341,8 +341,21 @@ impl<'poll> Tiny<'poll> {
                 MsgSource::User {
                     ref serv_name,
                     ref nick,
-                } =>
-                    (MsgTarget::User { serv_name, nick }, nick, serv_name),
+                } => {
+                    let msg_target = if nick.eq_ignore_ascii_case("nickserv")
+                        || nick.eq_ignore_ascii_case("chanserv")
+                    {
+                        MsgTarget::Server {
+                            serv_name: serv_name,
+                        }
+                    } else {
+                        MsgTarget::User {
+                            serv_name: serv_name,
+                            nick: nick,
+                        }
+                    };
+                    (msg_target, nick, serv_name)
+                }
             }
         };
 
