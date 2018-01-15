@@ -65,7 +65,7 @@ pub struct Config {
     pub log_dir: String,
 }
 
-pub fn get_config_path() -> PathBuf {
+pub fn get_default_config_path() -> PathBuf {
     let mut config_path = home_dir().unwrap();
     config_path.push(".tinyrc.yml");
     config_path
@@ -101,8 +101,7 @@ fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
     Ok(cfg)
 }
 
-pub fn generate_default_config() {
-    let config_path = get_config_path();
+pub fn generate_default_config(config_path: PathBuf) {
     {
         let mut file = File::create(&config_path).unwrap();
         file.write_all(get_default_config_yaml().as_bytes())
