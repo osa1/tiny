@@ -435,8 +435,8 @@ impl MessagingUI {
         }
     }
 
-    pub fn get_ignore_state(&self) -> bool{
-        return self.show_status;
+    pub fn get_ignore_state(&self) -> bool {
+        self.show_status
     }
 
     pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {

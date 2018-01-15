@@ -73,6 +73,8 @@ fn main() {
                         TUIRet::Input { msg, from } =>
                             if msg == "/clear".chars().collect::<Vec<char>>() {
                                 tui.clear(&from.to_target())
+                            } else if msg == "/ignore".chars().collect::<Vec<char>>() {
+                                tui.toggle_ignore(&from.to_target());
                             } else {
                                 tui.add_msg(
                                     &msg.into_iter().collect::<String>(),

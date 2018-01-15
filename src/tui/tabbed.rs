@@ -130,7 +130,8 @@ impl Tab {
 
     pub fn width(&self) -> i32 {
         // TODO: assuming ASCII string here. We should probably switch to a AsciiStr type.
-        self.visible_name().len() as i32
+        self.visible_name().len() as i32 +
+            if self.widget.get_ignore_state() { 0 } else { 3 }
     }
 
     pub fn draw(
@@ -147,9 +148,6 @@ impl Tab {
             self.style.get_style(colors)
         };
 
-        // termbox::print(tb, pos_x, pos_y, style, self.visible_name());
-        // if !self.widget.get_ignore_state() {
-        //     termbox::print(tb, pos_x + self.width(), pos_y, colors.faded, "|i");
         let mut switch_drawn = false;
         for ch in self.visible_name().chars() {
             if Some(ch) == self.switch && !switch_drawn {
@@ -611,11 +609,7 @@ impl Tabbed {
                 pos_y + self.height - 1,
                 self.active_idx == tab_idx + tab_left,
             );
-            // len() is OK since server, chan and nick names are ascii
-            pos_x += tab.visible_name().len() as i32 + 1; // +1 for margin
-            if !tab.widget.get_ignore_state() {
-                pos_x += 3;
-            }
+            pos_x += tab.width() as i32 + 1; // +1 for margin
         }
 
         if right_arr {
@@ -1030,6 +1024,12 @@ impl Tabbed {
                 tab.widget.set_or_toggle_ignore(None);
             });
         }
+        // Changing tab names (adding "[i]" suffix) may make the tab currently
+        // selected overflow from the screen. Easiest (although not most
+        // efficient) way to fix this is `resize()`.
+        let w = self.width;
+        let h = self.height;
+        self.resize(w, h);
     }
 
     pub fn does_user_tab_exist(&self, serv_name_: &str, nick_: &str) -> bool {

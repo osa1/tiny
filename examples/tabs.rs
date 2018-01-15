@@ -73,32 +73,36 @@ fn main() {
                     match tui.handle_input_event(ev) {
                         TUIRet::Input { msg, from } => {
                             let msg_string = msg.iter().cloned().collect::<String>();
-                            match from {
-                                MsgSource::Chan {
-                                    serv_name,
-                                    chan_name,
-                                } => {
-                                    tui.add_privmsg(
-                                        "me",
-                                        &msg_string,
-                                        Timestamp::now(),
-                                        &MsgTarget::Chan {
-                                            serv_name: &serv_name,
-                                            chan_name: &chan_name,
-                                        },
-                                        false,
-                                    );
-                                }
+                            if &msg_string == "/ignore" {
+                                tui.toggle_ignore(&from.to_target());
+                            } else {
+                                match from {
+                                    MsgSource::Chan {
+                                        serv_name,
+                                        chan_name,
+                                    } => {
+                                        tui.add_privmsg(
+                                            "me",
+                                            &msg_string,
+                                            Timestamp::now(),
+                                            &MsgTarget::Chan {
+                                                serv_name: &serv_name,
+                                                chan_name: &chan_name,
+                                            },
+                                            false,
+                                        );
+                                    }
 
-                                MsgSource::Serv { .. } => {
-                                    tui.add_client_err_msg(
-                                        "Can't send PRIVMSG to a server.",
-                                        &MsgTarget::CurrentTab,
-                                    );
-                                }
+                                    MsgSource::Serv { .. } => {
+                                        tui.add_client_err_msg(
+                                            "Can't send PRIVMSG to a server.",
+                                            &MsgTarget::CurrentTab,
+                                        );
+                                    }
 
-                                _ =>
-                                    {}
+                                    _ =>
+                                        {}
+                                }
                             }
                         }
                         TUIRet::Abort => {

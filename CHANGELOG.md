@@ -17,7 +17,7 @@
   servers (e.g. znc).
 - Fixed a bug that caused tiny to fail to connect via TLS on some systems
   (#64).
-- Fixed a bug that caused incorrect tab bar rendering in some cases (#76).
+- Fixed some bugs that caused incorrect tab bar rendering in some cases (#76).
 - tiny no longer creates `~/logs` directory. This directory was used for debug
   logs in the past (#82).
 - `NOTICE` messages (used by services like `NickServ`, `MemoServ`, `Global`
