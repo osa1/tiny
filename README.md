@@ -119,6 +119,8 @@ servers:
 By default tiny connects to both servers. You can connect to only the second
 server by passing `freenode` as a command line argument.
 
+You can use `--config <path>` to specify your config file location.
+
 ## Key bindings
 
 - `C-a`/`C-e` to move cursor beginning/end in the input field

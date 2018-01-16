@@ -23,6 +23,8 @@
 - `NOTICE` messages (used by services like `NickServ`, `MemoServ`, `Global`
   etc.) are now shown in server tabs unless there's already a tab for the sender
   (#21).
+- New command line argument `--config` added for specifying config file
+  location (#81).
 
 # 2017/11/12: 0.3.0
 
