@@ -57,7 +57,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use conn::{Conn, ConnErr, ConnEv};
-use cmd_line_args::parse_cmd_line_args;
+use cmd_line_args::{CmdLineArgs, parse_cmd_line_args};
 use logger::Logger;
 use term_input::{Event, Input};
 use tui::tabbed::MsgSource;
@@ -69,15 +69,16 @@ use wire::{Cmd, Msg, Pfx};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn run() {
-    let args = parse_cmd_line_args(std::env::args().collect());
-    let config_path = args.config_path.clone().unwrap_or(config::get_default_config_path());
-    if config_path.is_dir() || !config_path.clone().parent().unwrap().is_dir() {
-        println!("The config path is not valid.");
+    let CmdLineArgs { servers: server_args, config_path } =
+        parse_cmd_line_args(std::env::args());
+    let config_path = config_path.unwrap_or_else(config::get_default_config_path);
+    if config_path.is_dir() {
+        println!("The config path is a directory.");
         ::std::process::exit(1);
     } else if !config_path.is_file() {
-        config::generate_default_config(config_path);
+        config::generate_default_config(&config_path);
     } else {
-        match config::parse_config(config_path.clone()) {
+        match config::parse_config(&config_path) {
             Err(yaml_err) => {
                 println!("Can't parse config file:");
                 println!("{}", yaml_err);
@@ -89,13 +90,13 @@ pub fn run() {
                 colors,
                 log_dir,
             }) => {
-                let servers = if args.servers.len() >= 1 {
+                let servers = if !server_args.is_empty() {
                     // connect only to servers that match at least one of
                     // the given patterns
                     servers
                         .into_iter()
                         .filter(|s| {
-                            for server in &args.servers {
+                            for server in &server_args {
                                 if s.addr.contains(server) {
                                     return true;
                                 }
@@ -173,13 +174,13 @@ impl<'poll> Tiny<'poll> {
         }
 
         let mut tiny = Tiny {
-            conns: conns,
-            defaults: defaults,
-            servers: servers,
-            tui: tui,
+            conns,
+            defaults,
+            servers,
+            tui,
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from(log_dir)),
-            config_path: config_path,
+            config_path: config_path.to_owned(),
         };
 
         tiny.tui.draw();
