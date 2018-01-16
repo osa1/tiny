@@ -540,7 +540,7 @@ static RELOAD_CMD: Cmd = Cmd {
 };
 
 fn reload(_: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
-    match config::parse_config(config::get_config_path()) {
+    match config::parse_config(&tiny.config_path) {
         Ok(config::Config { colors, .. }) =>
             tiny.tui.set_colors(colors),
         Err(err) => {

@@ -36,6 +36,7 @@ extern crate take_mut;
 mod utils;
 
 mod cmd;
+mod cmd_line_args;
 mod conn;
 mod logger;
 mod stream;
@@ -56,6 +57,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use conn::{Conn, ConnErr, ConnEv};
+use cmd_line_args::{CmdLineArgs, parse_cmd_line_args};
 use logger::Logger;
 use term_input::{Event, Input};
 use tui::tabbed::MsgSource;
@@ -67,11 +69,16 @@ use wire::{Cmd, Msg, Pfx};
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn run() {
-    let config_path = config::get_config_path();
-    if !config_path.is_file() {
-        config::generate_default_config();
+    let CmdLineArgs { servers: server_args, config_path } =
+        parse_cmd_line_args(std::env::args());
+    let config_path = config_path.unwrap_or_else(config::get_default_config_path);
+    if config_path.is_dir() {
+        println!("The config path is a directory.");
+        ::std::process::exit(1);
+    } else if !config_path.is_file() {
+        config::generate_default_config(&config_path);
     } else {
-        match config::parse_config(config_path) {
+        match config::parse_config(&config_path) {
             Err(yaml_err) => {
                 println!("Can't parse config file:");
                 println!("{}", yaml_err);
@@ -83,16 +90,14 @@ pub fn run() {
                 colors,
                 log_dir,
             }) => {
-                let args = ::std::env::args().into_iter().collect::<Vec<String>>();
-                let servers = if args.len() >= 2 {
+                let servers = if !server_args.is_empty() {
                     // connect only to servers that match at least one of
                     // the given patterns
-                    let pats = &args[1..];
                     servers
                         .into_iter()
                         .filter(|s| {
-                            for pat in pats {
-                                if s.addr.contains(pat) {
+                            for server in &server_args {
+                                if s.addr.contains(server) {
                                     return true;
                                 }
                             }
@@ -102,7 +107,7 @@ pub fn run() {
                 } else {
                     servers
                 };
-                Tiny::run(servers, defaults, log_dir, colors)
+                Tiny::run(servers, defaults, log_dir, colors, config_path)
             }
         }
     }
@@ -117,6 +122,7 @@ pub struct Tiny<'poll> {
     tui: TUI,
     input_ev_handler: Input,
     logger: Logger,
+    config_path: PathBuf,
 }
 
 const STDIN_TOKEN: Token = Token(libc::STDIN_FILENO as usize);
@@ -127,6 +133,7 @@ impl<'poll> Tiny<'poll> {
         defaults: config::Defaults,
         log_dir: String,
         colors: config::Colors,
+        config_path: PathBuf,
     ) {
         let poll = Poll::new().unwrap();
 
@@ -167,12 +174,13 @@ impl<'poll> Tiny<'poll> {
         }
 
         let mut tiny = Tiny {
-            conns: conns,
-            defaults: defaults,
-            servers: servers,
-            tui: tui,
+            conns,
+            defaults,
+            servers,
+            tui,
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from(log_dir)),
+            config_path: config_path.to_owned(),
         };
 
         tiny.tui.draw();

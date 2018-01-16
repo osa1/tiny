@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Clone, Deserialize)]
 pub struct Server {
@@ -65,13 +66,13 @@ pub struct Config {
     pub log_dir: String,
 }
 
-pub fn get_config_path() -> PathBuf {
+pub fn get_default_config_path() -> PathBuf {
     let mut config_path = home_dir().unwrap();
     config_path.push(".tinyrc.yml");
     config_path
 }
 
-pub fn parse_config(config_path: PathBuf) -> Result<Config, serde_yaml::Error> {
+pub fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
     let contents = {
         let mut str = String::new();
         let mut file = File::open(config_path).unwrap();
@@ -101,13 +102,13 @@ fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
     Ok(cfg)
 }
 
-pub fn generate_default_config() {
-    let config_path = get_config_path();
-    {
-        let mut file = File::create(&config_path).unwrap();
-        file.write_all(get_default_config_yaml().as_bytes())
-            .unwrap();
+pub fn generate_default_config(config_path: &Path) {
+    if let Some(parent) = config_path.parent() {
+        let _ = ::std::fs::create_dir_all(parent);
     }
+    let mut file = File::create(config_path).unwrap();
+    file.write_all(get_default_config_yaml().as_bytes())
+        .unwrap();
     println!(
         "\
 tiny couldn't find a config file at {0:?}, and created a config file with defaults.
