@@ -230,6 +230,6 @@ start, open an issue and I'd love to help.
 
 [Umur Gedik](https://github.com/umurgdk)
 
-[Chiu Yue Chun](Chiu Yue Chun)
+[Chiu Yue Chun](https://github.com/BrianOn99)
 
 [Nick Econopouly](https://github.com/wrycode)
