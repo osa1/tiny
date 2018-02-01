@@ -186,7 +186,7 @@ Commands start with `/` character.
 tiny is in early stages of development. Some of features that you
 might think are essential may be missing. Please open an issue for
 those features (or even better, a pull request!). Remember to add
-yourself to the [list of contributors](#contributors)] if you submit a
+yourself to the [list of contributors](#contributors) if you submit a
 pull request.
 
 Being a Rust n00b, I spent a lot of time trying to convince borrow checker,
@@ -225,7 +225,11 @@ start, open an issue and I'd love to help.
 ## Contributors
 
 [Ömer Sinan Ağacan](https://github.com/osa1)
+
 [Abin Simon](https://github.com/meain)
+
 [Umur Gedik](https://github.com/umurgdk)
+
 [Chiu Yue Chun](Chiu Yue Chun)
+
 [Nick Econopouly](https://github.com/wrycode)
