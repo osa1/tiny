@@ -232,4 +232,6 @@ start, open an issue and I'd love to help.
 
 [Chiu Yue Chun](https://github.com/BrianOn99)
 
+[@wammies](https://github.com/wammies)
+
 [Nick Econopouly](https://github.com/wrycode)
