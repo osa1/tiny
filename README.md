@@ -183,9 +183,11 @@ Commands start with `/` character.
 
 ## Development
 
-tiny is in early stages of development. Some of features that you might think
-are essential may be missing. Please open an issue for those features (or even
-better, a pull request!).
+tiny is in early stages of development. Some of features that you
+might think are essential may be missing. Please open an issue for
+those features (or even better, a pull request!). Remember to add
+yourself to the [list of contributors](#contributors) if you submit a
+pull request.
 
 Being a Rust n00b, I spent a lot of time trying to convince borrow checker,
 failing at that, and either adding bunch of ugly hacks (e.g. instead a loop that
@@ -219,3 +221,17 @@ start, open an issue and I'd love to help.
 - Implement system notification support for private messages and highlights.
   When to show (and maybe even how to show) a notification should be
   configurable as otherwise it may be annoying.
+
+## Contributors
+
+[Ömer Sinan Ağacan](https://github.com/osa1)
+
+[Abin Simon](https://github.com/meain)
+
+[Umur Gedik](https://github.com/umurgdk)
+
+[Chiu Yue Chun](https://github.com/BrianOn99)
+
+[@wammies](https://github.com/wammies)
+
+[Nick Econopouly](https://github.com/wrycode)
