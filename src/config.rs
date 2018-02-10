@@ -10,6 +10,13 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::path::Path;
 
+#[derive(Clone, Deserialize, Debug)]
+pub struct Auth {
+    pub sasl_method: String,
+    pub sasl_username: String,
+    pub sasl_password: String,
+}
+
 #[derive(Clone, Deserialize)]
 pub struct Server {
     /// Address of the server
@@ -43,6 +50,9 @@ pub struct Server {
     /// Channels to automatically join. Any `/join` commands in `auto_cmds` will be moved here.
     #[serde(default)]
     pub join: Vec<String>,
+
+    /// Authenication method
+    pub auth: Option<Auth>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
