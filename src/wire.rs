@@ -53,6 +53,18 @@ pub fn away<W: Write>(sink: &mut W, msg: Option<&str>) -> std::io::Result<()> {
     }
 }
 
+pub fn cap_req<W: Write>(sink: &mut W, cap_identifiers: &[&str]) -> std::io::Result<()> {
+    write!(sink, "CAP REQ :{}\r\n", cap_identifiers.join(" "))
+}
+
+pub fn cap_end<W: Write>(sink: &mut W) -> std::io::Result<()> {
+    write!(sink, "CAP END\r\n")
+}
+
+pub fn authenticate<W: Write>(sink: &mut W, msg: &str) -> std::io::Result<()> {
+    write!(sink, "AUTHENTICATE {}\r\n", msg)
+}
+
 /*
 pub fn quit<W : Write>(mut sink: W, msg : Option<&str>) -> std::io::Result<()> {
     match msg {

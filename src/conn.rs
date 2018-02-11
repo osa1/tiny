@@ -1,3 +1,5 @@
+extern crate base64;
+
 use mio::Poll;
 use mio::Token;
 use std::io::Write;
@@ -133,12 +135,29 @@ pub enum ConnEv {
     NickChange(String),
 }
 
-fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str) {
-    if let Some(pass) = pass {
-        wire::pass(stream, pass).unwrap();
+fn plain_sasl_authenticate<W: Write>(stream: &mut W, username: &str, password: &str) {
+    wire::authenticate(stream, "PLAIN").unwrap();
+    let msg =  format!("{}\x00{}\x00{}", username, username, password);
+    wire::authenticate(stream, &base64::encode(&msg)).unwrap();
+}
+
+fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str, auth: &Option<config::Auth>) {
+    if let &Some(ref auth) = auth {
+        // Details of the protocol: https://ircv3.net/specs/extensions/sasl-3.1.html
+        // TODO: Should validate the method is PLAIN
+        wire::cap_req(stream, &["sasl"]).unwrap();
+        wire::nick(stream, nick).unwrap();
+        wire::user(stream, hostname, realname).unwrap();
+        // TODO: Should wait for server ACK
+        plain_sasl_authenticate(stream, &auth.sasl_username, &auth.sasl_password);
+        wire::cap_end(stream).unwrap();
+    } else {
+        if let Some(pass) = pass {
+            wire::pass(stream, pass).unwrap();
+        }
+        wire::nick(stream, nick).unwrap();
+        wire::user(stream, hostname, realname).unwrap();
     }
-    wire::nick(stream, nick).unwrap();
-    wire::user(stream, hostname, realname).unwrap();
 }
 
 impl<'poll> Conn<'poll> {
@@ -152,6 +171,7 @@ impl<'poll> Conn<'poll> {
             &server.hostname,
             &server.realname,
             &server.nicks[0],
+            &server.auth,
         );
 
         Ok(Conn {
@@ -197,7 +217,8 @@ impl<'poll> Conn<'poll> {
                     self.pass.as_ref().map(String::as_str),
                     &self.hostname,
                     &self.realname,
-                    self.get_nick()
+                    self.get_nick(),
+                    &None // TODO: should save SASL info
                 );
                 self.status = ConnStatus::PingPong {
                     ticks_passed: 0,
