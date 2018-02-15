@@ -10,9 +10,15 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::path::Path;
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Deserialize)]
+pub enum SASLMethod {
+    // Only PLAIN SASL is supported for now.
+    PLAIN
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Auth {
-    pub sasl_method: String,
+    pub sasl_method: SASLMethod,
     pub sasl_username: String,
     pub sasl_password: String,
 }

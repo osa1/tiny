@@ -150,6 +150,12 @@ pub enum Cmd {
         topic: String,
     },
 
+    CAP {
+        client: String,
+        subcommand: String,
+        params: Vec<String>,
+    },
+
     /// An IRC message other than the ones listed above.
     Other {
         cmd: String,
@@ -295,6 +301,12 @@ impl Msg {
                     Cmd::TOPIC {
                         chan: params[0].to_owned(),
                         topic: params[1].to_owned(),
+                    },
+                MsgType::Cmd("CAP") if params.len() == 3 =>
+                    Cmd::CAP {
+                        client: params[0].to_owned(),
+                        subcommand: params[1].to_owned(),
+                        params: params[2].split(' ').map(|s| s.to_owned()).collect(),
                     },
                 MsgType::Num(n) =>
                     Cmd::Reply {

@@ -53,6 +53,8 @@ pub struct Conn<'poll> {
 
     /// Incoming message buffer
     in_buf: Vec<u8>,
+
+    auth: Option<config::Auth>,
 }
 
 pub type ConnErr = StreamErr;
@@ -135,22 +137,13 @@ pub enum ConnEv {
     NickChange(String),
 }
 
-fn plain_sasl_authenticate<W: Write>(stream: &mut W, username: &str, password: &str) {
-    wire::authenticate(stream, "PLAIN").unwrap();
-    let msg =  format!("{}\x00{}\x00{}", username, username, password);
-    wire::authenticate(stream, &base64::encode(&msg)).unwrap();
-}
-
 fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str, auth: &Option<config::Auth>) {
-    if let &Some(ref auth) = auth {
+    if let &Some(_) = auth {
         // Details of the protocol: https://ircv3.net/specs/extensions/sasl-3.1.html
-        // TODO: Should validate the method is PLAIN
         wire::cap_req(stream, &["sasl"]).unwrap();
         wire::nick(stream, nick).unwrap();
         wire::user(stream, hostname, realname).unwrap();
-        // TODO: Should wait for server ACK
-        plain_sasl_authenticate(stream, &auth.sasl_username, &auth.sasl_password);
-        wire::cap_end(stream).unwrap();
+        // Will wait for CAP ... ACK from server before authenication.
     } else {
         if let Some(pass) = pass {
             wire::pass(stream, pass).unwrap();
@@ -193,6 +186,7 @@ impl<'poll> Conn<'poll> {
                 stream: stream,
             },
             in_buf: vec![],
+            auth: server.auth
         })
     }
 
@@ -218,7 +212,7 @@ impl<'poll> Conn<'poll> {
                     &self.hostname,
                     &self.realname,
                     self.get_nick(),
-                    &None // TODO: should save SASL info
+                    &self.auth,
                 );
                 self.status = ConnStatus::PingPong {
                     ticks_passed: 0,
@@ -263,6 +257,22 @@ impl<'poll> Conn<'poll> {
 }
 
 impl<'poll> Conn<'poll> {
+    fn plain_sasl_authenticate(&mut self) {
+        if let (Some(stream), Some(auth)) =
+                (self.status.get_stream_mut(), self.auth.as_ref()) {
+            wire::authenticate(stream, "PLAIN").unwrap();
+            let msg =  format!("{}\x00{}\x00{}",
+                               auth.sasl_username, auth.sasl_username, auth.sasl_password);
+            wire::authenticate(stream, &base64::encode(&msg)).unwrap();
+        }
+    }
+
+    fn end_capability_negotiation(&mut self) {
+        self.status.get_stream_mut().map(|stream| {
+            wire::cap_end(stream).unwrap();
+        });
+    }
+
     pub fn enter_disconnect_state(&mut self) {
         self.status = ConnStatus::Disconnected { ticks_passed: 0 };
     }
@@ -484,6 +494,32 @@ impl<'poll> Conn<'poll> {
     }
 
     fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
+        if let Msg {
+            cmd: Cmd::CAP { client: _, ref subcommand, ref params },
+            ..
+        } = msg
+        {
+            match subcommand.as_ref() {
+                "ACK" => {
+                    if params.iter().any(|cap| cap.as_str() == "sasl") {
+                        self.plain_sasl_authenticate();
+                    }
+                }
+                "NAK" => {
+                    self.end_capability_negotiation();
+                }
+                &_ => {}
+            };
+        }
+
+        match msg.cmd {
+            // SASL authentication successful or failed
+            Cmd::Reply { num: 903, .. } | Cmd::Reply { num: 904, .. } => {
+                self.end_capability_negotiation();
+            }
+            _  => {}
+        }
+
         if let Msg {
             cmd: Cmd::PING { ref server },
             ..
