@@ -25,6 +25,9 @@
   (#21).
 - New command line argument `--config` added for specifying config file
   location (#81).
+- tiny can now show desktop notifications for incoming messages. See README for
+  notification options. Defaults: show notifications for mentions in channels
+  and all private messages.
 
 # 2017/11/12: 0.3.0
 

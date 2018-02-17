@@ -54,6 +54,11 @@ libraries. See [rust-openssl's
 README](https://github.com/sfackler/rust-openssl#linux) for instructions on
 installing them.
 
+##### Dependencies
+
+* OpenSSL or LibreSSL
+* libdbus [Linux only]
+
 tiny is tested on Linux and OSX.
 
 ## Configuration
@@ -180,6 +185,10 @@ Commands start with `/` character.
 - `/ignore`: Ignore `join/quit` messages in a channel. When enabled channel
   name will have `[i]` added to the end to show that it is enabled. Running
   this command in a server tab applies it to all channels of that server.
+
+- `/notify [off|mentions|messages]`: Enable and disable desktop notifications.
+  You can use `/notify` command without any arguments to see the current mode.
+  Running this command in a server tab applies it to all channels of that server.
 
 ## Development
 

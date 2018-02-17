@@ -3,6 +3,7 @@ use termbox_simple::{Termbox, TB_UNDERLINE};
 
 use config::Colors;
 use config::Style;
+use notifier::Notifier;
 use trie::Trie;
 use tui::messaging::MessagingUI;
 use tui::messaging::Timestamp;
@@ -29,6 +30,7 @@ struct Tab {
     style: TabStyle,
     /// Alt-character to use to switch to this tab.
     switch: Option<char>,
+    notifier: Notifier,
 }
 
 // NOTE: Keep the variants sorted in increasing significance, to avoid updating
@@ -184,7 +186,7 @@ impl Tabbed {
         }
     }
 
-    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool) {
+    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool, notifier: Notifier) {
         use std::collections::HashMap;
 
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
@@ -223,6 +225,7 @@ impl Tabbed {
                 src,
                 style: TabStyle::Normal,
                 switch,
+                notifier,
             },
         );
     }
@@ -237,7 +240,8 @@ impl Tabbed {
                     MsgSource::Serv {
                         serv_name: serv_name.to_owned(),
                     },
-                    true
+                    true,
+                    Notifier::Mentions
                 );
                 Some(tab_idx)
             }
@@ -268,11 +272,13 @@ impl Tabbed {
                     }
                     Some(serv_tab_idx) => {
                         let mut status_val: bool = true;
+                        let mut notifier = Notifier::Mentions;
                         for tab in self.tabs.iter() {
-                            if let MsgSource::Serv{ serv_name: ref serv_name_ } = tab.src {
+                            if let MsgSource::Serv { serv_name: ref serv_name_ } = tab.src {
                                 if serv_name == serv_name_ {
                                     status_val = tab.widget.get_ignore_state();
-                                    break
+                                    notifier = tab.notifier;
+                                    break;
                                 }
                             }
                         }
@@ -283,7 +289,8 @@ impl Tabbed {
                                 serv_name: serv_name.to_owned(),
                                 chan_name: chan_name.to_owned(),
                             },
-                            status_val
+                            status_val,
+                            notifier
                         );
                         if self.active_idx >= tab_idx {
                             self.next_tab();
@@ -324,7 +331,8 @@ impl Tabbed {
                                 serv_name: serv_name.to_owned(),
                                 nick: nick.to_owned(),
                             },
-                            true
+                            true,
+                            Notifier::Messages
                         );
                         if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
                             self.tabs[tab_idx + 1].widget.set_nick(nick);
@@ -909,6 +917,12 @@ impl Tabbed {
         });
     }
 
+    pub fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
+            tab.widget.add_client_notify_msg(msg);
+        });
+    }
+
     pub fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_client_msg(msg);
@@ -925,6 +939,10 @@ impl Tabbed {
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_privmsg(sender, msg, ts, false, ctcp_action);
+            let nick = tab.widget.get_nick();
+            if let Some(nick_) = nick {
+                tab.notifier.notify_privmsg(sender, msg, target, nick_, false);
+            }
         });
     }
 
@@ -938,6 +956,10 @@ impl Tabbed {
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_privmsg(sender, msg, ts, true, ctcp_action);
+            let nick = tab.widget.get_nick();
+            if let Some(nick_) = nick {
+                tab.notifier.notify_privmsg(sender, msg, target, nick_, true);
+            }
         });
     }
 
@@ -1042,6 +1064,27 @@ impl Tabbed {
         }
         false
     }
+
+    pub fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget){
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
+            tab.notifier = notifier;
+        });
+    }
+
+    pub fn show_notify_mode(&mut self, target: &MsgTarget){
+        self.apply_to_target(target, &|tab: &mut Tab, _| {
+            let msg = match tab.notifier {
+                Notifier::Off =>
+                    "Notifications are off",
+                Notifier::Mentions =>
+                    "Notifications enabled for mentions",
+                Notifier::Messages =>
+                    "Notifications enabled for all messages",
+            };
+            tab.widget.add_client_notify_msg(msg);
+        });
+    }
+
 
     ////////////////////////////////////////////////////////////////////////////
     // Helpers

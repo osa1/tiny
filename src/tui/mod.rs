@@ -12,6 +12,7 @@ use config::Colors;
 use self::tabbed::{MsgSource, TabStyle, Tabbed, TabbedRet};
 pub use self::messaging::Timestamp;
 
+use notifier::Notifier;
 use term_input::{Event, Key};
 use termbox_simple::{OutputMode, Termbox};
 use trie::Trie;
@@ -217,6 +218,12 @@ impl TUI {
         self.ui.add_client_err_msg(msg, target);
     }
 
+    /// A notify message coming from tiny, usually shows a response of a command
+    /// e.g. "Notifications enabled".
+    pub fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
+        self.ui.add_client_notify_msg(msg, target);
+    }
+
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
     pub fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
@@ -275,6 +282,14 @@ impl TUI {
 
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
         self.ui.toggle_ignore(target);
+    }
+
+    pub fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
+        self.ui.set_notifier(notifier, target);
+    }
+
+    pub fn show_notify_mode(&mut self, target: &MsgTarget){
+        self.ui.show_notify_mode(target);
     }
 
     pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
