@@ -7,6 +7,7 @@
 #![feature(entry_and_modify)]
 #![feature(global_allocator)]
 #![feature(inclusive_range_syntax)]
+#![feature(nll)]
 #![feature(offset_to)]
 
 extern crate alloc_system;
@@ -39,9 +40,9 @@ mod cmd;
 mod cmd_line_args;
 mod conn;
 mod logger;
+mod notifier;
 mod stream;
 mod wire;
-mod notifier;
 pub mod config;
 pub mod trie;
 pub mod tui;

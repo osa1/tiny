@@ -9,7 +9,7 @@ use tui::{MsgTarget, Timestamp};
 use utils;
 use serde::de::{Deserializer, Visitor};
 
-use notifier::NotifyFor;
+use notifier::Notifier;
 
 pub struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
@@ -139,9 +139,9 @@ static CMDS: [&'static Cmd; 14] = [
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
+    &NOTIFY_CMD,
     &RELOAD_CMD,
     &SWITCH_CMD,
-    &NOTIFY_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -583,57 +583,57 @@ static NOTIFY_CMD: Cmd = Cmd {
 
 fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
+
+    let mut show_usage = || {
+        tiny.tui.add_client_err_msg(
+            "/notify usage: /notify [off|mentions|messages]",
+            &MsgTarget::CurrentTab,
+        )
+    };
+
     if words.len() == 0 {
         tiny.tui.show_notify_mode(&MsgTarget::CurrentTab);
-    }
-    else if !(words.len() == 1  && ["off", "mentions", "messages"].contains(&words[0])) {
-        return tiny.tui.add_client_err_msg(
-            "/notify usage: /notify [off/mentions/messages]",
-            &MsgTarget::CurrentTab,
-        );
-    }
-    else {
-        let mut notify_for = NotifyFor::Off;
-        if words[0] == "messages" {
-            notify_for = NotifyFor::Messages;
-            tiny.tui.add_client_notify_msg(
-                "Notifications enabled for all messages",
-                &MsgTarget::CurrentTab,
-            );
-        } else if words[0] == "mentions" {
-            notify_for = NotifyFor::Mentions;
-            tiny.tui.add_client_notify_msg(
-                "Notifications enabled for mentions",
-                &MsgTarget::CurrentTab,
-            );
-        } else {
-            tiny.tui.add_client_notify_msg(
-                "Notifications turned off",
-                &MsgTarget::CurrentTab,
-            );
-        }
-        match src {
-            MsgSource::Serv { serv_name } => {
-                tiny.tui.notify(notify_for, &MsgTarget::AllServTabs {
-                    serv_name: &serv_name,
-                });
-            }
-            MsgSource::Chan {
-                serv_name,
-                chan_name,
-            } => {
-                tiny.tui.notify(notify_for, &MsgTarget::Chan {
-                    serv_name: &serv_name,
-                    chan_name: &chan_name,
-                });
-            }
-            MsgSource::User { serv_name, nick } => {
-                tiny.tui.notify(notify_for, &MsgTarget::User {
-                    serv_name: &serv_name,
-                    nick: &nick,
-                });
-            }
-        }
+    } else if words.len() != 1 {
+        return show_usage();
+    } else {
+        let notifier =
+            match words[0] {
+                "off" => {
+                    tiny.tui.add_client_notify_msg(
+                        "Notifications turned off",
+                        &MsgTarget::CurrentTab,
+                    );
+                    Notifier::Off
+                }
+                "mentions" => {
+                    tiny.tui.add_client_notify_msg(
+                        "Notifications enabled for mentions",
+                        &MsgTarget::CurrentTab,
+                    );
+                    Notifier::Mentions
+                }
+                "messages" => {
+                    tiny.tui.add_client_notify_msg(
+                        "Notifications enabled for all messages",
+                        &MsgTarget::CurrentTab,
+                    );
+                    Notifier::Messages
+                }
+                _ => {
+                    return show_usage();
+                }
+            };
+        // can't use `MsgSource::to_target` here, `Serv` case is different
+        let tab_target =
+            match src {
+                MsgSource::Serv { ref serv_name } =>
+                    MsgTarget::AllServTabs { serv_name },
+                MsgSource::Chan { ref serv_name, ref chan_name } =>
+                    MsgTarget::Chan { serv_name, chan_name },
+                MsgSource::User { ref serv_name, ref nick } =>
+                    MsgTarget::User { serv_name, nick },
+            };
+        tiny.tui.set_notifier(notifier, &tab_target);
     }
 }
 

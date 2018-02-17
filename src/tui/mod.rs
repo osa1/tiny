@@ -12,11 +12,10 @@ use config::Colors;
 use self::tabbed::{MsgSource, TabStyle, Tabbed, TabbedRet};
 pub use self::messaging::Timestamp;
 
+use notifier::Notifier;
 use term_input::{Event, Key};
 use termbox_simple::{OutputMode, Termbox};
 use trie::Trie;
-
-use notifier::NotifyFor;
 
 pub struct TUI {
     /// Termbox instance
@@ -219,8 +218,8 @@ impl TUI {
         self.ui.add_client_err_msg(msg, target);
     }
 
-    /// An notify message coming from Tiny, usually shows a response of a command
-    /// Eg: "Notifications enabled"
+    /// A notify message coming from tiny, usually shows a response of a command
+    /// e.g. "Notifications enabled".
     pub fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
         self.ui.add_client_notify_msg(msg, target);
     }
@@ -285,8 +284,8 @@ impl TUI {
         self.ui.toggle_ignore(target);
     }
 
-    pub fn notify(&mut self, notify_for: NotifyFor, target: &MsgTarget) {
-        self.ui.notify(notify_for, target);
+    pub fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
+        self.ui.set_notifier(notifier, target);
     }
 
     pub fn show_notify_mode(&mut self, target: &MsgTarget){

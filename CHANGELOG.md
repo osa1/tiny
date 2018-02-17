@@ -1,6 +1,5 @@
 # Unreleased
 
-- `/notify` command to enable and disable desktop notifications.
 - `/switch` command added to quickly switch to a different tab using a
   substring of the tab name.
 - `Del` key is now handled. It deletes character under the cursor.
@@ -26,6 +25,9 @@
   (#21).
 - New command line argument `--config` added for specifying config file
   location (#81).
+- tiny can now show desktop notifications for incoming messages. See README for
+  notification options. Defaults: show notifications for mentions in channels
+  and all private messages.
 
 # 2017/11/12: 0.3.0
 

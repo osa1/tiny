@@ -186,8 +186,8 @@ Commands start with `/` character.
   name will have `[i]` added to the end to show that it is enabled. Running
   this command in a server tab applies it to all channels of that server.
 
-- `/notify [off/mentions/messages]`: Enable and disable desktop notifications.
-  You can use `/notify` command without any arguments to see the current mode. 
+- `/notify [off|mentions|messages]`: Enable and disable desktop notifications.
+  You can use `/notify` command without any arguments to see the current mode.
   Running this command in a server tab applies it to all channels of that server.
 
 ## Development
