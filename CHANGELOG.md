@@ -1,5 +1,6 @@
 # Unreleased
 
+- `/notify` command to enable and disable desktop notifications.
 - `/switch` command added to quickly switch to a different tab using a
   substring of the tab name.
 - `Del` key is now handled. It deletes character under the cursor.

@@ -9,6 +9,8 @@ use tui::{MsgTarget, Timestamp};
 use utils;
 use serde::de::{Deserializer, Visitor};
 
+use notifier::NotifyFor;
+
 pub struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
     pub name: &'static str,
@@ -125,7 +127,7 @@ impl<'de> Deserialize<'de> for AutoCmd {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&'static Cmd; 13] = [
+static CMDS: [&'static Cmd; 14] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
@@ -139,6 +141,7 @@ static CMDS: [&'static Cmd; 13] = [
     &NICK_CMD,
     &RELOAD_CMD,
     &SWITCH_CMD,
+    &NOTIFY_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -569,6 +572,69 @@ fn switch(args: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
         );
     }
     tiny.tui.switch(words[0]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static NOTIFY_CMD: Cmd = Cmd {
+    name: "notify",
+    cmd_fn: notify,
+};
+
+fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+    let words: Vec<&str> = args.split_whitespace().collect();
+    if words.len() == 0 {
+        tiny.tui.show_notify_mode(&MsgTarget::CurrentTab);
+    }
+    else if !(words.len() == 1  && ["off", "mentions", "messages"].contains(&words[0])) {
+        return tiny.tui.add_client_err_msg(
+            "/notify usage: /notify [off/mentions/messages]",
+            &MsgTarget::CurrentTab,
+        );
+    }
+    else {
+        let mut notify_for = NotifyFor::Off;
+        if words[0] == "messages" {
+            notify_for = NotifyFor::Messages;
+            tiny.tui.add_client_notify_msg(
+                "Notifications enabled for all messages",
+                &MsgTarget::CurrentTab,
+            );
+        } else if words[0] == "mentions" {
+            notify_for = NotifyFor::Mentions;
+            tiny.tui.add_client_notify_msg(
+                "Notifications enabled for mentions",
+                &MsgTarget::CurrentTab,
+            );
+        } else {
+            tiny.tui.add_client_notify_msg(
+                "Notifications turned off",
+                &MsgTarget::CurrentTab,
+            );
+        }
+        match src {
+            MsgSource::Serv { serv_name } => {
+                tiny.tui.notify(notify_for, &MsgTarget::AllServTabs {
+                    serv_name: &serv_name,
+                });
+            }
+            MsgSource::Chan {
+                serv_name,
+                chan_name,
+            } => {
+                tiny.tui.notify(notify_for, &MsgTarget::Chan {
+                    serv_name: &serv_name,
+                    chan_name: &chan_name,
+                });
+            }
+            MsgSource::User { serv_name, nick } => {
+                tiny.tui.notify(notify_for, &MsgTarget::User {
+                    serv_name: &serv_name,
+                    nick: &nick,
+                });
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

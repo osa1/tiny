@@ -16,6 +16,8 @@ use term_input::{Event, Key};
 use termbox_simple::{OutputMode, Termbox};
 use trie::Trie;
 
+use notifier::NotifyFor;
+
 pub struct TUI {
     /// Termbox instance
     termbox: Termbox,
@@ -217,6 +219,12 @@ impl TUI {
         self.ui.add_client_err_msg(msg, target);
     }
 
+    /// An notify message coming from Tiny, usually shows a response of a command
+    /// Eg: "Notifications enabled"
+    pub fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
+        self.ui.add_client_notify_msg(msg, target);
+    }
+
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
     pub fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
@@ -275,6 +283,14 @@ impl TUI {
 
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
         self.ui.toggle_ignore(target);
+    }
+
+    pub fn notify(&mut self, notify_for: NotifyFor, target: &MsgTarget) {
+        self.ui.notify(notify_for, target);
+    }
+
+    pub fn show_notify_mode(&mut self, target: &MsgTarget){
+        self.ui.show_notify_mode(target);
     }
 
     pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {

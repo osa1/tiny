@@ -1,3 +1,7 @@
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update -qq ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install -y libdbus-1-dev ; fi
+
 language: rust
 
 rust:
