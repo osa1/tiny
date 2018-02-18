@@ -331,7 +331,7 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
             nicks: tiny.defaults.nicks.clone(),
             auto_cmds: tiny.defaults.auto_cmds.clone(),
             join: tiny.defaults.join.clone(),
-            auth: None,
+            sasl_auth: None,
         },
         poll,
     );

@@ -11,14 +11,7 @@ use std::path::PathBuf;
 use std::path::Path;
 
 #[derive(Clone, Deserialize)]
-pub enum SASLMethod {
-    // Only PLAIN SASL is supported for now.
-    PLAIN
-}
-
-#[derive(Clone, Deserialize)]
-pub struct Auth {
-    pub sasl_method: SASLMethod,
+pub struct SASLAuth {
     pub sasl_username: String,
     pub sasl_password: String,
 }
@@ -58,7 +51,7 @@ pub struct Server {
     pub join: Vec<String>,
 
     /// Authenication method
-    pub auth: Option<Auth>,
+    pub sasl_auth: Option<SASLAuth>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.

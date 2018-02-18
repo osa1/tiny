@@ -745,7 +745,7 @@ impl<'poll> Tiny<'poll> {
                                                  &msg_target);
                         }
                     }
-                    &_ => {}
+                    _ => {}
                 };
             }
 

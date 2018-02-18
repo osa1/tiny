@@ -54,7 +54,7 @@ pub struct Conn<'poll> {
     /// Incoming message buffer
     in_buf: Vec<u8>,
 
-    auth: Option<config::Auth>,
+    sasl_auth: Option<config::SASLAuth>,
 }
 
 pub type ConnErr = StreamErr;
@@ -137,7 +137,7 @@ pub enum ConnEv {
     NickChange(String),
 }
 
-fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str, auth: &Option<config::Auth>) {
+fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str, auth: &Option<config::SASLAuth>) {
     if let &Some(_) = auth {
         // Details of the protocol: https://ircv3.net/specs/extensions/sasl-3.1.html
         wire::cap_req(stream, &["sasl"]).unwrap();
@@ -164,7 +164,7 @@ impl<'poll> Conn<'poll> {
             &server.hostname,
             &server.realname,
             &server.nicks[0],
-            &server.auth,
+            &server.sasl_auth,
         );
 
         Ok(Conn {
@@ -186,7 +186,7 @@ impl<'poll> Conn<'poll> {
                 stream: stream,
             },
             in_buf: vec![],
-            auth: server.auth
+            sasl_auth: server.sasl_auth
         })
     }
 
@@ -212,7 +212,7 @@ impl<'poll> Conn<'poll> {
                     &self.hostname,
                     &self.realname,
                     self.get_nick(),
-                    &self.auth,
+                    &self.sasl_auth,
                 );
                 self.status = ConnStatus::PingPong {
                     ticks_passed: 0,
@@ -259,7 +259,7 @@ impl<'poll> Conn<'poll> {
 impl<'poll> Conn<'poll> {
     fn plain_sasl_authenticate(&mut self) {
         if let (Some(stream), Some(auth)) =
-                (self.status.get_stream_mut(), self.auth.as_ref()) {
+                (self.status.get_stream_mut(), self.sasl_auth.as_ref()) {
             wire::authenticate(stream, "PLAIN").unwrap();
             let msg =  format!("{}\x00{}\x00{}",
                                auth.sasl_username, auth.sasl_username, auth.sasl_password);
