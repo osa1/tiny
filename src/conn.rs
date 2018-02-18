@@ -509,7 +509,7 @@ impl<'poll> Conn<'poll> {
                 "NAK" => {
                     self.end_capability_negotiation();
                 }
-                &_ => {}
+                _ => {}
             };
         }
 
@@ -519,12 +519,14 @@ impl<'poll> Conn<'poll> {
         } = msg
         {
             if param.as_str() == "+" {
+                // Empty AUTHENTICATE response.  It means server accepted the specified SASL
+                // mechanism (PLAIN)
                 self.plain_sasl_authenticate();
             }
         }
 
         match msg.cmd {
-            // SASL authentication successful or failed
+            // 903: RPL_SASLSUCCESS, 904: ERR_SASLFAIL
             Cmd::Reply { num: 903, .. } | Cmd::Reply { num: 904, .. } => {
                 self.end_capability_negotiation();
             }

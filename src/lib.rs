@@ -745,7 +745,12 @@ impl<'poll> Tiny<'poll> {
                                                  &msg_target);
                         }
                     }
-                    _ => {}
+                    "ACK" => {}
+                    cmd @ _ => {
+                        self.logger
+                            .get_debug_logs()
+                            .write_line(format_args!("CAP subcommand {} is not handled", cmd));
+                    }
                 };
             }
 
