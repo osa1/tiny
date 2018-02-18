@@ -749,6 +749,10 @@ impl<'poll> Tiny<'poll> {
                 };
             }
 
+            Cmd::AUTHENTICATE { .. } =>
+                // ignore
+                {}
+
             Cmd::Reply { num: n, params } => {
                 if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                         || n == 251 /* RPL_LUSERCLIENT */

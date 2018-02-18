@@ -260,7 +260,6 @@ impl<'poll> Conn<'poll> {
     fn plain_sasl_authenticate(&mut self) {
         if let (Some(stream), Some(auth)) =
                 (self.status.get_stream_mut(), self.sasl_auth.as_ref()) {
-            wire::authenticate(stream, "PLAIN").unwrap();
             let msg =  format!("{}\x00{}\x00{}",
                                auth.sasl_username, auth.sasl_username, auth.sasl_password);
             wire::authenticate(stream, &base64::encode(&msg)).unwrap();
@@ -502,7 +501,9 @@ impl<'poll> Conn<'poll> {
             match subcommand.as_ref() {
                 "ACK" => {
                     if params.iter().any(|cap| cap.as_str() == "sasl") {
-                        self.plain_sasl_authenticate();
+                        self.status.get_stream_mut().map(|stream| {
+                            wire::authenticate(stream, "PLAIN").unwrap();
+                        });
                     }
                 }
                 "NAK" => {
@@ -510,6 +511,16 @@ impl<'poll> Conn<'poll> {
                 }
                 &_ => {}
             };
+        }
+
+        if let Msg {
+            cmd: Cmd::AUTHENTICATE { ref param },
+            ..
+        } = msg
+        {
+            if param.as_str() == "+" {
+                self.plain_sasl_authenticate();
+            }
         }
 
         match msg.cmd {

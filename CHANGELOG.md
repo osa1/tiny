@@ -28,6 +28,8 @@
 - tiny can now show desktop notifications for incoming messages. See README for
   notification options. Defaults: show notifications for mentions in channels
   and all private messages.
+- Support SASL `PLAIN` authenication.  Add a section of `sasl_auth` in
+  `.tinyrc.yml` to use.
 
 # 2017/11/12: 0.3.0
 

@@ -156,6 +156,10 @@ pub enum Cmd {
         params: Vec<String>,
     },
 
+    AUTHENTICATE {
+        param: String,
+    },
+
     /// An IRC message other than the ones listed above.
     Other {
         cmd: String,
@@ -307,6 +311,10 @@ impl Msg {
                         client: params[0].to_owned(),
                         subcommand: params[1].to_owned(),
                         params: params[2].split(' ').map(|s| s.to_owned()).collect(),
+                    },
+                MsgType::Cmd("AUTHENTICATE") if params.len() == 1 =>
+                    Cmd::AUTHENTICATE {
+                        param: params[0].to_owned(),
                     },
                 MsgType::Num(n) =>
                     Cmd::Reply {
