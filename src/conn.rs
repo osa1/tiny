@@ -437,29 +437,19 @@ impl<'poll> Conn<'poll> {
     pub fn read_ready(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
         let mut read_buf: [u8; 512] = [0; 512];
 
-        // borrowchk workaround
-        let read_ret = {
-            match self.status.get_stream_mut() {
-                Some(stream) =>
-                    match stream.read_ready(&mut read_buf) {
-                        Err(err) => {
-                            if !err.is_would_block() {
-                                evs.push(ConnEv::Err(StreamErr::from(err)));
-                            }
-                            None
-                        }
-                        Ok(bytes_read) =>
-                            Some(bytes_read),
-                    },
-                None =>
-                    None,
+        if let Some(stream) = self.status.get_stream_mut() {
+            match stream.read_ready(&mut read_buf) {
+                Err(err) => {
+                    if !err.is_would_block() {
+                        evs.push(ConnEv::Err(StreamErr::from(err)));
+                    }
+                }
+                Ok(bytes_read) => {
+                    self.reset_ticks();
+                    self.in_buf.extend(&read_buf[0..bytes_read]);
+                    self.handle_msgs(evs, logger);
+                }
             }
-        };
-
-        if let Some(bytes_read) = read_ret {
-            self.reset_ticks();
-            self.in_buf.extend(&read_buf[0..bytes_read]);
-            self.handle_msgs(evs, logger);
         }
     }
 
