@@ -62,10 +62,8 @@ use conn::{Conn, ConnErr, ConnEv};
 use cmd_line_args::{CmdLineArgs, parse_cmd_line_args};
 use logger::Logger;
 use term_input::{Event, Input};
-use tui::tabbed::MsgSource;
 use cmd::{parse_cmd, ParseCmdResult};
-use tui::tabbed::TabStyle;
-use tui::{MsgTarget, TUIRet, Timestamp, TUI};
+use tui::{MsgTarget, TUI, TUIRet, Timestamp, TabStyle, MsgSource};
 use wire::{Cmd, Msg, Pfx};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

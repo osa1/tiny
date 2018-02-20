@@ -4,8 +4,7 @@ use mio::Poll;
 use serde::Deserialize;
 use std::error::Error;
 use super::Tiny;
-use tui::tabbed::MsgSource;
-use tui::{MsgTarget, Timestamp};
+use tui::{MsgTarget, MsgSource, Timestamp};
 use utils;
 use serde::de::{Deserializer, Visitor};
 

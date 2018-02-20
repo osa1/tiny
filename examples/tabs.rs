@@ -14,8 +14,8 @@ use mio::Token;
 use mio::unix::EventedFd;
 use term_input::{Event, Input};
 use tiny::config::Colors;
-use tiny::tui::tabbed::MsgSource;
-use tiny::tui::tabbed::TabStyle;
+use tiny::tui::MsgSource;
+use tiny::tui::TabStyle;
 use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
 
 fn main() {
