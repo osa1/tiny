@@ -21,6 +21,7 @@ name = "tiny"
 path = "bin/main.rs"
 
 [dependencies]
+base64 = "0.6.0"
 libc = "0.2.22"
 mio = "0.6.9"
 native-tls = "0.1.4"

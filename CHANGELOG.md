@@ -28,6 +28,9 @@
 - tiny can now show desktop notifications for incoming messages. See README for
   notification options. Defaults: show notifications for mentions in channels
   and all private messages.
+- Added SASL authentication support. See the configuration section in README
+  for how to enable it.
+
 
 # 2017/11/12: 0.3.0
 

@@ -53,6 +53,22 @@ pub fn away<W: Write>(sink: &mut W, msg: Option<&str>) -> std::io::Result<()> {
     }
 }
 
+pub fn cap_ls<W: Write>(sink: &mut W) -> std::io::Result<()> {
+    write!(sink, "CAP LS\r\n")
+}
+
+pub fn cap_req<W: Write>(sink: &mut W, cap_identifiers: &[&str]) -> std::io::Result<()> {
+    write!(sink, "CAP REQ :{}\r\n", cap_identifiers.join(" "))
+}
+
+pub fn cap_end<W: Write>(sink: &mut W) -> std::io::Result<()> {
+    write!(sink, "CAP END\r\n")
+}
+
+pub fn authenticate<W: Write>(sink: &mut W, msg: &str) -> std::io::Result<()> {
+    write!(sink, "AUTHENTICATE {}\r\n", msg)
+}
+
 /*
 pub fn quit<W : Write>(mut sink: W, msg : Option<&str>) -> std::io::Result<()> {
     match msg {
@@ -136,6 +152,16 @@ pub enum Cmd {
     TOPIC {
         chan: String,
         topic: String,
+    },
+
+    CAP {
+        client: String,
+        subcommand: String,
+        params: Vec<String>,
+    },
+
+    AUTHENTICATE {
+        param: String,
     },
 
     /// An IRC message other than the ones listed above.
@@ -283,6 +309,16 @@ impl Msg {
                     Cmd::TOPIC {
                         chan: params[0].to_owned(),
                         topic: params[1].to_owned(),
+                    },
+                MsgType::Cmd("CAP") if params.len() == 3 =>
+                    Cmd::CAP {
+                        client: params[0].to_owned(),
+                        subcommand: params[1].to_owned(),
+                        params: params[2].split(' ').map(|s| s.to_owned()).collect(),
+                    },
+                MsgType::Cmd("AUTHENTICATE") if params.len() == 1 =>
+                    Cmd::AUTHENTICATE {
+                        param: params[0].to_owned(),
                     },
                 MsgType::Num(n) =>
                     Cmd::Reply {
