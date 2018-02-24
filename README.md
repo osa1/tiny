@@ -39,6 +39,12 @@ tiny is an IRC client written in Rust.
 
 - Configurable colors
 
+- SASL authentication
+
+- Configurable desktop notifications on new messages
+
+- znc compatible
+
 ## Installation
 
 Install the Rust nightly toolchain, clone the repo, and run `cargo install` (or
@@ -230,10 +236,6 @@ start, open an issue and I'd love to help.
   that tiny currently doesn't support, maybe we should implement a "send raw
   message" command so that any user can directly send an IRC message to a server
   without any support from tiny.
-
-- Implement system notification support for private messages and highlights.
-  When to show (and maybe even how to show) a notification should be
-  configurable as otherwise it may be annoying.
 
 ## Contributors
 
