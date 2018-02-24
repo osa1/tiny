@@ -12,8 +12,8 @@ use std::path::Path;
 
 #[derive(Clone, Deserialize)]
 pub struct SASLAuth {
-    pub sasl_username: String,
-    pub sasl_password: String,
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Clone, Deserialize)]
@@ -51,6 +51,7 @@ pub struct Server {
     pub join: Vec<String>,
 
     /// Authenication method
+    #[serde(rename = "sasl")]
     pub sasl_auth: Option<SASLAuth>,
 }
 
@@ -404,6 +405,9 @@ servers:
       hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
+      sasl:
+        username: 'tiny_user'
+        password: 'hunter2'
       auto_cmds:
           - 'msg NickServ identify hunter2'
           - 'join #tiny'
@@ -439,6 +443,14 @@ log_dir: path";
                 assert_eq!(
                     cfg.servers[0].auto_cmds[0].args,
                     "NickServ identify hunter2",
+                );
+                assert_eq!(
+                    cfg.servers[0].sasl_auth.as_ref().unwrap().username,
+                    "tiny_user",
+                );
+                assert_eq!(
+                    cfg.servers[0].sasl_auth.as_ref().unwrap().password,
+                    "hunter2",
                 );
             }
         }

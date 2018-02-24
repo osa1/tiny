@@ -5,8 +5,12 @@ servers:
       hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
-      # Server or nick password (optional)
+      # # Server or nick password (optional)
       # pass: 'hunter2'
+      # # optional SASL authentication
+      # sasl:
+      #   username: 'tiny_user'
+      #   password: 'hunter2'
       auto_cmds:
           # Identify nick by sending a message to NickServ:
           # (useful when `pass` field above is not used)

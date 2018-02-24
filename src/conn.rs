@@ -151,6 +151,9 @@ impl<'poll> Conn<'poll> {
             Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
 
         if server.sasl_auth.is_some() {
+            // Will introduce self after getting a response to this LS command.
+            // This is to avoid getting stuck during nick registration. See the
+            // discussion in #91.
             wire::cap_ls(&mut stream).unwrap();
         } else {
             introduce(
@@ -259,7 +262,7 @@ impl<'poll> Conn<'poll> {
         if let (Some(stream), Some(auth)) =
                 (self.status.get_stream_mut(), self.sasl_auth.as_ref()) {
             let msg =  format!("{}\x00{}\x00{}",
-                               auth.sasl_username, auth.sasl_username, auth.sasl_password);
+                               auth.username, auth.username, auth.password);
             wire::authenticate(stream, &base64::encode(&msg)).unwrap();
         }
     }
@@ -508,11 +511,7 @@ impl<'poll> Conn<'poll> {
                     self.end_capability_negotiation();
                 }
                 "LS" => {
-                    if params.iter().any(|cap| cap.as_str() == "sasl") {
-                        let stream = match self.status.get_stream_mut() {
-                            Some(stream) => stream,
-                            None => return
-                        };
+                    if let Some(stream) = self.status.get_stream_mut() {
                         introduce(
                             stream,
                             None,
@@ -520,8 +519,10 @@ impl<'poll> Conn<'poll> {
                             &self.realname,
                             &self.nicks[0],
                         );
-                        wire::cap_req(stream, &["sasl"]).unwrap();
-                        // Will wait for CAP ... ACK from server before authenication.
+                        if params.iter().any(|cap| cap == "sasl") {
+                            wire::cap_req(stream, &["sasl"]).unwrap();
+                            // Will wait for CAP ... ACK from server before authentication.
+                        }
                     }
                 }
                 _ => {}
