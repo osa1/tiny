@@ -137,20 +137,12 @@ pub enum ConnEv {
     NickChange(String),
 }
 
-fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str, auth: &Option<config::SASLAuth>) {
-    if let &Some(_) = auth {
-        // Details of the protocol: https://ircv3.net/specs/extensions/sasl-3.1.html
-        wire::cap_req(stream, &["sasl"]).unwrap();
-        wire::nick(stream, nick).unwrap();
-        wire::user(stream, hostname, realname).unwrap();
-        // Will wait for CAP ... ACK from server before authenication.
-    } else {
-        if let Some(pass) = pass {
-            wire::pass(stream, pass).unwrap();
-        }
-        wire::nick(stream, nick).unwrap();
-        wire::user(stream, hostname, realname).unwrap();
+fn introduce<W: Write>(stream: &mut W, pass: Option<&str>, hostname: &str, realname: &str, nick: &str) {
+    if let Some(pass) = pass {
+        wire::pass(stream, pass).unwrap();
     }
+    wire::nick(stream, nick).unwrap();
+    wire::user(stream, hostname, realname).unwrap();
 }
 
 impl<'poll> Conn<'poll> {
@@ -158,14 +150,17 @@ impl<'poll> Conn<'poll> {
         let mut stream =
             Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
 
-        introduce(
-            &mut stream,
-            server.pass.as_ref().map(String::as_str),
-            &server.hostname,
-            &server.realname,
-            &server.nicks[0],
-            &server.sasl_auth,
-        );
+        if server.sasl_auth.is_some() {
+            wire::cap_ls(&mut stream).unwrap();
+        } else {
+            introduce(
+                &mut stream,
+                server.pass.as_ref().map(String::as_str),
+                &server.hostname,
+                &server.realname,
+                &server.nicks[0],
+            );
+        }
 
         Ok(Conn {
             serv_addr: server.addr,
@@ -206,14 +201,17 @@ impl<'poll> Conn<'poll> {
             Err(err) =>
                 Err(StreamErr::from(err)),
             Ok(mut stream) => {
-                introduce(
-                    &mut stream,
-                    self.pass.as_ref().map(String::as_str),
-                    &self.hostname,
-                    &self.realname,
-                    self.get_nick(),
-                    &self.sasl_auth,
-                );
+                if self.sasl_auth.is_some() {
+                    wire::cap_ls(&mut stream).unwrap();
+                } else {
+                    introduce(
+                        &mut stream,
+                        self.pass.as_ref().map(String::as_str),
+                        &self.hostname,
+                        &self.realname,
+                        self.get_nick(),
+                    );
+                }
                 self.status = ConnStatus::PingPong {
                     ticks_passed: 0,
                     stream: stream,
@@ -508,6 +506,23 @@ impl<'poll> Conn<'poll> {
                 }
                 "NAK" => {
                     self.end_capability_negotiation();
+                }
+                "LS" => {
+                    if params.iter().any(|cap| cap.as_str() == "sasl") {
+                        let stream = match self.status.get_stream_mut() {
+                            Some(stream) => stream,
+                            None => return
+                        };
+                        introduce(
+                            stream,
+                            None,
+                            &self.hostname,
+                            &self.realname,
+                            &self.nicks[0],
+                        );
+                        wire::cap_req(stream, &["sasl"]).unwrap();
+                        // Will wait for CAP ... ACK from server before authenication.
+                    }
                 }
                 _ => {}
             };

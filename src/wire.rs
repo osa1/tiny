@@ -53,6 +53,10 @@ pub fn away<W: Write>(sink: &mut W, msg: Option<&str>) -> std::io::Result<()> {
     }
 }
 
+pub fn cap_ls<W: Write>(sink: &mut W) -> std::io::Result<()> {
+    write!(sink, "CAP LS\r\n")
+}
+
 pub fn cap_req<W: Write>(sink: &mut W, cap_identifiers: &[&str]) -> std::io::Result<()> {
     write!(sink, "CAP REQ :{}\r\n", cap_identifiers.join(" "))
 }

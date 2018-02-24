@@ -736,10 +736,20 @@ impl<'poll> Tiny<'poll> {
             Cmd::CAP { client: _, ref subcommand, ref params } => {
                 match subcommand.as_ref() {
                     "NAK" => {
-                        let msg_target = MsgTarget::Server {
-                            serv_name: conn.get_serv_name(),
-                        };
                         if params.iter().any(|cap| cap.as_str() == "sasl") {
+                            let msg_target = MsgTarget::Server {
+                                serv_name: conn.get_serv_name(),
+                            };
+                            self.tui.add_err_msg("Server rejected using SASL authenication capability",
+                                                 Timestamp::now(),
+                                                 &msg_target);
+                        }
+                    }
+                    "LS" => {
+                        if !params.iter().any(|cap| cap.as_str() == "sasl") {
+                            let msg_target = MsgTarget::Server {
+                                serv_name: conn.get_serv_name(),
+                            };
                             self.tui.add_err_msg("Server does not support SASL authenication",
                                                  Timestamp::now(),
                                                  &msg_target);
