@@ -11,6 +11,12 @@ use std::path::PathBuf;
 use std::path::Path;
 
 #[derive(Clone, Deserialize)]
+pub struct SASLAuth {
+    pub sasl_username: String,
+    pub sasl_password: String,
+}
+
+#[derive(Clone, Deserialize)]
 pub struct Server {
     /// Address of the server
     pub addr: String,
@@ -43,6 +49,9 @@ pub struct Server {
     /// Channels to automatically join. Any `/join` commands in `auto_cmds` will be moved here.
     #[serde(default)]
     pub join: Vec<String>,
+
+    /// Authenication method
+    pub sasl_auth: Option<SASLAuth>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
