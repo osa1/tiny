@@ -81,9 +81,9 @@ servers:
       realname: yourname
       nicks: [tiny_user]
       # optional SASL authentication
-      sasl:
-        username: 'tiny_user'
-        password: 'hunter2'
+      # sasl:
+      #   username: 'tiny_user'
+      #   password: 'hunter2'
       auto_cmds:
           - 'msg NickServ identify hunter2'
           - 'join #tiny'
