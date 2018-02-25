@@ -1,6 +1,6 @@
 # Unreleased
 
-# 2017/02/24: 0.4.0
+# 2018/02/24: 0.4.0
 
 - `/switch` command added to quickly switch to a different tab using a
   substring of the tab name.
