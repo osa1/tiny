@@ -1,5 +1,9 @@
 # Unreleased
 
+# 2018/03/24: 0.4.1
+
+- Fixed rendering bugs with ncurses 6.1 (#96).
+
 # 2018/02/24: 0.4.0
 
 - `/switch` command added to quickly switch to a different tab using a
