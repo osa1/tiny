@@ -1,6 +1,6 @@
 [package]
 name = "termbox_simple"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 links = "termbox_simple"
 description = "A hacked version of termbox (see README)"
