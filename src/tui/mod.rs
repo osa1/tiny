@@ -317,6 +317,7 @@ impl TUI {
                         if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
                             self.tabs[tab_idx + 1].widget.set_nick(nick);
                         }
+                        self.tabs[tab_idx + 1].widget.join(nick, None);
                         Some(tab_idx + 1)
                     }
                 },

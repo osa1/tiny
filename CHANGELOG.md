@@ -1,5 +1,9 @@
 # Unreleased
 
+- Previously tiny showed a `-` line in a private message tab when we got a
+  `QUIT` message from the target of the tab. It now shows a `+` line when the
+  user quits and then joins to a channel that we participate in.
+
 # 2018/03/24: 0.4.1
 
 - Fixed rendering bugs with ncurses 6.1 (#96).

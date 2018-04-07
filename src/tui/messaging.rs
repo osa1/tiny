@@ -391,9 +391,7 @@ impl MessagingUI {
     }
 
     pub fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
-        self.nicks.insert(nick);
-
-        if self.show_status {
+        if self.show_status && !self.nicks.contains(nick) {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
                 self.msg_area.modify_line(line_idx, |line| {
@@ -405,6 +403,8 @@ impl MessagingUI {
                 });
             }
         }
+
+        self.nicks.insert(nick);
     }
 
     pub fn part(&mut self, nick: &str, ts: Option<Timestamp>) {

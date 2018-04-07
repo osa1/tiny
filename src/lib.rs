@@ -620,14 +620,22 @@ impl<'poll> Tiny<'poll> {
                         if nick == conn.get_nick() {
                             self.tui.new_chan_tab(serv_name, &chan);
                         } else {
+                            let nick = drop_nick_prefix(&nick);
+                            let ts = Some(Timestamp::now());
                             self.tui.add_nick(
-                                drop_nick_prefix(&nick),
-                                Some(Timestamp::now()),
+                                nick,
+                                ts,
                                 &MsgTarget::Chan {
-                                    serv_name: serv_name,
+                                    serv_name,
                                     chan_name: &chan,
                                 },
                             );
+                            // Also update the private message tab if it exists
+                            // Nothing will be shown if the user already known to be online by the
+                            // tab
+                            if self.tui.does_user_tab_exist(serv_name, nick) {
+                                self.tui.add_nick(nick, ts, &MsgTarget::User { serv_name, nick });
+                            }
                         }
                     }
                     pfx => {
