@@ -10,11 +10,8 @@ use self::notify_rust::Notification;
 pub enum Notifier { Off, Mentions, Messages }
 
 fn notify(summary: &str, body: &str) {
-    Notification::new()
-        .summary(summary)
-        .body(body)
-        .show()
-        .unwrap();
+    // TODO: Report errors somehow
+    let _ = Notification::new().summary(summary).body(body).show();
 }
 
 impl Notifier {
