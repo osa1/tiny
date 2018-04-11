@@ -7,7 +7,7 @@ arch=('x86_64')
 url="https://github.com/osa1/tiny"
 license=('MIT')
 depends=('openssl' 'dbus')
-makedepends=('git' 'rustup')
+makedepends=('git' 'rust-nightly')
 
 build() {
         return 0
