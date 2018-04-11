@@ -1,6 +1,6 @@
 # Maintainer: Nick Econopouly <wry@mm.st>
-pkgname=tiny-git
-pkgver="0.3.0"
+pkgname=tiny-irc-client-git
+pkgver="0.4.0"
 pkgrel=1
 pkgdesc="A console IRC client"
 arch=('x86_64')
