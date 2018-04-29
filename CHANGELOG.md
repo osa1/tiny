@@ -1,8 +1,10 @@
-# Unreleased
+# 2018/04/24: 0.4.2
 
 - Previously tiny showed a `-` line in a private message tab when we got a
   `QUIT` message from the target of the tab. It now shows a `+` line when the
   user quits and then joins to a channel that we participate in.
+- A bug that caused tiny to crash when dbus daemon is not configured properly
+  fixed (#97).
 
 # 2018/03/24: 0.4.1
 
