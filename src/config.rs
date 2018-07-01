@@ -103,7 +103,7 @@ fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
         }
     }
 
-    for mut server in &mut cfg.servers {
+    for server in &mut cfg.servers {
         parse_join_cmds(&mut server.auto_cmds, &mut server.join);
     }
 

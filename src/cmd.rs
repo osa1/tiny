@@ -44,8 +44,8 @@ pub enum ParseCmdResult<'a> {
         rest: &'a str,
     },
 
-    /// Command name is ambiguous, here are possible values
-    Ambiguous(Vec<&'static str>),
+    // Command name is ambiguous, here are possible values
+    // Ambiguous(Vec<&'static str>),
 
     /// Unknown command
     Unknown,
@@ -66,7 +66,7 @@ pub fn parse_cmd(cmd: &str) -> ParseCmdResult {
                         &cmd[rest_idx..],
                 }
             };
-            let mut possibilities: Vec<&'static Cmd> = vec![];
+            // let mut possibilities: Vec<&'static Cmd> = vec![];
             for cmd in CMDS.iter() {
                 if cmd_name == cmd.name {
                     // exact match, return
@@ -76,17 +76,18 @@ pub fn parse_cmd(cmd: &str) -> ParseCmdResult {
                     }
                 }
             }
-            match possibilities.len() {
-                0 =>
-                    ParseCmdResult::Unknown,
-                1 =>
-                    ParseCmdResult::Ok {
-                        cmd: possibilities[0],
-                        rest,
-                    },
-                _ =>
-                    ParseCmdResult::Ambiguous(possibilities.into_iter().map(|cmd| cmd.name).collect()),
-            }
+            ParseCmdResult::Unknown
+            // match possibilities.len() {
+            //     0 =>
+            //         ParseCmdResult::Unknown,
+            //     1 =>
+            //         ParseCmdResult::Ok {
+            //             cmd: possibilities[0],
+            //             rest,
+            //         },
+            //     _ =>
+            //         ParseCmdResult::Ambiguous(possibilities.into_iter().map(|cmd| cmd.name).collect()),
+            // }
         }
     }
 }
@@ -114,7 +115,7 @@ impl<'de> Deserialize<'de> for AutoCmd {
                 match parse_cmd(&v) {
                     ParseCmdResult::Ok { cmd, rest } =>
                         Ok(AutoCmd { cmd, args: rest.to_owned() }),
-                    ParseCmdResult::Ambiguous(_) | ParseCmdResult::Unknown =>
+                    /* ParseCmdResult::Ambiguous(_) | */ ParseCmdResult::Unknown =>
                         panic!(),
                 }
             }

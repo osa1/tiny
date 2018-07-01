@@ -5,10 +5,9 @@
 #![feature(const_fn)]
 #![feature(drain_filter)]
 #![feature(entry_and_modify)]
-#![feature(global_allocator)]
-#![feature(inclusive_range_syntax)]
 #![feature(nll)]
 #![feature(offset_to)]
+#![feature(ptr_offset_from)]
 
 extern crate alloc_system;
 
@@ -280,16 +279,16 @@ impl<'poll> Tiny<'poll> {
             ParseCmdResult::Ok { cmd, rest } => {
                 (cmd.cmd_fn)(rest, poll, self, src);
             },
-            ParseCmdResult::Ambiguous(vec) => {
-                self.tui.add_client_err_msg(
-                    &format!("Unsupported command: \"/{}\"", msg),
-                    &MsgTarget::CurrentTab,
-                );
-                self.tui.add_client_err_msg(
-                    &format!("Did you mean one of {:?} ?", vec),
-                    &MsgTarget::CurrentTab,
-                );
-            },
+            // ParseCmdResult::Ambiguous(vec) => {
+            //     self.tui.add_client_err_msg(
+            //         &format!("Unsupported command: \"/{}\"", msg),
+            //         &MsgTarget::CurrentTab,
+            //     );
+            //     self.tui.add_client_err_msg(
+            //         &format!("Did you mean one of {:?} ?", vec),
+            //         &MsgTarget::CurrentTab,
+            //     );
+            // },
             ParseCmdResult::Unknown =>
                 self.tui.add_client_err_msg(
                     &format!("Unsupported command: \"/{}\"", msg),
