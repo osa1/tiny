@@ -1,6 +1,5 @@
 //! To see how color numbers map to actual colors in your terminal run
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
-use cmd::AutoCmd;
 use serde::Deserialize;
 use serde_yaml;
 use std::env::home_dir;
@@ -10,7 +9,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::path::Path;
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 pub struct SASLAuth {
     pub username: String,
     pub password: String,
@@ -42,13 +41,12 @@ pub struct Server {
     /// adding trailing underscores to the last one if none of the nicks are available.
     pub nicks: Vec<String>,
 
-    /// Commands to automatically run after joining to the server. Useful for e.g. registering the
-    /// nick via nickserv or joining channels. Uses tiny command syntax.
-    pub auto_cmds: Vec<AutoCmd>,
-
-    /// Channels to automatically join. Any `/join` commands in `auto_cmds` will be moved here.
+    /// Channels to automatically join.
     #[serde(default)]
     pub join: Vec<String>,
+
+    /// NickServ identification password. Used on connecting to the server and nick change.
+    pub nickserv_ident: Option<String>,
 
     /// Authenication method
     #[serde(rename = "sasl")]
@@ -61,7 +59,6 @@ pub struct Defaults {
     pub nicks: Vec<String>,
     pub hostname: String,
     pub realname: String,
-    pub auto_cmds: Vec<AutoCmd>,
     #[serde(default)]
     pub join: Vec<String>,
     #[serde(default)]
@@ -94,22 +91,7 @@ pub fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
 }
 
 fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
-    let mut cfg: Config = serde_yaml::from_str(&contents)?;
-
-    fn parse_join_cmds(cmds: &mut Vec<AutoCmd>, join: &mut Vec<String>) {
-        // couldn't write this using flat_map() because of borrowchk issues
-        for join_cmd in cmds.drain_filter(|cmd| cmd.cmd.name == "join").into_iter() {
-            join.extend(join_cmd.args.split_whitespace().map(str::to_owned));
-        }
-    }
-
-    for server in &mut cfg.servers {
-        parse_join_cmds(&mut server.auto_cmds, &mut server.join);
-    }
-
-    parse_join_cmds(&mut cfg.defaults.auto_cmds, &mut cfg.defaults.join);
-
-    Ok(cfg)
+    serde_yaml::from_str(&contents)
 }
 
 pub fn generate_default_config(config_path: &Path) {
@@ -388,69 +370,29 @@ mod tests {
                 println!("{}", yaml_err);
                 assert!(false);
             }
-            Ok(Config { .. }) =>
-                {}
-        }
-    }
-
-    #[test]
-    fn parse_pre_color_config() {
-        // Parse config file without a theme field. Important to be able to
-        // parse old config files.
-        let config = "\
-# Servers to auto-connect
-servers:
-    - addr: irc.mozilla.org
-      port: 6667
-      hostname: yourhost
-      realname: yourname
-      nicks: [tiny_user]
-      sasl:
-        username: 'tiny_user'
-        password: 'hunter2'
-      auto_cmds:
-          - 'msg NickServ identify hunter2'
-          - 'join #tiny'
-          - 'join #rust'
-
-# Defaults used when connecting to servers via the /connect command
-defaults:
-    nicks: [tiny_user]
-    hostname: yourhost
-    realname: yourname
-    auto_cmds: []
-
-# Where to put log files
-log_dir: path";
-        match parse_config_str(config) {
-            Err(yaml_err) => {
-                println!("{}", yaml_err);
-                assert!(false);
-            }
-            Ok(cfg) => {
+            Ok(Config { servers, .. }) => {
                 assert_eq!(
-                    cfg.servers[0].join,
+                    servers[0].join,
                     vec!["#tiny".to_owned(), "#rust".to_owned()]
                 );
                 assert_eq!(
-                    cfg.servers[0].auto_cmds.len(),
-                    1,
+                    servers[0].tls,
+                    true
                 );
                 assert_eq!(
-                    cfg.servers[0].auto_cmds[0].cmd.name,
-                    "msg",
+                    servers[0].pass,
+                    Some("hunter2".to_owned())
                 );
                 assert_eq!(
-                    cfg.servers[0].auto_cmds[0].args,
-                    "NickServ identify hunter2",
+                    servers[0].sasl_auth,
+                    Some(SASLAuth {
+                        username: "tiny_user".to_owned(),
+                        password: "hunter2".to_owned(),
+                    })
                 );
                 assert_eq!(
-                    cfg.servers[0].sasl_auth.as_ref().unwrap().username,
-                    "tiny_user",
-                );
-                assert_eq!(
-                    cfg.servers[0].sasl_auth.as_ref().unwrap().password,
-                    "hunter2",
+                    servers[0].nickserv_ident,
+                    Some("hunter2".to_owned())
                 );
             }
         }

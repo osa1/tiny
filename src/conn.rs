@@ -31,7 +31,14 @@ pub struct Conn<'poll> {
 
     /// Channels to auto-join. Every channel we join will be added here to be able to re-join
     /// automatically on reconnect and channels we leave will be removed.
+    ///
+    /// Technically a set but we want to join channels in the order given by the user, so using
+    /// `Vec` here.
     auto_join: Vec<String>,
+
+    /// Nickserv password. Sent to NickServ on connecting to the server and nick change, before
+    /// join commands.
+    nickserv_ident: Option<String>,
 
     /// Away reason if away mode is on. `None` otherwise.
     away_status: Option<String>,
@@ -175,6 +182,7 @@ impl<'poll> Conn<'poll> {
             nicks: server.nicks,
             current_nick_idx: 0,
             auto_join: server.join,
+            nickserv_ident: server.nickserv_ident,
             away_status: None,
             servername: None,
             usermask: None,
@@ -237,20 +245,24 @@ impl<'poll> Conn<'poll> {
         &self.nicks[self.current_nick_idx]
     }
 
-    pub fn set_nick(&mut self, nick: &str) {
+    /// Update the current nick state. Only do this after a new nick has given/accepted by the
+    /// server.
+    fn set_nick(&mut self, nick: &str) {
         if let Some(nick_idx) = self.nicks.iter().position(|n| n == nick) {
             self.current_nick_idx = nick_idx;
         } else {
             self.nicks.push(nick.to_owned());
             self.current_nick_idx = self.nicks.len() - 1;
         }
-        self.send_nick();
     }
 
     fn next_nick(&mut self) {
         if self.current_nick_idx + 1 == self.nicks.len() {
             let mut new_nick = self.nicks.last().unwrap().to_string();
             new_nick.push('_');
+            self.status.get_stream_mut().map(|stream| {
+                wire::nick(stream, &new_nick).unwrap();
+            });
             self.nicks.push(new_nick);
         }
         self.current_nick_idx += 1;
@@ -368,11 +380,19 @@ impl<'poll> Conn<'poll> {
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
 
-    fn send_nick(&mut self) {
-        let nick = &self.nicks[self.current_nick_idx];
+    /// Send a nick message. Does not mean we will be successfully changing the nick, the new nick
+    /// may be in use or for some other reason server may reject the request. Expect ERR_NICKINUSE
+    /// or NICK message in response.
+    pub fn send_nick(&mut self, nick: &str) {
         self.status.get_stream_mut().map(|stream| {
             wire::nick(stream, nick).unwrap();
         });
+    }
+
+    fn nickserv_ident(&mut self) {
+        if let Some(ref pwd) = self.nickserv_ident {
+            self.privmsg("NickServ", &format!("identify {}", pwd));
+        }
     }
 
     /// `extra_len`: Size (in bytes) for a prefix/suffix etc. that'll be added to each line.
@@ -638,6 +658,7 @@ impl<'poll> Conn<'poll> {
             // 001 RPL_WELCOME is how we understand that the registration was successful
             evs.push(ConnEv::Connected);
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
+            self.nickserv_ident();
         }
 
         if let Msg {
@@ -677,31 +698,17 @@ impl<'poll> Conn<'poll> {
         {
             // ERR_NICKNAMEINUSE
             self.next_nick();
-            self.send_nick();
-            evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
         }
 
-        // Not in any of the RFCs. Also known as ERR_BANONCHAN on the internets.
-        // Sent by freenode when nick change failed. See issue #29.
         if let Msg {
-            cmd: Cmd::Reply {
-                num: 435,
-                ref params,
-            },
-            ..
+            cmd: Cmd::NICK { nick: ref new_nick },
+            pfx: Some(Pfx::User { nick: ref old_nick, .. }),
         } = msg
         {
-            if params.len() == 4 {
-                // args: [old_nick, new_nick, chan, msg]
-                let old_nick = &params[0];
-                // make current nick 'old_nick'
-                for (nick_idx, nick) in self.nicks.iter().enumerate() {
-                    if nick == old_nick {
-                        self.current_nick_idx = nick_idx;
-                        evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
-                        break;
-                    }
-                }
+            if old_nick == self.get_nick() {
+                self.set_nick(new_nick);
+                evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
+                self.nickserv_ident();
             }
         }
 

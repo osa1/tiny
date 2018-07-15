@@ -1,3 +1,26 @@
+# WIP
+
+- `auto_cmds` config field is gone and nick change and identification handling
+  is updated.
+
+  A major pain point for me has been the handling of nick changes when the
+  server doesn't support SASL (sigh). We now solve this problem by simplifying
+  (removing!) `auto_cmds` field and refactoring nick change logic:
+
+  - We now only consider the nick as changed if we hear a NICK response from the
+    server. This way we no longer have to revert a nick change when the request
+    fails or is rejected.
+
+  - Config file format changed: auto_cmds is gone, two new fields are added:
+    `join` (a list of channels) and `nickserv_ident` (nickserv password to send
+    on connecting and nick change).
+
+    Note that `join` is technically old, but it just wasn't advertised as a
+    config file field.
+
+  This breaks backwards compatibility, but simplifies the code and nick changes
+  and identification are now handled better.
+
 # 2018/04/24: 0.4.2
 
 - Previously tiny showed a `-` line in a private message tab when we got a

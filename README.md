@@ -84,27 +84,33 @@ this:
 servers:
     - addr: irc.mozilla.org
       port: 6697
-      # optional field, defaults to false:
+      # Optional field, defaults to false:
       tls: true
-      # optional field for server password:
+      # Optional field for server password:
       # pass: 'server_pass'
       hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
-      # optional SASL authentication
+
+      # Optional SASL authentication
       # sasl:
       #   username: 'tiny_user'
       #   password: 'hunter2'
-      auto_cmds:
-          - 'msg NickServ identify hunter2'
-          - 'join #tiny'
+
+      # Channels to automatically join
+      join:
+          - '#tiny'
+          - '#rust'
+
+      # Optional password to identify via NickServ
+      # nickserv_ident: 'hunter2'
 
 # Defaults used when connecting to a server via the /connect command
 defaults:
     nicks: [tiny_user]
     hostname: yourhost
     realname: yourname
-    auto_cmds: []
+    join: []
 
 # Where to put log files
 log_dir: '/home/$USER/tiny_logs'
@@ -115,9 +121,9 @@ log_dir: '/home/$USER/tiny_logs'
 **A note on nick identification:** Some IRC servers such as ircd-seven (used by
 Freenode) and InspIRCd (used by Mozilla) support identification via the `PASS`
 command. This way of identification (rather than sending a message to a service
-like `NickServ`) is better when some of the channels that you automatically join
-(by adding a `join` command to `auto_cmds`) require identification. To use this
-method enter your nick password to the `pass` field in servers.
+like `NickServ`) is better when some of the channels that you automatically
+join require identification. To use this method enter your nick password to the
+`pass` field in servers.
 
 ## Command line arguments
 

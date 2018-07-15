@@ -117,7 +117,6 @@ pub fn run() {
 pub struct Tiny<'poll> {
     conns: Vec<Conn<'poll>>,
     defaults: config::Defaults,
-    servers: Vec<config::Server>,
     tui: TUI,
     input_ev_handler: Input,
     logger: Logger,
@@ -175,7 +174,6 @@ impl<'poll> Tiny<'poll> {
         let mut tiny = Tiny {
             conns,
             defaults,
-            servers,
             tui,
             input_ev_handler: Input::new(),
             logger: Logger::new(PathBuf::from(log_dir)),
@@ -213,7 +211,7 @@ impl<'poll> Tiny<'poll> {
                                     ));
                                 }
                                 Some(conn_idx) => {
-                                    tiny.handle_socket(&poll, event.readiness(), conn_idx, &mut conn_evs);
+                                    tiny.handle_socket(event.readiness(), conn_idx, &mut conn_evs);
                                 }
                             }
                         }
@@ -225,7 +223,7 @@ impl<'poll> Tiny<'poll> {
                                 let conn = &mut tiny.conns[conn_idx];
                                 conn.tick(&mut conn_evs, tiny.logger.get_debug_logs());
                             }
-                            tiny.handle_conn_evs(&poll, conn_idx, &mut conn_evs);
+                            tiny.handle_conn_evs(conn_idx, &mut conn_evs);
                         }
                         last_tick = Instant::now();
                     }
@@ -387,7 +385,7 @@ impl<'poll> Tiny<'poll> {
 
     ////////////////////////////////////////////////////////////////////////////
 
-    fn handle_socket(&mut self, poll: &'poll Poll, readiness: Ready, conn_idx: usize, evs: &mut Vec<ConnEv>) {
+    fn handle_socket(&mut self, readiness: Ready, conn_idx: usize, evs: &mut Vec<ConnEv>) {
         {
             let conn = &mut self.conns[conn_idx];
             if readiness.is_readable() {
@@ -411,16 +409,16 @@ impl<'poll> Tiny<'poll> {
                 );
             }
         }
-        self.handle_conn_evs(poll, conn_idx, evs);
+        self.handle_conn_evs(conn_idx, evs);
     }
 
-    fn handle_conn_evs(&mut self, poll: &'poll Poll, conn_idx: usize, evs: &mut Vec<ConnEv>) {
+    fn handle_conn_evs(&mut self, conn_idx: usize, evs: &mut Vec<ConnEv>) {
         for ev in evs.drain(..) {
-            self.handle_conn_ev(poll, conn_idx, ev);
+            self.handle_conn_ev(conn_idx, ev);
         }
     }
 
-    fn handle_conn_ev(&mut self, poll: &'poll Poll, conn_idx: usize, ev: ConnEv) {
+    fn handle_conn_ev(&mut self, conn_idx: usize, ev: ConnEv) {
         match ev {
             ConnEv::Connected => {
                 self.tui.add_msg(
@@ -430,29 +428,6 @@ impl<'poll> Tiny<'poll> {
                         serv_name: self.conns[conn_idx].get_serv_name(),
                     },
                 );
-                let mut serv_auto_cmds = None;
-                {
-                    let conn = &self.conns[conn_idx];
-                    let conn_name = conn.get_serv_name();
-                    for server in &self.servers {
-                        if server.addr == conn_name {
-                            // redundant clone() here because of aliasing
-                            serv_auto_cmds = Some((server.addr.clone(), server.auto_cmds.clone()));
-                            break;
-                        }
-                    }
-                }
-                if let Some((serv_name, auto_cmds)) = serv_auto_cmds {
-                    for cmd in &auto_cmds {
-                        cmd.run(
-                            poll,
-                            self,
-                            MsgSource::Serv {
-                                serv_name: serv_name.to_owned(),
-                            },
-                        );
-                    }
-                }
             }
             ConnEv::Disconnected => {
                 let conn = &mut self.conns[conn_idx];

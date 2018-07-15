@@ -1,29 +1,40 @@
 # Servers to auto-connect
 servers:
     - addr: irc.mozilla.org
-      port: 6667
+      port: 6697
+      tls: true
       hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
-      # # Server or nick password (optional)
-      # pass: 'hunter2'
-      # # optional SASL authentication
-      # sasl:
-      #   username: 'tiny_user'
-      #   password: 'hunter2'
-      auto_cmds:
-          # Identify nick by sending a message to NickServ:
-          # (useful when `pass` field above is not used)
-          - 'msg NickServ identify hunter2'
-          # Join some channels:
-          - 'join #tiny'
+
+      # Channels to automatically join
+      join:
+          - '#tiny'
+          - '#rust'
+
+      # Three authentication methods: pass, sasl, and nickserv_ident
+      # These are optional and you probably only need one of these, delete
+      # others.
+
+      # Server or nick password
+      pass: 'hunter2'
+
+      # SASL authentication
+      sasl:
+        username: 'tiny_user'
+        password: 'hunter2'
+
+      # Identify nick by sending a message to NickServ:
+      # (useful when `pass` or `sasl` fields above are not used)
+      nickserv_ident: 'hunter2'
 
 # Defaults used when connecting to servers via the /connect command
 defaults:
     nicks: [tiny_user]
     hostname: yourhost
     realname: yourname
-    auto_cmds: []
+    join: []
+    tls: false
 
 # Where to put log files
 log_dir: '{}'

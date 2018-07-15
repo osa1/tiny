@@ -1,12 +1,10 @@
 use config;
 use conn::Conn;
 use mio::Poll;
-use serde::Deserialize;
 use std::error::Error;
 use super::Tiny;
 use tui::{MsgTarget, MsgSource, Timestamp};
 use utils;
-use serde::de::{Deserializer, Visitor};
 
 use notifier::Notifier;
 
@@ -19,18 +17,6 @@ pub struct Cmd {
 
     /// Command function.
     pub cmd_fn: for<'a, 'b> fn(&str, poll: &'b Poll, &'a mut Tiny<'b>, MsgSource),
-}
-
-#[derive(Clone)]
-pub struct AutoCmd {
-    pub cmd: &'static Cmd,
-    pub args: String,
-}
-
-impl AutoCmd {
-    pub fn run<'a, 'b>(&self, poll: &'b Poll, tiny: &'a mut Tiny<'b>, src: MsgSource) {
-        (self.cmd.cmd_fn)(&self.args, poll, tiny, src);
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,39 +75,6 @@ pub fn parse_cmd(cmd: &str) -> ParseCmdResult {
             //         ParseCmdResult::Ambiguous(possibilities.into_iter().map(|cmd| cmd.name).collect()),
             // }
         }
-    }
-}
-
-impl<'de> Deserialize<'de> for AutoCmd {
-    fn deserialize<D>(d: D) -> Result<AutoCmd, D::Error>
-    where
-        D: Deserializer<'de>
-    {
-        use std::fmt;
-
-        struct CmdVisitor;
-        impl<'de> Visitor<'de> for CmdVisitor {
-            type Value = AutoCmd;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                let expected = CMDS.iter().map(|cmd| cmd.name).collect::<Vec<_>>();
-                writeln!(formatter, "one of: {:?}", expected)
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<AutoCmd, E>
-            where
-                E: ::serde::de::Error
-            {
-                match parse_cmd(&v) {
-                    ParseCmdResult::Ok { cmd, rest } =>
-                        Ok(AutoCmd { cmd, args: rest.to_owned() }),
-                    /* ParseCmdResult::Ambiguous(_) | */ ParseCmdResult::Unknown =>
-                        panic!(),
-                }
-            }
-        }
-
-        d.deserialize_str(CmdVisitor)
     }
 }
 
@@ -329,8 +282,8 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
             realname: tiny.defaults.realname.clone(),
             pass: pass.map(str::to_owned),
             nicks: tiny.defaults.nicks.clone(),
-            auto_cmds: tiny.defaults.auto_cmds.clone(),
             join: tiny.defaults.join.clone(),
+            nickserv_ident: None,
             sasl_auth: None,
         },
         poll,
@@ -525,8 +478,7 @@ fn nick(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
     if words.len() == 1 {
         if let Some(conn) = super::find_conn(&mut tiny.conns, src.serv_name()) {
             let new_nick = words[0];
-            conn.set_nick(new_nick);
-            tiny.tui.set_nick(conn.get_serv_name(), new_nick);
+            conn.send_nick(new_nick);
         }
     } else {
         tiny.tui.add_client_err_msg(
