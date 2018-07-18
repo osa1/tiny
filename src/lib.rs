@@ -335,10 +335,7 @@ impl<'poll> Tiny<'poll> {
                     ref chan_name,
                 } =>
                     (
-                        MsgTarget::Chan {
-                            serv_name: serv_name,
-                            chan_name: chan_name,
-                        },
+                        MsgTarget::Chan { serv_name, chan_name },
                         chan_name,
                         serv_name,
                     ),
@@ -350,14 +347,9 @@ impl<'poll> Tiny<'poll> {
                     let msg_target = if nick.eq_ignore_ascii_case("nickserv")
                         || nick.eq_ignore_ascii_case("chanserv")
                     {
-                        MsgTarget::Server {
-                            serv_name: serv_name,
-                        }
+                        MsgTarget::Server { serv_name }
                     } else {
-                        MsgTarget::User {
-                            serv_name: serv_name,
-                            nick: nick,
-                        }
+                        MsgTarget::User { serv_name, nick }
                     };
                     (msg_target, nick, serv_name)
                 }
@@ -631,7 +623,7 @@ impl<'poll> Tiny<'poll> {
                                 &nick,
                                 Some(Timestamp::now()),
                                 &MsgTarget::Chan {
-                                    serv_name: serv_name,
+                                    serv_name,
                                     chan_name: &chan,
                                 },
                             );
@@ -650,10 +642,7 @@ impl<'poll> Tiny<'poll> {
                         self.tui.remove_nick(
                             nick,
                             Some(Timestamp::now()),
-                            &MsgTarget::AllUserTabs {
-                                serv_name: serv_name,
-                                nick: nick,
-                            },
+                            &MsgTarget::AllUserTabs { serv_name, nick },
                         );
                     },
                     pfx => {
@@ -675,7 +664,7 @@ impl<'poll> Tiny<'poll> {
                             &nick,
                             Timestamp::now(),
                             &MsgTarget::AllUserTabs {
-                                serv_name: serv_name,
+                                serv_name,
                                 nick: old_nick,
                             },
                         );
@@ -696,9 +685,7 @@ impl<'poll> Tiny<'poll> {
                 self.tui.add_err_msg(
                     msg,
                     Timestamp::now(),
-                    &MsgTarget::AllServTabs {
-                        serv_name: serv_name,
-                    },
+                    &MsgTarget::AllServTabs { serv_name },
                 );
             }
 
@@ -736,7 +723,7 @@ impl<'poll> Tiny<'poll> {
                         }
                     }
                     "ACK" => {}
-                    cmd @ _ => {
+                    cmd => {
                         self.logger
                             .get_debug_logs()
                             .write_line(format_args!("CAP subcommand {} is not handled", cmd));
@@ -838,10 +825,7 @@ impl<'poll> Tiny<'poll> {
                     let serv_name = conn.get_serv_name();
                     self.tui.add_client_msg(
                         msg,
-                        &MsgTarget::User {
-                            serv_name: serv_name,
-                            nick: nick,
-                        },
+                        &MsgTarget::User { serv_name, nick, },
                     );
                 // RPL_AWAY
                 } else if n == 301 {

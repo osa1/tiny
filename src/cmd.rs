@@ -53,13 +53,10 @@ pub fn parse_cmd(cmd: &str) -> ParseCmdResult {
                 }
             };
             // let mut possibilities: Vec<&'static Cmd> = vec![];
-            for cmd in CMDS.iter() {
+            for cmd in &CMDS {
                 if cmd_name == cmd.name {
                     // exact match, return
-                    return ParseCmdResult::Ok {
-                        cmd: cmd,
-                        rest,
-                    }
+                    return ParseCmdResult::Ok { cmd, rest }
                 }
             }
             ParseCmdResult::Unknown
@@ -177,7 +174,7 @@ fn connect<'a, 'b>(args: &str, poll: &'b Poll, tiny: &'a mut Tiny<'b>, src: MsgS
         _ =>
             // wat
             tiny.tui.add_client_err_msg(
-                &format!("/connect usage: /connect <host>:<port> or /connect (to reconnect)"),
+                "/connect usage: /connect <host>:<port> or /connect (to reconnect)",
                 &MsgTarget::CurrentTab,
             ),
     }
@@ -243,9 +240,7 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
     if let Some(conn) = super::find_conn(&mut tiny.conns, serv_name) {
         tiny.tui.add_client_msg(
             "Connecting...",
-            &MsgTarget::AllServTabs {
-                serv_name: serv_name,
-            },
+            &MsgTarget::AllServTabs { serv_name },
         );
         match conn.reconnect(Some((serv_name, serv_port))) {
             Ok(()) =>
@@ -268,9 +263,7 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
 
     // otherwise create a new Conn, tab etc.
     tiny.tui.new_server_tab(serv_name);
-    let msg_target = MsgTarget::Server {
-        serv_name: serv_name,
-    };
+    let msg_target = MsgTarget::Server { serv_name };
     tiny.tui.add_client_msg("Connecting...", &msg_target);
 
     let conn_ret = Conn::new(
@@ -440,10 +433,7 @@ fn names(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
             .get_nicks(serv_name, chan_name)
             .map(|nicks| nicks.to_strings(""));
         if let Some(nicks_vec) = nicks_vec {
-            let target = MsgTarget::Chan {
-                serv_name: serv_name,
-                chan_name: chan_name,
-            };
+            let target = MsgTarget::Chan { serv_name, chan_name };
             if words.is_empty() {
                 tiny.tui.add_client_msg(
                     &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
@@ -544,10 +534,10 @@ fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         )
     };
 
-    if words.len() == 0 {
+    if words.is_empty() {
         tiny.tui.show_notify_mode(&MsgTarget::CurrentTab);
     } else if words.len() != 1 {
-        return show_usage();
+        show_usage();
     } else {
         let notifier =
             match words[0] {

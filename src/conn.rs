@@ -189,7 +189,7 @@ impl<'poll> Conn<'poll> {
             poll,
             status: ConnStatus::PingPong {
                 ticks_passed: 0,
-                stream: stream,
+                stream,
             },
             in_buf: vec![],
             sasl_auth: server.sasl_auth
@@ -210,7 +210,7 @@ impl<'poll> Conn<'poll> {
         }
         match Stream::new(self.poll, &self.serv_addr, self.serv_port, self.tls) {
             Err(err) =>
-                Err(StreamErr::from(err)),
+                Err(err),
             Ok(mut stream) => {
                 if self.sasl_auth.is_some() {
                     wire::cap_ls(&mut stream).unwrap();
@@ -225,7 +225,7 @@ impl<'poll> Conn<'poll> {
                 }
                 self.status = ConnStatus::PingPong {
                     ticks_passed: 0,
-                    stream: stream,
+                    stream,
                 };
                 self.current_nick_idx = 0;
                 Ok(())
@@ -474,7 +474,7 @@ impl<'poll> Conn<'poll> {
             match stream.write_ready() {
                 Err(err) =>
                     if !err.is_would_block() {
-                        evs.push(ConnEv::Err(StreamErr::from(err)));
+                        evs.push(ConnEv::Err(err));
                     },
                 Ok(()) =>
                     {}
@@ -492,7 +492,7 @@ impl<'poll> Conn<'poll> {
             match stream.read_ready(&mut read_buf) {
                 Err(err) => {
                     if !err.is_would_block() {
-                        evs.push(ConnEv::Err(StreamErr::from(err)));
+                        evs.push(ConnEv::Err(err));
                     }
                 }
                 Ok(bytes_read) => {

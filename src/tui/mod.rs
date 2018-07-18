@@ -253,7 +253,7 @@ impl TUI {
                     Some(serv_tab_idx) => {
                         let mut status_val: bool = true;
                         let mut notifier = Notifier::Mentions;
-                        for tab in self.tabs.iter() {
+                        for tab in &self.tabs {
                             if let MsgSource::Serv { serv_name: ref serv_name_ } = tab.src {
                                 if serv_name == serv_name_ {
                                     status_val = tab.widget.get_ignore_state();
@@ -893,7 +893,7 @@ impl TUI {
 
         // Create server/chan/user tab when necessary
         if target_idxs.is_empty() {
-            for idx in self.maybe_create_tab(target) {
+            if let Some(idx) = self.maybe_create_tab(target) {
                 target_idxs.push(idx);
             }
         }
@@ -1067,7 +1067,7 @@ impl TUI {
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
         if let MsgTarget::AllServTabs { serv_name } = *target {
             let mut status_val: bool = false;
-            for tab in self.tabs.iter() {
+            for tab in &self.tabs {
                 if let MsgSource::Serv { serv_name: ref serv_name_ } = tab.src {
                     if serv_name == serv_name_ {
                         status_val = tab.widget.get_ignore_state();

@@ -10,7 +10,7 @@ pub struct ExitDialogue {
 
 impl ExitDialogue {
     pub fn new(width: i32) -> ExitDialogue {
-        ExitDialogue { width: width }
+        ExitDialogue { width }
     }
 }
 

@@ -58,7 +58,7 @@ impl Timestamp {
         Timestamp::from(time::now())
     }
 
-    fn stamp(&self, msg_area: &mut MsgArea) {
+    fn stamp(self, msg_area: &mut MsgArea) {
         msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::Timestamp));
         msg_area.add_text(&format!("{:02}:{:02} ", self.hour, self.min));
     }
@@ -87,8 +87,8 @@ impl MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
             input_field: TextField::new(width),
             exit_dialogue: None,
-            width: width,
-            height: height,
+            width,
+            height,
             show_status: status,
             nicks: Trie::new(),
             current_nick: None,
@@ -473,10 +473,7 @@ impl MessagingUI {
 
         self.add_timestamp(ts);
         let line_idx = self.msg_area.flush_line();
-        self.last_activity_line = Some(ActivityLine {
-            ts: ts,
-            line_idx: line_idx,
-        });
+        self.last_activity_line = Some(ActivityLine { ts, line_idx });
         line_idx
     }
 }

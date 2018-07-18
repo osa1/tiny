@@ -46,7 +46,7 @@ impl Trie {
                 let del = {
                     let trie = &mut self.vec[idx].1;
                     trie.remove(chars.as_str());
-                    !trie.word && trie.vec.len() == 0
+                    !trie.word && trie.vec.is_empty()
                 };
                 if del {
                     self.vec.remove(idx);

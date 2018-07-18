@@ -25,7 +25,7 @@ impl<'a> LogFile<'a> {
         let now = time::now();
         write!(self.fd, "[{}] ", now.rfc822()).unwrap();
         self.fd.write_fmt(args).unwrap();
-        writeln!(self.fd, "").unwrap();
+        writeln!(self.fd).unwrap();
     }
 }
 
@@ -62,7 +62,7 @@ impl Logger {
         };
 
         Logger {
-            log_dir: log_dir,
+            log_dir,
             fds: vec![],
             debug_fd: debug_logs,
         }

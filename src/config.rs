@@ -227,7 +227,7 @@ impl Default for Colors {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Color names are taken from https://en.wikipedia.org/wiki/List_of_software_palettes
-const COLORS: [(&'static str, u16); 17] = [
+const COLORS: [(&str, u16); 17] = [
     ("default", TB_DEFAULT), // Default fg/bg color of the terminal
     ("black", 0),
     ("maroon", 1),
@@ -247,7 +247,7 @@ const COLORS: [(&'static str, u16); 17] = [
     ("white", 15),
 ];
 
-const ATTRS: [(&'static str, u16); 2] = [("bold", TB_BOLD), ("underline", TB_UNDERLINE)];
+const ATTRS: [(&str, u16); 2] = [("bold", TB_BOLD), ("underline", TB_UNDERLINE)];
 
 fn parse_color(val: String) -> Option<u16> {
     for &(name, color) in &COLORS {

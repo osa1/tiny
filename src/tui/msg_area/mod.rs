@@ -33,8 +33,8 @@ impl MsgArea {
     pub fn new(width: i32, height: i32) -> MsgArea {
         MsgArea {
             lines: Vec::new(),
-            width: width,
-            height: height,
+            width,
+            height,
             scroll: 0,
             line_buf: Line::new(),
             lines_height: Some(0),

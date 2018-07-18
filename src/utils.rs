@@ -28,10 +28,10 @@ pub fn insert_iter<'iter, A>(
     insert_point: usize,
 ) -> InsertIterator<'iter, A> {
     InsertIterator {
-        insert_point: insert_point,
+        insert_point,
         current_idx: 0,
-        iter_orig: iter_orig,
-        iter_insert: iter_insert,
+        iter_orig,
+        iter_insert,
     }
 }
 
@@ -58,7 +58,7 @@ impl<'a> Iterator for SplitWhitespaceIndices<'a> {
 pub fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
     SplitWhitespaceIndices {
         inner: str.split_whitespace(),
-        str: str,
+        str,
     }
 }
 
@@ -74,7 +74,7 @@ pub struct SplitIterator<'a> {
 pub fn split_iterator(s: &str, max: usize) -> SplitIterator {
     SplitIterator {
         s: Some(s),
-        max: max,
+        max,
     }
 }
 

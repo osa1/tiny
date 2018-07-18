@@ -58,7 +58,7 @@ impl TextField {
             buffer: Vec::with_capacity(512),
             cursor: 0,
             scroll: 0,
-            width: width,
+            width,
             history: Vec::with_capacity(HIST_SIZE),
             mode: Mode::Edit,
         }
@@ -307,11 +307,11 @@ impl TextField {
                             (insertion_point + completions[current_completion].len()) as i32;
 
                         self.mode = Mode::Autocomplete {
-                            original_buffer: original_buffer,
-                            insertion_point: insertion_point,
-                            word_starts: word_starts,
-                            completions: completions,
-                            current_completion: current_completion,
+                            original_buffer,
+                            insertion_point,
+                            word_starts,
+                            completions,
+                            current_completion,
                         };
 
                         self.move_cursor(cursor);
@@ -353,11 +353,11 @@ impl TextField {
                             (insertion_point + completions[current_completion].len()) as i32;
 
                         self.mode = Mode::Autocomplete {
-                            original_buffer: original_buffer,
-                            insertion_point: insertion_point,
-                            word_starts: word_starts,
-                            completions: completions,
-                            current_completion: current_completion,
+                            original_buffer,
+                            insertion_point,
+                            word_starts,
+                            completions,
+                            current_completion,
                         };
 
                         self.move_cursor(cursor);
@@ -630,7 +630,7 @@ impl TextField {
                 original_buffer: self.shown_line().to_owned(),
                 insertion_point: self.cursor as usize,
                 word_starts: cursor_left as usize,
-                completions: completions,
+                completions,
                 current_completion: 0,
             };
             let cursor = self.cursor;

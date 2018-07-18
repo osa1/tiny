@@ -29,15 +29,12 @@ impl Notifier {
         match *target {
             MsgTarget::Chan { chan_name, .. } => {
                 if *self == Notifier::Messages || (*self == Notifier::Mentions && mention) {
-                    notify(&format!("{} in {}", sender, chan_name), &format!("{}", msg))
+                    notify(&format!("{} in {}", sender, chan_name), msg)
                 }
             }
             MsgTarget::User { nick: ref nick_sender, .. } => {
                 if *self != Notifier::Off {
-                    notify(
-                        &format!("{} sent a private message", nick_sender),
-                        &format!("{}", msg),
-                    )
+                    notify(&format!("{} sent a private message", nick_sender), msg)
                 }
             }
             _ => {}

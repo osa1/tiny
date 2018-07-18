@@ -332,7 +332,7 @@ impl Msg {
                     },
             };
 
-            Msg { pfx: pfx, cmd: cmd }
+            Msg { pfx, cmd }
         };
 
         buf.drain(0..crlf_idx + 2);

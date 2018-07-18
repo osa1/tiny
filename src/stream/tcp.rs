@@ -59,7 +59,7 @@ impl<'poll> TcpStream<'poll> {
         register_for_r(poll, stream.as_raw_fd());
         Ok(TcpStream {
             inner: stream,
-            poll: poll,
+            poll,
             out_buf: Vec::with_capacity(1024),
         })
     }

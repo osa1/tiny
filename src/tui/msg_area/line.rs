@@ -152,7 +152,7 @@ impl Line {
                 &mut self.current_seg,
                 Seg {
                     text: String::new(),
-                    style: style,
+                    style,
                 },
             );
             self.segs.push(seg);
@@ -171,7 +171,7 @@ impl Line {
                 let bg = iter.next().unwrap() as u8;
                 let fg = ((st as u16) << 8) | (fg as u16);
                 let bg = bg as u16;
-                let style = config::Style { fg: fg, bg: bg };
+                let style = config::Style { fg, bg };
                 self.set_style(SegStyle::Fixed(style));
             } else if char > '\x08' {
                 self.current_seg.text.push(char);
