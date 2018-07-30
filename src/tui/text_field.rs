@@ -154,6 +154,27 @@ impl TextField {
 
     pub fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
+            Key::Char('\r') =>
+                if self.line_len() > 0 {
+                    self.modify();
+
+                    let ret = mem::replace(&mut self.buffer, Vec::new());
+                    if self.history.len() == HIST_SIZE {
+                        let mut reuse = self.history.remove(0);
+                        reuse.clear();
+                        reuse.extend_from_slice(&ret);
+                        self.history.push(reuse);
+                    } else {
+                        self.history.push(ret.clone());
+                    }
+
+                    self.move_cursor(0);
+
+                    WidgetRet::Input(ret)
+                } else {
+                    WidgetRet::KeyHandled
+                },
+
             Key::Char(ch) => {
                 self.modify();
                 self.buffer.insert(self.cursor as usize, ch);
@@ -207,27 +228,6 @@ impl TextField {
                 self.inc_cursor();
                 WidgetRet::KeyHandled
             }
-
-            Key::Enter =>
-                if self.line_len() > 0 {
-                    self.modify();
-
-                    let ret = mem::replace(&mut self.buffer, Vec::new());
-                    if self.history.len() == HIST_SIZE {
-                        let mut reuse = self.history.remove(0);
-                        reuse.clear();
-                        reuse.extend_from_slice(&ret);
-                        self.history.push(reuse);
-                    } else {
-                        self.history.push(ret.clone());
-                    }
-
-                    self.move_cursor(0);
-
-                    WidgetRet::Input(ret)
-                } else {
-                    WidgetRet::KeyHandled
-                },
 
             Key::CtrlArrow(Arrow::Left) => {
                 if self.cursor > 0 {
@@ -671,7 +671,7 @@ mod tests {
         text_field.keypressed(Key::Char('b'));
         text_field.keypressed(Key::Char(' '));
         text_field.keypressed(Key::Char('c'));
-        text_field.keypressed(Key::Enter);
+        text_field.keypressed(Key::Char('\r'));
         text_field.keypressed(Key::Arrow(Arrow::Up));
         // this panics:
         text_field.keypressed(Key::CtrlArrow(Arrow::Left));

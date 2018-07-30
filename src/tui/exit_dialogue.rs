@@ -50,7 +50,7 @@ impl ExitDialogue {
 
     pub fn keypressed(&self, key: Key) -> WidgetRet {
         match key {
-            Key::Char('y') | Key::Enter =>
+            Key::Char('y') | Key::Char('\r') =>
                 WidgetRet::Abort,
             _ =>
                 WidgetRet::Remove,

@@ -1,6 +1,6 @@
 [package]
 name = "term_input"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "Input handling for xterm-compatible terminals"
 repository = "https://github.com/osa1/tiny"

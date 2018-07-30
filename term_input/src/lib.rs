@@ -35,7 +35,6 @@ pub enum Key {
     CtrlArrow(Arrow),
     Del,
     End,
-    Enter,
     Esc,
     Home,
     PageDown,
@@ -147,9 +146,8 @@ static XTERM_KEY_SEQS : [(&'static [u8], Event); 27] =
     ];
 
 // Make sure not to use 27 (ESC) because it's used as a prefix in many combinations.
-static XTERM_SINGLE_BYTES : [(u8, Event); 13] =
-    [ (13,  Event::Key(Key::Enter)),
-      (9,   Event::Key(Key::Tab)),
+static XTERM_SINGLE_BYTES : [(u8, Event); 12] =
+    [ (9,   Event::Key(Key::Tab)),
       (127, Event::Key(Key::Backspace)),
       (1,   Event::Key(Key::Ctrl('a'))),
       (5,   Event::Key(Key::Ctrl('e'))),
@@ -196,8 +194,9 @@ impl Input {
             debug_assert!(!buf_slice.is_empty());
 
             while !buf_slice.is_empty() {
-                // Special treatment for 127 (backspace)
-                let read_fn = if buf_slice[0] < 32 || buf_slice[0] == 127 {
+                // Special treatment for 127 (backspace) and 13 ('\r')
+                let fst = buf_slice[0];
+                let read_fn = if (fst < 32 && fst != 13) || fst == 127 {
                     read_key_comb
                 } else {
                     read_chars
