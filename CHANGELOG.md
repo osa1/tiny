@@ -1,5 +1,7 @@
 # WIP
 
+- Fixed a bug when pasing a string starting with a newline (#86).
+
 - `auto_cmds` config field is gone and nick change and identification handling
   is updated.
 
