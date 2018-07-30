@@ -22,6 +22,7 @@ path = "bin/main.rs"
 
 [dependencies]
 base64 = "0.6.0"
+dirs = "1.0.2"
 libc = "0.2.22"
 mio = "0.6.9"
 native-tls = "0.1.4"

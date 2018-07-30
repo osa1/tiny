@@ -2,7 +2,7 @@
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
 use serde::Deserialize;
 use serde_yaml;
-use std::env::home_dir;
+use dirs::home_dir;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;

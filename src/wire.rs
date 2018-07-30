@@ -378,16 +378,16 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     let mut slice_begins = 0;
     for (char_idx, char) in chrs.char_indices() {
         if char == ':' {
-            ret.push(unsafe { chrs.slice_unchecked(char_idx + 1, chrs.len()) });
+            ret.push(unsafe { chrs.get_unchecked(char_idx + 1 .. chrs.len()) });
             return ret;
         } else if char == ' ' {
-            ret.push(unsafe { chrs.slice_unchecked(slice_begins, char_idx) });
+            ret.push(unsafe { chrs.get_unchecked(slice_begins .. char_idx) });
             slice_begins = char_idx + 1;
         }
     }
 
     if slice_begins != chrs.len() {
-        ret.push(unsafe { chrs.slice_unchecked(slice_begins, chrs.len()) });
+        ret.push(unsafe { chrs.get_unchecked(slice_begins .. chrs.len()) });
     }
 
     ret

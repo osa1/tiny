@@ -17,6 +17,7 @@ static ALLOC: alloc_system::System = alloc_system::System;
 #[cfg(test)]
 extern crate quickcheck;
 
+extern crate dirs;
 extern crate libc;
 extern crate mio;
 extern crate native_tls;
