@@ -27,6 +27,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_yaml;
 extern crate time;
+extern crate tempfile;
 
 extern crate term_input;
 extern crate termbox_simple;
@@ -255,7 +256,17 @@ impl<'poll> Tiny<'poll> {
                         let msg_str: String = (&msg[1..]).into_iter().cloned().collect();
                         self.handle_cmd(poll, from, &msg_str);
                     } else {
-                        self.send_msg(from, &msg.into_iter().collect::<String>(), false);
+                        self.send_msg(&from, &msg.into_iter().collect::<String>(), false);
+                    }
+                }
+                TUIRet::Lines { lines, from } => {
+                    self.logger.get_debug_logs().write_line(format_args!(
+                        "Input source: {:#?}, lines: {:?}",
+                        from,
+                        lines
+                    ));
+                    for line in lines {
+                        self.send_msg(&from, &line, false);
                     }
                 }
                 TUIRet::KeyHandled =>
@@ -301,7 +312,7 @@ impl<'poll> Tiny<'poll> {
         conn.part(chan);
     }
 
-    fn send_msg(&mut self, from: MsgSource, msg: &str, ctcp_action: bool) {
+    fn send_msg(&mut self, from: &MsgSource, msg: &str, ctcp_action: bool) {
         if from.serv_name() == "mentions" {
             self.tui.add_client_err_msg(
                 "Use `/connect <server>` to connect to a server",

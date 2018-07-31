@@ -1,7 +1,10 @@
 # WIP
 
+- tiny now supports pasting multi-line strings. It runs `$EDITOR` to let you
+  edit the paste before sending. After closing the editor the final contents of
+  the file (excluding comment lines) are sent. Note: we currently don't support
+  commands in paste mode, so none of the lines can start with `/`.
 - Fixed a bug when pasing a string starting with a newline (#86).
-
 - `auto_cmds` config field is gone and nick change and identification handling
   is updated.
 

@@ -235,9 +235,6 @@ start, open an issue and I'd love to help.
 
 ## TODOs
 
-- Paste events are ignored when string includes newline characters (`\n`). It'd
-  be nice to use $EDITOR for editing multi-line pastes before sending.
-
 - Logging should be improved. Currently messages are logged in raw form in
   `<log dir>/server_raw.log`, but outgoing message are not logged. Channel logs
   are printed in a weird format etc.

@@ -373,7 +373,7 @@ fn me(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         return tiny.tui
             .add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
-    tiny.send_msg(src, args, true);
+    tiny.send_msg(&src, args, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -396,7 +396,7 @@ fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
     word_indices.next(); // target
     if let Some(msg_begins) = word_indices.next() {
         let msg = &args[msg_begins..];
-        let source = if tiny.conns.iter().any(|conn| conn.get_serv_name() == target) {
+        let src = if tiny.conns.iter().any(|conn| conn.get_serv_name() == target) {
             MsgSource::Serv {
                 serv_name: target.to_owned(),
             }
@@ -407,7 +407,7 @@ fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
                 nick: target.to_owned(),
             }
         };
-        tiny.send_msg(source, msg, false);
+        tiny.send_msg(&src, msg, false);
     } else {
         return tiny.tui.add_client_err_msg(
             "/msg usage: /msg target message", &MsgTarget::CurrentTab);

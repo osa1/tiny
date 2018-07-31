@@ -34,6 +34,12 @@ pub enum TUIRet {
         msg: Vec<char>,
         from: MsgSource,
     },
+
+    /// A pasted string. Send directly.
+    Lines {
+        lines: Vec<String>,
+        from: MsgSource,
+    }
 }
 
 /// Target of a message to be shown on TUI.
@@ -351,15 +357,50 @@ impl TUI {
                 // For some reason on my terminal newlines in text are
                 // translated to carriage returns when pasting so we check for
                 // both just to make sure
-                if !str.contains('\n') && !str.contains('\r') {
+                if str.contains('\n') || str.contains('\r') {
+                    match paste_lines(&str) {
+                        Ok(lines) =>
+                            TUIRet::Lines {
+                                lines,
+                                from: self.tabs[self.active_idx].src.clone(),
+                            },
+                        Err(err) => {
+                            use std::env::VarError;
+                            match err {
+                                PasteError::Io(err) => {
+                                    self.add_client_err_msg(
+                                        &format!(
+                                            "Error while running $EDITOR: {:?}",
+                                            err),
+                                        &MsgTarget::CurrentTab);
+                                }
+                                PasteError::Var(VarError::NotPresent) => {
+                                    self.add_client_err_msg(
+                                        "Can't paste multi-line string: \
+                                         make sure your $EDITOR is set",
+                                        &MsgTarget::CurrentTab);
+                                }
+                                PasteError::Var(VarError::NotUnicode(_)) => {
+                                    self.add_client_err_msg(
+                                        "Can't paste multi-line string: \
+                                         can't parse $EDITOR (not unicode)",
+                                        &MsgTarget::CurrentTab);
+                                }
+                                PasteError::PastedCmd => {
+                                    self.add_client_err_msg(
+                                        "One of the pasted lines looks like a command.",
+                                        &MsgTarget::CurrentTab);
+                                }
+                            }
+                            TUIRet::KeyHandled
+                        }
+                    }
+                } else {
                     // TODO this may be too slow for pasting long single lines
                     for ch in str.chars() {
                         self.handle_input_event(Event::Key(Key::Char(ch)));
                     }
                     TUIRet::KeyHandled
-                } else {
-                    // TODO: Paste with newlines
-                    TUIRet::EventIgnored(Event::String(str))
                 }
             }
 
@@ -1197,4 +1238,88 @@ impl TUI {
         }
         (left, right)
     }
+}
+
+#[derive(Debug)]
+pub enum PasteError {
+    Io(::std::io::Error),
+    Var(::std::env::VarError),
+    /// One of the lines looks like a command. This is something we don't support yet.
+    PastedCmd,
+}
+
+impl From<::std::io::Error> for PasteError {
+    fn from(err: ::std::io::Error) -> PasteError {
+        PasteError::Io(err)
+    }
+}
+
+impl From<::std::env::VarError> for PasteError {
+    fn from(err: ::std::env::VarError) -> PasteError {
+        PasteError::Var(err)
+    }
+}
+
+/// The user tried to paste the multi-line string passed as the argument. Run $EDITOR to edit a
+/// temporary file with the string as the contents. On exit, parse the final contents of the file
+/// (ignore comment lines), and send each line in the file as a message. Abort if any of the lines
+/// look like a command (e.g. `/msg ...`). I don't know what's the best way to handle commands in
+/// this context.
+///
+/// Ok(str) => final string to send
+/// Err(str) => err message to show
+///
+/// FIXME: Ideally this function should get a `Termbox` argument and return a new `Termbox` because
+/// we shutdown the current termbox instance and initialize it again after running $EDITOR.
+pub fn paste_lines(str: &str) -> Result<Vec<String>, PasteError> {
+    use std::io::Read;
+    use std::io::Write;
+    use std::io::{Seek, SeekFrom};
+    use std::process::Command;
+
+    use termbox_simple::*;
+
+    let editor = ::std::env::var("EDITOR")?;
+    let mut tmp_file = ::tempfile::NamedTempFile::new()?;
+
+    writeln!(tmp_file, "\
+        # You pasted a multi-line message. When you close the editor final version of\n\
+        # this file will be sent (ignoring these lines). Delete contents to abort the\n\
+        # paste.")?;
+    write!(tmp_file, "{}", str.replace('\r', "\n"))?;
+
+    unsafe { tb_shutdown(); }
+    let ret = Command::new(editor).arg(tmp_file.path()).status();
+    unsafe { tb_init(); }
+    // No need to set color mode etc. again as they're held in static variables and won't be reset
+    // after tb_shutdown()
+
+    let ret = ret?;
+    if !ret.success() {
+        return Ok(vec![]); // assume aborted
+    }
+
+    let mut tmp_file = tmp_file.into_file();
+    tmp_file.seek(SeekFrom::Start(0))?;
+
+    let mut file_contents = String::new();
+    tmp_file.read_to_string(&mut file_contents)?;
+
+    let mut filtered_lines = vec![];
+    for s in file_contents.lines() {
+        let s_ = s.trim_left();
+        let first_char = s_.chars().next();
+        // Ignore if first non-whitespace char is '#'
+        // No way to send a line starting with '#' now, I hope that's OK
+        if first_char == Some('#') {
+            // skip this line
+            continue;
+        } else if first_char == Some('/') {
+            return Err(PasteError::PastedCmd);
+        } else {
+            filtered_lines.push(s.to_owned());
+        }
+    }
+
+    Ok(filtered_lines)
 }
