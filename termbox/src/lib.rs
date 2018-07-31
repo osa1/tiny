@@ -34,19 +34,19 @@ const TB_OUTPUT_NORMAL    : libc::c_int = 1;
 const TB_OUTPUT_GRAYSCALE : libc::c_int = 4;
 
 extern {
-    fn tb_init() -> libc::c_int;
-    fn tb_resize();
-    fn tb_shutdown();
-    fn tb_width() -> libc::c_int;
-    fn tb_height() -> libc::c_int;
-    fn tb_clear() -> libc::c_int;
-    fn tb_set_clear_attributes(fg: u16, bg: u16);
-    fn tb_present();
-    fn tb_set_cursor(cx: libc::c_int, cy: libc::c_int);
-    fn tb_put_cell(x: libc::c_int, y: libc::c_int, cell: Cell);
-    fn tb_change_cell(x: libc::c_int, y: libc::c_int, ch: u32, fg: u16, bg: u16);
+    pub fn tb_init() -> libc::c_int;
+    pub fn tb_resize();
+    pub fn tb_shutdown();
+    pub fn tb_width() -> libc::c_int;
+    pub fn tb_height() -> libc::c_int;
+    pub fn tb_clear() -> libc::c_int;
+    pub fn tb_set_clear_attributes(fg: u16, bg: u16);
+    pub fn tb_present();
+    pub fn tb_set_cursor(cx: libc::c_int, cy: libc::c_int);
+    pub fn tb_put_cell(x: libc::c_int, y: libc::c_int, cell: Cell);
+    pub fn tb_change_cell(x: libc::c_int, y: libc::c_int, ch: u32, fg: u16, bg: u16);
     // fn tb_cell_buffer() -> *mut tb_cell;
-    fn tb_select_output_mode(mode: libc::c_int) -> libc::c_int;
+    pub fn tb_select_output_mode(mode: libc::c_int) -> libc::c_int;
 }
 
 pub struct Termbox {}

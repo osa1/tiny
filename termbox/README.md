@@ -12,6 +12,12 @@ Main differences are:
 
 (Based on [7f7694](https://github.com/nsf/termbox/commit/7f7694061d7d3eba9a7d9b6a8313155c03545e46))
 
+* Few other tweaks in various functions:
+
+    - `tb_shutdown` resets `cursor_x` and `cursor_y` so that in an application
+      if you shutdown termbox and then initialize again you get correct cursor
+      rendering.
+
 1/7/2017:
 
 * Support for terminal focus events implemented.
