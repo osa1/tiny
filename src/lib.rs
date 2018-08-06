@@ -9,10 +9,8 @@
 #![feature(offset_to)]
 #![feature(ptr_offset_from)]
 
-extern crate alloc_system;
-
 #[global_allocator]
-static ALLOC: alloc_system::System = alloc_system::System;
+static ALLOC: std::alloc::System = std::alloc::System;
 
 #[cfg(test)]
 extern crate quickcheck;
