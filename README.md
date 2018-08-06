@@ -230,20 +230,9 @@ handling etc.).
 
 Any suggestions / code reviews / pull requests are very welcome!
 
-If you're looking to contribute, see TODOs below. If you don't know where to
-start, open an issue and I'd love to help.
-
-## TODOs
-
-- Logging should be improved. Currently messages are logged in raw form in
-  `<log dir>/server_raw.log`, but outgoing message are not logged. Channel logs
-  are printed in a weird format etc.
-
-- Only a small subset of IRC messages are implemented. I don't moderate
-  channels, so my needs are simple. For moderation commands or other commands
-  that tiny currently doesn't support, maybe we should implement a "send raw
-  message" command so that any user can directly send an IRC message to a server
-  without any support from tiny.
+If you're looking to contribute please see open issues. If you don't know where
+to start, write a comment in the issue you'd like to work on and I'd love to
+help.
 
 ## Contributors
 
