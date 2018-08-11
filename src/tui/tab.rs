@@ -57,7 +57,7 @@ impl Tab {
     pub fn width(&self) -> i32 {
         // TODO: assuming ASCII string here. We should probably switch to a AsciiStr type.
         self.visible_name().len() as i32 +
-            if self.widget.get_ignore_state() { 0 } else { 3 }
+            if self.widget.get_ignore_state() { 0 } else { 3 } + 3
     }
 
     pub fn draw(
@@ -75,6 +75,21 @@ impl Tab {
         };
 
         let mut switch_drawn = false;
+
+        pos_x += 1;
+        match self.notifier {
+            Notifier::Off => {
+                ::tui::termbox::print_chars(tb, pos_x, pos_y, style, "".chars());
+            },
+            Notifier::Mentions => {
+                ::tui::termbox::print_chars(tb, pos_x, pos_y, style, "○".chars());
+            },
+            Notifier::Messages => {
+                ::tui::termbox::print_chars(tb, pos_x, pos_y, style, "●".chars());
+            },
+        };
+        pos_x += 2;
+
         for ch in self.visible_name().chars() {
             if Some(ch) == self.switch && !switch_drawn {
                 tb.change_cell(pos_x, pos_y, ch, style.fg | TB_UNDERLINE, style.bg);
