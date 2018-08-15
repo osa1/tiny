@@ -8,8 +8,6 @@
 //! Keyboard events are read from stdin. We look for byte strings of key combinations that we care
 //! about. E.g. Alt-arrow keys, C-w etc.
 
-#![feature(const_atomic_bool_new)]
-
 extern crate libc;
 extern crate nix;
 

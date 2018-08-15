@@ -1,12 +1,10 @@
 #![cfg_attr(test, feature(test))]
 #![feature(alloc_system)]
 #![feature(allocator_api)]
-#![feature(ascii_ctype)]
 #![feature(const_fn)]
 #![feature(drain_filter)]
 #![feature(entry_and_modify)]
 #![feature(nll)]
-#![feature(offset_to)]
 #![feature(ptr_offset_from)]
 
 #[global_allocator]
