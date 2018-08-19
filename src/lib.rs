@@ -3,7 +3,6 @@
 #![feature(allocator_api)]
 #![feature(const_fn)]
 #![feature(drain_filter)]
-#![feature(entry_and_modify)]
 #![feature(nll)]
 #![feature(ptr_offset_from)]
 
