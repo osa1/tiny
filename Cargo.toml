@@ -33,8 +33,8 @@ serde_derive = "1.0.8"
 serde_yaml = "0.7.1"
 take_mut = "0.2.0"
 tempfile = "3.0.3"
-term_input = { path = "term_input" }
-termbox_simple = { path = "termbox" }
+term_input = { path = "term_input", version = "0.1.4" }
+termbox_simple = { path = "termbox", version = "0.2.2" }
 time = "0.1"
 
 [dev-dependencies]
