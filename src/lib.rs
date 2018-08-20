@@ -918,7 +918,7 @@ fn find_conn<'a, 'poll>(
         None =>
             None,
         Some(idx) =>
-            Some(unsafe { conns.get_unchecked_mut(idx) }),
+            Some(&mut conns[idx]),
     }
 }
 

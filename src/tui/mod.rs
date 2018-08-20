@@ -941,7 +941,7 @@ impl TUI {
 
         for tab_idx in target_idxs {
             f(
-                unsafe { self.tabs.get_unchecked_mut(tab_idx) },
+                &mut self.tabs[tab_idx],
                 self.active_idx == tab_idx,
             );
         }

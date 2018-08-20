@@ -358,9 +358,9 @@ fn parse_reply_num(bs: &[u8]) -> Option<u16> {
     }
 
     if bs.len() == 3 {
-        let n3 = unsafe { *bs.get_unchecked(0) };
-        let n2 = unsafe { *bs.get_unchecked(1) };
-        let n1 = unsafe { *bs.get_unchecked(2) };
+        let n3 = bs[0];
+        let n2 = bs[1];
+        let n1 = bs[2];
         if is_num_ascii(n3) && is_num_ascii(n2) && is_num_ascii(n1) {
             return Some(
                 ((n3 - b'0') as u16) * 100 + ((n2 - b'0') as u16) * 10 + ((n1 - b'0') as u16),

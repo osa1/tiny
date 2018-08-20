@@ -203,7 +203,7 @@ impl Line {
         let mut line_start: i32 = 0;
 
         for split_idx in 0..self.splits.len() {
-            let char_idx = *unsafe { self.splits.get_unchecked(split_idx) };
+            let char_idx = self.splits[split_idx];
             // writeln!(io::stderr(), "rendered_height: char_idx: {}", char_idx);
             let col = char_idx - line_start;
 

@@ -57,7 +57,7 @@ impl MsgArea {
         // Draw lines in reverse order
         let mut line_idx = (self.lines.len() as i32) - 1;
         while line_idx >= 0 && row >= pos_y {
-            let line = unsafe { self.lines.get_unchecked(line_idx as usize) };
+            let line = &self.lines[line_idx as usize];
             let line_height = line.rendered_height(self.width);
             debug_assert!(line_height > 0);
 
