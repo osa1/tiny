@@ -245,6 +245,16 @@ impl MessagingUI {
         &self.nicks
     }
 
+    /// Get contents of the input field and clear it.
+    pub fn flush_input_field(&mut self) -> String {
+        self.input_field.flush()
+    }
+
+    /// Add a line to input field history.
+    pub fn add_input_field_history(&mut self, str: &str) {
+        self.input_field.add_history(str)
+    }
+
     fn toggle_exit_dialogue(&mut self) {
         let exit_dialogue = ::std::mem::replace(&mut self.exit_dialogue, None);
         if exit_dialogue.is_none() {

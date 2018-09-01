@@ -358,12 +358,19 @@ impl TUI {
                 // translated to carriage returns when pasting so we check for
                 // both just to make sure
                 if str.contains('\n') || str.contains('\r') {
-                    match paste_lines(&str) {
-                        Ok(lines) =>
+                    let tab = &mut self.tabs[self.active_idx].widget;
+                    let tf = tab.flush_input_field();
+                    match paste_lines(tf, &str) {
+                        Ok(lines) => {
+                            // Add the lines to text field history
+                            for line in &lines {
+                                tab.add_input_field_history(line);
+                            }
                             TUIRet::Lines {
                                 lines,
                                 from: self.tabs[self.active_idx].src.clone(),
-                            },
+                            }
+                        }
                         Err(err) => {
                             use std::env::VarError;
                             match err {
@@ -1271,7 +1278,7 @@ impl From<::std::env::VarError> for PasteError {
 ///
 /// FIXME: Ideally this function should get a `Termbox` argument and return a new `Termbox` because
 /// we shutdown the current termbox instance and initialize it again after running $EDITOR.
-pub fn paste_lines(str: &str) -> Result<Vec<String>, PasteError> {
+pub fn paste_lines(tf: String, str: &str) -> Result<Vec<String>, PasteError> {
     use std::io::Read;
     use std::io::Write;
     use std::io::{Seek, SeekFrom};
@@ -1286,6 +1293,7 @@ pub fn paste_lines(str: &str) -> Result<Vec<String>, PasteError> {
         # You pasted a multi-line message. When you close the editor final version of\n\
         # this file will be sent (ignoring these lines). Delete contents to abort the\n\
         # paste.")?;
+    write!(tmp_file, "{}", tf)?;
     write!(tmp_file, "{}", str.replace('\r', "\n"))?;
 
     unsafe { tb_shutdown(); }

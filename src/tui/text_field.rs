@@ -373,6 +373,17 @@ impl TextField {
         }
     }
 
+    /// Get contents of the text field and clear it.
+    pub fn flush(&mut self) -> String {
+        self.cursor = 0;
+        self.buffer.drain(..).collect()
+    }
+
+    /// Add a line to the text field history.
+    pub fn add_history(&mut self, str: &str) {
+        self.history.push(str.chars().collect());
+    }
+
     fn consume_word_before_curs(&mut self) {
         // No modifications can happen if the scroll is at the beginning
         if self.cursor == 0 {
