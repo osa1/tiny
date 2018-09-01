@@ -358,61 +358,72 @@ impl TUI {
                 // translated to carriage returns when pasting so we check for
                 // both just to make sure
                 if str.contains('\n') || str.contains('\r') {
-                    let tab = &mut self.tabs[self.active_idx].widget;
-                    let tf = tab.flush_input_field();
-                    match paste_lines(tf, &str) {
-                        Ok(lines) => {
-                            // Add the lines to text field history
-                            for line in &lines {
-                                tab.add_input_field_history(line);
-                            }
-                            TUIRet::Lines {
-                                lines,
-                                from: self.tabs[self.active_idx].src.clone(),
-                            }
-                        }
-                        Err(err) => {
-                            use std::env::VarError;
-                            match err {
-                                PasteError::Io(err) => {
-                                    self.add_client_err_msg(
-                                        &format!(
-                                            "Error while running $EDITOR: {:?}",
-                                            err),
-                                        &MsgTarget::CurrentTab);
-                                }
-                                PasteError::Var(VarError::NotPresent) => {
-                                    self.add_client_err_msg(
-                                        "Can't paste multi-line string: \
-                                         make sure your $EDITOR is set",
-                                        &MsgTarget::CurrentTab);
-                                }
-                                PasteError::Var(VarError::NotUnicode(_)) => {
-                                    self.add_client_err_msg(
-                                        "Can't paste multi-line string: \
-                                         can't parse $EDITOR (not unicode)",
-                                        &MsgTarget::CurrentTab);
-                                }
-                                PasteError::PastedCmd => {
-                                    self.add_client_err_msg(
-                                        "One of the pasted lines looks like a command.",
-                                        &MsgTarget::CurrentTab);
-                                }
-                            }
-                            TUIRet::KeyHandled
-                        }
-                    }
+                    self.edit_input(&str);
                 } else {
                     // TODO this may be too slow for pasting long single lines
                     for ch in str.chars() {
                         self.handle_input_event(Event::Key(Key::Char(ch)));
                     }
-                    TUIRet::KeyHandled
                 }
+                TUIRet::KeyHandled
             }
 
             ev =>
                 TUIRet::EventIgnored(ev),
+        }
+    }
+
+    /// Edit current input + `str` before sending.
+    fn edit_input(&mut self, str: &str) -> TUIRet {
+        let tab = &mut self.tabs[self.active_idx].widget;
+        let tf = tab.flush_input_field();
+        match paste_lines(tf, &str) {
+            Ok(lines) => {
+                // If there's only one line just add it to the input field, do not send it
+                if lines.len() == 1 {
+                    tab.set_input_field(&lines[0]);
+                    TUIRet::KeyHandled
+                } else {
+                    // Otherwise add the lines to text field history and send it
+                    for line in &lines {
+                        tab.add_input_field_history(line);
+                    }
+                    TUIRet::Lines {
+                        lines,
+                        from: self.tabs[self.active_idx].src.clone(),
+                    }
+                }
+            }
+            Err(err) => {
+                use std::env::VarError;
+                match err {
+                    PasteError::Io(err) => {
+                        self.add_client_err_msg(
+                            &format!(
+                                "Error while running $EDITOR: {:?}",
+                                err),
+                            &MsgTarget::CurrentTab);
+                    }
+                    PasteError::Var(VarError::NotPresent) => {
+                        self.add_client_err_msg(
+                            "Can't paste multi-line string: \
+                             make sure your $EDITOR is set",
+                            &MsgTarget::CurrentTab);
+                    }
+                    PasteError::Var(VarError::NotUnicode(_)) => {
+                        self.add_client_err_msg(
+                            "Can't paste multi-line string: \
+                             can't parse $EDITOR (not unicode)",
+                            &MsgTarget::CurrentTab);
+                    }
+                    PasteError::PastedCmd => {
+                        self.add_client_err_msg(
+                            "One of the pasted lines looks like a command.",
+                            &MsgTarget::CurrentTab);
+                    }
+                }
+                TUIRet::KeyHandled
+            }
         }
     }
 
@@ -444,6 +455,10 @@ impl TUI {
             Key::Ctrl('p') => {
                 self.prev_tab();
                 TUIRet::KeyHandled
+            }
+
+            Key::Ctrl('x') => {
+                self.edit_input("")
             }
 
             Key::AltChar(c) =>

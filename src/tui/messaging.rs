@@ -255,6 +255,11 @@ impl MessagingUI {
         self.input_field.add_history(str)
     }
 
+    /// Set input field contents.
+    pub fn set_input_field(&mut self, str: &str) {
+        self.input_field.set(str)
+    }
+
     fn toggle_exit_dialogue(&mut self) {
         let exit_dialogue = ::std::mem::replace(&mut self.exit_dialogue, None);
         if exit_dialogue.is_none() {

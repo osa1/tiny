@@ -384,6 +384,12 @@ impl TextField {
         self.history.push(str.chars().collect());
     }
 
+    pub fn set(&mut self, str: &str) {
+        self.mode = Mode::Edit;
+        self.buffer = str.chars().collect();
+        self.move_cursor_to_end();
+    }
+
     fn consume_word_before_curs(&mut self) {
         // No modifications can happen if the scroll is at the beginning
         if self.cursor == 0 {

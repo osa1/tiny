@@ -144,7 +144,7 @@ static XTERM_KEY_SEQS : [(&'static [u8], Event); 27] =
     ];
 
 // Make sure not to use 27 (ESC) because it's used as a prefix in many combinations.
-static XTERM_SINGLE_BYTES : [(u8, Event); 12] =
+static XTERM_SINGLE_BYTES : [(u8, Event); 13] =
     [ (9,   Event::Key(Key::Tab)),
       (127, Event::Key(Key::Backspace)),
       (1,   Event::Key(Key::Ctrl('a'))),
@@ -157,6 +157,7 @@ static XTERM_SINGLE_BYTES : [(u8, Event); 12] =
       (16,  Event::Key(Key::Ctrl('p'))),
       (14,  Event::Key(Key::Ctrl('n'))),
       (21,  Event::Key(Key::Ctrl('u'))),
+      (24,  Event::Key(Key::Ctrl('x'))),
     ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
