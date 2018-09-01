@@ -683,6 +683,20 @@ impl<'poll> Tiny<'poll> {
                     }
                 },
 
+            Cmd::Reply { num: 433, .. } => {
+                // ERR_NICKNAMEINUSE
+                if conn.is_nick_accepted() {
+                    // Nick change request from user failed. Just show an error message.
+                    self.tui.add_err_msg(
+                        "Nickname is already in use",
+                        Timestamp::now(),
+                        &MsgTarget::AllServTabs {
+                            serv_name: conn.get_serv_name()
+                        },
+                    );
+                }
+            }
+
             Cmd::PING { .. } | Cmd::PONG { .. } =>
                 // ignore
                 {}

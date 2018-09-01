@@ -62,6 +62,9 @@ pub struct Conn<'poll> {
     in_buf: Vec<u8>,
 
     sasl_auth: Option<config::SASLAuth>,
+
+    /// Do we have a nick yet? Try another nick on ERR_NICKNAMEINUSE (433) until we've got a nick.
+    nick_accepted: bool,
 }
 
 pub type ConnErr = StreamErr;
@@ -192,7 +195,8 @@ impl<'poll> Conn<'poll> {
                 stream,
             },
             in_buf: vec![],
-            sasl_auth: server.sasl_auth
+            sasl_auth: server.sasl_auth,
+            nick_accepted: false,
         })
     }
 
@@ -203,6 +207,8 @@ impl<'poll> Conn<'poll> {
             ConnStatus::Disconnected { ticks_passed: 0 },
         );
         drop(old_stream);
+
+        self.nick_accepted = false;
 
         if let Some((new_name, new_port)) = new_serv {
             self.serv_addr = new_name.to_owned();
@@ -243,6 +249,10 @@ impl<'poll> Conn<'poll> {
 
     pub fn get_nick(&self) -> &str {
         &self.nicks[self.current_nick_idx]
+    }
+
+    pub fn is_nick_accepted(&self) -> bool {
+        self.nick_accepted
     }
 
     /// Update the current nick state. Only do this after a new nick has given/accepted by the
@@ -287,6 +297,7 @@ impl<'poll> Conn<'poll> {
 
     pub fn enter_disconnect_state(&mut self) {
         self.status = ConnStatus::Disconnected { ticks_passed: 0 };
+        self.nick_accepted = false;
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -336,6 +347,7 @@ impl<'poll> Conn<'poll> {
                     let ticks = ticks_passed + 1;
                     if ticks == PONG_TICKS {
                         evs.push(ConnEv::Disconnected);
+                        self.nick_accepted = false;
                         ConnStatus::Disconnected { ticks_passed: 0 }
                     } else {
                         ConnStatus::WaitPong {
@@ -659,6 +671,7 @@ impl<'poll> Conn<'poll> {
             evs.push(ConnEv::Connected);
             evs.push(ConnEv::NickChange(self.get_nick().to_owned()));
             self.nickserv_ident();
+            self.nick_accepted = true;
         }
 
         if let Msg {
@@ -697,7 +710,9 @@ impl<'poll> Conn<'poll> {
         } = msg
         {
             // ERR_NICKNAMEINUSE
-            self.next_nick();
+            if !self.nick_accepted {
+                self.next_nick();
+            }
         }
 
         if let Msg {
