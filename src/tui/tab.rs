@@ -55,7 +55,7 @@ impl Tab {
 
     pub fn width(&self) -> i32 {
         // TODO: assuming ASCII string here. We should probably switch to a AsciiStr type.
-        self.visible_name().len() as i32 + if self.widget.get_ignore_state() { 0 } else { 3 }
+        self.visible_name().len() as i32
     }
 
     pub fn draw(
@@ -81,9 +81,6 @@ impl Tab {
                 tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
             }
             pos_x += 1;
-        }
-        if !self.widget.get_ignore_state() {
-            ::tui::termbox::print_chars(tb, pos_x, pos_y, style, "[i]".chars());
         }
     }
 }
