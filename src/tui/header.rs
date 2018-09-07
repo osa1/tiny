@@ -28,12 +28,12 @@ impl Header {
             ignore_state = "On"
         }
 
-        let left_pane = format!(" tiny | {}", visible_name);
-        let right_pane = format!("Notify: {} | Ignore: {} ", notify_state, ignore_state );
+        let left_pane = format!(" {} ", visible_name);
+        let right_pane = format!(" Notify: {} | Ignore: {} ", notify_state, ignore_state );
         let spacing_length = self.width - (right_pane.chars().count() as i32) - (left_pane.chars().count() as i32);
 
-        ::tui::termbox::print_chars(tb, 0, 0, colors.header_normal, left_pane.chars());
+        ::tui::termbox::print_chars(tb, 0, 0, colors.header_left, left_pane.chars());
         ::tui::termbox::print_chars(tb, left_pane.chars().count() as i32, 0, colors.header_normal," ".repeat(spacing_length as usize).chars());
-        ::tui::termbox::print_chars(tb, spacing_length + left_pane.chars().count() as i32 , 0, colors.header_normal, right_pane.chars());
+        ::tui::termbox::print_chars(tb, spacing_length + left_pane.chars().count() as i32 , 0, colors.header_right, right_pane.chars());
     }
 }

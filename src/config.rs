@@ -157,6 +157,8 @@ pub struct Colors {
     pub tab_new_msg: Style,
     pub tab_highlight: Style,
     pub header_normal: Style,
+    pub header_left: Style,
+    pub header_right: Style,
 }
 
 impl Default for Colors {
@@ -219,7 +221,9 @@ impl Default for Colors {
                 fg: 9 | TB_BOLD,
                 bg: 0,
             },
-            header_normal: Style { fg: 16, bg: 15 },
+            header_normal: Style { fg: 15, bg: 238 },
+            header_left: Style { fg: 10, bg: 238 },
+            header_right: Style { fg: 8, bg: 238 },
         }
     }
 }
