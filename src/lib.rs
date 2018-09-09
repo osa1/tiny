@@ -84,6 +84,7 @@ pub fn run() {
                 defaults,
                 colors,
                 log_dir,
+                statusline,
             }) => {
                 let servers = if !server_args.is_empty() {
                     // connect only to servers that match at least one of
@@ -102,7 +103,7 @@ pub fn run() {
                 } else {
                     servers
                 };
-                Tiny::run(servers, defaults, log_dir, colors, config_path)
+                Tiny::run(servers, defaults, log_dir, colors, statusline, config_path)
             }
         }
     }
@@ -127,6 +128,7 @@ impl<'poll> Tiny<'poll> {
         defaults: config::Defaults,
         log_dir: String,
         colors: config::Colors,
+        statusline: bool,
         config_path: PathBuf,
     ) {
         let poll = Poll::new().unwrap();
@@ -141,7 +143,7 @@ impl<'poll> Tiny<'poll> {
 
         let mut conns = Vec::with_capacity(servers.len());
 
-        let mut tui = TUI::new(colors);
+        let mut tui = TUI::new(colors, statusline);
 
         // init "mentions" tab
         tui.new_server_tab("mentions");
