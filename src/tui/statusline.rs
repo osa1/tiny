@@ -2,13 +2,13 @@ use termbox_simple::{Termbox};
 use config::Colors;
 use notifier::Notifier;
 
-pub struct Header {
+pub struct StatusLine {
     width: i32,
 }
 
-impl Header {
-    pub fn new(width: i32) -> Header {
-        Header {
+impl StatusLine {
+    pub fn new(width: i32) -> StatusLine {
+        StatusLine {
             width,
         }
     }
@@ -32,8 +32,8 @@ impl Header {
         let right_pane = format!(" Notify: {} | Ignore: {} ", notify_state, ignore_state );
         let spacing_length = self.width - (right_pane.chars().count() as i32) - (left_pane.chars().count() as i32);
 
-        ::tui::termbox::print_chars(tb, 0, 0, colors.header_left, left_pane.chars());
-        ::tui::termbox::print_chars(tb, left_pane.chars().count() as i32, 0, colors.header_normal," ".repeat(spacing_length as usize).chars());
-        ::tui::termbox::print_chars(tb, spacing_length + left_pane.chars().count() as i32 , 0, colors.header_right, right_pane.chars());
+        ::tui::termbox::print_chars(tb, 0, 0, colors.statusline_left, left_pane.chars());
+        ::tui::termbox::print_chars(tb, left_pane.chars().count() as i32, 0, colors.statusline_normal," ".repeat(spacing_length as usize).chars());
+        ::tui::termbox::print_chars(tb, spacing_length + left_pane.chars().count() as i32 , 0, colors.statusline_right, right_pane.chars());
     }
 }

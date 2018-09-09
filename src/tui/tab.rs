@@ -5,11 +5,11 @@ use config::Style;
 use notifier::Notifier;
 use tui::messaging::MessagingUI;
 use tui::MsgSource;
-use tui::header::Header;
+use tui::statusline::StatusLine;
 
 pub struct Tab {
     pub widget: MessagingUI,
-    pub header: Header,
+    pub statusline: StatusLine,
     pub src: MsgSource,
     pub style: TabStyle,
     /// Alt-character to use to switch to this tab.
