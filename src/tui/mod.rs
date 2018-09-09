@@ -510,6 +510,7 @@ impl TUI {
 
         for tab in &mut self.tabs {
             tab.widget.resize(self.width, self.height - 1);
+            tab.statusline.resize(self.width)
         }
         // scroll the tab bar so that currently active tab is still visible
         let (mut tab_left, mut tab_right) = self.rendered_tabs();
@@ -555,6 +556,9 @@ impl TUI {
             tab_left = tab_left_;
             num_visible = num_visible_;
         }
+
+        // redraw after resize
+        self.draw()
     }
 
     pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
