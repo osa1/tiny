@@ -19,7 +19,7 @@ use tiny::tui::TabStyle;
 use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
 
 fn main() {
-    let mut tui = TUI::new(Colors::default());
+    let mut tui = TUI::new(Colors::default(), true);
 
     tui.new_server_tab("mentions");
 

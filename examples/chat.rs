@@ -26,7 +26,7 @@ fn main() {
         chan_name: "chan",
     };
 
-    let mut tui = TUI::new(Colors::default());
+    let mut tui = TUI::new(Colors::default(), true);
     tui.new_server_tab("debug");
     tui.new_chan_tab("debug", "chan");
     tui.show_topic("This is channel topic", Timestamp::now(), &chan_target);
