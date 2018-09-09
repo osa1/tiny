@@ -221,9 +221,9 @@ impl Default for Colors {
                 fg: 9 | TB_BOLD,
                 bg: 0,
             },
-            header_normal: Style { fg: 15, bg: 238 },
-            header_left: Style { fg: 10, bg: 238 },
-            header_right: Style { fg: 8, bg: 238 },
+            header_normal: Style { fg: 15, bg: 8 },
+            header_left: Style { fg: 10, bg: 8 },
+            header_right: Style { fg: 7, bg: 8 },
         }
     }
 }
