@@ -72,12 +72,13 @@ pub fn parse_cmd(cmd: &str) -> ParseCmdResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&'static Cmd; 14] = [
+static CMDS: [&'static Cmd; 15] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
     &HELP_CMD,
+    &STATUSLINE_CMD,
     &IGNORE_CMD,
     &JOIN_CMD,
     &ME_CMD,
@@ -285,6 +286,16 @@ static HELP_CMD: Cmd = Cmd {
 
 fn help(_: &str, _: &Poll, _: &mut Tiny, _: MsgSource) {
     // TODO
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static STATUSLINE_CMD: Cmd = Cmd {
+    name: "statusline",
+    cmd_fn: statusline,
+};
+fn statusline(_: &str, _: &Poll, tiny: &mut Tiny, _src: MsgSource) {
+    tiny.tui.toggle_statusline();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
