@@ -143,7 +143,10 @@ impl<'poll> Tiny<'poll> {
 
         let mut conns = Vec::with_capacity(servers.len());
 
-        let mut tui = TUI::new(colors, statusline);
+        let mut tui = TUI::new(colors);
+        if statusline {
+            tui.toggle_statusline();
+        }
 
         // init "mentions" tab
         tui.new_server_tab("mentions");

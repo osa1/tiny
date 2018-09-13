@@ -204,14 +204,13 @@ Commands start with `/` character.
 - `/statusline`: Enable or disable status line on top which gives you info about
   current settings of a tab.
 
-- `/ignore`: Ignore `join/quit` messages in a channel. Running
-  this command in a server tab applies it to all channels of that server.
-  You can check your ignore state in the status line.
+- `/ignore`: Ignore `join/quit` messages in a channel. Running this command in
+  a server tab applies it to all channels of that server. You can check your
+  ignore state in the status line.
 
 - `/notify [off|mentions|messages]`: Enable and disable desktop notifications.
-  You can use `/notify` command without any arguments to see the current mode.
-  Running this command in a server tab applies it to all channels of that server.
-  You can check your notify state in the status line.
+  Running this command in a server tab applies it to all channels of that
+  server. You can check your notify state in the status line.
 
 ## Development
 

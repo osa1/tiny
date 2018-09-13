@@ -20,7 +20,7 @@ use tui::messaging::MessagingUI;
 pub use tui::tab::Tab;
 pub use tui::tab::TabStyle;
 use tui::widget::WidgetRet;
-use tui::statusline::StatusLine;
+use tui::statusline::{draw_statusline, statusline_visible};
 
 #[derive(Debug)]
 pub enum TUIRet {
@@ -106,7 +106,10 @@ pub struct TUI {
     height: i32,
     h_scroll: i32,
 
+    /// Do we want to show statusline?
     show_statusline: bool,
+    /// Is there room for statusline?
+    statusline_visible: bool,
 }
 
 impl MsgSource {
@@ -145,7 +148,7 @@ impl MsgSource {
 }
 
 impl TUI {
-    pub fn new(colors: Colors, statusline: bool) -> TUI {
+    pub fn new(colors: Colors) -> TUI {
         let mut tb = Termbox::init().unwrap(); // TODO: check errors
         tb.set_output_mode(OutputMode::Output256);
         tb.set_clear_attributes(colors.clear.fg, colors.clear.bg);
@@ -161,7 +164,8 @@ impl TUI {
             width,
             height,
             h_scroll: 0,
-            show_statusline:statusline
+            show_statusline: false,
+            statusline_visible: statusline_visible(width, height),
         }
     }
 
@@ -208,7 +212,6 @@ impl TUI {
             idx,
             Tab {
                 widget: MessagingUI::new(self.width, self.height - 1, status),
-                statusline: StatusLine::new(self.width),
                 src,
                 style: TabStyle::Normal,
                 switch,
@@ -508,9 +511,11 @@ impl TUI {
         self.width = self.tb.width();
         self.height = self.tb.height();
 
+        self.statusline_visible = statusline_visible(self.width, self.height);
+        let statusline_height = if self.statusline_visible { 1 } else { 0 };
+
         for tab in &mut self.tabs {
-            tab.widget.resize(self.width, self.height - 1);
-            tab.statusline.resize(self.width)
+            tab.widget.resize(self.width, self.height - 1 - statusline_height);
         }
         // scroll the tab bar so that currently active tab is still visible
         let (mut tab_left, mut tab_right) = self.rendered_tabs();
@@ -658,16 +663,16 @@ impl TUI {
             .widget
             .draw(&mut self.tb, &self.colors, 0, 0);
 
-        self.tabs[self.active_idx]
-            .statusline
-            .draw(
+        if self.show_statusline && self.statusline_visible {
+            draw_statusline(
                 &mut self.tb,
+                self.width,
                 &self.colors,
-                &self.show_statusline,
                 &self.tabs[self.active_idx].visible_name(),
                 &self.tabs[self.active_idx].notifier,
                 self.tabs[self.active_idx].widget.get_ignore_state()
             );
+        }
 
         // decide whether we need to draw left/right arrows in tab bar
         let left_arr = self.draw_left_arrow();
@@ -1150,10 +1155,6 @@ impl TUI {
                 tab.widget.set_or_toggle_ignore(None);
             });
         }
-        // Changing tab names (adding "[i]" suffix) may make the tab currently
-        // selected overflow from the screen. Easiest (although not most
-        // efficient) way to fix this is `resize()`.
-        self.resize();
     }
 
     pub fn does_user_tab_exist(&self, serv_name_: &str, nick_: &str) -> bool {
