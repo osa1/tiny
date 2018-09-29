@@ -1,3 +1,7 @@
+# WIP
+
+- A bug when using an invalid nick in `/msg` command fixed (#111).
+
 # 2018/09/01: 0.4.3
 
 - tiny now supports pasting multi-line strings. It runs `$EDITOR` to let you

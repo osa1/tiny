@@ -383,35 +383,54 @@ static MSG_CMD: Cmd = Cmd {
     cmd_fn: msg,
 };
 
-fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
-    let words = args.split_whitespace().collect::<Vec<_>>();
-    if words.len() < 2 {
-        return tiny.tui.add_client_err_msg(
-            "/msg usage: /msg target message", &MsgTarget::CurrentTab);
+fn split_msg_args(args: &str) -> Option<(&str, &str)> {
+    // Apparently we can't break with a val in a for loop yet so using mut var
+    let mut target_msg: Option<(&str, &str)> = None;
+    for (i, c) in args.char_indices() {
+        if !utils::is_nick_char(c) {
+            // This is where we split the message into target and actual message, however if the
+            // current char is a whitespace then we don't include it in the message, otherwise most
+            // messages would start with a whitespace. See `test_msg_args` below for some examples.
+            let target = &args[0..i];
+            let i = if c.is_whitespace() { i + 1 } else { i };
+            let msg = &args[i..];
+            target_msg = Some((target, msg));
+            break;
+        }
     }
-    let target = words[0];
+    target_msg
+}
 
-    // need to find index of the second word
-    let mut word_indices = utils::split_whitespace_indices(args);
-    word_indices.next(); // target
-    if let Some(msg_begins) = word_indices.next() {
-        let msg = &args[msg_begins..];
-        let src = if tiny.conns.iter().any(|conn| conn.get_serv_name() == target) {
-            MsgSource::Serv {
-                serv_name: target.to_owned(),
-            }
-        } else {
-            let serv = src.serv_name();
-            MsgSource::User {
-                serv_name: serv.to_owned(),
-                nick: target.to_owned(),
-            }
-        };
-        tiny.send_msg(&src, msg, false);
-    } else {
-        return tiny.tui.add_client_err_msg(
+fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+    let mut fail = || {
+        tiny.tui.add_client_err_msg(
             "/msg usage: /msg target message", &MsgTarget::CurrentTab);
-    }
+    };
+
+    let (target, msg) = match split_msg_args(args) {
+        None => { return fail() }
+        Some((target, msg)) => {
+            if msg.is_empty() {
+                return fail();
+            } else {
+                (target, msg)
+            }
+        }
+    };
+
+    let src = if tiny.conns.iter().any(|conn| conn.get_serv_name() == target) {
+        MsgSource::Serv {
+            serv_name: target.to_owned(),
+        }
+    } else {
+        let serv = src.serv_name();
+        MsgSource::User {
+            serv_name: serv.to_owned(),
+            nick: target.to_owned(),
+        }
+    };
+
+    tiny.send_msg(&src, msg, false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -609,5 +628,13 @@ mod tests {
                 panic!("Can't parse cmd");
             }
         }
+    }
+
+    #[test]
+    fn test_msg_args() {
+        assert_eq!(split_msg_args("foo,bar"), Some(("foo", ",bar")));
+        assert_eq!(split_msg_args("foo bar"), Some(("foo", "bar")));
+        assert_eq!(split_msg_args("foo, bar"), Some(("foo", ", bar")));
+        assert_eq!(split_msg_args("foo ,bar"), Some(("foo", ",bar")));
     }
 }
