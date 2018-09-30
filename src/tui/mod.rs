@@ -208,10 +208,11 @@ impl TUI {
             ret
         };
 
+        let statusline_height = if self.statusline_visible && self.show_statusline { 1 } else { 0 };
         self.tabs.insert(
             idx,
             Tab {
-                widget: MessagingUI::new(self.width, self.height - 1, status),
+                widget: MessagingUI::new(self.width, self.height - 1 - statusline_height, status),
                 src,
                 style: TabStyle::Normal,
                 switch,
@@ -512,8 +513,7 @@ impl TUI {
         self.height = self.tb.height();
 
         self.statusline_visible = statusline_visible(self.width, self.height);
-        let statusline_height = if self.statusline_visible { 1 } else { 0 };
-
+        let statusline_height = if self.statusline_visible && self.show_statusline { 1 } else { 0 };
         for tab in &mut self.tabs {
             tab.widget.resize(self.width, self.height - 1 - statusline_height);
         }
@@ -561,9 +561,6 @@ impl TUI {
             tab_left = tab_left_;
             num_visible = num_visible_;
         }
-
-        // redraw after resize
-        self.draw()
     }
 
     pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
@@ -659,9 +656,10 @@ impl TUI {
     pub fn draw(&mut self) {
         self.tb.clear();
 
+        let statusline_height = if self.statusline_visible && self.show_statusline { 1 } else { 0 };
         self.tabs[self.active_idx]
             .widget
-            .draw(&mut self.tb, &self.colors, 0, 0);
+            .draw(&mut self.tb, &self.colors, 0, statusline_height);
 
         if self.show_statusline && self.statusline_visible {
             draw_statusline(
@@ -1131,6 +1129,10 @@ impl TUI {
 
     pub fn toggle_statusline(&mut self) {
         self.show_statusline = !self.show_statusline;
+        let statusline_height = if self.statusline_visible && self.show_statusline { 1 } else { 0 };
+        for tab in &mut self.tabs {
+            tab.widget.resize(self.width, self.height - 1 - statusline_height);
+        }
     }
 
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
