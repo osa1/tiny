@@ -517,50 +517,56 @@ impl TUI {
         for tab in &mut self.tabs {
             tab.widget.resize(self.width, self.height - 1 - statusline_height);
         }
-        // scroll the tab bar so that currently active tab is still visible
-        let (mut tab_left, mut tab_right) = self.rendered_tabs();
-        if tab_left == tab_right {
-            // nothing to show
-            return;
-        }
-        while self.active_idx < tab_left || self.active_idx >= tab_right {
-            if self.active_idx >= tab_right {
-                // scroll right
-                self.h_scroll += self.tabs[tab_left].width() + 1;
-            } else if self.active_idx < tab_left {
-                // scroll left
+
+        if self.tabs.len() > 0 {
+            // scroll the tab bar so that currently active tab is still visible
+            let (mut tab_left, mut tab_right) = self.rendered_tabs();
+            if tab_left == tab_right {
+                // nothing to show
+                return;
+            }
+            while self.active_idx < tab_left || self.active_idx >= tab_right {
+                if self.active_idx >= tab_right {
+                    // scroll right
+                    self.h_scroll += self.tabs[tab_left].width() + 1;
+                } else if self.active_idx < tab_left {
+                    // scroll left
+                    self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
+                }
+                let (tab_left_, tab_right_) = self.rendered_tabs();
+                tab_left = tab_left_;
+                tab_right = tab_right_;
+            }
+            // the selected tab is visible. scroll to the left as much as possible
+            // to make more tabs visible.
+            let mut num_visible = tab_right - tab_left;
+            loop {
+                if tab_left == 0 {
+                    break;
+                }
+                // save current scroll value
+                let scroll_orig = self.h_scroll;
+                // scoll to the left
                 self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
+                // get new bounds
+                let (tab_left_, tab_right_) = self.rendered_tabs();
+                // commit if these two conditions hold
+                let num_visible_ = tab_right_ - tab_left_;
+                let more_tabs_visible = num_visible_ > num_visible;
+                let selected_tab_visible = self.active_idx >= tab_left_ && self.active_idx < tab_right_;
+                if !(more_tabs_visible && selected_tab_visible) {
+                    // revert scroll value and abort
+                    self.h_scroll = scroll_orig;
+                    break;
+                }
+                // otherwise commit
+                tab_left = tab_left_;
+                num_visible = num_visible_;
             }
-            let (tab_left_, tab_right_) = self.rendered_tabs();
-            tab_left = tab_left_;
-            tab_right = tab_right_;
         }
-        // the selected tab is visible. scroll to the left as much as possible
-        // to make more tabs visible.
-        let mut num_visible = tab_right - tab_left;
-        loop {
-            if tab_left == 0 {
-                break;
-            }
-            // save current scroll value
-            let scroll_orig = self.h_scroll;
-            // scoll to the left
-            self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
-            // get new bounds
-            let (tab_left_, tab_right_) = self.rendered_tabs();
-            // commit if these two conditions hold
-            let num_visible_ = tab_right_ - tab_left_;
-            let more_tabs_visible = num_visible_ > num_visible;
-            let selected_tab_visible = self.active_idx >= tab_left_ && self.active_idx < tab_right_;
-            if !(more_tabs_visible && selected_tab_visible) {
-                // revert scroll value and abort
-                self.h_scroll = scroll_orig;
-                break;
-            }
-            // otherwise commit
-            tab_left = tab_left_;
-            num_visible = num_visible_;
-        }
+
+        // redraw after resize
+        self.draw()
     }
 
     pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
@@ -656,57 +662,72 @@ impl TUI {
     pub fn draw(&mut self) {
         self.tb.clear();
 
-        let statusline_height = if self.statusline_visible && self.show_statusline { 1 } else { 0 };
-        self.tabs[self.active_idx]
-            .widget
-            .draw(&mut self.tb, &self.colors, 0, statusline_height);
+        if self.tabs.len() > 0 {
+            let statusline_height = if self.statusline_visible && self.show_statusline { 1 } else { 0 };
+            self.tabs[self.active_idx]
+                .widget
+                .draw(&mut self.tb, &self.colors, 0, statusline_height);
 
-        if self.show_statusline && self.statusline_visible {
-            draw_statusline(
-                &mut self.tb,
-                self.width,
-                &self.colors,
-                &self.tabs[self.active_idx].visible_name(),
-                &self.tabs[self.active_idx].notifier,
-                self.tabs[self.active_idx].widget.get_ignore_state()
-            );
+            if self.show_statusline && self.statusline_visible {
+                draw_statusline(
+                    &mut self.tb,
+                    self.width,
+                    &self.colors,
+                    &self.tabs[self.active_idx].visible_name(),
+                    &self.tabs[self.active_idx].notifier,
+                    self.tabs[self.active_idx].widget.get_ignore_state()
+                );
+            }
+
+            // decide whether we need to draw left/right arrows in tab bar
+            let left_arr = self.draw_left_arrow();
+            let right_arr = self.draw_right_arrow();
+
+            let (tab_left, tab_right) = self.rendered_tabs();
+
+            let mut pos_x: i32 = 0;
+            if left_arr {
+                let style = arrow_style(&self.tabs[0..tab_left], &self.colors);
+                self.tb.change_cell(
+                    pos_x,
+                    self.height - 1,
+                    LEFT_ARROW,
+                    style.fg,
+                    style.bg,
+                );
+                pos_x += 2;
+            }
+
+            // finally draw the tabs
+            for (tab_idx, tab) in (&self.tabs[tab_left..tab_right]).iter().enumerate() {
+                tab.draw(
+                    &mut self.tb,
+                    &self.colors,
+                    pos_x,
+                    self.height - 1,
+                    self.active_idx == tab_idx + tab_left,
+                );
+                pos_x += tab.width() as i32 + 1; // +1 for margin
+            }
+
+            if right_arr {
+                let style = arrow_style(&self.tabs[tab_right..], &self.colors);
+                self.tb.change_cell(
+                    pos_x,
+                    self.height - 1,
+                    RIGHT_ARROW,
+                    style.fg,
+                    style.bg,
+                );
+            }
         }
 
-        // decide whether we need to draw left/right arrows in tab bar
-        let left_arr = self.draw_left_arrow();
-        let right_arr = self.draw_right_arrow();
 
-        let (tab_left, tab_right) = self.rendered_tabs();
-
-        let mut pos_x: i32 = 0;
-        if left_arr {
-            let style = arrow_style(&self.tabs[0..tab_left], &self.colors);
-            self.tb
-                .change_cell(pos_x, self.height - 1, LEFT_ARROW, style.fg, style.bg);
-            pos_x += 2;
-        }
 
         // Debugging
         // eprintln!("number of tabs to draw: {}", tab_right - tab_left);
         // eprintln!("left_arr: {}, right_arr: {}", left_arr, right_arr);
 
-        // finally draw the tabs
-        for (tab_idx, tab) in (&self.tabs[tab_left..tab_right]).iter().enumerate() {
-            tab.draw(
-                &mut self.tb,
-                &self.colors,
-                pos_x,
-                self.height - 1,
-                self.active_idx == tab_idx + tab_left,
-            );
-            pos_x += tab.width() as i32 + 1; // +1 for margin
-        }
-
-        if right_arr {
-            let style = arrow_style(&self.tabs[tab_right..], &self.colors);
-            self.tb
-                .change_cell(pos_x, self.height - 1, RIGHT_ARROW, style.fg, style.bg);
-        }
 
         self.tb.present();
     }
@@ -1129,10 +1150,7 @@ impl TUI {
 
     pub fn toggle_statusline(&mut self) {
         self.show_statusline = !self.show_statusline;
-        let statusline_height = if self.statusline_visible && self.show_statusline { 1 } else { 0 };
-        for tab in &mut self.tabs {
-            tab.widget.resize(self.width, self.height - 1 - statusline_height);
-        }
+        self.resize();
     }
 
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
