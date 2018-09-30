@@ -20,7 +20,7 @@ pub fn draw_statusline(
         Notifier::Mentions => "Mentions",
         Notifier::Messages => "Messages",
     };
-    let ignore_state = if ignore_mode { "On" } else { "Off" };
+    let ignore_state = if ignore_mode { "Off" } else { "On" };
 
     let left_pane: String = format!(" {} ", visible_name);
 
