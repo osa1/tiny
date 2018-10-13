@@ -34,14 +34,13 @@ impl<'poll> TlsStream<'poll> {
         serv_port: u16,
     ) -> Result<TlsStream<'poll>, TlsError> {
         let connector = tls::TlsConnector::builder()
-            .map_err(TlsError::TlsError)?
             .build()
             .map_err(TlsError::TlsError)?;
         let tcp_stream = TcpStream::new(poll, serv_addr, serv_port).map_err(TlsError::TcpError)?;
         match connector.connect(serv_addr, tcp_stream) {
             Ok(tls_stream) =>
                 Ok(TlsStream::Connected { stream: tls_stream }),
-            Err(tls::HandshakeError::Interrupted(mid)) =>
+            Err(tls::HandshakeError::WouldBlock(mid)) =>
                 Ok(TlsStream::Handshake {
                     stream: mid,
                     out_buf: Vec::with_capacity(1024),
@@ -73,7 +72,7 @@ impl<'poll> TlsStream<'poll> {
                             .map_err(|err| TlsError::TcpError(TcpError::IoError(err)));
                         TlsStream::Connected { stream: tls_stream }
                     }
-                    Err(tls::HandshakeError::Interrupted(mid)) =>
+                    Err(tls::HandshakeError::WouldBlock(mid)) =>
                         TlsStream::Handshake {
                             stream: mid,
                             out_buf,
