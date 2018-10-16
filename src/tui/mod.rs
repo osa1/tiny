@@ -687,10 +687,8 @@ impl TUI {
         }
 
         // Debugging
-        // use std::io;
-        // use std::io::Write;
-        // writeln!(io::stderr(), "number of tabs to draw: {}", tab_right - tab_left).unwrap();
-        // writeln!(io::stderr(), "left_arr: {}, right_arr: {}", left_arr, right_arr).unwrap();
+        // eprintln!("number of tabs to draw: {}", tab_right - tab_left);
+        // eprintln!("left_arr: {}, right_arr: {}", left_arr, right_arr);
 
         // finally draw the tabs
         for (tab_idx, tab) in (&self.tabs[tab_left..tab_right]).iter().enumerate() {

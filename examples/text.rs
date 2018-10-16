@@ -12,8 +12,6 @@ use mio::Token;
 use mio::unix::EventedFd;
 use std::fs::File;
 use std::io::Read;
-// use std::io::Write;
-// use std::io;
 
 use term_input::{Event, Input, Key};
 use termbox_simple::*;
@@ -39,7 +37,7 @@ fn main() {
         let single_line_text = text.lines().collect::<Vec<&str>>().join("");
         msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
         msg_area.add_text(&single_line_text);
-        // writeln!(io::stderr(), "full text added: {}", single_line_text).unwrap();
+        // eprintln!("full text added: {}", single_line_text);
         msg_area.flush_line();
 
         for line in text.lines() {
