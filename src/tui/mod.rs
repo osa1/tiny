@@ -1328,15 +1328,14 @@ pub fn paste_lines(tf: String, str: &str) -> Result<Vec<String>, PasteError> {
 
     let mut filtered_lines = vec![];
     for s in file_contents.lines() {
-        let s_ = s.trim_left();
-        let first_char = s_.chars().next();
-        // Ignore if first non-whitespace char is '#'
-        // No way to send a line starting with '#' now, I hope that's OK
+        // Ignore if the char is '#'. To actually send a `#` add space.
+        // For empty lines, send " ".
+        let first_char = s.chars().next();
         if first_char == Some('#') {
             // skip this line
             continue;
-        } else if first_char == Some('/') {
-            return Err(PasteError::PastedCmd);
+        } else if s.is_empty() {
+            filtered_lines.push(" ".to_owned());
         } else {
             filtered_lines.push(s.to_owned());
         }
