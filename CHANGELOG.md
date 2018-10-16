@@ -2,6 +2,7 @@
 
 - A bug when using an invalid nick in `/msg` command fixed (#111).
 - Bumped native-tls dependency -- fixes build for newer OpenSSLs (#114).
+- A bug when sending multi-line text (via C-x or pasting) fixed (#113).
 
 # 2018/09/01: 0.4.3
 

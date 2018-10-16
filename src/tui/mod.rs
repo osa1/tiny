@@ -358,7 +358,7 @@ impl TUI {
                 // translated to carriage returns when pasting so we check for
                 // both just to make sure
                 if str.contains('\n') || str.contains('\r') {
-                    self.edit_input(&str);
+                    return self.edit_input(&str);
                 } else {
                     // TODO this may be too slow for pasting long single lines
                     for ch in str.chars() {
