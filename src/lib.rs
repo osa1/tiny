@@ -1,5 +1,4 @@
 #![cfg_attr(test, feature(test))]
-#![feature(alloc_system)]
 #![feature(allocator_api)]
 #![feature(const_fn)]
 #![feature(drain_filter)]
