@@ -55,15 +55,15 @@ impl StreamErr {
         }
     }
 
-    pub fn cause(&self) -> Option<&error::Error> {
+    pub fn source(&self) -> Option<&error::Error> {
         use self::StreamErr::*;
         match *self {
             IoError(ref err) =>
-                err.cause(),
+                err.source(),
             CantResolveAddr =>
                 None,
             TlsError(ref err) =>
-                err.cause(),
+                err.source(),
             ConnectionClosed =>
                 None,
         }

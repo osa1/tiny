@@ -945,7 +945,7 @@ fn find_conn_idx(conns: &[Conn], serv_name: &str) -> Option<usize> {
 }
 
 fn connect_err_msg(err: &ConnErr) -> String {
-    match err.cause() {
+    match err.source() {
         Some(other_err) =>
             format!("Connection error: {} ({})", err.description(), other_err.description()),
         None =>
@@ -954,7 +954,7 @@ fn connect_err_msg(err: &ConnErr) -> String {
 }
 
 fn reconnect_err_msg(err: &ConnErr) -> String {
-    match err.cause() {
+    match err.source() {
         Some(other_err) =>
             format!(
                 "Connection error: {} ({}). \
