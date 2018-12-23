@@ -4,6 +4,7 @@ pub use tui::messaging::Timestamp;
 use tui::MsgTarget;
 
 use self::notify_rust::Notification;
+use utils::remove_irc_control_chars;
 
 /// Destktop notification handler
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -26,15 +27,18 @@ impl Notifier {
         if our_nick == sender {
             return;
         }
+
+        let msg = remove_irc_control_chars(msg);
+
         match *target {
             MsgTarget::Chan { chan_name, .. } => {
                 if *self == Notifier::Messages || (*self == Notifier::Mentions && mention) {
-                    notify(&format!("{} in {}", sender, chan_name), msg)
+                    notify(&format!("{} in {}", sender, chan_name), &msg)
                 }
             }
             MsgTarget::User { nick: ref nick_sender, .. } => {
                 if *self != Notifier::Off {
-                    notify(&format!("{} sent a private message", nick_sender), msg)
+                    notify(&format!("{} sent a private message", nick_sender), &msg)
                 }
             }
             _ => {}

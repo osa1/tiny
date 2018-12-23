@@ -1,3 +1,8 @@
+# WIP
+
+- IRC color codes and ASCII control chars are now removed from desktop
+  notifications to avoid weird notification rendering and glitches.
+
 # 2018/12/22: 0.4.4
 
 - A bug when using an invalid nick in `/msg` command fixed (#111).

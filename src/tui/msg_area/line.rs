@@ -1,11 +1,10 @@
-use std::iter::Peekable;
 use std::mem;
-use std::str::Chars;
 use termbox_simple::Termbox;
 use termbox_simple;
 
 use config;
 use config::Colors;
+use utils::translate_irc_control_chars;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
@@ -157,7 +156,16 @@ impl Line {
     }
 
     pub fn add_text(&mut self, str: &str) {
-        let str = translate_irc_control_chars(str);
+    fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
+        ret.push(TERMBOX_COLOR_PREFIX);
+        ret.push(0 as char); // style
+        ret.push(irc_color_to_termbox(irc_fg) as char);
+        ret.push(irc_bg
+            .map(irc_color_to_termbox)
+            .unwrap_or(termbox_simple::TB_DEFAULT as u8)
+            as char);
+    }
+        let str = translate_irc_control_chars(str, push_color);
         self.current_seg.text.reserve(str.len());
 
         let mut iter = str.chars();
@@ -300,91 +308,6 @@ impl Line {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Parse at least one, at most two digits. Does not consume the iterator when
-/// result is `None`.
-fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
-    fn to_dec(ch: char) -> Option<u8> {
-        ch.to_digit(10).map(|c| c as u8)
-    }
-
-    let c1_char = *chars.peek()?;
-    let c1_digit = match to_dec(c1_char) {
-        None => {
-            return None;
-        }
-        Some(c1_digit) => {
-            chars.next();
-            c1_digit
-        }
-    };
-
-    match chars.peek().cloned() {
-        None =>
-            Some(c1_digit),
-        Some(c2) =>
-            match to_dec(c2) {
-                None =>
-                    Some(c1_digit),
-                Some(c2_digit) => {
-                    chars.next();
-                    Some(c1_digit * 10 + c2_digit)
-                }
-            },
-    }
-}
-
-// TODO: No need to allocate a String here, make this an iterator
-fn translate_irc_control_chars(str: &str) -> String {
-    let mut ret = String::with_capacity(str.len());
-    let mut iter = str.chars().peekable();
-
-    fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
-        ret.push(TERMBOX_COLOR_PREFIX);
-        ret.push(0 as char); // style
-        ret.push(irc_color_to_termbox(irc_fg) as char);
-        ret.push(irc_bg
-            .map(irc_color_to_termbox)
-            .unwrap_or(termbox_simple::TB_DEFAULT as u8)
-            as char);
-    }
-
-    while let Some(char) = iter.next() {
-        if char == '\x03' {
-            match parse_color_code(&mut iter) {
-                None => {
-                    // just skip the control char
-                }
-                Some(fg) => {
-                    if let Some(char) = iter.peek().cloned() {
-                        if char == ',' {
-                            iter.next(); // consume ','
-                            match parse_color_code(&mut iter) {
-                                None => {
-                                    // comma was not part of the color code,
-                                    // add it to the new string
-                                    push_color(&mut ret, fg, None);
-                                    ret.push(char);
-                                }
-                                Some(bg) => {
-                                    push_color(&mut ret, fg, Some(bg));
-                                }
-                            }
-                        } else {
-                            push_color(&mut ret, fg, None);
-                        }
-                    } else {
-                        push_color(&mut ret, fg, None);
-                    }
-                }
-            }
-        } else if !char.is_ascii_control() {
-            ret.push(char);
-        }
-    }
-
-    ret
-}
-
 // IRC colors: http://en.wikichip.org/wiki/irc/colors
 // Termbox colors: http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
 //                 (alternatively just run `cargo run --example colors`)
@@ -525,21 +448,6 @@ mod tests {
         // lipsum.txt has 1160 words in it. each line should contain at most one
         // word so we should have 1160 lines.
         assert_eq!(line.rendered_height(1), 1160);
-    }
-
-    #[test]
-    fn test_parse_color_code() {
-        assert_eq!(parse_color_code(&mut "1".chars().peekable()), Some(1));
-        assert_eq!(parse_color_code(&mut "01".chars().peekable()), Some(1));
-        assert_eq!(parse_color_code(&mut "1,".chars().peekable()), Some(1));
-    }
-
-    #[test]
-    fn test_translate_irc_control_chars() {
-        assert_eq!(
-            translate_irc_control_chars("  Le Voyageur imprudent  "),
-            "  Le Voyageur imprudent  "
-        );
     }
 
     #[bench]
