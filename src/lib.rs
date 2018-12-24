@@ -17,8 +17,6 @@ extern crate mio;
 extern crate native_tls;
 extern crate net2;
 extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 extern crate serde_yaml;
 extern crate time;
 extern crate tempfile;
