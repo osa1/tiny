@@ -382,28 +382,32 @@ impl<'poll> Tiny<'poll> {
     ////////////////////////////////////////////////////////////////////////////
 
     fn handle_socket(&mut self, readiness: Ready, conn_idx: usize, evs: &mut Vec<ConnEv>) {
-        {
-            let conn = &mut self.conns[conn_idx];
-            if readiness.is_readable() {
-                conn.read_ready(evs, &mut self.logger);
-            }
-            if readiness.is_writable() {
-                conn.write_ready(evs);
-            }
-            if readiness.contains(UnixReady::hup()) {
-                conn.enter_disconnect_state();
-                self.tui.add_err_msg(
-                    &format!(
-                        "Connection error (HUP). \
-                         Will try to reconnect in {} seconds.",
-                        conn::RECONNECT_TICKS
-                    ),
-                    Timestamp::now(),
-                    &MsgTarget::AllServTabs {
-                        serv_name: conn.get_serv_name(),
-                    },
-                );
-            }
+        if readiness.is_readable() {
+            self.conns[conn_idx].read_ready(evs, &mut self.logger);
+        }
+        // Handle `ConnEv`s first before checking other readiness events. Reason: we sometimes
+        // realize that the connection is closed/got broken at this point even though a write
+        // readiness event is also available. When this happens we need to enter disconnect state
+        // first, otherwise we end up calling `write_ready()` on a broken/disconnected `Stream`,
+        // which causes a panic. This caused #119.
+        self.handle_conn_evs(conn_idx, evs);
+        // This does nothing if we entered disconnect state in the line above.
+        if readiness.is_writable() {
+            self.conns[conn_idx].write_ready(evs);
+        }
+        if readiness.contains(UnixReady::hup()) {
+            self.conns[conn_idx].enter_disconnect_state();
+            self.tui.add_err_msg(
+                &format!(
+                    "Connection error (HUP). \
+                     Will try to reconnect in {} seconds.",
+                    conn::RECONNECT_TICKS
+                ),
+                Timestamp::now(),
+                &MsgTarget::AllServTabs {
+                    serv_name: self.conns[conn_idx].get_serv_name(),
+                },
+            );
         }
         self.handle_conn_evs(conn_idx, evs);
     }

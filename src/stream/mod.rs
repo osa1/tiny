@@ -120,6 +120,7 @@ impl<'poll> Stream<'poll> {
         }
     }
 
+    /// NOTE: Calling this on a broken/closed stream causes a panic! See #120.
     pub fn write_ready(&mut self) -> Result<()> {
         match *self {
             Stream::Tcp(ref mut s) =>
@@ -129,6 +130,7 @@ impl<'poll> Stream<'poll> {
         }
     }
 
+    /// NOTE: Calling this on a broken/closed stream causes a panic! See #120.
     pub fn read_ready(&mut self, buf: &mut [u8]) -> Result<usize> {
         match *self {
             Stream::Tcp(ref mut s) =>
@@ -138,6 +140,7 @@ impl<'poll> Stream<'poll> {
         }
     }
 
+    /// NOTE: Calling this on a broken/closed stream causes a panic! See #120.
     pub fn get_tok(&self) -> Token {
         match *self {
             Stream::Tcp(ref s) =>

@@ -2,6 +2,8 @@
 
 - IRC color codes and ASCII control chars are now removed from desktop
   notifications to avoid weird notification rendering and glitches.
+- Fixed a bug that caused panics when running tiny with spotty connections (lots
+  of disconnects) (#119).
 
 # 2018/12/22: 0.4.4
 
