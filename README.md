@@ -51,14 +51,7 @@ Install the Rust nightly toolchain, clone the repo, and run `cargo install` (or
 `cargo install --force` if you already have an older version installed).
 
 Arch Linux users can install tiny from the
-[AUR](https://aur.archlinux.org/packages/tiny-irc-client-git/). Note
-that the supported way to meet the rust-nightly dependency is with the
-official
-[Rustup](https://www.archlinux.org/packages/community/x86_64/rustup/)
-package, but you can alternatively install Rustup via the [Rust
-Toolchain
-Installer](https://www.rust-lang.org/en-US/install.html). Either way, remember to
-install the Rust nightly toolchain before running makepkg.
+[AUR](https://aur.archlinux.org/packages/tiny-irc-client-git/).
 
 Since version 0.3.0 tiny needs OpenSSL or LibreSSL headers and runtime
 libraries. See [rust-openssl's
