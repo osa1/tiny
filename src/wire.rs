@@ -35,12 +35,15 @@ pub fn part<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
 }
 
 pub fn privmsg<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
+    // IRC messages need to be shorter than 512 bytes (see RFC 1459 or 2812). This should be dealt
+    // with at call sites as we can't show how we split messages into multiple messages in the UI
+    // at this point.
     assert!(msgtarget.len() + msg.len() + 12 <= 512);
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
 pub fn ctcp_action<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
-    assert!(msgtarget.len() + msg.len() + 21 <= 512);
+    assert!(msgtarget.len() + msg.len() + 21 <= 512); // See comments in `privmsg`
     write!(sink, "PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
 }
 
