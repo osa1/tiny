@@ -402,8 +402,11 @@ impl<'poll> Conn<'poll> {
     }
 
     fn nickserv_ident(&mut self) {
+        // FIXME: privmsg method inlined below to work around a borrowchk error
         if let Some(ref pwd) = self.nickserv_ident {
-            self.privmsg("NickServ", &format!("identify {}", pwd));
+            self.status.get_stream_mut().map(|stream| {
+                wire::privmsg(stream, "NickServ", &format!("identify {}", pwd)).unwrap();
+            });
         }
     }
 
@@ -473,7 +476,6 @@ impl<'poll> Conn<'poll> {
 
     pub fn raw_msg(&mut self, msg: &str) {
         self.status.get_stream_mut().map(|stream| {
-            use std::io::Write;
             write!(stream, "{}\r\n", msg).unwrap();
         });
     }
