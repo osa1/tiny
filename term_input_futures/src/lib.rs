@@ -222,6 +222,11 @@ impl futures::Stream for Input {
     type Error = tokio::io::Error;
 
     fn poll(&mut self) -> Result<futures::Async<Option<Event>>, tokio::io::Error> {
+        // Yield any resize events
+        if GOT_SIGWINCH.swap(false, Ordering::Relaxed) {
+            return Ok(futures::Async::Ready(Some(Event::Resize)));
+        }
+
         // Try to parse any bytes in the input buffer from the last poll
         {
             let mut buf_slice: &[u8] = &mut self.buf;
