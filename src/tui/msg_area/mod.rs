@@ -6,9 +6,9 @@ use std::str;
 
 use termbox_simple::Termbox;
 
-use config::Colors;
 pub use self::line::Line;
 pub use self::line::SegStyle;
+use config::Colors;
 
 pub struct MsgArea {
     lines: Vec<Line>,
@@ -95,8 +95,7 @@ impl MsgArea {
 impl MsgArea {
     fn lines_height(&mut self) -> i32 {
         match self.lines_height {
-            Some(height) =>
-                height,
+            Some(height) => height,
             None => {
                 let mut total_height = 0;
                 for line in &self.lines {

@@ -2,12 +2,12 @@ use mio::Poll;
 use mio::Token;
 use net2::TcpBuilder;
 use net2::TcpStreamExt;
+use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::io;
+use std::net;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
-use std::net;
 use std::os::unix::io::AsRawFd;
 use std::result::Result;
 
@@ -41,16 +41,14 @@ impl<'poll> TcpStream<'poll> {
         let addr = addr_iter.next().ok_or(TcpError::CantResolveAddr)?;
         let stream = {
             match addr {
-                SocketAddr::V4(_) =>
-                    TcpBuilder::new_v4()
-                        .map_err(TcpError::IoError)?
-                        .to_tcp_stream()
-                        .map_err(TcpError::IoError)?,
-                SocketAddr::V6(_) =>
-                    TcpBuilder::new_v6()
-                        .map_err(TcpError::IoError)?
-                        .to_tcp_stream()
-                        .map_err(TcpError::IoError)?,
+                SocketAddr::V4(_) => TcpBuilder::new_v4()
+                    .map_err(TcpError::IoError)?
+                    .to_tcp_stream()
+                    .map_err(TcpError::IoError)?,
+                SocketAddr::V6(_) => TcpBuilder::new_v6()
+                    .map_err(TcpError::IoError)?
+                    .to_tcp_stream()
+                    .map_err(TcpError::IoError)?,
             }
         };
         stream.set_nonblocking(true).map_err(TcpError::IoError)?;
@@ -88,12 +86,9 @@ impl<'poll> TcpStream<'poll> {
     /// Call when the stream is ready for writing.
     pub fn read_ready(&mut self, buf: &mut [u8]) -> Result<usize, TcpError> {
         match self.read(buf) {
-            Ok(0) =>
-                Err(TcpError::ConnectionClosed),
-            Ok(n) =>
-                Ok(n),
-            Err(err) =>
-                Err(TcpError::IoError(err)),
+            Ok(0) => Err(TcpError::ConnectionClosed),
+            Ok(n) => Ok(n),
+            Err(err) => Err(TcpError::IoError(err)),
         }
     }
 

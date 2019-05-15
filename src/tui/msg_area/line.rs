@@ -1,6 +1,6 @@
 use std::mem;
-use termbox_simple::Termbox;
 use termbox_simple;
+use termbox_simple::Termbox;
 
 use config;
 use config::Colors;
@@ -73,50 +73,31 @@ pub enum SchemeStyle {
 impl Seg {
     pub fn style(&self, colors: &Colors) -> config::Style {
         match self.style {
-            SegStyle::Fixed(style) =>
-                style,
-            SegStyle::Index(idx) =>
-                config::Style {
-                    fg: colors.nick[idx % colors.nick.len()] as u16,
-                    bg: colors.user_msg.bg,
-                },
+            SegStyle::Fixed(style) => style,
+            SegStyle::Index(idx) => config::Style {
+                fg: colors.nick[idx % colors.nick.len()] as u16,
+                bg: colors.user_msg.bg,
+            },
             SegStyle::SchemeStyle(sty) => {
                 use self::SchemeStyle::*;
                 match sty {
-                    Clear =>
-                        colors.clear,
-                    UserMsg =>
-                        colors.user_msg,
-                    ErrMsg =>
-                        colors.err_msg,
-                    Topic =>
-                        colors.topic,
-                    Cursor =>
-                        colors.cursor,
-                    Join =>
-                        colors.join,
-                    Part =>
-                        colors.part,
-                    Nick =>
-                        colors.nick_change,
-                    Faded =>
-                        colors.faded,
-                    ExitDialogue =>
-                        colors.exit_dialogue,
-                    Highlight =>
-                        colors.highlight,
-                    Completion =>
-                        colors.completion,
-                    Timestamp =>
-                        colors.timestamp,
-                    TabActive =>
-                        colors.tab_active,
-                    TabNormal =>
-                        colors.tab_normal,
-                    TabNewMsg =>
-                        colors.tab_new_msg,
-                    TabHighlight =>
-                        colors.tab_highlight,
+                    Clear => colors.clear,
+                    UserMsg => colors.user_msg,
+                    ErrMsg => colors.err_msg,
+                    Topic => colors.topic,
+                    Cursor => colors.cursor,
+                    Join => colors.join,
+                    Part => colors.part,
+                    Nick => colors.nick_change,
+                    Faded => colors.faded,
+                    ExitDialogue => colors.exit_dialogue,
+                    Highlight => colors.highlight,
+                    Completion => colors.completion,
+                    Timestamp => colors.timestamp,
+                    TabActive => colors.tab_active,
+                    TabNormal => colors.tab_normal,
+                    TabNewMsg => colors.tab_new_msg,
+                    TabHighlight => colors.tab_highlight,
                 }
             }
         }
@@ -156,15 +137,16 @@ impl Line {
     }
 
     pub fn add_text(&mut self, str: &str) {
-    fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
-        ret.push(TERMBOX_COLOR_PREFIX);
-        ret.push(0 as char); // style
-        ret.push(irc_color_to_termbox(irc_fg) as char);
-        ret.push(irc_bg
-            .map(irc_color_to_termbox)
-            .unwrap_or(termbox_simple::TB_DEFAULT as u8)
-            as char);
-    }
+        fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
+            ret.push(TERMBOX_COLOR_PREFIX);
+            ret.push(0 as char); // style
+            ret.push(irc_color_to_termbox(irc_fg) as char);
+            ret.push(
+                irc_bg
+                    .map(irc_color_to_termbox)
+                    .unwrap_or(termbox_simple::TB_DEFAULT as u8) as char,
+            );
+        }
         let str = translate_irc_control_chars(str, push_color);
         self.current_seg.text.reserve(str.len());
 
@@ -313,40 +295,23 @@ impl Line {
 //                 (alternatively just run `cargo run --example colors`)
 fn irc_color_to_termbox(irc_color: u8) -> u8 {
     match irc_color {
-        0 =>
-            15, // white
-        1 =>
-            0, // black
-        2 =>
-            17, // navy
-        3 =>
-            2, // green
-        4 =>
-            9, // red
-        5 =>
-            88, // maroon
-        6 =>
-            5, // purple
-        7 =>
-            130, // olive
-        8 =>
-            11, // yellow
-        9 =>
-            10, // light green
-        10 =>
-            6, // teal
-        11 =>
-            14, // cyan
-        12 =>
-            12, // awful blue
-        13 =>
-            13, // magenta
-        14 =>
-            8, // gray
-        15 =>
-            7, // light gray
-        _ =>
-            termbox_simple::TB_DEFAULT as u8,
+        0 => 15,  // white
+        1 => 0,   // black
+        2 => 17,  // navy
+        3 => 2,   // green
+        4 => 9,   // red
+        5 => 88,  // maroon
+        6 => 5,   // purple
+        7 => 130, // olive
+        8 => 11,  // yellow
+        9 => 10,  // light green
+        10 => 6,  // teal
+        11 => 14, // cyan
+        12 => 12, // awful blue
+        13 => 13, // magenta
+        14 => 8,  // gray
+        15 => 7,  // light gray
+        _ => termbox_simple::TB_DEFAULT as u8,
     }
 }
 
@@ -358,9 +323,9 @@ mod tests {
     extern crate test;
 
     use self::test::Bencher;
+    use super::*;
     use std::fs::File;
     use std::io::Read;
-    use super::*;
 
     #[test]
     fn height_test_1() {

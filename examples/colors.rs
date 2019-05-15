@@ -3,12 +3,12 @@ extern crate mio;
 extern crate term_input;
 extern crate termbox_simple;
 
+use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
 use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
-use mio::unix::EventedFd;
 use term_input::{Event, Input, Key};
 use termbox_simple::*;
 
@@ -26,16 +26,15 @@ fn main() {
         Token(libc::STDIN_FILENO as usize),
         Ready::readable(),
         PollOpt::level(),
-    ).unwrap();
-
+    )
+    .unwrap();
 
     let mut input = Input::new();
     let mut ev_buffer: Vec<Event> = Vec::new();
     let mut events = Events::with_capacity(10);
     'mainloop: loop {
         match poll.poll(&mut events, None) {
-            Err(_) =>
-                {}
+            Err(_) => {}
             Ok(_) => {
                 input.read_input_events(&mut ev_buffer);
                 for ev in &ev_buffer {
@@ -46,8 +45,7 @@ fn main() {
                         Event::Key(Key::Esc) => {
                             break 'mainloop;
                         }
-                        _ =>
-                            {}
+                        _ => {}
                     }
                 }
                 draw(&mut tui, fg);

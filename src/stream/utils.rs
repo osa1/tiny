@@ -1,8 +1,8 @@
-use mio::Poll;
-use mio::Token;
 use mio::unix::EventedFd;
-use mio::Ready;
+use mio::Poll;
 use mio::PollOpt;
+use mio::Ready;
+use mio::Token;
 use std::os::unix::io::RawFd;
 
 pub fn register_for_r(poll: &Poll, fd: RawFd) {

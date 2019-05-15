@@ -96,8 +96,7 @@ fn get_char_node_for_insert(trie: *mut Trie, char: char) -> *mut Trie {
         .vec
         .binary_search_by(|&(char_, _)| char_.cmp(&char))
     {
-        Ok(idx) =>
-            &mut *trie_ref.vec[idx].1,
+        Ok(idx) => &mut *trie_ref.vec[idx].1,
         Err(idx) => {
             trie_ref.vec.insert(
                 idx,
@@ -116,10 +115,8 @@ fn get_char_node_for_insert(trie: *mut Trie, char: char) -> *mut Trie {
 
 fn get_char_node_for_lookup(trie: &Trie, char: char) -> Option<&Trie> {
     match trie.vec.binary_search_by(|&(char_, _)| char_.cmp(&char)) {
-        Ok(idx) =>
-            Some(&trie.vec[idx].1),
-        Err(_) =>
-            None,
+        Ok(idx) => Some(&trie.vec[idx].1),
+        Err(_) => None,
     }
 }
 
@@ -182,9 +179,9 @@ mod benchs {
     extern crate test;
 
     use self::test::Bencher;
+    use super::*;
     use std::fs::File;
     use std::io::Read;
-    use super::*;
 
     #[bench]
     fn bench_trie_build(b: &mut Bencher) {
@@ -220,33 +217,32 @@ mod benchs {
         });
     }
 
-
     /*
-#[bench]
-fn bench_hashset_build(b : &mut Bencher) {
+    #[bench]
+    fn bench_hashset_build(b : &mut Bencher) {
 
-    // Total words: 305,089
-    // 40,292,006 ns (0.04 seconds)
+        // Total words: 305,089
+        // 40,292,006 ns (0.04 seconds)
 
-    use std::collections::HashSet;
+        use std::collections::HashSet;
 
-    let mut contents = String::new();
-    let mut words : Vec<&str> = vec![];
-    {
-        let mut file = File::open("/usr/share/dict/american").unwrap();
-        file.read_to_string(&mut contents).unwrap();
-        words.extend(contents.lines());
-    }
-
-    b.iter(|| {
-        let mut set = HashSet::new();
-        for word in words.iter() {
-            set.insert(word);
+        let mut contents = String::new();
+        let mut words : Vec<&str> = vec![];
+        {
+            let mut file = File::open("/usr/share/dict/american").unwrap();
+            file.read_to_string(&mut contents).unwrap();
+            words.extend(contents.lines());
         }
-        set
-    });
-}
-*/
+
+        b.iter(|| {
+            let mut set = HashSet::new();
+            for word in words.iter() {
+                set.insert(word);
+            }
+            set
+        });
+    }
+    */
 
     #[bench]
     fn bench_trie_lookup(b: &mut Bencher) {

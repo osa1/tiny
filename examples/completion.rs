@@ -4,12 +4,12 @@ extern crate term_input;
 extern crate termbox_simple;
 extern crate tiny;
 
+use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
 use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
-use mio::unix::EventedFd;
 use std::fs::File;
 use std::io::Read;
 
@@ -47,7 +47,8 @@ fn main() {
         Token(libc::STDIN_FILENO as usize),
         Ready::readable(),
         PollOpt::level(),
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut input = Input::new();
     let mut ev_buffer: Vec<Event> = Vec::new();
@@ -72,8 +73,7 @@ fn main() {
                         TUIRet::Abort => {
                             break 'mainloop;
                         }
-                        _ =>
-                            {}
+                        _ => {}
                     }
                 }
                 tui.draw();

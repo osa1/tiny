@@ -1,13 +1,13 @@
 //! To see how color numbers map to actual colors in your terminal run
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
+use dirs::home_dir;
 use serde::Deserialize;
 use serde_yaml;
-use dirs::home_dir;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
-use std::path::PathBuf;
 use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 pub struct SASLAuth {
@@ -69,7 +69,8 @@ pub struct Defaults {
 pub struct Config {
     pub servers: Vec<Server>,
     pub defaults: Defaults,
-    #[serde(default)] pub colors: Colors,
+    #[serde(default)]
+    pub colors: Colors,
     pub log_dir: String,
 }
 
@@ -122,8 +123,8 @@ fn get_default_config_yaml() -> String {
 // Colors
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub use termbox_simple::*;
 use serde::de::{self, Deserializer, MapAccess, Visitor};
+pub use termbox_simple::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
@@ -133,7 +134,6 @@ pub struct Style {
     /// Termbox bg.
     pub bg: u16,
 }
-
 
 #[derive(Debug, Deserialize)]
 #[serde(default)]
@@ -306,8 +306,7 @@ impl<'de> Deserialize<'de> for Style {
                      bg: 0-255 or color name\n\
                      attrs: [{}]\n\n\
                      color names: {}",
-                    attrs,
-                    colors
+                    attrs, colors
                 )
             }
 
@@ -375,14 +374,8 @@ mod tests {
                     servers[0].join,
                     vec!["#tiny".to_owned(), "#rust".to_owned()]
                 );
-                assert_eq!(
-                    servers[0].tls,
-                    true
-                );
-                assert_eq!(
-                    servers[0].pass,
-                    Some("hunter2".to_owned())
-                );
+                assert_eq!(servers[0].tls, true);
+                assert_eq!(servers[0].pass, Some("hunter2".to_owned()));
                 assert_eq!(
                     servers[0].sasl_auth,
                     Some(SASLAuth {
@@ -390,10 +383,7 @@ mod tests {
                         password: "hunter2".to_owned(),
                     })
                 );
-                assert_eq!(
-                    servers[0].nickserv_ident,
-                    Some("hunter2".to_owned())
-                );
+                assert_eq!(servers[0].nickserv_ident, Some("hunter2".to_owned()));
             }
         }
     }

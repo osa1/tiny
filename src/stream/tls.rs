@@ -1,11 +1,11 @@
 use mio::Poll;
 use mio::Token;
-use take_mut::take;
 use native_tls as tls;
+use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::io;
 use std::result::Result;
+use take_mut::take;
 
 use stream::tcp::{TcpError, TcpStream};
 
@@ -38,50 +38,42 @@ impl<'poll> TlsStream<'poll> {
             .map_err(TlsError::TlsError)?;
         let tcp_stream = TcpStream::new(poll, serv_addr, serv_port).map_err(TlsError::TcpError)?;
         match connector.connect(serv_addr, tcp_stream) {
-            Ok(tls_stream) =>
-                Ok(TlsStream::Connected { stream: tls_stream }),
-            Err(tls::HandshakeError::WouldBlock(mid)) =>
-                Ok(TlsStream::Handshake {
-                    stream: mid,
-                    out_buf: Vec::with_capacity(1024),
-                }),
-            Err(tls::HandshakeError::Failure(err)) =>
-                Err(TlsError::TlsError(err)),
+            Ok(tls_stream) => Ok(TlsStream::Connected { stream: tls_stream }),
+            Err(tls::HandshakeError::WouldBlock(mid)) => Ok(TlsStream::Handshake {
+                stream: mid,
+                out_buf: Vec::with_capacity(1024),
+            }),
+            Err(tls::HandshakeError::Failure(err)) => Err(TlsError::TlsError(err)),
         }
     }
 
     pub fn write_ready(&mut self) -> io::Result<()> {
         match *self {
-            TlsStream::Handshake { ref mut stream, .. } =>
-                stream.get_mut().write_ready(),
-            TlsStream::Connected { ref mut stream } =>
-                stream.get_mut().write_ready(),
-            TlsStream::Broken =>
-                panic!("write_ready() called on broken tls stream"),
+            TlsStream::Handshake { ref mut stream, .. } => stream.get_mut().write_ready(),
+            TlsStream::Connected { ref mut stream } => stream.get_mut().write_ready(),
+            TlsStream::Broken => panic!("write_ready() called on broken tls stream"),
         }
     }
 
     pub fn read_ready(&mut self, buf: &mut [u8]) -> Result<usize, TlsError> {
         let mut ret = Ok(0);
         take(self, |s| match s {
-            TlsStream::Handshake { stream, out_buf } =>
-                match stream.handshake() {
-                    Ok(mut tls_stream) => {
-                        ret = tls_stream
-                            .write(&out_buf)
-                            .map_err(|err| TlsError::TcpError(TcpError::IoError(err)));
-                        TlsStream::Connected { stream: tls_stream }
-                    }
-                    Err(tls::HandshakeError::WouldBlock(mid)) =>
-                        TlsStream::Handshake {
-                            stream: mid,
-                            out_buf,
-                        },
-                    Err(tls::HandshakeError::Failure(err)) => {
-                        ret = Err(TlsError::TlsError(err));
-                        TlsStream::Broken
-                    }
+            TlsStream::Handshake { stream, out_buf } => match stream.handshake() {
+                Ok(mut tls_stream) => {
+                    ret = tls_stream
+                        .write(&out_buf)
+                        .map_err(|err| TlsError::TcpError(TcpError::IoError(err)));
+                    TlsStream::Connected { stream: tls_stream }
+                }
+                Err(tls::HandshakeError::WouldBlock(mid)) => TlsStream::Handshake {
+                    stream: mid,
+                    out_buf,
                 },
+                Err(tls::HandshakeError::Failure(err)) => {
+                    ret = Err(TlsError::TlsError(err));
+                    TlsStream::Broken
+                }
+            },
             TlsStream::Connected { mut stream } => {
                 match stream.read(buf) {
                     Ok(0) => {
@@ -96,20 +88,16 @@ impl<'poll> TlsStream<'poll> {
                 }
                 TlsStream::Connected { stream }
             }
-            TlsStream::Broken =>
-                panic!("read_ready() called on broken tls stream"),
+            TlsStream::Broken => panic!("read_ready() called on broken tls stream"),
         });
         ret
     }
 
     pub fn get_tok(&self) -> Token {
         match *self {
-            TlsStream::Handshake { ref stream, .. } =>
-                stream.get_ref().get_tok(),
-            TlsStream::Connected { ref stream } =>
-                stream.get_ref().get_tok(),
-            TlsStream::Broken =>
-                panic!("get_tok() called on broken tls stream"),
+            TlsStream::Handshake { ref stream, .. } => stream.get_ref().get_tok(),
+            TlsStream::Connected { ref stream } => stream.get_ref().get_tok(),
+            TlsStream::Broken => panic!("get_tok() called on broken tls stream"),
         }
     }
 }
@@ -123,10 +111,8 @@ impl<'poll> Write for TlsStream<'poll> {
                 out_buf.extend(buf);
                 Ok(buf.len())
             }
-            TlsStream::Connected { ref mut stream } =>
-                stream.write(buf),
-            TlsStream::Broken =>
-                Ok(0),
+            TlsStream::Connected { ref mut stream } => stream.write(buf),
+            TlsStream::Broken => Ok(0),
         }
     }
 

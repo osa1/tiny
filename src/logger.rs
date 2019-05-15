@@ -1,8 +1,8 @@
+use std::fmt;
+use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::fs;
 use std::io::Write;
-use std::fmt;
 use std::path::PathBuf;
 use time;
 
@@ -72,29 +72,29 @@ impl Logger {
     // https://users.rust-lang.org/t/weird-borrow-checker-error-for-loop-keeps-references-after-its-scope-ends/10929
 
     /*
-    pub fn get_serv_logs(&mut self, serv_: &str) -> LogFile {
-        let pos = self.fds.iter().position(|&(ref dest, _)| {
-            if let &LogDest::Server(ref serv) = dest {
-                serv == serv_
-            } else {
-                false
-            }
-        });
+        pub fn get_serv_logs(&mut self, serv_: &str) -> LogFile {
+            let pos = self.fds.iter().position(|&(ref dest, _)| {
+                if let &LogDest::Server(ref serv) = dest {
+                    serv == serv_
+                } else {
+                    false
+                }
+            });
 
-        match pos {
-            Some(idx) => LogFile { fd: &mut self.fds[idx].1 },
-            None => {
-                let mut log_path = self.log_dir.clone();
-                log_path.push(format!("{}.log", serv_));
-                let mut file = OpenOptions::new().append(true).create(true).open(log_path).unwrap();
-                init_log_file(&mut file);
-                let idx = self.fds.len();
-                self.fds.push((LogDest::Server(serv_.to_owned()), file));
-                LogFile { fd: &mut self.fds[idx].1 }
+            match pos {
+                Some(idx) => LogFile { fd: &mut self.fds[idx].1 },
+                None => {
+                    let mut log_path = self.log_dir.clone();
+                    log_path.push(format!("{}.log", serv_));
+                    let mut file = OpenOptions::new().append(true).create(true).open(log_path).unwrap();
+                    init_log_file(&mut file);
+                    let idx = self.fds.len();
+                    self.fds.push((LogDest::Server(serv_.to_owned()), file));
+                    LogFile { fd: &mut self.fds[idx].1 }
+                }
             }
         }
-    }
-*/
+    */
 
     pub fn get_chan_logs(&mut self, serv_: &str, chan_: &str) -> LogFile {
         let pos = self.fds.iter().position(|&(ref dest, _)| {
@@ -106,10 +106,9 @@ impl Logger {
         });
 
         match pos {
-            Some(idx) =>
-                LogFile {
-                    fd: &mut self.fds[idx].1,
-                },
+            Some(idx) => LogFile {
+                fd: &mut self.fds[idx].1,
+            },
             None => {
                 let mut log_path = self.log_dir.clone();
                 log_path.push(format!("{}_{}.log", serv_, chan_));
@@ -144,10 +143,9 @@ impl Logger {
         });
 
         match pos {
-            Some(idx) =>
-                LogFile {
-                    fd: &mut self.fds[idx].1,
-                },
+            Some(idx) => LogFile {
+                fd: &mut self.fds[idx].1,
+            },
             None => {
                 let mut log_path = self.log_dir.clone();
                 log_path.push(format!("{}_raw.log", serv_));

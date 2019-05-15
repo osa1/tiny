@@ -8,7 +8,11 @@ use utils::remove_irc_control_chars;
 
 /// Destktop notification handler
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Notifier { Off, Mentions, Messages }
+pub enum Notifier {
+    Off,
+    Mentions,
+    Messages,
+}
 
 fn notify(summary: &str, body: &str) {
     // TODO: Report errors somehow
@@ -36,7 +40,10 @@ impl Notifier {
                     notify(&format!("{} in {}", sender, chan_name), &msg)
                 }
             }
-            MsgTarget::User { nick: ref nick_sender, .. } => {
+            MsgTarget::User {
+                nick: ref nick_sender,
+                ..
+            } => {
                 if *self != Notifier::Off {
                     notify(&format!("{} sent a private message", nick_sender), &msg)
                 }

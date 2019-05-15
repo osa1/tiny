@@ -154,7 +154,7 @@ impl TextField {
 
     pub fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
-            Key::Char('\r') =>
+            Key::Char('\r') => {
                 if self.line_len() > 0 {
                     self.modify();
 
@@ -173,7 +173,8 @@ impl TextField {
                     WidgetRet::Input(ret)
                 } else {
                     WidgetRet::KeyHandled
-                },
+                }
+            }
 
             Key::Char(ch) => {
                 self.modify();
@@ -199,7 +200,7 @@ impl TextField {
                 WidgetRet::KeyHandled
             }
 
-            Key::Ctrl(ch) =>
+            Key::Ctrl(ch) => {
                 if ch == 'a' {
                     self.move_cursor(0);
                     WidgetRet::KeyHandled
@@ -217,7 +218,8 @@ impl TextField {
                     WidgetRet::KeyHandled
                 } else {
                     WidgetRet::KeyIgnored
-                },
+                }
+            }
 
             Key::Arrow(Arrow::Left) => {
                 self.dec_cursor();
@@ -276,11 +278,12 @@ impl TextField {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit =>
+                    Mode::Edit => {
                         if !self.history.is_empty() {
                             self.mode = Mode::History((self.history.len() as i32) - 1);
                             self.move_cursor_to_end();
-                        },
+                        }
+                    }
                     Mode::History(hist_curs) => {
                         self.mode = Mode::History(if hist_curs > 0 {
                             hist_curs - 1
@@ -325,8 +328,7 @@ impl TextField {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
-                    Mode::Edit =>
-                        {}
+                    Mode::Edit => {}
                     Mode::History(hist_curs) => {
                         if hist_curs != (self.history.len() - 1) as i32 {
                             self.mode = Mode::History(hist_curs + 1);
@@ -368,8 +370,7 @@ impl TextField {
             }
 
             ////////////////////////////////////////////////////////////////////
-            _ =>
-                WidgetRet::KeyIgnored,
+            _ => WidgetRet::KeyIgnored,
         }
     }
 
@@ -433,42 +434,35 @@ impl TextField {
     // Ignoring auto-completions
     fn shown_line(&self) -> &Vec<char> {
         match self.mode {
-            Mode::Edit | Mode::Autocomplete { .. } =>
-                &self.buffer,
-            Mode::History(hist_curs) =>
-                &self.history[hist_curs as usize],
+            Mode::Edit | Mode::Autocomplete { .. } => &self.buffer,
+            Mode::History(hist_curs) => &self.history[hist_curs as usize],
         }
     }
 
     fn line_len(&self) -> i32 {
         match self.mode {
-            Mode::Edit =>
-                self.buffer.len() as i32,
-            Mode::History(hist_curs) =>
-                self.history[hist_curs as usize].len() as i32,
+            Mode::Edit => self.buffer.len() as i32,
+            Mode::History(hist_curs) => self.history[hist_curs as usize].len() as i32,
             Mode::Autocomplete {
                 ref original_buffer,
                 ref completions,
                 current_completion,
                 ..
-            } =>
-                (original_buffer.len() + completions[current_completion].len()) as i32,
+            } => (original_buffer.len() + completions[current_completion].len()) as i32,
         }
     }
 
     fn char_at(&self, idx: usize) -> char {
         match self.mode {
-            Mode::Edit =>
-                self.buffer[idx],
-            Mode::History(hist_curs) =>
-                self.history[hist_curs as usize][idx],
+            Mode::Edit => self.buffer[idx],
+            Mode::History(hist_curs) => self.history[hist_curs as usize][idx],
             Mode::Autocomplete {
                 ref original_buffer,
                 insertion_point,
                 ref completions,
                 current_completion,
                 ..
-            } =>
+            } => {
                 if idx < insertion_point {
                     original_buffer[idx]
                 } else if idx >= insertion_point
@@ -480,7 +474,8 @@ impl TextField {
                         .unwrap()
                 } else {
                     original_buffer[idx - completions[current_completion].len()]
-                },
+                }
+            }
         }
     }
 
@@ -488,17 +483,14 @@ impl TextField {
 
     fn in_autocomplete(&self) -> bool {
         match self.mode {
-            Mode::Autocomplete { .. } =>
-                true,
-            _ =>
-                false,
+            Mode::Autocomplete { .. } => true,
+            _ => false,
         }
     }
 
     fn modify(&mut self) {
         match self.mode {
-            Mode::Edit =>
-                {}
+            Mode::Edit => {}
             Mode::History(hist_idx) => {
                 self.buffer.clear();
                 self.buffer
@@ -622,7 +614,8 @@ impl TextField {
             let line = self.shown_line();
 
             while cursor_left >= 0
-                && line.get(cursor_left as usize)
+                && line
+                    .get(cursor_left as usize)
                     .map(|c| utils::is_nick_char(*c))
                     .unwrap_or(false)
             {

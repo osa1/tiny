@@ -1,18 +1,18 @@
 extern crate libc;
 
-pub const TB_DEFAULT   : u16 = 0x00;
-pub const TB_BLACK     : u16 = 0x01;
-pub const TB_RED       : u16 = 0x02;
-pub const TB_GREEN     : u16 = 0x03;
-pub const TB_YELLOW    : u16 = 0x04;
-pub const TB_BLUE      : u16 = 0x05;
-pub const TB_MAGENTA   : u16 = 0x06;
-pub const TB_CYAN      : u16 = 0x07;
-pub const TB_WHITE     : u16 = 0x08;
+pub const TB_DEFAULT: u16 = 0x00;
+pub const TB_BLACK: u16 = 0x01;
+pub const TB_RED: u16 = 0x02;
+pub const TB_GREEN: u16 = 0x03;
+pub const TB_YELLOW: u16 = 0x04;
+pub const TB_BLUE: u16 = 0x05;
+pub const TB_MAGENTA: u16 = 0x06;
+pub const TB_CYAN: u16 = 0x07;
+pub const TB_WHITE: u16 = 0x08;
 
-pub const TB_BOLD      : u16 = 0x0100;
-pub const TB_UNDERLINE : u16 = 0x0200;
-pub const TB_REVERSE   : u16 = 0x0400;
+pub const TB_BOLD: u16 = 0x0100;
+pub const TB_UNDERLINE: u16 = 0x0200;
+pub const TB_REVERSE: u16 = 0x0400;
 
 #[repr(C)]
 pub struct Cell {
@@ -21,19 +21,19 @@ pub struct Cell {
     pub bg: u16,
 }
 
-const TB_EUNSUPPORTED_TERMINAL : libc::c_int = -1;
-const TB_EFAILED_TO_OPEN_TTY   : libc::c_int = -2;
+const TB_EUNSUPPORTED_TERMINAL: libc::c_int = -1;
+const TB_EFAILED_TO_OPEN_TTY: libc::c_int = -2;
 
-const TB_HIDE_CURSOR      : libc::c_int = -1;
+const TB_HIDE_CURSOR: libc::c_int = -1;
 
-const TB_OUTPUT_CURRENT   : libc::c_int = 0;
-const TB_OUTPUT_NORMAL    : libc::c_int = 1;
+const TB_OUTPUT_CURRENT: libc::c_int = 0;
+const TB_OUTPUT_NORMAL: libc::c_int = 1;
 // These are not used, we just std::mem::transmute the value if it's in range
 // const TB_OUTPUT_256       : libc::c_int = 2;
 // const TB_OUTPUT_216       : libc::c_int = 3;
-const TB_OUTPUT_GRAYSCALE : libc::c_int = 4;
+const TB_OUTPUT_GRAYSCALE: libc::c_int = 4;
 
-extern {
+extern "C" {
     pub fn tb_init() -> libc::c_int;
     pub fn tb_resize();
     pub fn tb_shutdown();
@@ -52,11 +52,17 @@ extern {
 pub struct Termbox {}
 
 #[derive(Debug)]
-pub enum InitError { UnsupportedTerminal, FailedToOpenTty }
+pub enum InitError {
+    UnsupportedTerminal,
+    FailedToOpenTty,
+}
 
 #[repr(C)]
 pub enum OutputMode {
-    OutputNormal = 1, Output256, Output216, OutputGrayscale
+    OutputNormal = 1,
+    Output256,
+    Output216,
+    OutputGrayscale,
 }
 
 impl Termbox {
@@ -72,7 +78,9 @@ impl Termbox {
     }
 
     pub fn resize(&mut self) {
-        unsafe { tb_resize(); }
+        unsafe {
+            tb_resize();
+        }
     }
 
     pub fn width(&self) -> i32 {
@@ -84,7 +92,9 @@ impl Termbox {
     }
 
     pub fn clear(&mut self) {
-        unsafe { tb_clear(); }
+        unsafe {
+            tb_clear();
+        }
     }
 
     pub fn set_clear_attributes(&mut self, fg: u16, bg: u16) {
@@ -96,7 +106,9 @@ impl Termbox {
     }
 
     pub fn hide_cursor(&mut self) {
-        unsafe { tb_set_cursor(TB_HIDE_CURSOR, TB_HIDE_CURSOR); }
+        unsafe {
+            tb_set_cursor(TB_HIDE_CURSOR, TB_HIDE_CURSOR);
+        }
     }
 
     pub fn set_cursor(&mut self, cx: i32, cy: i32) {
@@ -121,42 +133,45 @@ impl Termbox {
     }
 
     pub fn set_output_mode(&mut self, mode: OutputMode) {
-        unsafe { tb_select_output_mode(std::mem::transmute(mode)); }
+        unsafe {
+            tb_select_output_mode(std::mem::transmute(mode));
+        }
     }
 }
 
 impl Drop for Termbox {
     fn drop(&mut self) {
-        unsafe { tb_shutdown(); }
+        unsafe {
+            tb_shutdown();
+        }
     }
 }
 
-
 // https://github.com/rust-lang/rust/blob/03bed655142dd5e42ba4539de53b3663d8a123e0/src/libcore/char.rs#L424
 
-const TAG_CONT:    u8  = 0b1000_0000;
-const TAG_TWO_B:   u8  = 0b1100_0000;
-const TAG_THREE_B: u8  = 0b1110_0000;
-const TAG_FOUR_B:  u8  = 0b1111_0000;
-const MAX_ONE_B:   u32 =     0x80;
-const MAX_TWO_B:   u32 =    0x800;
-const MAX_THREE_B: u32 =  0x10000;
+const TAG_CONT: u8 = 0b1000_0000;
+const TAG_TWO_B: u8 = 0b1100_0000;
+const TAG_THREE_B: u8 = 0b1110_0000;
+const TAG_FOUR_B: u8 = 0b1111_0000;
+const MAX_ONE_B: u32 = 0x80;
+const MAX_TWO_B: u32 = 0x800;
+const MAX_THREE_B: u32 = 0x10000;
 
 fn char_to_utf8(c: char) -> u32 {
     let code = c as u32;
     if code < MAX_ONE_B {
         code as u32
     } else if code < MAX_TWO_B {
-        ((((code >> 6 & 0x1F) as u8 | TAG_TWO_B) as u32) << 8) +
-        (((code & 0x3F) as u8 | TAG_CONT) as u32)
+        ((((code >> 6 & 0x1F) as u8 | TAG_TWO_B) as u32) << 8)
+            + (((code & 0x3F) as u8 | TAG_CONT) as u32)
     } else if code < MAX_THREE_B {
-        ((((code >> 12 & 0x0F) as u8 | TAG_THREE_B) as u32) << 16) +
-        ((((code >>  6 & 0x3F) as u8 | TAG_CONT) as u32) << 8) +
-        (((code & 0x3F) as u8 | TAG_CONT) as u32)
+        ((((code >> 12 & 0x0F) as u8 | TAG_THREE_B) as u32) << 16)
+            + ((((code >> 6 & 0x3F) as u8 | TAG_CONT) as u32) << 8)
+            + (((code & 0x3F) as u8 | TAG_CONT) as u32)
     } else {
-        ((((code >> 18 & 0x07) as u8 | TAG_FOUR_B) as u32) << 24) +
-        ((((code >> 12 & 0x3F) as u8 | TAG_CONT) as u32) << 16) +
-        ((((code >>  6 & 0x3F) as u8 | TAG_CONT) as u32) << 8) +
-        (((code & 0x3F) as u8 | TAG_CONT) as u32)
+        ((((code >> 18 & 0x07) as u8 | TAG_FOUR_B) as u32) << 24)
+            + ((((code >> 12 & 0x3F) as u8 | TAG_CONT) as u32) << 16)
+            + ((((code >> 6 & 0x3F) as u8 | TAG_CONT) as u32) << 8)
+            + (((code & 0x3F) as u8 | TAG_CONT) as u32)
     }
 }

@@ -1,8 +1,8 @@
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
 
+use std;
 use std::io::Write;
 use std::str;
-use std;
 
 use logger::LogFile;
 
@@ -49,10 +49,8 @@ pub fn ctcp_action<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::i
 
 pub fn away<W: Write>(sink: &mut W, msg: Option<&str>) -> std::io::Result<()> {
     match msg {
-        None =>
-            write!(sink, "AWAY\r\n"),
-        Some(msg) =>
-            write!(sink, "AWAY :{}\r\n", msg),
+        None => write!(sink, "AWAY\r\n"),
+        Some(msg) => write!(sink, "AWAY :{}\r\n", msg),
     }
 }
 
@@ -197,10 +195,8 @@ impl Msg {
         // using this hacky method instead.
         let crlf_idx = {
             match buf.windows(2).position(|sub| sub == CRLF) {
-                None =>
-                    return None,
-                Some(i) =>
-                    i,
+                None => return None,
+                Some(i) => i,
             }
         };
 
@@ -237,21 +233,23 @@ impl Msg {
                 let (cmd, slice_) = slice.split_at(ws_idx);
                 slice = &slice_[1..]; // drop the space
                 match parse_reply_num(cmd) {
-                    None =>
-                        MsgType::Cmd(unsafe {
-                            // Cmd strings are added by the server and they're always ASCII strings, so
-                            // this is safe and O(1).
-                            str::from_utf8_unchecked(cmd)
-                        }),
-                    Some(num) =>
-                        MsgType::Num(num),
+                    None => MsgType::Cmd(unsafe {
+                        // Cmd strings are added by the server and they're always ASCII strings, so
+                        // this is safe and O(1).
+                        str::from_utf8_unchecked(cmd)
+                    }),
+                    Some(num) => MsgType::Num(num),
                 }
             };
 
             let params: Vec<&str> = parse_params(unsafe { str::from_utf8_unchecked(slice) });
             let cmd = match msg_ty {
                 MsgType::Cmd("PRIVMSG") | MsgType::Cmd("NOTICE") if params.len() == 2 => {
-                    let is_notice = if let MsgType::Cmd("NOTICE") = msg_ty { true } else { false };
+                    let is_notice = if let MsgType::Cmd("NOTICE") = msg_ty {
+                        true
+                    } else {
+                        false
+                    };
                     let target = params[0];
                     let msg = params[1];
                     let target = if target.chars().nth(0) == Some('#') {
@@ -296,43 +294,35 @@ impl Msg {
                         nick: nick.to_owned(),
                     }
                 }
-                MsgType::Cmd("PING") if params.len() == 1 =>
-                    Cmd::PING {
-                        server: params[0].to_owned(),
-                    },
-                MsgType::Cmd("PONG") if params.len() >= 1 =>
-                    Cmd::PONG {
-                        server: params[0].to_owned(),
-                    },
-                MsgType::Cmd("ERROR") if params.len() == 1 =>
-                    Cmd::ERROR {
-                        msg: params[0].to_owned(),
-                    },
-                MsgType::Cmd("TOPIC") if params.len() == 2 =>
-                    Cmd::TOPIC {
-                        chan: params[0].to_owned(),
-                        topic: params[1].to_owned(),
-                    },
-                MsgType::Cmd("CAP") if params.len() == 3 =>
-                    Cmd::CAP {
-                        client: params[0].to_owned(),
-                        subcommand: params[1].to_owned(),
-                        params: params[2].split(' ').map(|s| s.to_owned()).collect(),
-                    },
-                MsgType::Cmd("AUTHENTICATE") if params.len() == 1 =>
-                    Cmd::AUTHENTICATE {
-                        param: params[0].to_owned(),
-                    },
-                MsgType::Num(n) =>
-                    Cmd::Reply {
-                        num: n,
-                        params: params.into_iter().map(|s| s.to_owned()).collect(),
-                    },
-                MsgType::Cmd(cmd) =>
-                    Cmd::Other {
-                        cmd: cmd.to_owned(),
-                        params: params.into_iter().map(|s| s.to_owned()).collect(),
-                    },
+                MsgType::Cmd("PING") if params.len() == 1 => Cmd::PING {
+                    server: params[0].to_owned(),
+                },
+                MsgType::Cmd("PONG") if params.len() >= 1 => Cmd::PONG {
+                    server: params[0].to_owned(),
+                },
+                MsgType::Cmd("ERROR") if params.len() == 1 => Cmd::ERROR {
+                    msg: params[0].to_owned(),
+                },
+                MsgType::Cmd("TOPIC") if params.len() == 2 => Cmd::TOPIC {
+                    chan: params[0].to_owned(),
+                    topic: params[1].to_owned(),
+                },
+                MsgType::Cmd("CAP") if params.len() == 3 => Cmd::CAP {
+                    client: params[0].to_owned(),
+                    subcommand: params[1].to_owned(),
+                    params: params[2].split(' ').map(|s| s.to_owned()).collect(),
+                },
+                MsgType::Cmd("AUTHENTICATE") if params.len() == 1 => Cmd::AUTHENTICATE {
+                    param: params[0].to_owned(),
+                },
+                MsgType::Num(n) => Cmd::Reply {
+                    num: n,
+                    params: params.into_iter().map(|s| s.to_owned()).collect(),
+                },
+                MsgType::Cmd(cmd) => Cmd::Other {
+                    cmd: cmd.to_owned(),
+                    params: params.into_iter().map(|s| s.to_owned()).collect(),
+                },
             };
 
             Msg { pfx, cmd }
@@ -345,13 +335,11 @@ impl Msg {
 
 fn parse_pfx(pfx: &[u8]) -> Pfx {
     match find_byte(pfx, b'!') {
-        None =>
-            Pfx::Server(unsafe { str::from_utf8_unchecked(pfx).to_owned() }),
-        Some(idx) =>
-            Pfx::User {
-                nick: unsafe { str::from_utf8_unchecked(&pfx[0..idx]) }.to_owned(),
-                user: unsafe { str::from_utf8_unchecked(&pfx[idx + 1..]) }.to_owned(),
-            },
+        None => Pfx::Server(unsafe { str::from_utf8_unchecked(pfx).to_owned() }),
+        Some(idx) => Pfx::User {
+            nick: unsafe { str::from_utf8_unchecked(&pfx[0..idx]) }.to_owned(),
+            user: unsafe { str::from_utf8_unchecked(&pfx[idx + 1..]) }.to_owned(),
+        },
     }
 }
 
@@ -381,16 +369,16 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     let mut slice_begins = 0;
     for (char_idx, char) in chrs.char_indices() {
         if char == ':' {
-            ret.push(unsafe { chrs.get_unchecked(char_idx + 1 .. chrs.len()) });
+            ret.push(unsafe { chrs.get_unchecked(char_idx + 1..chrs.len()) });
             return ret;
         } else if char == ' ' {
-            ret.push(unsafe { chrs.get_unchecked(slice_begins .. char_idx) });
+            ret.push(unsafe { chrs.get_unchecked(slice_begins..char_idx) });
             slice_begins = char_idx + 1;
         }
     }
 
     if slice_begins != chrs.len() {
-        ret.push(unsafe { chrs.get_unchecked(slice_begins .. chrs.len()) });
+        ret.push(unsafe { chrs.get_unchecked(slice_begins..chrs.len()) });
     }
 
     ret
@@ -443,7 +431,8 @@ mod tests {
         write!(
             &mut buf,
             ":nick!~nick@unaffiliated/nick PRIVMSG tiny :a b c\r\n"
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             Msg::read(&mut buf, None),
             Some(Msg {
@@ -467,7 +456,8 @@ mod tests {
         write!(
             &mut buf,
             ":barjavel.freenode.net NOTICE * :*** Looking up your hostname...\r\n"
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             Msg::read(&mut buf, None),
             Some(Msg {
@@ -498,14 +488,16 @@ mod tests {
             ":barjavel.freenode.net 004 tiny_test barjavel.freenode.net \
              ircd-seven-1.1.4 DOQRSZaghilopswz \
              CFILMPQSbcefgijklmnopqrstvz bkloveqjfI\r\n"
-        ).unwrap();
+        )
+        .unwrap();
         write!(
             &mut buf,
             ":barjavel.freenode.net 005 tiny_test CHANTYPES=# EXCEPTS INVEX \
              CHANMODES=eIbq,k,flj,CFLMPQScgimnprstz CHANLIMIT=#:120 PREFIX=(ov)@+ \
              MAXLIST=bqeI:100 MODES=4 NETWORK=freenode STATUSMSG=@+ CALLERID=g \
              CASEMAPPING=rfc1459 :are supported by this server\r\n"
-        ).unwrap();
+        )
+        .unwrap();
 
         let mut msgs = vec![];
         while let Some(msg) = Msg::read(&mut buf, None) {
@@ -583,7 +575,8 @@ mod tests {
         write!(
             &mut buf,
             "ERROR :Closing Link: 212.252.143.51 (Excess Flood)\r\n"
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             Msg::read(&mut buf, None),
             Some(Msg {

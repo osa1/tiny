@@ -49,9 +49,9 @@ impl<'a> Iterator for SplitWhitespaceIndices<'a> {
     type Item = usize;
 
     fn next(&mut self) -> Option<usize> {
-        self.inner.next().map(|str| unsafe {
-            str.as_ptr().offset_from(self.str.as_ptr()) as usize
-        })
+        self.inner
+            .next()
+            .map(|str| unsafe { str.as_ptr().offset_from(self.str.as_ptr()) as usize })
     }
 }
 
@@ -72,10 +72,7 @@ pub struct SplitIterator<'a> {
 /// Iterate over subslices that are at most `max` long (in bytes). Splits are
 /// made on whitespace characters when possible.
 pub fn split_iterator(s: &str, max: usize) -> SplitIterator {
-    SplitIterator {
-        s: Some(s),
-        max,
-    }
+    SplitIterator { s: Some(s), max }
 }
 
 impl<'a> Iterator for SplitIterator<'a> {
@@ -87,8 +84,7 @@ impl<'a> Iterator for SplitIterator<'a> {
         }
 
         match self.s {
-            None =>
-                None,
+            None => None,
             Some(s) => {
                 if s.len() <= self.max {
                     let ret = Some(s);
@@ -144,10 +140,11 @@ pub fn is_nick_char(c: char) -> bool {
     //
     // we use a simpler check here (allows strictly more nicks)
 
-    c.is_alphanumeric() || (c as i32 >= 0x5B && c as i32 <= 0x60) ||
-        (c as i32 >= 0x7B && c as i32 <= 0x7D) ||
-        c == '-' // not valid according to RFC 2812 but servers accept it and I've seen nicks with
-                 // this char in the wild
+    c.is_alphanumeric()
+        || (c as i32 >= 0x5B && c as i32 <= 0x60)
+        || (c as i32 >= 0x7B && c as i32 <= 0x7D)
+        || c == '-' // not valid according to RFC 2812 but servers accept it and I've seen nicks with
+                    // this char in the wild
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -174,22 +171,22 @@ fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
     };
 
     match chars.peek().cloned() {
-        None =>
-            Some(c1_digit),
-        Some(c2) =>
-            match to_dec(c2) {
-                None =>
-                    Some(c1_digit),
-                Some(c2_digit) => {
-                    chars.next();
-                    Some(c1_digit * 10 + c2_digit)
-                }
-            },
+        None => Some(c1_digit),
+        Some(c2) => match to_dec(c2) {
+            None => Some(c1_digit),
+            Some(c2_digit) => {
+                chars.next();
+                Some(c1_digit * 10 + c2_digit)
+            }
+        },
     }
 }
 
 /// Translate IRC color codes using the callback, and remove ASCII control chars from the input.
-pub fn translate_irc_control_chars(str: &str, push_color: fn(ret: &mut String, fg: u8, bg: Option<u8>)) -> String {
+pub fn translate_irc_control_chars(
+    str: &str,
+    push_color: fn(ret: &mut String, fg: u8, bg: Option<u8>),
+) -> String {
     let mut ret = String::with_capacity(str.len());
     let mut iter = str.chars().peekable();
 
@@ -373,25 +370,10 @@ mod tests {
             remove_irc_control_chars("  Le Voyageur imprudent  "),
             "  Le Voyageur imprudent  "
         );
-        assert_eq!(
-            remove_irc_control_chars("\x0301,02foo"),
-            "foo"
-        );
-        assert_eq!(
-            remove_irc_control_chars("\x0301,2foo"),
-            "foo"
-        );
-        assert_eq!(
-            remove_irc_control_chars("\x031,2foo"),
-            "foo"
-        );
-        assert_eq!(
-            remove_irc_control_chars("\x031,foo"),
-            ",foo"
-        );
-        assert_eq!(
-            remove_irc_control_chars("\x03,foo"),
-            ",foo"
-        );
+        assert_eq!(remove_irc_control_chars("\x0301,02foo"), "foo");
+        assert_eq!(remove_irc_control_chars("\x0301,2foo"), "foo");
+        assert_eq!(remove_irc_control_chars("\x031,2foo"), "foo");
+        assert_eq!(remove_irc_control_chars("\x031,foo"), ",foo");
+        assert_eq!(remove_irc_control_chars("\x03,foo"), ",foo");
     }
 }

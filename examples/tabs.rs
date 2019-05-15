@@ -6,12 +6,12 @@ extern crate term_input;
 extern crate termbox_simple;
 extern crate tiny;
 
+use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
 use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
-use mio::unix::EventedFd;
 use term_input::{Event, Input};
 use tiny::config::Colors;
 use tiny::tui::MsgSource;
@@ -56,7 +56,8 @@ fn main() {
         Token(libc::STDIN_FILENO as usize),
         Ready::readable(),
         PollOpt::level(),
-    ).unwrap();
+    )
+    .unwrap();
 
     let mut ev_buffer: Vec<Event> = Vec::new();
     let mut input = Input::new();
@@ -100,16 +101,14 @@ fn main() {
                                         );
                                     }
 
-                                    _ =>
-                                        {}
+                                    _ => {}
                                 }
                             }
                         }
                         TUIRet::Abort => {
                             break 'mainloop;
                         }
-                        _ =>
-                            {}
+                        _ => {}
                     }
                 }
                 tui.draw();

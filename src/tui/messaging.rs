@@ -1,14 +1,14 @@
-use termbox_simple::Termbox;
 use term_input::Key;
+use termbox_simple::Termbox;
 
 use std::convert::From;
 
-use time::Tm;
 use time;
+use time::Tm;
 
+use config;
 use config::Colors;
 use config::Style;
-use config;
 use trie::Trie;
 use tui::exit_dialogue::ExitDialogue;
 use tui::msg_area::line::SchemeStyle;
@@ -112,10 +112,8 @@ impl MessagingUI {
 
     fn draw_input_field(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         match self.exit_dialogue {
-            Some(ref exit_dialogue) =>
-                exit_dialogue.draw(tb, colors, pos_x, pos_y),
-            None =>
-                self.input_field.draw(tb, colors, pos_x, pos_y),
+            Some(ref exit_dialogue) => exit_dialogue.draw(tb, colors, pos_x, pos_y),
+            None => self.input_field.draw(tb, colors, pos_x, pos_y),
         }
     }
 
@@ -220,11 +218,12 @@ impl MessagingUI {
         self.msg_area.resize(width, height - 1);
 
         let nick_width = match self.current_nick {
-            None =>
-                0,
+            None => 0,
             Some(ref rc) =>
-                // +2 for ": "
-                rc.len() as i32 + 2,
+            // +2 for ": "
+            {
+                rc.len() as i32 + 2
+            }
         };
 
         self.draw_current_nick = (nick_width as f32) <= (width as f32) * (30f32 / 100f32);

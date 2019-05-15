@@ -8,16 +8,16 @@ pub mod widget;
 
 use std::str;
 
+pub use self::messaging::Timestamp;
 use config::Colors;
 use config::Style;
 use notifier::Notifier;
-pub use self::messaging::Timestamp;
-use term_input::{Arrow, Key, Event};
-use termbox_simple::{Termbox, OutputMode};
+use term_input::{Arrow, Event, Key};
+use termbox_simple::{OutputMode, Termbox};
 use trie::Trie;
+use tui::messaging::MessagingUI;
 pub use tui::tab::Tab;
 pub use tui::tab::TabStyle;
-use tui::messaging::MessagingUI;
 use tui::widget::WidgetRet;
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ pub enum TUIRet {
     Lines {
         lines: Vec<String>,
         from: MsgSource,
-    }
+    },
 }
 
 /// Target of a message to be shown on TUI.
@@ -110,39 +110,32 @@ impl MsgSource {
         match *self {
             MsgSource::Serv { ref serv_name }
             | MsgSource::Chan { ref serv_name, .. }
-            | MsgSource::User { ref serv_name, .. } =>
-                serv_name,
+            | MsgSource::User { ref serv_name, .. } => serv_name,
         }
     }
 
     pub fn to_target(&self) -> MsgTarget {
         match *self {
-            MsgSource::Serv { ref serv_name } =>
-                MsgTarget::Server { serv_name },
+            MsgSource::Serv { ref serv_name } => MsgTarget::Server { serv_name },
             MsgSource::Chan {
                 ref serv_name,
                 ref chan_name,
-            } =>
-                MsgTarget::Chan {
-                    serv_name,
-                    chan_name,
-                },
+            } => MsgTarget::Chan {
+                serv_name,
+                chan_name,
+            },
             MsgSource::User {
                 ref serv_name,
                 ref nick,
-            } =>
-                MsgTarget::User { serv_name, nick },
+            } => MsgTarget::User { serv_name, nick },
         }
     }
 
     pub fn visible_name(&self) -> &str {
         match *self {
-            MsgSource::Serv { ref serv_name, .. } =>
-                serv_name,
-            MsgSource::Chan { ref chan_name, .. } =>
-                chan_name,
-            MsgSource::User { ref nick, .. } =>
-                nick,
+            MsgSource::Serv { ref serv_name, .. } => serv_name,
+            MsgSource::Chan { ref chan_name, .. } => chan_name,
+            MsgSource::User { ref nick, .. } => nick,
         }
     }
 }
@@ -168,7 +161,8 @@ impl TUI {
     }
 
     pub fn set_colors(&mut self, colors: Colors) {
-        self.tb.set_clear_attributes(colors.clear.fg, colors.clear.bg);
+        self.tb
+            .set_clear_attributes(colors.clear.fg, colors.clear.bg);
         self.colors = colors;
     }
 
@@ -194,11 +188,12 @@ impl TUI {
                         ret = Some(ch);
                         break;
                     }
-                    Some(n_) =>
+                    Some(n_) => {
                         if ret == None || n > *n_ {
                             ret = Some(ch);
                             n = *n_;
-                        },
+                        }
+                    }
                 }
             }
             ret
@@ -227,12 +222,11 @@ impl TUI {
                         serv_name: serv_name.to_owned(),
                     },
                     true,
-                    Notifier::Mentions
+                    Notifier::Mentions,
                 );
                 Some(tab_idx)
             }
-            Some(_) =>
-                None,
+            Some(_) => None,
         }
     }
 
@@ -250,45 +244,47 @@ impl TUI {
     /// Returns index of the new tab if a new tab is created.
     pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str) -> Option<usize> {
         match self.find_chan_tab_idx(serv_name, chan_name) {
-            None =>
-                match self.find_last_serv_tab_idx(serv_name) {
-                    None => {
-                        self.new_server_tab(serv_name);
-                        self.new_chan_tab(serv_name, chan_name)
-                    }
-                    Some(serv_tab_idx) => {
-                        let mut status_val: bool = true;
-                        let mut notifier = Notifier::Mentions;
-                        for tab in &self.tabs {
-                            if let MsgSource::Serv { serv_name: ref serv_name_ } = tab.src {
-                                if serv_name == serv_name_ {
-                                    status_val = tab.widget.get_ignore_state();
-                                    notifier = tab.notifier;
-                                    break;
-                                }
+            None => match self.find_last_serv_tab_idx(serv_name) {
+                None => {
+                    self.new_server_tab(serv_name);
+                    self.new_chan_tab(serv_name, chan_name)
+                }
+                Some(serv_tab_idx) => {
+                    let mut status_val: bool = true;
+                    let mut notifier = Notifier::Mentions;
+                    for tab in &self.tabs {
+                        if let MsgSource::Serv {
+                            serv_name: ref serv_name_,
+                        } = tab.src
+                        {
+                            if serv_name == serv_name_ {
+                                status_val = tab.widget.get_ignore_state();
+                                notifier = tab.notifier;
+                                break;
                             }
                         }
-                        let tab_idx = serv_tab_idx + 1;
-                        self.new_tab(
-                            tab_idx,
-                            MsgSource::Chan {
-                                serv_name: serv_name.to_owned(),
-                                chan_name: chan_name.to_owned(),
-                            },
-                            status_val,
-                            notifier
-                        );
-                        if self.active_idx >= tab_idx {
-                            self.next_tab();
-                        }
-                        if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick().map(str::to_owned) {
-                            self.tabs[tab_idx].widget.set_nick(nick);
-                        }
-                        Some(tab_idx)
                     }
-                },
-            Some(_) =>
-                None,
+                    let tab_idx = serv_tab_idx + 1;
+                    self.new_tab(
+                        tab_idx,
+                        MsgSource::Chan {
+                            serv_name: serv_name.to_owned(),
+                            chan_name: chan_name.to_owned(),
+                        },
+                        status_val,
+                        notifier,
+                    );
+                    if self.active_idx >= tab_idx {
+                        self.next_tab();
+                    }
+                    if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick().map(str::to_owned)
+                    {
+                        self.tabs[tab_idx].widget.set_nick(nick);
+                    }
+                    Some(tab_idx)
+                }
+            },
+            Some(_) => None,
         }
     }
 
@@ -304,31 +300,29 @@ impl TUI {
     /// Returns index of the new tab if a new tab is created.
     pub fn new_user_tab(&mut self, serv_name: &str, nick: &str) -> Option<usize> {
         match self.find_user_tab_idx(serv_name, nick) {
-            None =>
-                match self.find_last_serv_tab_idx(serv_name) {
-                    None => {
-                        self.new_server_tab(serv_name);
-                        self.new_user_tab(serv_name, nick)
+            None => match self.find_last_serv_tab_idx(serv_name) {
+                None => {
+                    self.new_server_tab(serv_name);
+                    self.new_user_tab(serv_name, nick)
+                }
+                Some(tab_idx) => {
+                    self.new_tab(
+                        tab_idx + 1,
+                        MsgSource::User {
+                            serv_name: serv_name.to_owned(),
+                            nick: nick.to_owned(),
+                        },
+                        true,
+                        Notifier::Messages,
+                    );
+                    if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
+                        self.tabs[tab_idx + 1].widget.set_nick(nick);
                     }
-                    Some(tab_idx) => {
-                        self.new_tab(
-                            tab_idx + 1,
-                            MsgSource::User {
-                                serv_name: serv_name.to_owned(),
-                                nick: nick.to_owned(),
-                            },
-                            true,
-                            Notifier::Messages
-                        );
-                        if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
-                            self.tabs[tab_idx + 1].widget.set_nick(nick);
-                        }
-                        self.tabs[tab_idx + 1].widget.join(nick, None);
-                        Some(tab_idx + 1)
-                    }
-                },
-            Some(_) =>
-                None,
+                    self.tabs[tab_idx + 1].widget.join(nick, None);
+                    Some(tab_idx + 1)
+                }
+            },
+            Some(_) => None,
         }
     }
 
@@ -350,8 +344,7 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            Event::Key(key) =>
-                self.keypressed(key),
+            Event::Key(key) => self.keypressed(key),
 
             Event::String(str) => {
                 // For some reason on my terminal newlines in text are
@@ -368,8 +361,7 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            ev =>
-                TUIRet::EventIgnored(ev),
+            ev => TUIRet::EventIgnored(ev),
         }
     }
 
@@ -399,27 +391,29 @@ impl TUI {
                 match err {
                     PasteError::Io(err) => {
                         self.add_client_err_msg(
-                            &format!(
-                                "Error while running $EDITOR: {:?}",
-                                err),
-                            &MsgTarget::CurrentTab);
+                            &format!("Error while running $EDITOR: {:?}", err),
+                            &MsgTarget::CurrentTab,
+                        );
                     }
                     PasteError::Var(VarError::NotPresent) => {
                         self.add_client_err_msg(
                             "Can't paste multi-line string: \
                              make sure your $EDITOR is set",
-                            &MsgTarget::CurrentTab);
+                            &MsgTarget::CurrentTab,
+                        );
                     }
                     PasteError::Var(VarError::NotUnicode(_)) => {
                         self.add_client_err_msg(
                             "Can't paste multi-line string: \
                              can't parse $EDITOR (not unicode)",
-                            &MsgTarget::CurrentTab);
+                            &MsgTarget::CurrentTab,
+                        );
                     }
                     PasteError::PastedCmd => {
                         self.add_client_err_msg(
                             "One of the pasted lines looks like a command.",
-                            &MsgTarget::CurrentTab);
+                            &MsgTarget::CurrentTab,
+                        );
                     }
                 }
                 TUIRet::KeyHandled
@@ -429,19 +423,14 @@ impl TUI {
 
     pub fn keypressed(&mut self, key: Key) -> TUIRet {
         match self.tabs[self.active_idx].widget.keypressed(key) {
-            WidgetRet::KeyHandled =>
-                TUIRet::KeyHandled,
-            WidgetRet::KeyIgnored =>
-                self.handle_keypress(key),
-            WidgetRet::Input(input) =>
-                TUIRet::Input {
-                    msg: input,
-                    from: self.tabs[self.active_idx].src.clone(),
-                },
-            WidgetRet::Remove =>
-                unimplemented!(),
-            WidgetRet::Abort =>
-                TUIRet::Abort,
+            WidgetRet::KeyHandled => TUIRet::KeyHandled,
+            WidgetRet::KeyIgnored => self.handle_keypress(key),
+            WidgetRet::Input(input) => TUIRet::Input {
+                msg: input,
+                from: self.tabs[self.active_idx].src.clone(),
+            },
+            WidgetRet::Remove => unimplemented!(),
+            WidgetRet::Abort => TUIRet::Abort,
         }
     }
 
@@ -457,43 +446,40 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            Key::Ctrl('x') => {
-                self.edit_input("")
-            }
+            Key::Ctrl('x') => self.edit_input(""),
 
-            Key::AltChar(c) =>
-                match c.to_digit(10) {
-                    Some(i) => {
-                        let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
-                            self.tabs.len() - 1
-                        } else {
-                            i as usize - 1
-                        };
-                        if new_tab_idx > self.active_idx {
-                            for _ in 0..new_tab_idx - self.active_idx {
-                                self.next_tab_();
-                            }
-                        } else if new_tab_idx < self.active_idx {
-                            for _ in 0..self.active_idx - new_tab_idx {
-                                self.prev_tab_();
-                            }
+            Key::AltChar(c) => match c.to_digit(10) {
+                Some(i) => {
+                    let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
+                        self.tabs.len() - 1
+                    } else {
+                        i as usize - 1
+                    };
+                    if new_tab_idx > self.active_idx {
+                        for _ in 0..new_tab_idx - self.active_idx {
+                            self.next_tab_();
                         }
-                        self.tabs[self.active_idx].set_style(TabStyle::Normal);
-                        TUIRet::KeyHandled
-                    }
-                    None => {
-                        // multiple tabs can have same switch character so scan
-                        // forwards instead of starting from the first tab
-                        for i in 1..=self.tabs.len() {
-                            let idx = (self.active_idx + i) % self.tabs.len();
-                            if self.tabs[idx].switch == Some(c) {
-                                self.select_tab(idx);
-                                break;
-                            }
+                    } else if new_tab_idx < self.active_idx {
+                        for _ in 0..self.active_idx - new_tab_idx {
+                            self.prev_tab_();
                         }
-                        TUIRet::KeyHandled
                     }
-                },
+                    self.tabs[self.active_idx].set_style(TabStyle::Normal);
+                    TUIRet::KeyHandled
+                }
+                None => {
+                    // multiple tabs can have same switch character so scan
+                    // forwards instead of starting from the first tab
+                    for i in 1..=self.tabs.len() {
+                        let idx = (self.active_idx + i) % self.tabs.len();
+                        if self.tabs[idx].switch == Some(c) {
+                            self.select_tab(idx);
+                            break;
+                        }
+                    }
+                    TUIRet::KeyHandled
+                }
+            },
 
             Key::AltArrow(Arrow::Left) => {
                 self.move_tab_left();
@@ -505,8 +491,7 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            key =>
-                TUIRet::KeyIgnored(key),
+            key => TUIRet::KeyIgnored(key),
         }
     }
 
@@ -568,10 +553,8 @@ impl TUI {
 
     pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
         match self.find_chan_tab_idx(serv_name, chan_name) {
-            None =>
-                None,
-            Some(i) =>
-                Some(self.tabs[i].widget.get_nicks()),
+            None => None,
+            Some(i) => Some(self.tabs[i].widget.get_nicks()),
         }
     }
 }
@@ -580,17 +563,15 @@ impl TUI {
 // Rendering
 
 fn arrow_style(tabs: &[Tab], colors: &Colors) -> Style {
-    let tab_style = tabs.iter()
+    let tab_style = tabs
+        .iter()
         .map(|tab| tab.style)
         .max()
         .unwrap_or(TabStyle::Normal);
     match tab_style {
-        TabStyle::Normal =>
-            colors.tab_normal,
-        TabStyle::NewMsg =>
-            colors.tab_new_msg,
-        TabStyle::Highlight =>
-            colors.tab_highlight,
+        TabStyle::Normal => colors.tab_normal,
+        TabStyle::NewMsg => colors.tab_new_msg,
+        TabStyle::Highlight => colors.tab_highlight,
     }
 }
 
@@ -676,13 +657,8 @@ impl TUI {
         let mut pos_x: i32 = 0;
         if left_arr {
             let style = arrow_style(&self.tabs[0..tab_left], &self.colors);
-            self.tb.change_cell(
-                pos_x,
-                self.height - 1,
-                LEFT_ARROW,
-                style.fg,
-                style.bg,
-            );
+            self.tb
+                .change_cell(pos_x, self.height - 1, LEFT_ARROW, style.fg, style.bg);
             pos_x += 2;
         }
 
@@ -704,13 +680,8 @@ impl TUI {
 
         if right_arr {
             let style = arrow_style(&self.tabs[tab_right..], &self.colors);
-            self.tb.change_cell(
-                pos_x,
-                self.height - 1,
-                RIGHT_ARROW,
-                style.fg,
-                style.bg,
-            );
+            self.tb
+                .change_cell(pos_x, self.height - 1, RIGHT_ARROW, style.fg, style.bg);
         }
 
         self.tb.present();
@@ -746,21 +717,24 @@ impl TUI {
         let mut next_idx = self.active_idx;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             match tab.src {
-                MsgSource::Serv { ref serv_name } =>
+                MsgSource::Serv { ref serv_name } => {
                     if serv_name.contains(string) {
                         next_idx = tab_idx;
                         break;
-                    },
-                MsgSource::Chan { ref chan_name, .. } =>
+                    }
+                }
+                MsgSource::Chan { ref chan_name, .. } => {
                     if chan_name.contains(string) {
                         next_idx = tab_idx;
                         break;
-                    },
-                MsgSource::User { ref nick, .. } =>
+                    }
+                }
+                MsgSource::User { ref nick, .. } => {
                     if nick.contains(string) {
                         next_idx = tab_idx;
                         break;
-                    },
+                    }
+                }
             }
         }
         if next_idx != self.active_idx {
@@ -825,8 +799,9 @@ impl TUI {
                 while insert_idx > 0 && !self.is_server_tab(insert_idx) {
                     insert_idx -= 1;
                 }
-                let to_move: Vec<Tab> = self.tabs.drain(left .. right).collect();
-                self.tabs.splice(insert_idx..insert_idx, to_move.into_iter());
+                let to_move: Vec<Tab> = self.tabs.drain(left..right).collect();
+                self.tabs
+                    .splice(insert_idx..insert_idx, to_move.into_iter());
                 self.select_tab(insert_idx);
             }
         } else if !self.is_server_tab(self.active_idx - 1) {
@@ -847,8 +822,9 @@ impl TUI {
             if right < self.tabs.len() {
                 let right_next = self.server_tab_range(right).1;
                 let insert_idx = right_next - (right - left);
-                let to_move: Vec<Tab> = self.tabs.drain(left .. right).collect();
-                self.tabs.splice(insert_idx..insert_idx, to_move.into_iter());
+                let to_move: Vec<Tab> = self.tabs.drain(left..right).collect();
+                self.tabs
+                    .splice(insert_idx..insert_idx, to_move.into_iter());
                 self.select_tab(insert_idx);
             }
         } else if !self.is_server_tab(self.active_idx + 1) {
@@ -874,7 +850,7 @@ impl TUI {
         let mut target_idxs: Vec<usize> = Vec::with_capacity(1);
 
         match *target {
-            MsgTarget::Server { serv_name } =>
+            MsgTarget::Server { serv_name } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if let MsgSource::Serv {
                         serv_name: ref serv_name_,
@@ -885,12 +861,13 @@ impl TUI {
                             break;
                         }
                     }
-                },
+                }
+            }
 
             MsgTarget::Chan {
                 serv_name,
                 chan_name,
-            } =>
+            } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if let MsgSource::Chan {
                         serv_name: ref serv_name_,
@@ -902,9 +879,10 @@ impl TUI {
                             break;
                         }
                     }
-                },
+                }
+            }
 
-            MsgTarget::User { serv_name, nick } =>
+            MsgTarget::User { serv_name, nick } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if let MsgSource::User {
                         serv_name: ref serv_name_,
@@ -916,36 +894,40 @@ impl TUI {
                             break;
                         }
                     }
-                },
+                }
+            }
 
-            MsgTarget::AllServTabs { serv_name } =>
+            MsgTarget::AllServTabs { serv_name } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if tab.src.serv_name() == serv_name {
                         target_idxs.push(tab_idx);
                     }
-                },
+                }
+            }
 
-            MsgTarget::AllUserTabs { serv_name, nick } =>
+            MsgTarget::AllUserTabs { serv_name, nick } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     match tab.src {
-                        MsgSource::Serv { .. } =>
-                            {}
+                        MsgSource::Serv { .. } => {}
                         MsgSource::Chan {
                             serv_name: ref serv_name_,
                             ..
-                        } =>
+                        } => {
                             if serv_name_ == serv_name && tab.widget.has_nick(nick) {
                                 target_idxs.push(tab_idx);
-                            },
+                            }
+                        }
                         MsgSource::User {
                             serv_name: ref serv_name_,
                             nick: ref nick_,
-                        } =>
+                        } => {
                             if serv_name_ == serv_name && nick_ == nick {
                                 target_idxs.push(tab_idx);
-                            },
+                            }
+                        }
                     }
-                },
+                }
+            }
 
             MsgTarget::CurrentTab => {
                 target_idxs.push(self.active_idx);
@@ -960,39 +942,33 @@ impl TUI {
         }
 
         for tab_idx in target_idxs {
-            f(
-                &mut self.tabs[tab_idx],
-                self.active_idx == tab_idx,
-            );
+            f(&mut self.tabs[tab_idx], self.active_idx == tab_idx);
         }
     }
 
     fn maybe_create_tab(&mut self, target: &MsgTarget) -> Option<usize> {
         match *target {
-            MsgTarget::Server { serv_name } | MsgTarget::AllServTabs { serv_name } =>
-                self.new_server_tab(serv_name),
+            MsgTarget::Server { serv_name } | MsgTarget::AllServTabs { serv_name } => {
+                self.new_server_tab(serv_name)
+            }
 
             MsgTarget::Chan {
                 serv_name,
                 chan_name,
-            } =>
-                self.new_chan_tab(serv_name, chan_name),
+            } => self.new_chan_tab(serv_name, chan_name),
 
-            MsgTarget::User { serv_name, nick } =>
-                self.new_user_tab(serv_name, nick),
+            MsgTarget::User { serv_name, nick } => self.new_user_tab(serv_name, nick),
 
-            _ =>
-                None,
+            _ => None,
         }
     }
 
     pub fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
-        self.apply_to_target(
-            target,
-            &|tab: &mut Tab, is_active: bool| if !is_active && tab.style < style {
+        self.apply_to_target(target, &|tab: &mut Tab, is_active: bool| {
+            if !is_active && tab.style < style {
                 tab.set_style(style);
-            },
-        );
+            }
+        });
     }
 
     /// An error message coming from Tiny, probably because of a command error
@@ -1033,7 +1009,8 @@ impl TUI {
             tab.widget.add_privmsg(sender, msg, ts, false, ctcp_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
-                tab.notifier.notify_privmsg(sender, msg, target, nick_, false);
+                tab.notifier
+                    .notify_privmsg(sender, msg, target, nick_, false);
             }
         });
     }
@@ -1051,7 +1028,8 @@ impl TUI {
             tab.widget.add_privmsg(sender, msg, ts, true, ctcp_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
-                tab.notifier.notify_privmsg(sender, msg, target, nick_, true);
+                tab.notifier
+                    .notify_privmsg(sender, msg, target, nick_, true);
             }
         });
     }
@@ -1105,12 +1083,12 @@ impl TUI {
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, ts);
-            tab.update_source(
-                &|src: &mut MsgSource| if let MsgSource::User { ref mut nick, .. } = *src {
+            tab.update_source(&|src: &mut MsgSource| {
+                if let MsgSource::User { ref mut nick, .. } = *src {
                     nick.clear();
                     nick.push_str(new_nick);
-                },
-            );
+                }
+            });
         });
     }
 
@@ -1129,7 +1107,10 @@ impl TUI {
         if let MsgTarget::AllServTabs { serv_name } = *target {
             let mut status_val: bool = false;
             for tab in &self.tabs {
-                if let MsgSource::Serv { serv_name: ref serv_name_ } = tab.src {
+                if let MsgSource::Serv {
+                    serv_name: ref serv_name_,
+                } = tab.src
+                {
                     if serv_name == serv_name_ {
                         status_val = tab.widget.get_ignore_state();
                         break;
@@ -1152,7 +1133,11 @@ impl TUI {
 
     pub fn does_user_tab_exist(&self, serv_name_: &str, nick_: &str) -> bool {
         for tab in &self.tabs {
-            if let MsgSource::User { ref serv_name, ref nick } = tab.src {
+            if let MsgSource::User {
+                ref serv_name,
+                ref nick,
+            } = tab.src
+            {
                 if serv_name_ == serv_name && nick_ == nick {
                     return true;
                 }
@@ -1161,26 +1146,22 @@ impl TUI {
         false
     }
 
-    pub fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget){
+    pub fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.notifier = notifier;
         });
     }
 
-    pub fn show_notify_mode(&mut self, target: &MsgTarget){
+    pub fn show_notify_mode(&mut self, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             let msg = match tab.notifier {
-                Notifier::Off =>
-                    "Notifications are off",
-                Notifier::Mentions =>
-                    "Notifications enabled for mentions",
-                Notifier::Messages =>
-                    "Notifications enabled for all messages",
+                Notifier::Off => "Notifications are off",
+                Notifier::Mentions => "Notifications enabled for mentions",
+                Notifier::Messages => "Notifications enabled for all messages",
             };
             tab.widget.add_client_notify_msg(msg);
         });
     }
-
 
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
@@ -1238,10 +1219,8 @@ impl TUI {
 
     fn is_server_tab(&self, idx: usize) -> bool {
         match self.tabs[idx].src {
-            MsgSource::Serv { .. } =>
-                true,
-            MsgSource::Chan { .. } | MsgSource::User { .. } =>
-                false,
+            MsgSource::Serv { .. } => true,
+            MsgSource::Chan { .. } | MsgSource::User { .. } => false,
         }
     }
 
@@ -1302,16 +1281,23 @@ pub fn paste_lines(tf: String, str: &str) -> Result<Vec<String>, PasteError> {
     let editor = ::std::env::var("EDITOR")?;
     let mut tmp_file = ::tempfile::NamedTempFile::new()?;
 
-    writeln!(tmp_file, "\
-        # You pasted a multi-line message. When you close the editor final version of\n\
-        # this file will be sent (ignoring these lines). Delete contents to abort the\n\
-        # paste.")?;
+    writeln!(
+        tmp_file,
+        "\
+         # You pasted a multi-line message. When you close the editor final version of\n\
+         # this file will be sent (ignoring these lines). Delete contents to abort the\n\
+         # paste."
+    )?;
     write!(tmp_file, "{}", tf)?;
     write!(tmp_file, "{}", str.replace('\r', "\n"))?;
 
-    unsafe { tb_shutdown(); }
+    unsafe {
+        tb_shutdown();
+    }
     let ret = Command::new(editor).arg(tmp_file.path()).status();
-    unsafe { tb_init(); }
+    unsafe {
+        tb_init();
+    }
     // No need to set color mode etc. again as they're held in static variables and won't be reset
     // after tb_shutdown()
 

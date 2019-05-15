@@ -28,12 +28,9 @@ pub enum TabStyle {
 impl TabStyle {
     pub fn get_style(self, colors: &Colors) -> Style {
         match self {
-            TabStyle::Normal =>
-                colors.tab_normal,
-            TabStyle::NewMsg =>
-                colors.tab_new_msg,
-            TabStyle::Highlight =>
-                colors.tab_highlight,
+            TabStyle::Normal => colors.tab_normal,
+            TabStyle::NewMsg => colors.tab_new_msg,
+            TabStyle::Highlight => colors.tab_highlight,
         }
     }
 }
@@ -56,8 +53,7 @@ impl Tab {
 
     pub fn width(&self) -> i32 {
         // TODO: assuming ASCII string here. We should probably switch to a AsciiStr type.
-        self.visible_name().len() as i32 +
-            if self.widget.get_ignore_state() { 0 } else { 3 }
+        self.visible_name().len() as i32 + if self.widget.get_ignore_state() { 0 } else { 3 }
     }
 
     pub fn draw(

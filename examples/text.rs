@@ -4,12 +4,12 @@ extern crate term_input;
 extern crate termbox_simple;
 extern crate tiny;
 
+use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
 use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
-use mio::unix::EventedFd;
 use std::fs::File;
 use std::io::Read;
 
@@ -17,9 +17,9 @@ use term_input::{Event, Input, Key};
 use termbox_simple::*;
 
 use tiny::config::Colors;
-use tiny::tui::msg_area::MsgArea;
 use tiny::tui::msg_area::line::SchemeStyle;
 use tiny::tui::msg_area::line::SegStyle;
+use tiny::tui::msg_area::MsgArea;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();
@@ -56,7 +56,8 @@ fn main() {
         Token(libc::STDIN_FILENO as usize),
         Ready::readable(),
         PollOpt::level(),
-    ).unwrap();
+    )
+    .unwrap();
 
     tui.clear();
     msg_area.draw(&mut tui, &colors, 0, 0);
@@ -107,8 +108,7 @@ fn main() {
                         //     ctx.0.resize();
                         //     ctx.1.resize(ctx.0.width(), ctx.0.height());
                         // }
-                        _ =>
-                            {}
+                        _ => {}
                     }
                 }
 
