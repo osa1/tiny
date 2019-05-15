@@ -258,10 +258,7 @@ impl futures::Stream for Input {
         }
 
         // Otherwise read stdin and loop if successful
-        match self
-            .stdin
-            .poll_read_ready(mio::Ready::readable() /* &mut self.buf */)
-        {
+        match self.stdin.poll_read_ready(mio::Ready::readable()) {
             Ok(futures::Async::Ready(_)) => {
                 if read_stdin(&mut self.buf) {
                     self.poll()
