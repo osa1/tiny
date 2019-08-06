@@ -40,7 +40,7 @@ enum LogDest {
     ServerRaw(String),
 }
 
-fn init_log_file(file: &mut Write) {
+fn init_log_file(file: &mut dyn Write) {
     let now = time::now();
     writeln!(file, "\nLogs started on {}\n", now.rfc822()).unwrap();
 }

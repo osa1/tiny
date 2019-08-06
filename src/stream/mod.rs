@@ -49,7 +49,7 @@ impl StreamErr {
         }
     }
 
-    pub fn source(&self) -> Option<&error::Error> {
+    pub fn source(&self) -> Option<&dyn error::Error> {
         use self::StreamErr::*;
         match *self {
             IoError(ref err) => err.source(),

@@ -1,6 +1,6 @@
 [package]
 name = "tiny"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 repository = "https://github.com/osa1/tiny"
 readme = "README.md"
@@ -33,7 +33,7 @@ serde_yaml = "0.7.1"
 take_mut = "0.2.0"
 tempfile = "3.0.3"
 term_input = { path = "term_input", version = "0.1.5" }
-termbox_simple = { path = "termbox", version = "0.2.2" }
+termbox_simple = { path = "termbox", version = "0.2.3" }
 time = "0.1"
 
 [dev-dependencies]

@@ -77,7 +77,7 @@ impl Trie {
     }
 
     // TODO: We need an Iterator instance instead.
-    pub fn drop_pfx(&self, prefix: &mut Iterator<Item = char>) -> Vec<String> {
+    pub fn drop_pfx(&self, prefix: &mut dyn Iterator<Item = char>) -> Vec<String> {
         let mut trie = self;
         for char in prefix {
             if let Some(trie_) = get_char_node_for_lookup(trie, char) {

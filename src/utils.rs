@@ -1,8 +1,8 @@
 pub struct InsertIterator<'iter, A: 'iter> {
     insert_point: usize,
     current_idx: usize,
-    iter_orig: &'iter mut Iterator<Item = A>,
-    iter_insert: &'iter mut Iterator<Item = A>,
+    iter_orig: &'iter mut dyn Iterator<Item = A>,
+    iter_insert: &'iter mut dyn Iterator<Item = A>,
 }
 
 impl<'iter, A> Iterator for InsertIterator<'iter, A> {
@@ -23,8 +23,8 @@ impl<'iter, A> Iterator for InsertIterator<'iter, A> {
 }
 
 pub fn insert_iter<'iter, A>(
-    iter_orig: &'iter mut Iterator<Item = A>,
-    iter_insert: &'iter mut Iterator<Item = A>,
+    iter_orig: &'iter mut dyn Iterator<Item = A>,
+    iter_insert: &'iter mut dyn Iterator<Item = A>,
     insert_point: usize,
 ) -> InsertIterator<'iter, A> {
     InsertIterator {

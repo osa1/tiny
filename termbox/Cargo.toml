@@ -1,6 +1,6 @@
 [package]
 name = "termbox_simple"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 links = "termbox_simple"
 description = "A hacked version of termbox (see README)"
@@ -12,7 +12,7 @@ build = "build.rs"
 libc = "0.2"
 
 [build-dependencies]
-gcc = "0.3.54"
+cc = "1.0.38"
 
 [dev-dependencies]
 mio = "0.6.9"

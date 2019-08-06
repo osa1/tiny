@@ -1,7 +1,7 @@
-extern crate gcc;
+extern crate cc;
 
 fn main() {
-    gcc::Build::new()
+    cc::Build::new()
         .file("cbits/termbox.c")
         .include("cbits")
         .define("_XOPEN_SOURCE", None)

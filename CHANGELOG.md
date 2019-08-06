@@ -1,9 +1,10 @@
-# WIP
+# 2019/08/06: 0.4.5
 
 - IRC color codes and ASCII control chars are now removed from desktop
   notifications to avoid weird notification rendering and glitches.
 - Fixed a bug that caused panics when running tiny with spotty connections (lots
   of disconnects) (#119).
+- Fix build with Rust nightly (#133), fix new warnings.
 
 # 2018/12/22: 0.4.4
 
