@@ -170,7 +170,6 @@ mod tests {
         assert!(trie.contains("baz"));
         assert_eq!(vec!["az"], trie.drop_pfx(&mut "b".chars()));
     }
-
 } // tests
 
 #[cfg(test)]
@@ -301,5 +300,4 @@ mod benchs {
 
         b.iter(|| trie.drop_pfx(&mut "".chars()));
     }
-
 } // benchs

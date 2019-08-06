@@ -429,5 +429,4 @@ mod tests {
         line.add_text(&text);
         b.iter(|| line.rendered_height(1));
     }
-
 } // mod tests
