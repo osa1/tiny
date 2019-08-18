@@ -1,21 +1,14 @@
-extern crate futures;
+#![feature(async_await, async_closure)]
+
 extern crate libc;
-extern crate term_input_futures;
+extern crate term_input_std_futures;
 extern crate tokio;
 
+use futures::stream::StreamExt;
 use std::io;
 use std::io::Write;
 
-use futures::future;
-use futures::Future;
-use futures::Stream;
-
-use term_input_futures::{Event, Input, Key};
-
-enum IterErr {
-    Io(std::io::Error),
-    Break,
-}
+use term_input_std_futures::{Event, Input, Key};
 
 fn main() {
     // put the terminal in non-buffering, no-enchoing mode
@@ -44,23 +37,25 @@ fn main() {
     }
 
     /* DO THE BUSINESS HERE */
-    let input = Input::new();
-    tokio::run(future::lazy(|| {
-        input
-            .map_err(IterErr::Io)
-            .for_each(|ev| {
-                println!("{:?}", ev);
-                if ev == Event::Key(Key::Esc) {
-                    future::err(IterErr::Break)
-                } else {
-                    future::ok(())
+    let mut input = Input::new();
+    let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
+    executor.spawn(async move {
+        while let Some(mb_ev) = input.next().await {
+            match mb_ev {
+                Ok(ev) => {
+                    println!("{:?}", ev);
+                    if ev == Event::Key(Key::Esc) {
+                        break;
+                    }
                 }
-            })
-            .map_err(|e| match e {
-                IterErr::Break => {}
-                IterErr::Io(io_err) => println!("Error: {:?}", io_err),
-            })
-    }));
+                Err(io_err) => {
+                    println!("Error: {:?}", io_err);
+                    break;
+                }
+            }
+        }
+    });
+    executor.run().unwrap();
 
     // restore the old settings
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &old_term) };

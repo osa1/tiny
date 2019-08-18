@@ -1,17 +1,19 @@
 [package]
-name = "term_input_futures"
+name = "term_input_std_futures"
 version = "0.1.5"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "Input handling for xterm-compatible terminals"
 repository = "https://github.com/osa1/tiny"
 license = "MIT"
+edition = "2018"
 
 [dependencies]
-futures = "0.1"
+futures-preview = "0.3.0-alpha.18"
 libc = "0.2"
 mio = "0.6"
 nix = "0.7"
-tokio = "0.1"
+tokio = "0.2.0-alpha.2"
+tokio-net = "0.2.0-alpha.2"
 
 [dev-dependencies]
 mio = "0.6.9"
