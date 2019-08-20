@@ -72,6 +72,8 @@ pub struct Config {
     #[serde(default)]
     pub colors: Colors,
     pub log_dir: String,
+    #[serde(default)]
+    pub statusline: bool,
 }
 
 pub fn get_default_config_path() -> PathBuf {
@@ -156,6 +158,9 @@ pub struct Colors {
     pub tab_normal: Style,
     pub tab_new_msg: Style,
     pub tab_highlight: Style,
+    pub statusline_normal: Style,
+    pub statusline_left: Style,
+    pub statusline_right: Style,
 }
 
 impl Default for Colors {
@@ -218,6 +223,9 @@ impl Default for Colors {
                 fg: 9 | TB_BOLD,
                 bg: 0,
             },
+            statusline_normal: Style { fg: 15, bg: 8 },
+            statusline_left: Style { fg: 10, bg: 8 },
+            statusline_right: Style { fg: 7, bg: 8 },
         }
     }
 }

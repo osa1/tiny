@@ -71,7 +71,7 @@ pub fn parse_cmd(cmd: &str) -> ParseCmdResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&'static Cmd; 14] = [
+static CMDS: [&'static Cmd; 15] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
@@ -86,6 +86,7 @@ static CMDS: [&'static Cmd; 14] = [
     &NOTIFY_CMD,
     &RELOAD_CMD,
     &SWITCH_CMD,
+    &STATUSLINE_CMD
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -517,6 +518,17 @@ fn switch(args: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
             .add_client_err_msg("/switch usage: /switch <tab name>", &MsgTarget::CurrentTab);
     }
     tiny.tui.switch(words[0]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static STATUSLINE_CMD: Cmd = Cmd {
+    name: "statusline",
+    cmd_fn: statusline,
+};
+
+fn statusline(_: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
+    tiny.tui.toggle_statusline();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
