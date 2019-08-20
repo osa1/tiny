@@ -108,6 +108,9 @@ defaults:
 # Where to put log files
 log_dir: '/home/$USER/tiny_logs'
 
+# Enable/Disable statusline
+statusline: false
+
 # <Color scheme configuration>
 ```
 
@@ -198,13 +201,16 @@ Commands start with `/` character.
 
 - `/switch <string>`: Switch to the first tab which has the given string in the name.
 
-- `/ignore`: Ignore `join/quit` messages in a channel. When enabled channel
-  name will have `[i]` added to the end to show that it is enabled. Running
-  this command in a server tab applies it to all channels of that server.
+- `/statusline`: Enable or disable status line on top which gives you info about
+  current settings of a tab.
+
+- `/ignore`: Ignore `join/quit` messages in a channel. Running this command in
+  a server tab applies it to all channels of that server. You can check your
+  ignore state in the status line.
 
 - `/notify [off|mentions|messages]`: Enable and disable desktop notifications.
-  You can use `/notify` command without any arguments to see the current mode.
-  Running this command in a server tab applies it to all channels of that server.
+  Running this command in a server tab applies it to all channels of that
+  server. You can check your notify state in the status line.
 
 ## Development
 
