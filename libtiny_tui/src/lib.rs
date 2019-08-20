@@ -8,6 +8,7 @@ mod messaging;
 #[doc(hidden)]
 pub mod msg_area;
 mod notifier;
+mod statusline;
 mod tab;
 mod termbox;
 mod text_field;
