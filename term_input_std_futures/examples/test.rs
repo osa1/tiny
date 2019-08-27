@@ -1,4 +1,4 @@
-#![feature(async_await, async_closure)]
+#![feature(async_closure)]
 
 extern crate libc;
 extern crate term_input_std_futures;
