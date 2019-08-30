@@ -4,11 +4,11 @@ use std::mem;
 use term_input::{Arrow, Key};
 use termbox_simple::Termbox;
 
-use config::Colors;
-use trie::Trie;
-use tui::termbox;
-use tui::widget::WidgetRet;
-use utils;
+use crate::config::Colors;
+use crate::trie::Trie;
+use crate::tui::termbox;
+use crate::tui::widget::WidgetRet;
+use crate::utils;
 
 // TODO: Make these settings
 const SCROLLOFF: i32 = 5;

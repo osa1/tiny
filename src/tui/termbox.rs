@@ -1,6 +1,6 @@
 //! Some utilities for termbox
 
-use config::Style;
+use crate::config::Style;
 use termbox_simple::Termbox;
 
 pub fn print(tb: &mut Termbox, mut pos_x: i32, pos_y: i32, style: Style, str: &str) {

@@ -8,6 +8,7 @@ license = "MIT"
 keywords = ["irc"]
 categories = ["network-programming"]
 description = "An IRC client"
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "osa1/tiny" }

@@ -1,3 +1,4 @@
+use crate::stream::tcp::{TcpError, TcpStream};
 use mio::Poll;
 use mio::Token;
 use native_tls as tls;
@@ -6,8 +7,6 @@ use std::io::Read;
 use std::io::Write;
 use std::result::Result;
 use take_mut::take;
-
-use stream::tcp::{TcpError, TcpStream};
 
 pub enum TlsStream<'poll> {
     Handshake {

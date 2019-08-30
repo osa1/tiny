@@ -1,3 +1,4 @@
+use crate::stream::utils::*;
 use mio::Poll;
 use mio::Token;
 use net2::TcpBuilder;
@@ -10,8 +11,6 @@ use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::os::unix::io::AsRawFd;
 use std::result::Result;
-
-use stream::utils::*;
 
 /// A buffered TCP stream that registers itself for readiness events when the buffer is not empty.
 /// Use `Write` instance for writing to the buffer. Use `Read` instance when the stream is ready

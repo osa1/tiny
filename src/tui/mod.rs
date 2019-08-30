@@ -9,16 +9,16 @@ pub mod widget;
 use std::str;
 
 pub use self::messaging::Timestamp;
-use config::Colors;
-use config::Style;
-use notifier::Notifier;
+use crate::config::Colors;
+use crate::config::Style;
+use crate::notifier::Notifier;
+use crate::trie::Trie;
+use crate::tui::messaging::MessagingUI;
+pub use crate::tui::tab::Tab;
+pub use crate::tui::tab::TabStyle;
+use crate::tui::widget::WidgetRet;
 use term_input::{Arrow, Event, Key};
 use termbox_simple::{OutputMode, Termbox};
-use trie::Trie;
-use tui::messaging::MessagingUI;
-pub use tui::tab::Tab;
-pub use tui::tab::TabStyle;
-use tui::widget::WidgetRet;
 
 #[derive(Debug)]
 pub enum TUIRet {

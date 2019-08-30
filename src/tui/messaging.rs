@@ -6,17 +6,17 @@ use std::convert::From;
 use time;
 use time::Tm;
 
-use config;
-use config::Colors;
-use config::Style;
-use trie::Trie;
-use tui::exit_dialogue::ExitDialogue;
-use tui::msg_area::line::SchemeStyle;
-use tui::msg_area::line::SegStyle;
-use tui::msg_area::MsgArea;
-use tui::termbox;
-use tui::text_field::TextField;
-use tui::widget::WidgetRet;
+use crate::config;
+use crate::config::Colors;
+use crate::config::Style;
+use crate::trie::Trie;
+use crate::tui::exit_dialogue::ExitDialogue;
+use crate::tui::msg_area::line::SchemeStyle;
+use crate::tui::msg_area::line::SegStyle;
+use crate::tui::msg_area::MsgArea;
+use crate::tui::termbox;
+use crate::tui::text_field::TextField;
+use crate::tui::widget::WidgetRet;
 
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.

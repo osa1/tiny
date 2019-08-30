@@ -1,12 +1,11 @@
 use super::Tiny;
-use config;
-use conn::Conn;
+use crate::config;
+use crate::conn::Conn;
+use crate::notifier::Notifier;
+use crate::tui::{MsgSource, MsgTarget, Timestamp};
+use crate::utils;
 use mio::Poll;
 use std::error::Error;
-use tui::{MsgSource, MsgTarget, Timestamp};
-use utils;
-
-use notifier::Notifier;
 
 pub struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.

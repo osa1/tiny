@@ -4,7 +4,7 @@ use std;
 use std::io::Write;
 use std::str;
 
-use logger::LogFile;
+use crate::logger::LogFile;
 
 pub fn pass<W: Write>(sink: &mut W, pass: &str) -> std::io::Result<()> {
     write!(sink, "PASS {}\r\n", pass)

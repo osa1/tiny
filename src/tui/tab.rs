@@ -1,10 +1,10 @@
 use termbox_simple::{Termbox, TB_UNDERLINE};
 
-use config::Colors;
-use config::Style;
-use notifier::Notifier;
-use tui::messaging::MessagingUI;
-use tui::MsgSource;
+use crate::config::Colors;
+use crate::config::Style;
+use crate::notifier::Notifier;
+use crate::tui::messaging::MessagingUI;
+use crate::tui::MsgSource;
 
 pub struct Tab {
     pub widget: MessagingUI,
@@ -81,7 +81,7 @@ impl Tab {
             pos_x += 1;
         }
         if !self.widget.get_ignore_state() {
-            ::tui::termbox::print_chars(tb, pos_x, pos_y, style, "[i]".chars());
+            crate::tui::termbox::print_chars(tb, pos_x, pos_y, style, "[i]".chars());
         }
     }
 }

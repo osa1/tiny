@@ -2,9 +2,9 @@ use std::mem;
 use termbox_simple;
 use termbox_simple::Termbox;
 
-use config;
-use config::Colors;
-use utils::translate_irc_control_chars;
+use crate::config;
+use crate::config::Colors;
+use crate::utils::translate_irc_control_chars;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.

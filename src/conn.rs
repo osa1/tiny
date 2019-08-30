@@ -6,13 +6,13 @@ use std::io::Write;
 use std::result;
 use std::str;
 
-use config;
-use logger::LogFile;
-use logger::Logger;
-use stream::{Stream, StreamErr};
-use utils;
-use wire;
-use wire::{Cmd, Msg, Pfx};
+use crate::config;
+use crate::logger::LogFile;
+use crate::logger::Logger;
+use crate::stream::{Stream, StreamErr};
+use crate::utils;
+use crate::wire;
+use crate::wire::{Cmd, Msg, Pfx};
 
 pub struct Conn<'poll> {
     serv_addr: String,

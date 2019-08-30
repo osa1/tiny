@@ -8,7 +8,7 @@ use termbox_simple::Termbox;
 
 pub use self::line::Line;
 pub use self::line::SegStyle;
-use config::Colors;
+use crate::config::Colors;
 
 pub struct MsgArea {
     lines: Vec<Line>,

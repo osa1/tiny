@@ -1,8 +1,8 @@
 use term_input::Key;
 use termbox_simple::Termbox;
 
-use config::Colors;
-use tui::widget::WidgetRet;
+use crate::config::Colors;
+use crate::tui::widget::WidgetRet;
 
 pub struct ExitDialogue {
     width: i32,
