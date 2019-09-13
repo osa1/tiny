@@ -6,7 +6,7 @@ use futures_util::stream::StreamExt;
 fn main() {
     let server_info = ServerInfo {
         addr: "chat.freenode.net".to_string(),
-        port: 6697,
+        port: 6667,
         pass: None,
         hostname: "omer".to_string(),
         realname: "omer".to_string(),
