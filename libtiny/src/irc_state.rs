@@ -12,6 +12,10 @@ pub struct IrcState<'a> {
     /// underscores to the last nick in `nicks`
     current_nick_idx: usize,
 
+    /// A cache of current nick, to avoid allocating new nicks when inventing new nicks with
+    /// underscores.
+    current_nick: String,
+
     /// Currently joined channels. Every channel we join will be added here to be able to re-join
     /// automatically on reconnect and channels we leave will be removed.
     ///
@@ -40,9 +44,11 @@ pub struct IrcState<'a> {
 
 impl<'a> IrcState<'a> {
     pub fn new(server_info: &'a ServerInfo) -> IrcState<'a> {
+        let current_nick = server_info.nicks[0].to_owned();
         IrcState {
-            nicks: vec![],
+            nicks: server_info.nicks.clone(),
             current_nick_idx: 0,
+            current_nick,
             chans: vec![],
             away_status: None,
             servername: None,
@@ -52,12 +58,19 @@ impl<'a> IrcState<'a> {
         }
     }
 
-    fn get_current_nick(&self) -> &str {
-        unimplemented!()
-    }
-
     fn get_next_nick(&mut self) -> &str {
-        unimplemented!()
+        self.current_nick_idx += 1;
+        if self.current_nick_idx >= self.nicks.len() {
+            let n_underscores = self.current_nick_idx - self.nicks.len() + 1;
+            let mut new_nick = self.nicks.last().unwrap().to_string();
+            for _ in 0..n_underscores {
+                new_nick.push('_');
+            }
+            self.current_nick = new_nick;
+        } else {
+            self.current_nick = self.nicks[self.current_nick_idx].clone();
+        }
+        &self.current_nick
     }
 
     pub fn update(
@@ -72,7 +85,7 @@ impl<'a> IrcState<'a> {
         match cmd {
             JOIN { chan } => {
                 if let Some(Pfx::User { nick, .. }) = pfx {
-                    if nick == self.get_current_nick() {
+                    if nick == &self.current_nick {
                         if !self.chans.contains(chan) {
                             self.chans.push(chan.to_owned());
                         }
@@ -81,7 +94,7 @@ impl<'a> IrcState<'a> {
             }
             PART { chan, .. } => {
                 if let Some(Pfx::User { nick, .. }) = pfx {
-                    if nick == self.get_current_nick() {
+                    if nick == &self.current_nick {
                         self.chans.drain_filter(|chan_| chan_ == chan);
                     }
                 }
@@ -91,7 +104,7 @@ impl<'a> IrcState<'a> {
                     nick: ref old_nick, ..
                 }) = pfx
                 {
-                    if old_nick == self.get_current_nick() {
+                    if old_nick == &self.current_nick {
                         snd_ev.try_send(IrcEv::NickChange(new_nick.to_owned())); // TODO panic on error
                         if !self.nicks.contains(new_nick) {
                             self.nicks.push(new_nick.to_owned());
@@ -115,7 +128,7 @@ impl<'a> IrcState<'a> {
                 if params.len() == 3 {
                     let usermask = format!(
                         "{}!~{}@{}",
-                        self.get_current_nick(),
+                        self.current_nick,
                         self.server_info.hostname,
                         params[1]
                     );
