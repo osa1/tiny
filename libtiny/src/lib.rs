@@ -187,13 +187,14 @@ pub async fn connect(
                 }
             });
 
+            let mut read_buf: [u8; 1024] = [0; 1024];
+            let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
+            let mut irc_state = irc_state::IrcState::new(&server_info);
+
             loop {
-                let mut irc_state = irc_state::IrcState::new(&server_info);
+                read_buf = [0; 1024];
 
                 let mut rcv_cmd_fused: Fuse<Next<mpsc::Receiver<_>>> = rcv_cmd.next().fuse();
-                let mut read_buf: [u8; 1024] = [0; 1024];
-                let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
-                let mut write_buf: Vec<u8> = Vec::with_capacity(1024);
 
                 select! {
                     cmd = rcv_cmd_fused => {
@@ -208,7 +209,6 @@ pub async fn connect(
                             Some(IrcCmd::Msg(msg)) => {
                                 // FIXME something like this
                                 println!(">>> {}", &msg[..msg.len()-2]);
-                                write_buf.extend_from_slice(msg.as_str().as_bytes());
                             }
                         }
                     }

@@ -38,8 +38,8 @@ fn main() {
         pass: None,
         hostname: "omer".to_string(),
         realname: "omer".to_string(),
-        nicks: vec!["osa1".to_string()],
-        auto_join: vec![],
+        nicks: vec!["osa1s_irc_bot".to_string()],
+        auto_join: vec!["#justtesting".to_string()],
         nickserv_ident: None,
     };
 
@@ -58,7 +58,7 @@ fn main() {
 
                 println!("sleeping for 5 seconds before joining #justtesting");
                 tokio::timer::delay(tokio::clock::now() + Duration::from_secs(5)).await;
-                client.join("#justtesting");
+                // client.join("#justtesting");
                 // FIXME: Just to avoid dropping the client
                 tokio::timer::delay(tokio::clock::now() + Duration::from_secs(10000)).await;
             }

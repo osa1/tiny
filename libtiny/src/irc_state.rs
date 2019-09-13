@@ -45,11 +45,12 @@ pub struct IrcState<'a> {
 impl<'a> IrcState<'a> {
     pub fn new(server_info: &'a ServerInfo) -> IrcState<'a> {
         let current_nick = server_info.nicks[0].to_owned();
+        let chans = server_info.auto_join.clone();
         IrcState {
             nicks: server_info.nicks.clone(),
             current_nick_idx: 0,
             current_nick,
-            chans: vec![],
+            chans,
             away_status: None,
             servername: None,
             usermask: None,
@@ -60,6 +61,7 @@ impl<'a> IrcState<'a> {
 
     pub fn get_next_nick(&mut self) -> &str {
         self.current_nick_idx += 1;
+        println!("current_nick_idx: {}", self.current_nick_idx);
         if self.current_nick_idx >= self.nicks.len() {
             let n_underscores = self.current_nick_idx - self.nicks.len() + 1;
             let mut new_nick = self.nicks.last().unwrap().to_string();
@@ -104,13 +106,13 @@ impl<'a> IrcState<'a> {
                     nick: ref old_nick, ..
                 }) = pfx
                 {
-                    if old_nick == &self.current_nick {
-                        snd_ev.try_send(IrcEv::NickChange(new_nick.to_owned())); // TODO panic on error
-                        if !self.nicks.contains(new_nick) {
-                            self.nicks.push(new_nick.to_owned());
-                            self.current_nick_idx = self.nicks.len() - 1;
-                        }
-                    }
+                    // if old_nick == &self.current_nick {
+                    //     snd_ev.try_send(IrcEv::NickChange(new_nick.to_owned())); // TODO panic on error
+                    //     if !self.nicks.contains(new_nick) {
+                    //         self.nicks.push(new_nick.to_owned());
+                    //         self.current_nick_idx = self.nicks.len() - 1;
+                    //     }
+                    // }
                 }
             }
             Reply { num: 433, .. } => {
@@ -120,7 +122,7 @@ impl<'a> IrcState<'a> {
                     println!("new nick: {}", new_nick);
                     snd_ev.try_send(IrcEv::NickChange(new_nick.to_owned()));
                     snd_irc_msg
-                        .try_send(format!("NICK {}\n\n", new_nick))
+                        .try_send(format!("NICK {}\r\n", new_nick))
                         .unwrap();
                 }
             }
@@ -134,6 +136,12 @@ impl<'a> IrcState<'a> {
                         self.current_nick, self.server_info.hostname, params[1]
                     );
                     self.usermask = Some(usermask);
+                }
+            }
+            Reply { num: 376, .. } => {
+                // End of MOTD, join channels
+                if !self.chans.is_empty() {
+                    snd_irc_msg.try_send(format!("JOIN {}\r\n", self.chans.join(","))).unwrap();
                 }
             }
             _ => {}
