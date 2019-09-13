@@ -58,7 +58,7 @@ impl<'a> IrcState<'a> {
         }
     }
 
-    fn get_next_nick(&mut self) -> &str {
+    pub fn get_next_nick(&mut self) -> &str {
         self.current_nick_idx += 1;
         if self.current_nick_idx >= self.nicks.len() {
             let n_underscores = self.current_nick_idx - self.nicks.len() + 1;
@@ -117,8 +117,11 @@ impl<'a> IrcState<'a> {
                 // ERR_NICKNAMEINUSE. If we don't have a nick already try next nick.
                 if !self.nick_accepted {
                     let new_nick = self.get_next_nick();
+                    println!("new nick: {}", new_nick);
                     snd_ev.try_send(IrcEv::NickChange(new_nick.to_owned()));
-                    snd_irc_msg.try_send(format!("NICK {}\n\n", new_nick));
+                    snd_irc_msg
+                        .try_send(format!("NICK {}\n\n", new_nick))
+                        .unwrap();
                 }
             }
             Reply {
@@ -128,9 +131,7 @@ impl<'a> IrcState<'a> {
                 if params.len() == 3 {
                     let usermask = format!(
                         "{}!~{}@{}",
-                        self.current_nick,
-                        self.server_info.hostname,
-                        params[1]
+                        self.current_nick, self.server_info.hostname, params[1]
                     );
                     self.usermask = Some(usermask);
                 }

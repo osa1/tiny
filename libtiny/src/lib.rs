@@ -1,5 +1,4 @@
-#![recursion_limit="256"]
-
+#![recursion_limit = "256"]
 #![feature(drain_filter)]
 
 // pub mod conn;
@@ -18,7 +17,8 @@ use tokio::sync::mpsc;
 
 use futures::future::FutureExt;
 use futures::select;
-// use futures_util::stream::StreamExt;
+use futures_util::future::Fuse;
+use futures_util::stream::Next;
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -58,12 +58,21 @@ pub enum IrcEv {
     NickChange(String),
 }
 
+#[derive(Debug)]
 enum IrcCmd {
     Msg(String),
 }
 
 pub struct IrcClient {
     msg_chan: mpsc::Sender<IrcCmd>,
+}
+
+impl IrcClient {
+    pub fn join(&mut self, chan: &str) {
+        self.msg_chan
+            .try_send(IrcCmd::Msg(format!("JOIN {}\r\n", chan)))
+            .unwrap();
+    }
 }
 
 #[derive(Debug)]
@@ -160,10 +169,15 @@ pub async fn connect(
 
             // Spawn a task for outgoing messages.
             tokio::spawn(async move {
-
                 // XXX JUST TESING
-                write_half.write_all("NICK osa1\r\n".as_bytes()).await.unwrap();
-                write_half.write_all("USER omer 8 * :omer\r\n".as_bytes()).await.unwrap();
+                write_half
+                    .write_all("NICK osa1\r\n".as_bytes())
+                    .await
+                    .unwrap();
+                write_half
+                    .write_all("USER omer 8 * :omer\r\n".as_bytes())
+                    .await
+                    .unwrap();
 
                 while let Some(msg) = rcv_msg.next().await {
                     if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
@@ -176,7 +190,7 @@ pub async fn connect(
             loop {
                 let mut irc_state = irc_state::IrcState::new(&server_info);
 
-                let mut rcv_cmd_fused = rcv_cmd.next().fuse();
+                let mut rcv_cmd_fused: Fuse<Next<mpsc::Receiver<_>>> = rcv_cmd.next().fuse();
                 let mut read_buf: [u8; 1024] = [0; 1024];
                 let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
                 let mut write_buf: Vec<u8> = Vec::with_capacity(1024);
@@ -185,12 +199,16 @@ pub async fn connect(
                     cmd = rcv_cmd_fused => {
                         match cmd {
                             None => {
+                                // FIXME: This should just loop and rcv_cmd should not be polled
+                                // again. I thought Fuse already does this, but apparently it
+                                // does not ...
                                 println!("main loop: command channel terminated from the other end");
                                 return;
                             }
                             Some(IrcCmd::Msg(msg)) => {
                                 // FIXME something like this
-                                write_buf.copy_from_slice(msg.as_str().as_bytes());
+                                println!(">>> {}", &msg[..msg.len()-2]);
+                                write_buf.extend_from_slice(msg.as_str().as_bytes());
                             }
                         }
                     }
