@@ -191,20 +191,18 @@ pub async fn connect(
             let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
             let mut irc_state = irc_state::IrcState::new(&server_info);
 
+            let mut rcv_cmd_fused = rcv_cmd.fuse();
+
             loop {
                 read_buf = [0; 1024];
 
-                let mut rcv_cmd_fused: Fuse<Next<mpsc::Receiver<_>>> = rcv_cmd.next().fuse();
 
                 select! {
-                    cmd = rcv_cmd_fused => {
+                    cmd = rcv_cmd_fused.next() => {
                         match cmd {
                             None => {
-                                // FIXME: This should just loop and rcv_cmd should not be polled
-                                // again. I thought Fuse already does this, but apparently it
-                                // does not ...
                                 println!("main loop: command channel terminated from the other end");
-                                return;
+                                // That's OK, rcv_cmd_fused will never be ready again
                             }
                             Some(IrcCmd::Msg(msg)) => {
                                 // FIXME something like this

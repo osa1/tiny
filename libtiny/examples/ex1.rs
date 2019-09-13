@@ -58,9 +58,6 @@ fn main() {
 
                 println!("sleeping for 5 seconds before joining #justtesting");
                 tokio::timer::delay(tokio::clock::now() + Duration::from_secs(5)).await;
-                // client.join("#justtesting");
-                // FIXME: Just to avoid dropping the client
-                tokio::timer::delay(tokio::clock::now() + Duration::from_secs(10000)).await;
             }
             Err(err) => {
                 println!("connect failed: {:?}", err);
