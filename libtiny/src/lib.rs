@@ -1,8 +1,8 @@
 #![recursion_limit = "256"]
 #![feature(drain_filter)]
 
-pub mod wire;
 pub mod irc_state;
+pub mod wire;
 
 use futures::stream::StreamExt;
 use std::net::ToSocketAddrs;
@@ -39,14 +39,21 @@ pub struct ServerInfo {
     pub nickserv_ident: Option<String>,
 }
 
+/// IRC client events.
 #[derive(Debug)]
 pub enum IrcEv {
+    /// Client trying to connect
     Connecting,
+    /// TCP connection established *and* the introduction sequence with the IRC server started.
     Connected,
+    /// Disconnected from the server. Usually sent right after an `IrcEv::IoErr`.
     Disconnected,
+    /// An IO error happened.
     IoErr(std::io::Error),
+    /// Client couldn't resolve host address.
     CantResolveAddr,
-    NickChange(String),
+    /// Nick changed.
+    NickChange { new_nick: String },
 }
 
 #[derive(Debug)]
