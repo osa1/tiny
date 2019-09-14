@@ -212,7 +212,7 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
                     msg: mb_msg,
                 }
             }
-            MsgType::Cmd("QUIT") if params.len() == 0 || params.len() == 1 => {
+            MsgType::Cmd("QUIT") if params.is_empty() || params.len() == 1 => {
                 let mb_msg = if params.len() == 1 {
                     Some(params[0].to_owned())
                 } else {
@@ -229,7 +229,7 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
             MsgType::Cmd("PING") if params.len() == 1 => Cmd::PING {
                 server: params[0].to_owned(),
             },
-            MsgType::Cmd("PONG") if params.len() >= 1 => Cmd::PONG {
+            MsgType::Cmd("PONG") if !params.is_empty() => Cmd::PONG {
                 server: params[0].to_owned(),
             },
             MsgType::Cmd("ERROR") if params.len() == 1 => Cmd::ERROR {
@@ -285,7 +285,7 @@ fn parse_reply_num(bs: &[u8]) -> Option<u16> {
         let n1 = bs[2];
         if is_num_ascii(n3) && is_num_ascii(n2) && is_num_ascii(n1) {
             return Some(
-                ((n3 - b'0') as u16) * 100 + ((n2 - b'0') as u16) * 10 + ((n1 - b'0') as u16),
+                u16::from(n3 - b'0') * 100 + u16::from(n2 - b'0') * 10 + u16::from(n1 - b'0'),
             );
         }
     }
@@ -324,7 +324,7 @@ pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
     None
 }
 
-static CTCP_PREFIX: &'static str = "\x01ACTION ";
+static CTCP_PREFIX: &str = "\x01ACTION ";
 
 pub fn check_ctcp_action_msg(msg: &str) -> (&str, bool) {
     let msg_bytes = msg.as_bytes();

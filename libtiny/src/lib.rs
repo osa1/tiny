@@ -1,27 +1,18 @@
 #![recursion_limit = "256"]
 #![feature(drain_filter)]
 
-// pub mod conn;
-pub mod handle;
-// pub mod irc;
 pub mod wire;
-
 pub mod irc_state;
 
 use futures::stream::StreamExt;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
 use futures::future::FutureExt;
 use futures::select;
-use futures_util::future::Fuse;
-use futures_util::stream::Next;
-
-use std::rc::Rc;
-use std::sync::Arc;
 
 pub struct ServerInfo {
     /// Server address
@@ -97,7 +88,7 @@ pub async fn connect(
     // Channel for returning IRC events to user.
     let (mut snd_ev, rcv_ev) = mpsc::channel::<IrcEv>(100);
     // Channel for commands from user.
-    let (snd_cmd, mut rcv_cmd) = mpsc::channel::<IrcCmd>(100);
+    let (snd_cmd, rcv_cmd) = mpsc::channel::<IrcCmd>(100);
     // Channel for the sender task. TODO: Find a way to remove this.
     let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
 
@@ -107,7 +98,7 @@ pub async fn connect(
 
     tokio::spawn(async move {
         // Main loop just tries to (re)connect
-        'connect: loop {
+        /* 'connect: */ loop {
             snd_ev.send(IrcEv::Connecting).await.unwrap();
 
             //
@@ -149,7 +140,7 @@ pub async fn connect(
 
             println!("Establishing connection ...");
 
-            let mut stream = match TcpStream::connect(&addr).await {
+            let stream = match TcpStream::connect(&addr).await {
                 Err(io_err) => {
                     snd_ev.send(IrcEv::IoErr(io_err)).await.unwrap();
                     // Wait 30 seconds before looping
@@ -187,15 +178,13 @@ pub async fn connect(
                 }
             });
 
-            let mut read_buf: [u8; 1024] = [0; 1024];
             let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
             let mut irc_state = irc_state::IrcState::new(&server_info);
 
             let mut rcv_cmd_fused = rcv_cmd.fuse();
 
             loop {
-                read_buf = [0; 1024];
-
+                let mut read_buf: [u8; 1024] = [0; 1024];
 
                 select! {
                     cmd = rcv_cmd_fused.next() => {
