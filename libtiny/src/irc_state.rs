@@ -1,6 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::wire::{Cmd, Msg, Pfx, find_byte};
+use crate::wire::{find_byte, Cmd, Msg, Pfx};
 use crate::IrcEv;
 use crate::ServerInfo;
 
@@ -46,10 +46,16 @@ pub struct IrcState<'a> {
 
 impl<'a> IrcState<'a> {
     pub fn new(server_info: &'a ServerInfo, snd_irc_msg: &mut Sender<String>) -> IrcState<'a> {
-
         // Introduce self
-        snd_irc_msg.try_send(format!("NICK {}\r\n", server_info.nicks[0])).unwrap();
-        snd_irc_msg.try_send(format!("USER {} 8 * :{}\r\n", server_info.hostname, server_info.realname)).unwrap();
+        snd_irc_msg
+            .try_send(format!("NICK {}\r\n", server_info.nicks[0]))
+            .unwrap();
+        snd_irc_msg
+            .try_send(format!(
+                "USER {} 8 * :{}\r\n",
+                server_info.hostname, server_info.realname
+            ))
+            .unwrap();
 
         let current_nick = server_info.nicks[0].to_owned();
         let chans = server_info.auto_join.clone();
@@ -93,13 +99,14 @@ impl<'a> IrcState<'a> {
         use Cmd::*;
         match cmd {
             PING { server } => {
-                snd_irc_msg.try_send(format!("PONG {}\r\n", server)).unwrap();
+                snd_irc_msg
+                    .try_send(format!("PONG {}\r\n", server))
+                    .unwrap();
             }
 
             //
             // Setting usermask using JOIN, RPL_USERHOST and 396 (?)
             //
-
             JOIN { .. } => {
                 if let Some(Pfx::User { nick, user }) = pfx {
                     if nick == &self.current_nick {
@@ -113,7 +120,10 @@ impl<'a> IrcState<'a> {
                 // :hobana.freenode.net 396 osa1 haskell/developer/osa1
                 // :is now your hidden host (set by services.)
                 if params.len() == 3 {
-                    let usermask = format!("{}!~{}@{}", self.current_nick, self.server_info.hostname, params[1]);
+                    let usermask = format!(
+                        "{}!~{}@{}",
+                        self.current_nick, self.server_info.hostname, params[1]
+                    );
                     self.usermask = Some(usermask);
                 }
             }
@@ -147,10 +157,13 @@ impl<'a> IrcState<'a> {
             //
             // RPL_WELCOME
             //
-
             Reply { num: 001, .. } => {
                 snd_ev.try_send(IrcEv::Connected).unwrap();
-                snd_ev.try_send(IrcEv::NickChange(self.current_nick.clone())).unwrap();
+                snd_ev
+                    .try_send(IrcEv::NickChange {
+                        new_nick: self.current_nick.clone(),
+                    })
+                    .unwrap();
                 // TODO: identify via nickserv
                 self.nick_accepted = true;
             }
@@ -158,7 +171,6 @@ impl<'a> IrcState<'a> {
             //
             // RPL_YOURHOST
             //
-
             Reply { num: 002, params } => {
                 // 002    RPL_YOURHOST
                 //        "Your host is <servername>, running version <ver>"
@@ -178,13 +190,16 @@ impl<'a> IrcState<'a> {
             //
             // ERR_NICKNAMEINUSE
             //
-
             Reply { num: 433, .. } => {
                 // ERR_NICKNAMEINUSE. If we don't have a nick already try next nick.
                 if !self.nick_accepted {
                     let new_nick = self.get_next_nick();
                     println!("new nick: {}", new_nick);
-                    snd_ev.try_send(IrcEv::NickChange(new_nick.to_owned())).unwrap();
+                    snd_ev
+                        .try_send(IrcEv::NickChange {
+                            new_nick: new_nick.to_owned(),
+                        })
+                        .unwrap();
                     snd_irc_msg
                         .try_send(format!("NICK {}\r\n", new_nick))
                         .unwrap();
@@ -194,14 +209,14 @@ impl<'a> IrcState<'a> {
             //
             // NICK message sent from the server when our nick change request was successful
             //
-
             NICK { nick: new_nick } => {
-                if let Some(Pfx::User {
-                    nick: old_nick, ..
-                }) = pfx
-                {
+                if let Some(Pfx::User { nick: old_nick, .. }) = pfx {
                     if old_nick == &self.current_nick {
-                        snd_ev.try_send(IrcEv::NickChange(new_nick.to_owned())).unwrap();
+                        snd_ev
+                            .try_send(IrcEv::NickChange {
+                                new_nick: new_nick.to_owned(),
+                            })
+                            .unwrap();
                         if !self.nicks.contains(new_nick) {
                             self.nicks.push(new_nick.to_owned());
                             self.current_nick_idx = self.nicks.len() - 1;
@@ -213,17 +228,17 @@ impl<'a> IrcState<'a> {
             //
             // RPL_ENDOFMOTD, join channels, set away status (TODO)
             //
-
             Reply { num: 376, .. } => {
                 if !self.chans.is_empty() {
-                    snd_irc_msg.try_send(format!("JOIN {}\r\n", self.chans.join(","))).unwrap();
+                    snd_irc_msg
+                        .try_send(format!("JOIN {}\r\n", self.chans.join(",")))
+                        .unwrap();
                 }
             }
 
             //
             // RPL_TOPIC, we've successfully joined a channel
             //
-
             Reply { num: 332, params } => {
                 if params.len() == 2 || params.len() == 3 {
                     let chan = &params[params.len() - 2];
@@ -242,8 +257,8 @@ impl<'a> IrcState<'a> {
 fn parse_servername(params: &[String]) -> Option<String> {
     let msg = params.get(1).or_else(|| params.get(0))?;
     let slice1 = &msg[13..];
-    let servername_ends = find_byte(slice1.as_bytes(), b'[')
-        .or_else(|| find_byte(slice1.as_bytes(), b','))?;
+    let servername_ends =
+        find_byte(slice1.as_bytes(), b'[').or_else(|| find_byte(slice1.as_bytes(), b','))?;
     Some((&slice1[..servername_ends]).to_owned())
 }
 
