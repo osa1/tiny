@@ -78,7 +78,7 @@ impl From<std::io::Error> for ConnectError {
     }
 }
 
-pub async fn connect(
+pub fn connect(
     server_info: ServerInfo,
 ) -> Result<(IrcClient, mpsc::Receiver<IrcEv>), ConnectError> {
     //
