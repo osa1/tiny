@@ -45,7 +45,12 @@ pub struct IrcState<'a> {
 }
 
 impl<'a> IrcState<'a> {
-    pub fn new(server_info: &'a ServerInfo) -> IrcState<'a> {
+    pub fn new(server_info: &'a ServerInfo, snd_irc_msg: &mut Sender<String>) -> IrcState<'a> {
+
+        // Introduce self
+        snd_irc_msg.try_send(format!("NICK {}\r\n", server_info.nicks[0])).unwrap();
+        snd_irc_msg.try_send(format!("USER {} 8 * :{}\r\n", server_info.hostname, server_info.realname)).unwrap();
+
         let current_nick = server_info.nicks[0].to_owned();
         let chans = server_info.auto_join.clone();
         IrcState {

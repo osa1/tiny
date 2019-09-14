@@ -160,16 +160,6 @@ pub async fn connect(
 
             // Spawn a task for outgoing messages.
             tokio::spawn(async move {
-                // XXX JUST TESING
-                write_half
-                    .write_all("NICK osa1\r\n".as_bytes())
-                    .await
-                    .unwrap();
-                write_half
-                    .write_all("USER omer 8 * :omer\r\n".as_bytes())
-                    .await
-                    .unwrap();
-
                 while let Some(msg) = rcv_msg.next().await {
                     if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
                         println!("IO error when writing: {:?}", io_err);
@@ -179,7 +169,7 @@ pub async fn connect(
             });
 
             let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
-            let mut irc_state = irc_state::IrcState::new(&server_info);
+            let mut irc_state = irc_state::IrcState::new(&server_info, &mut snd_msg);
 
             let mut rcv_cmd_fused = rcv_cmd.fuse();
 
