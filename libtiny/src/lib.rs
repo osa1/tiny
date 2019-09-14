@@ -89,8 +89,7 @@ pub async fn connect(
     let (mut snd_ev, rcv_ev) = mpsc::channel::<IrcEv>(100);
     // Channel for commands from user.
     let (snd_cmd, rcv_cmd) = mpsc::channel::<IrcCmd>(100);
-    // Channel for the sender task. TODO: Find a way to remove this.
-    let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
+    let mut rcv_cmd_fused = rcv_cmd.fuse();
 
     //
     // Create the main loop task
@@ -98,8 +97,11 @@ pub async fn connect(
 
     tokio::spawn(async move {
         // Main loop just tries to (re)connect
-        /* 'connect: */ loop {
-            snd_ev.send(IrcEv::Connecting).await.unwrap();
+        'connect: loop {
+            // Channel for the sender task. TODO: Find a way to remove this.
+            let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
+
+            snd_ev.try_send(IrcEv::Connecting).unwrap();
 
             //
             // Resolve IP address
@@ -116,7 +118,7 @@ pub async fn connect(
             .await
             {
                 Err(io_err) => {
-                    snd_ev.send(IrcEv::IoErr(io_err)).await.unwrap();
+                    snd_ev.try_send(IrcEv::IoErr(io_err)).unwrap();
                     // Wait 30 seconds before looping
                     tokio::timer::delay(tokio::clock::now() + Duration::from_secs(30)).await;
                     continue;
@@ -128,7 +130,7 @@ pub async fn connect(
 
             let addr = match addr_iter.next() {
                 None => {
-                    snd_ev.send(IrcEv::CantResolveAddr).await.unwrap();
+                    snd_ev.try_send(IrcEv::CantResolveAddr).unwrap();
                     break;
                 }
                 Some(addr) => addr,
@@ -142,7 +144,7 @@ pub async fn connect(
 
             let stream = match TcpStream::connect(&addr).await {
                 Err(io_err) => {
-                    snd_ev.send(IrcEv::IoErr(io_err)).await.unwrap();
+                    snd_ev.try_send(IrcEv::IoErr(io_err)).unwrap();
                     // Wait 30 seconds before looping
                     tokio::timer::delay(tokio::clock::now() + Duration::from_secs(30)).await;
                     continue;
@@ -159,10 +161,12 @@ pub async fn connect(
             //
 
             // Spawn a task for outgoing messages.
+            let mut snd_ev_clone = snd_ev.clone();
             tokio::spawn(async move {
                 while let Some(msg) = rcv_msg.next().await {
                     if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
                         println!("IO error when writing: {:?}", io_err);
+                        snd_ev_clone.try_send(IrcEv::IoErr(io_err)).unwrap();
                         return;
                     }
                 }
@@ -170,8 +174,6 @@ pub async fn connect(
 
             let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
             let mut irc_state = irc_state::IrcState::new(&server_info, &mut snd_msg);
-
-            let mut rcv_cmd_fused = rcv_cmd.fuse();
 
             loop {
                 let mut read_buf: [u8; 1024] = [0; 1024];
@@ -193,7 +195,9 @@ pub async fn connect(
                         match bytes {
                             Err(io_err) => {
                                 println!("main loop: error when reading from socket: {:?}", io_err);
-                                return;
+                                snd_ev.try_send(IrcEv::IoErr(io_err)).unwrap();
+                                snd_ev.try_send(IrcEv::Disconnected).unwrap();
+                                continue 'connect;
                             }
                             Ok(bytes) => {
                                 parse_buf.extend_from_slice(&read_buf[0..bytes]);
