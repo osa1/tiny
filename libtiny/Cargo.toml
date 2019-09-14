@@ -14,31 +14,14 @@ edition = "2018"
 travis-ci = { repository = "osa1/tiny" }
 
 [lib]
-name = "tiny"
+name = "libtiny"
 path = "src/lib.rs"
 
 [dependencies]
-base64 = "0.6.0"
-dirs = "1.0.2"
 futures-preview = { version = "0.3.0-alpha.18",  features = ["async-await", "nightly"] }
-libc = "0.2"
-mio = "0.6"
-native-tls = "0.2.2"
-net2 = "0.2.23"
-notify-rust = "3"
-serde = { version = "1.0.8", features = ["derive"] }
-serde_yaml = "0.7.1"
-take_mut = "0.2.0"
-tempfile = "3.0.3"
-term_input = { path = "../term_input", version = "0.1.5" }
-termbox_simple = { path = "../termbox", version = "0.2.3" }
-time = "0.1"
+futures-util-preview = "0.3.0-alpha.18"
 tokio = { version = "0.2.0-alpha.2", features = ["timer"] }
-tokio-net = "0.2.0-alpha.2"
-tokio-sync = "0.2.0-alpha.2"
-tokio-timer = "0.2.0-alpha.2"
 tokio-executor = "0.2.0-alpha.2"
-futures-util-preview = "=0.3.0-alpha.18"
 
 [profile.release]
 lto = true
