@@ -1,3 +1,5 @@
+#![allow(clippy::write_with_newline)]
+
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
 
 use std;
