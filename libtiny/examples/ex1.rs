@@ -1,7 +1,7 @@
 use futures_util::stream::StreamExt;
 use std::time::Duration;
 
-use tiny::ServerInfo;
+use libtiny::{Client, ServerInfo};
 
 fn main() {
     let executor = tokio::runtime::Runtime::new().unwrap();
@@ -18,7 +18,7 @@ fn main() {
     };
 
     executor.spawn(async {
-        let (_client, mut rcv_ev) = tiny::Client::new(server_info);
+        let (_client, mut rcv_ev) = Client::new(server_info);
         println!("client created");
         while let Some(ev) = rcv_ev.next().await {
             println!("ev: {:?}", ev);
@@ -39,7 +39,7 @@ fn main() {
     executor.spawn(async {
         println!("Sleeping for 3 seconds before the second connection");
         tokio::timer::delay(tokio::clock::now() + Duration::from_secs(3)).await;
-        let (mut client, mut rcv_ev) = tiny::Client::new(server_info);
+        let (mut client, mut rcv_ev) = Client::new(server_info);
 
         println!("client created, spawning incoming msg handler task");
 
