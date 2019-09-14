@@ -1,7 +1,6 @@
 use futures_util::stream::StreamExt;
 use std::time::Duration;
 
-use tiny::irc_state::IrcState;
 use tiny::ServerInfo;
 
 fn main() {
@@ -20,7 +19,7 @@ fn main() {
 
     executor.spawn(async {
         match tiny::connect(server_info).await {
-            Ok((client, mut rcv_ev)) => {
+            Ok((_client, mut rcv_ev)) => {
                 println!("client created");
                 while let Some(ev) = rcv_ev.next().await {
                     println!("ev: {:?}", ev);
@@ -47,7 +46,7 @@ fn main() {
         println!("Sleeping for 3 seconds before the second connection");
         tokio::timer::delay(tokio::clock::now() + Duration::from_secs(3)).await;
         match tiny::connect(server_info).await {
-            Ok((mut client, mut rcv_ev)) => {
+            Ok((_client, mut rcv_ev)) => {
                 println!("client created, spawning incoming msg handler task");
 
                 tokio::spawn(async move {

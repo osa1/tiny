@@ -133,7 +133,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 
 /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
 /// Otherwise the buffer is left unchanged.
-pub fn parse_irc_msg(buf: &[u8]) -> Option<(Msg, usize)> {
+pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
     // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
     // using this hacky method instead.
     let crlf_idx = {
@@ -260,7 +260,8 @@ pub fn parse_irc_msg(buf: &[u8]) -> Option<(Msg, usize)> {
         Msg { pfx, cmd }
     };
 
-    Some((ret, crlf_idx + 2))
+    buf.drain(0..crlf_idx + 2);
+    Some(ret)
 }
 
 fn parse_pfx(pfx: &[u8]) -> Pfx {
@@ -364,7 +365,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            parse_irc_msg(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "nick".to_owned(),
@@ -389,7 +390,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            parse_irc_msg(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
                 cmd: Cmd::PRIVMSG {
@@ -430,7 +431,7 @@ mod tests {
         .unwrap();
 
         let mut msgs = vec![];
-        while let Some(msg) = Msg::read(&mut buf, None) {
+        while let Some(msg) = parse_irc_msg(&mut buf) {
             msgs.push(msg);
         }
 
@@ -442,7 +443,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@123.123.123.123 PART #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            parse_irc_msg(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
@@ -461,7 +462,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@192.168.0.1 JOIN #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            parse_irc_msg(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
@@ -508,7 +509,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            parse_irc_msg(&mut buf),
             Some(Msg {
                 pfx: None,
                 cmd: Cmd::ERROR {
