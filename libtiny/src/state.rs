@@ -1,12 +1,14 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::wire::{find_byte, Cmd, Msg, Pfx};
-use crate::IrcEv;
-use crate::ServerInfo;
+use crate::{
+    wire,
+    wire::{find_byte, Cmd, Msg, Pfx},
+    Event, ServerInfo,
+};
 
 use tokio::sync::mpsc::Sender;
 
-pub struct IrcState<'a> {
+pub(crate) struct State<'a> {
     /// Nicks to try, with this order.
     nicks: Vec<String>,
 
@@ -44,22 +46,19 @@ pub struct IrcState<'a> {
     server_info: &'a ServerInfo,
 }
 
-impl<'a> IrcState<'a> {
-    pub fn new(server_info: &'a ServerInfo, snd_irc_msg: &mut Sender<String>) -> IrcState<'a> {
+impl<'a> State<'a> {
+    pub(crate) fn new(server_info: &'a ServerInfo, snd_irc_msg: &mut Sender<String>) -> State<'a> {
         // Introduce self
         snd_irc_msg
-            .try_send(format!("NICK {}\r\n", server_info.nicks[0]))
+            .try_send(wire::nick(&server_info.nicks[0]))
             .unwrap();
         snd_irc_msg
-            .try_send(format!(
-                "USER {} 8 * :{}\r\n",
-                server_info.hostname, server_info.realname
-            ))
+            .try_send(wire::user(&server_info.hostname, &server_info.realname))
             .unwrap();
 
         let current_nick = server_info.nicks[0].to_owned();
         let chans = server_info.auto_join.clone();
-        IrcState {
+        State {
             nicks: server_info.nicks.clone(),
             current_nick_idx: 0,
             current_nick,
@@ -72,7 +71,7 @@ impl<'a> IrcState<'a> {
         }
     }
 
-    pub fn get_next_nick(&mut self) -> &str {
+    fn get_next_nick(&mut self) -> &str {
         self.current_nick_idx += 1;
         println!("current_nick_idx: {}", self.current_nick_idx);
         if self.current_nick_idx >= self.nicks.len() {
@@ -88,10 +87,10 @@ impl<'a> IrcState<'a> {
         &self.current_nick
     }
 
-    pub fn update(
+    pub(crate) fn update(
         &mut self,
         msg: &Msg,
-        snd_ev: &mut Sender<IrcEv>,
+        snd_ev: &mut Sender<Event>,
         snd_irc_msg: &mut Sender<String>,
     ) {
         let Msg { ref pfx, ref cmd } = msg;
@@ -100,7 +99,7 @@ impl<'a> IrcState<'a> {
         match cmd {
             PING { server } => {
                 snd_irc_msg
-                    .try_send(format!("PONG {}\r\n", server))
+                    .try_send(wire::pong(server))
                     .unwrap();
             }
 
@@ -158,9 +157,9 @@ impl<'a> IrcState<'a> {
             // RPL_WELCOME
             //
             Reply { num: 001, .. } => {
-                snd_ev.try_send(IrcEv::Connected).unwrap();
+                snd_ev.try_send(Event::Connected).unwrap();
                 snd_ev
-                    .try_send(IrcEv::NickChange {
+                    .try_send(Event::NickChange {
                         new_nick: self.current_nick.clone(),
                     })
                     .unwrap();
@@ -196,12 +195,12 @@ impl<'a> IrcState<'a> {
                     let new_nick = self.get_next_nick();
                     println!("new nick: {}", new_nick);
                     snd_ev
-                        .try_send(IrcEv::NickChange {
+                        .try_send(Event::NickChange {
                             new_nick: new_nick.to_owned(),
                         })
                         .unwrap();
                     snd_irc_msg
-                        .try_send(format!("NICK {}\r\n", new_nick))
+                        .try_send(wire::nick(new_nick))
                         .unwrap();
                 }
             }
@@ -213,7 +212,7 @@ impl<'a> IrcState<'a> {
                 if let Some(Pfx::User { nick: old_nick, .. }) = pfx {
                     if old_nick == &self.current_nick {
                         snd_ev
-                            .try_send(IrcEv::NickChange {
+                            .try_send(Event::NickChange {
                                 new_nick: new_nick.to_owned(),
                             })
                             .unwrap();
