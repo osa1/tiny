@@ -18,16 +18,10 @@ fn main() {
     };
 
     executor.spawn(async {
-        match tiny::connect(server_info).await {
-            Ok((_client, mut rcv_ev)) => {
-                println!("client created");
-                while let Some(ev) = rcv_ev.next().await {
-                    println!("ev: {:?}", ev);
-                }
-            }
-            Err(err) => {
-                println!("connect failed: {:?}", err);
-            }
+        let (_client, mut rcv_ev) = tiny::Client::new(server_info);
+        println!("client created");
+        while let Some(ev) = rcv_ev.next().await {
+            println!("ev: {:?}", ev);
         }
     });
 
@@ -45,23 +39,19 @@ fn main() {
     executor.spawn(async {
         println!("Sleeping for 3 seconds before the second connection");
         tokio::timer::delay(tokio::clock::now() + Duration::from_secs(3)).await;
-        match tiny::connect(server_info).await {
-            Ok((_client, mut rcv_ev)) => {
-                println!("client created, spawning incoming msg handler task");
+        let (mut client, mut rcv_ev) = tiny::Client::new(server_info);
 
-                tokio::spawn(async move {
-                    while let Some(ev) = rcv_ev.next().await {
-                        println!("ev: {:?}", ev);
-                    }
-                });
+        println!("client created, spawning incoming msg handler task");
 
-                println!("sleeping for 5 seconds before joining #justtesting");
-                tokio::timer::delay(tokio::clock::now() + Duration::from_secs(5)).await;
+        tokio::spawn(async move {
+            while let Some(ev) = rcv_ev.next().await {
+                println!("ev: {:?}", ev);
             }
-            Err(err) => {
-                println!("connect failed: {:?}", err);
-            }
-        }
+        });
+
+        println!("sleeping for 5 seconds before joining #justtesting");
+        tokio::timer::delay(tokio::clock::now() + Duration::from_secs(5)).await;
+        client.join("#justtesting");
     });
 
     executor.shutdown_on_idle();
