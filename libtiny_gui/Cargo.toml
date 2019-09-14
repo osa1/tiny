@@ -1,0 +1,27 @@
+[package]
+name = "libtiny_gui"
+version = "0.4.5"
+authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+repository = "https://github.com/osa1/tiny"
+readme = "README.md"
+license = "MIT"
+keywords = ["irc"]
+categories = ["network-programming"]
+description = "An IRC client"
+edition = "2018"
+
+[badges]
+travis-ci = { repository = "osa1/tiny" }
+
+[lib]
+name = "libtiny_gui"
+path = "src/lib.rs"
+
+[dependencies]
+gdk = "0.11"
+gio = "0.7"
+glib = "0.8"
+gtk = { version = "0.7", features = ["v3_22_30"] }
+
+[profile.release]
+lto = true
