@@ -218,9 +218,8 @@ pub async fn connect(
                             }
                             Ok(bytes) => {
                                 parse_buf.extend_from_slice(&read_buf[0..bytes]);
-                                while let Some((msg, n_parsed)) = wire::parse_irc_msg(&parse_buf) {
+                                while let Some(msg) = wire::parse_irc_msg(&mut parse_buf) {
                                     println!("parsed msg: {:?}", msg);
-                                    parse_buf.drain(0..n_parsed);
                                     irc_state.update(&msg, &mut snd_ev, &mut snd_msg);
                                 }
                             }
