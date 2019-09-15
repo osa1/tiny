@@ -21,16 +21,19 @@ path = "src/main.rs"
 base64 = "0.6.0"
 dirs = "1.0.2"
 libc = "0.2.22"
-mio = "0.6.9"
 native-tls = "0.2.2"
 net2 = "0.2.23"
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 take_mut = "0.2.0"
-term_input = { path = "term_input", version = "0.1.5" }
 time = "0.1"
 
+libtiny = { path = "libtiny" }
 libtiny_tui = { path = "libtiny_tui" }
+term_input = { path = "term_input_std_futures" }
+tokio = { version = "0.2.0-alpha.2", features = ["timer"] }
+tokio-executor = "0.2.0-alpha.2"
+futures-util-preview = "0.3.0-alpha.18"
 
 [dev-dependencies]
 quickcheck = "0.3"

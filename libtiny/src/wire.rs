@@ -36,6 +36,7 @@ pub(crate) fn join(chans: &[&str]) -> String {
 pub(crate) fn part(channel: &str) -> String {
     format!("PART {}\r\n", channel)
 }
+*/
 
 pub(crate) fn privmsg(msgtarget: &str, msg: &str) -> String {
     // IRC messages need to be shorter than 512 bytes (see RFC 1459 or 2812). This should be dealt
@@ -50,6 +51,7 @@ pub(crate) fn ctcp_action(msgtarget: &str, msg: &str) -> String {
     format!("PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
 }
 
+/*
 pub(crate) fn away(msg: Option<&str>) -> String {
     match msg {
         None => format!("AWAY\r\n"),

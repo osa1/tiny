@@ -2,34 +2,30 @@
 #![feature(drain_filter)]
 #![feature(ptr_offset_from)]
 
-#[macro_use]
-mod utils;
+// #[macro_use]
+// mod utils;
 
-mod cmd;
+// mod cmd;
 mod cmd_line_args;
 mod config;
-mod conn;
-mod stream;
-mod wire;
+// mod conn;
+// mod stream;
+// mod wire;
 
-use mio::unix::EventedFd;
-use mio::unix::UnixReady;
-use mio::Events;
-use mio::Poll;
-use mio::PollOpt;
-use mio::Ready;
-use mio::Token;
+use futures_util::stream::StreamExt;
+use std::error::Error;
 use std::path::PathBuf;
-use std::time::Duration;
-use std::time::Instant;
-use time::Tm;
+use std::sync::{Arc, Mutex};
+// use std::time::Duration;
+// use std::time::Instant;
+// use time::Tm;
 
-use cmd::{parse_cmd, ParseCmdResult};
+// use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
-use conn::{Conn, ConnErr, ConnEv};
+// use conn::{Conn, ConnErr, ConnEv};
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
 use term_input::{Event, Input};
-use wire::{Cmd, Msg, Pfx};
+// use wire::{Cmd, Msg, Pfx};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,167 +70,290 @@ fn main() {
                 } else {
                     servers
                 };
-                Tiny::run(servers, defaults, colors, config_path)
+                run(servers, defaults, colors, config_path)
             }
         }
+    }
+}
+
+fn run(
+    servers: Vec<config::Server>,
+    defaults: config::Defaults,
+    colors: Colors,
+    config_path: PathBuf,
+) {
+    let mut tui = TUI::new(colors);
+
+    // init "mentions" tab
+    tui.new_server_tab("mentions");
+    tui.add_client_msg(
+        "Any mentions to you will be listed here.",
+        &MsgTarget::Server {
+            serv_name: "mentions",
+        },
+    );
+    tui.draw();
+
+    let executor = tokio::runtime::Runtime::new().unwrap();
+
+    // A reference to the TUI will be shared with each connection event handler
+    let tui = Arc::new(Mutex::new(tui));
+
+    let mut clients: Vec<libtiny::Client> = Vec::with_capacity(servers.len());
+
+    for server in servers.iter().cloned() {
+        let server_info = libtiny::ServerInfo {
+            addr: server.addr,
+            port: server.port,
+            pass: server.pass,
+            hostname: server.hostname,
+            realname: server.realname,
+            nicks: server.nicks,
+            auto_join: server.join,
+            nickserv_ident: server.nickserv_ident,
+        };
+
+        let (client, mut rcv_ev) = libtiny::Client::new(server_info);
+        let tui_clone = tui.clone();
+        let client_clone = client.clone();
+
+        // Spawn a task to handle connection events
+        executor.spawn(async move {
+            while let Some(ev) = rcv_ev.next().await {
+                handle_conn_ev(&mut *tui_clone.lock().unwrap(), &client_clone, ev);
+            }
+        });
+
+        clients.push(client);
+    }
+
+    // Spawn a task for input events
+    executor.spawn(async move {
+        let mut input = Input::new();
+        while let Some(mb_ev) = input.next().await {
+            match mb_ev {
+                Err(io_err) => {
+                    println!("term input error: {:?}", io_err);
+                    return;
+                }
+                Ok(ev) => {
+                    handle_input_ev(&mut *tui.lock().unwrap(), &mut clients, ev);
+                }
+            }
+            tui.lock().unwrap().draw();
+        }
+    });
+
+    executor.shutdown_on_idle();
+}
+
+fn handle_conn_ev(tui: &mut TUI, client: &libtiny::Client, ev: libtiny::Event) {
+    use libtiny::Event::*;
+    match ev {
+        Connecting => {
+            tui.add_client_msg(
+                "Connecting...",
+                &MsgTarget::AllServTabs {
+                    serv_name: client.get_serv_name(),
+                },
+            );
+        }
+        Connected => {
+            tui.add_msg(
+                "Connected.",
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv_name: client.get_serv_name(),
+                },
+            );
+        }
+        Disconnected => {
+            tui.add_err_msg(
+                &format!(
+                    "Disconnected. Will try to reconnect in {} seconds.",
+                    libtiny::RECONNECT_SECS
+                ),
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv_name: client.get_serv_name(),
+                },
+            );
+        }
+        IoErr(err) => {
+            tui.add_err_msg(
+                &format!(
+                    "Connection error: {}. Will try to reconnect in {} seconds.",
+                    err.description(),
+                    libtiny::RECONNECT_SECS
+                ),
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv_name: client.get_serv_name(),
+                },
+            );
+        }
+        CantResolveAddr => {
+            tui.add_err_msg(
+                "Can't resolve address",
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv_name: client.get_serv_name(),
+                },
+            );
+        }
+        NickChange(new_nick) => {
+            tui.set_nick(client.get_serv_name(), &new_nick);
+        }
+        Msg(msg) => {
+            handle_msg(tui, client, msg);
+        }
+    }
+}
+
+fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) {
+    use libtiny::wire::*;
+
+    // let pfx = msg.pfx;
+    match msg.cmd {
+        Cmd::PRIVMSG {
+            target,
+            msg,
+            is_notice,
+        } => unimplemented!(),
+        Cmd::JOIN { chan } => unimplemented!(),
+        Cmd::PART { chan, .. } => unimplemented!(),
+        Cmd::QUIT { .. } => unimplemented!(),
+        Cmd::NICK { nick } => unimplemented!(),
+        Cmd::Reply { num: 433, .. } => unimplemented!(),
+        Cmd::PING { .. } | Cmd::PONG { .. } => unimplemented!(),
+        Cmd::ERROR { msg } => unimplemented!(),
+        Cmd::TOPIC { chan, topic } => unimplemented!(),
+        Cmd::CAP {
+            client,
+            subcommand,
+            params,
+        } => unimplemented!(),
+        Cmd::AUTHENTICATE { .. } => unimplemented!(),
+        Cmd::Reply { num: n, params } => unimplemented!(),
+        Cmd::Other { cmd: _, params } => unimplemented!(),
+    }
+}
+
+fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event) {
+    match tui.handle_input_event(ev) {
+        TUIRet::Abort => {
+            // TODO: abort here
+        },
+        TUIRet::KeyHandled => {}
+        TUIRet::KeyIgnored(_) => {}
+        TUIRet::EventIgnored(ev) => {
+            // TODO: log this
+        }
+        TUIRet::Input { msg, from } => {
+            // We know msg has at least one character as the TUI won't accept it otherwise.
+            if msg[0] == '/' {
+                let cmd_str: String = (&msg[1..]).into_iter().cloned().collect();
+                handle_cmd(tui, clients, &cmd_str)
+            } else {
+                let msg_str: String = msg.into_iter().collect();
+                send_msg(tui, clients, &from, msg_str, false)
+            }
+        }
+        TUIRet::Lines { lines, from } => {
+            for line in lines.into_iter() {
+                send_msg(tui, clients, &from, line, false)
+            }
+        }
+    }
+}
+
+fn handle_cmd(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, cmd: &str) {
+    unimplemented!()
+}
+
+fn send_msg(
+    tui: &mut TUI,
+    clients: &mut Vec<libtiny::Client>,
+    src: &MsgSource,
+    msg: String,
+    ctcp_action: bool,
+) {
+    if src.serv_name() == "mentions" {
+        tui.add_client_err_msg(
+            "Use `/connect <server>` to connect to a server",
+            &MsgTarget::CurrentTab,
+        );
+        return;
+    }
+
+    let client = clients
+        .iter_mut()
+        .find(|client| client.get_serv_name() == src.serv_name())
+        .unwrap();
+
+    // TODO: For errors:
+    //
+    // tui.add_client_err_msg(
+    //     &format!("Can't find server: {}", serv_name),
+    //     &MsgTarget::CurrentTab,
+    // );
+
+    // `tui_target`: Where to show the message on TUI
+    // `msg_target`: Actual PRIVMSG target to send to the server
+    // `serv_name`: Server name to find connection in `clients`
+    let (tui_target, msg_target, serv_name) = {
+        match src {
+            MsgSource::Serv { ref serv_name } => {
+                // we don't split raw messages to 512-bytes long chunks
+                client.raw_msg(msg);
+                return;
+            }
+
+            MsgSource::Chan {
+                ref serv_name,
+                ref chan_name,
+            } => (
+                MsgTarget::Chan {
+                    serv_name,
+                    chan_name,
+                },
+                chan_name,
+                serv_name,
+            ),
+
+            MsgSource::User {
+                ref serv_name,
+                ref nick,
+            } => {
+                let msg_target = if nick.eq_ignore_ascii_case("nickserv")
+                    || nick.eq_ignore_ascii_case("chanserv")
+                {
+                    MsgTarget::Server { serv_name }
+                } else {
+                    MsgTarget::User { serv_name, nick }
+                };
+                (msg_target, nick, serv_name)
+            }
+        }
+    };
+
+    let ts = time::now();
+    let extra_len = msg_target.len()
+        + if ctcp_action {
+            9 // "\0x1ACTION \0x1".len()
+        } else {
+            0
+        };
+    for msg in client.split_privmsg(extra_len, &msg) {
+        client.privmsg(msg_target, msg, ctcp_action);
+        tui.add_privmsg(&client.get_nick(), msg, ts, &tui_target, ctcp_action);
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Tiny<'poll> {
-    conns: Vec<Conn<'poll>>,
-    defaults: config::Defaults,
-    tui: TUI,
-    input_ev_handler: Input,
-    config_path: PathBuf,
-}
-
-const STDIN_TOKEN: Token = Token(libc::STDIN_FILENO as usize);
-
+/*
 impl<'poll> Tiny<'poll> {
-    fn run(
-        servers: Vec<config::Server>,
-        defaults: config::Defaults,
-        colors: Colors,
-        config_path: PathBuf,
-    ) {
-        let poll = Poll::new().unwrap();
-
-        poll.register(
-            &EventedFd(&libc::STDIN_FILENO),
-            STDIN_TOKEN,
-            Ready::readable(),
-            PollOpt::level(),
-        )
-        .unwrap();
-
-        let mut conns = Vec::with_capacity(servers.len());
-
-        let mut tui = TUI::new(colors);
-
-        // init "mentions" tab
-        tui.new_server_tab("mentions");
-        tui.add_client_msg(
-            "Any mentions to you will be listed here.",
-            &MsgTarget::Server {
-                serv_name: "mentions",
-            },
-        );
-
-        tui.draw();
-
-        for server in servers.iter().cloned() {
-            let msg_target = MsgTarget::Server {
-                serv_name: &server.addr.clone(),
-            };
-            match Conn::new(server, &poll) {
-                Ok(conn) => {
-                    conns.push(conn);
-                }
-                Err(err) => {
-                    tui.add_err_msg(&connect_err_msg(&err), time::now(), &msg_target);
-                }
-            }
-        }
-
-        let mut tiny = Tiny {
-            conns,
-            defaults,
-            tui,
-            input_ev_handler: Input::new(),
-            config_path: config_path.to_owned(),
-        };
-
-        tiny.tui.draw();
-
-        let mut last_tick = Instant::now();
-        let mut poll_evs = Events::with_capacity(10);
-        let mut conn_evs = Vec::with_capacity(10);
-        let mut input_evs = Vec::with_capacity(10);
-        'mainloop: loop {
-            // FIXME this will sometimes miss the tick deadline
-            match poll.poll(&mut poll_evs, Some(Duration::from_secs(1))) {
-                Err(_) => {
-                    // usually SIGWINCH, which is caught by term_input
-                    if tiny.handle_stdin(&poll, &mut input_evs) {
-                        break 'mainloop;
-                    }
-                }
-                Ok(_) => {
-                    for event in poll_evs.iter() {
-                        let token = event.token();
-                        if token == STDIN_TOKEN {
-                            if tiny.handle_stdin(&poll, &mut input_evs) {
-                                break 'mainloop;
-                            }
-                        } else {
-                            match find_token_conn_idx(&tiny.conns, token) {
-                                None => {
-                                    // tiny.logger.get_debug_logs().write_line(format_args!(
-                                    //     "BUG: Can't find Token in conns: {:?}",
-                                    //     event.token()
-                                    // ));
-                                }
-                                Some(conn_idx) => {
-                                    tiny.handle_socket(event.readiness(), conn_idx, &mut conn_evs);
-                                }
-                            }
-                        }
-                    }
-
-                    if last_tick.elapsed() >= Duration::from_secs(1) {
-                        for conn_idx in 0..tiny.conns.len() {
-                            {
-                                let conn = &mut tiny.conns[conn_idx];
-                                conn.tick(&mut conn_evs);
-                            }
-                            tiny.handle_conn_evs(conn_idx, &mut conn_evs);
-                        }
-                        last_tick = Instant::now();
-                    }
-                }
-            }
-
-            tiny.tui.draw();
-        }
-    }
-
-    fn handle_stdin(&mut self, poll: &'poll Poll, evs: &mut Vec<Event>) -> bool {
-        let mut abort = false;
-        self.input_ev_handler.read_input_events(evs);
-        for ev in evs.drain(..) {
-            match self.tui.handle_input_event(ev) {
-                TUIRet::Abort => {
-                    abort = true;
-                }
-                TUIRet::Input { msg, from } => {
-                    // We know msg has at least one character as the TUI won't accept it otherwise.
-                    if msg[0] == '/' {
-                        let msg_str: String = (&msg[1..]).into_iter().cloned().collect();
-                        self.handle_cmd(poll, from, &msg_str);
-                    } else {
-                        self.send_msg(&from, &msg.into_iter().collect::<String>(), false);
-                    }
-                }
-                TUIRet::Lines { lines, from } => {
-                    for line in lines {
-                        self.send_msg(&from, &line, false);
-                    }
-                }
-                TUIRet::KeyHandled => {}
-                TUIRet::EventIgnored(Event::FocusGained)
-                | TUIRet::EventIgnored(Event::FocusLost) => {}
-                _ev => {
-                    // self.logger
-                    //     .get_debug_logs()
-                    //     .write_line(format_args!("Ignoring event: {:?}", ev));
-                }
-            }
-        }
-        abort
-    }
-
     fn handle_cmd(&mut self, poll: &'poll Poll, src: MsgSource, msg: &str) {
         match parse_cmd(msg) {
             ParseCmdResult::Ok { cmd, rest } => {
@@ -262,123 +381,10 @@ impl<'poll> Tiny<'poll> {
         conn.part(chan);
     }
 
-    fn send_msg(&mut self, from: &MsgSource, msg: &str, ctcp_action: bool) {
-        if from.serv_name() == "mentions" {
-            self.tui.add_client_err_msg(
-                "Use `/connect <server>` to connect to a server",
-                &MsgTarget::CurrentTab,
-            );
-            return;
-        }
-
-        // `tui_target`: Where to show the message on TUI
-        // `msg_target`: Actual PRIVMSG target to send to the server
-        // `serv_name`: Server name to find connection in `self.conns`
-        let (tui_target, msg_target, serv_name) = {
-            match from {
-                MsgSource::Serv { ref serv_name } => {
-                    // we don't split raw messages to 512-bytes long chunks
-                    if let Some(conn) = self
-                        .conns
-                        .iter_mut()
-                        .find(|conn| conn.get_serv_name() == serv_name)
-                    {
-                        conn.raw_msg(msg);
-                    } else {
-                        self.tui.add_client_err_msg(
-                            &format!("Can't find server: {}", serv_name),
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    return;
-                }
-
-                MsgSource::Chan {
-                    ref serv_name,
-                    ref chan_name,
-                } => (
-                    MsgTarget::Chan {
-                        serv_name,
-                        chan_name,
-                    },
-                    chan_name,
-                    serv_name,
-                ),
-
-                MsgSource::User {
-                    ref serv_name,
-                    ref nick,
-                } => {
-                    let msg_target = if nick.eq_ignore_ascii_case("nickserv")
-                        || nick.eq_ignore_ascii_case("chanserv")
-                    {
-                        MsgTarget::Server { serv_name }
-                    } else {
-                        MsgTarget::User { serv_name, nick }
-                    };
-                    (msg_target, nick, serv_name)
-                }
-            }
-        };
-
-        let conn = find_conn(&mut self.conns, serv_name).unwrap();
-        let ts = time::now();
-        let extra_len = msg_target.len() as i32
-            + if ctcp_action {
-                9 // "\0x1ACTION \0x1".len()
-            } else {
-                0
-            };
-        let send_fn = if ctcp_action {
-            Conn::ctcp_action
-        } else {
-            Conn::privmsg
-        };
-        for msg in conn.split_privmsg(extra_len, msg) {
-            send_fn(conn, msg_target, msg);
-            self.tui
-                .add_privmsg(conn.get_nick(), msg, ts, &tui_target, ctcp_action);
-        }
+    fn send_msg(&mut self, _: &MsgSource, _: &str, _: bool) {
     }
 
     ////////////////////////////////////////////////////////////////////////////
-
-    fn handle_socket(&mut self, readiness: Ready, conn_idx: usize, evs: &mut Vec<ConnEv>) {
-        if readiness.is_readable() {
-            self.conns[conn_idx].read_ready(evs);
-        }
-        // Handle `ConnEv`s first before checking other readiness events. Reason: we sometimes
-        // realize that the connection is closed/got broken at this point even though a write
-        // readiness event is also available. When this happens we need to enter disconnect state
-        // first, otherwise we end up calling `write_ready()` on a broken/disconnected `Stream`,
-        // which causes a panic. This caused #119.
-        self.handle_conn_evs(conn_idx, evs);
-        // This does nothing if we entered disconnect state in the line above.
-        if readiness.is_writable() {
-            self.conns[conn_idx].write_ready(evs);
-        }
-        if readiness.contains(UnixReady::hup()) {
-            self.conns[conn_idx].enter_disconnect_state();
-            self.tui.add_err_msg(
-                &format!(
-                    "Connection error (HUP). \
-                     Will try to reconnect in {} seconds.",
-                    conn::RECONNECT_TICKS
-                ),
-                time::now(),
-                &MsgTarget::AllServTabs {
-                    serv_name: self.conns[conn_idx].get_serv_name(),
-                },
-            );
-        }
-        self.handle_conn_evs(conn_idx, evs);
-    }
-
-    fn handle_conn_evs(&mut self, conn_idx: usize, evs: &mut Vec<ConnEv>) {
-        for ev in evs.drain(..) {
-            self.handle_conn_ev(conn_idx, ev);
-        }
-    }
 
     fn handle_conn_ev(&mut self, conn_idx: usize, ev: ConnEv) {
         match ev {
@@ -869,63 +875,7 @@ impl<'poll> Tiny<'poll> {
         }
     }
 }
-
-fn find_token_conn_idx(conns: &[Conn], token: Token) -> Option<usize> {
-    for (conn_idx, conn) in conns.iter().enumerate() {
-        if conn.get_conn_tok() == Some(token) {
-            return Some(conn_idx);
-        }
-    }
-    None
-}
-
-fn find_conn<'a, 'poll>(
-    conns: &'a mut [Conn<'poll>],
-    serv_name: &str,
-) -> Option<&'a mut Conn<'poll>> {
-    match find_conn_idx(conns, serv_name) {
-        None => None,
-        Some(idx) => Some(&mut conns[idx]),
-    }
-}
-
-fn find_conn_idx(conns: &[Conn], serv_name: &str) -> Option<usize> {
-    for (conn_idx, conn) in conns.iter().enumerate() {
-        if conn.get_serv_name() == serv_name {
-            return Some(conn_idx);
-        }
-    }
-    None
-}
-
-fn connect_err_msg(err: &ConnErr) -> String {
-    match err.source() {
-        Some(other_err) => format!(
-            "Connection error: {} ({})",
-            err.description(),
-            other_err.description()
-        ),
-        None => format!("Connection error: {}", err.description()),
-    }
-}
-
-fn reconnect_err_msg(err: &ConnErr) -> String {
-    match err.source() {
-        Some(other_err) => format!(
-            "Connection error: {} ({}). \
-             Will try to reconnect in {} seconds.",
-            err.description(),
-            other_err.description(),
-            conn::RECONNECT_TICKS
-        ),
-        None => format!(
-            "Connection error: {}. \
-             Will try to reconnect in {} seconds.",
-            err.description(),
-            conn::RECONNECT_TICKS
-        ),
-    }
-}
+*/
 
 /// Nicks may have prefixes, indicating it is a operator, founder, or
 /// something else.

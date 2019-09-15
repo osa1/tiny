@@ -2,6 +2,7 @@
 #![feature(drain_filter)]
 
 mod state;
+pub mod utils;
 pub mod wire;
 
 use state::State;
@@ -18,7 +19,10 @@ use tokio::{
 // Public API
 //
 
-#[derive(Debug)]
+/// `Client` tries to reconnect on error after this many seconds.
+pub const RECONNECT_SECS: u64 = 30;
+
+#[derive(Debug, Clone)]
 pub struct ServerInfo {
     /// Server address
     pub addr: String,
@@ -58,15 +62,25 @@ pub enum Event {
     /// Client couldn't resolve host address.
     CantResolveAddr,
     /// Nick changed.
-    NickChange { new_nick: String },
+    NickChange(String),
+    /// A message from the server
+    Msg(wire::Msg),
 }
 
 /// IRC client.
+#[derive(Clone)]
 pub struct Client {
     /// Channel to the send commands to the main loop. Usually just for sending messages to the
     /// server.
     msg_chan: mpsc::Sender<Cmd>,
 
+    // TODO: This is mostly here to make switching from the old `conn.rs` easier; it may be
+    // possible to remove this and maybe have a unique usize in each client as id.
+    serv_name: String,
+
+    /// Reference to the state, to be able to provide methods like `get_nick` and
+    /// `is_nick_accepted`.
+    state: State,
     // We can't have a channel to the sender task directly here, because when the sender task
     // returns we lose the receiving end of the channel and there's no way to avoid this except
     // with annoying hacks like wrapping it with an `Arc<Mutex<..>>` or something.
@@ -78,10 +92,75 @@ impl Client {
         connect(server_info)
     }
 
+    /// Get host name of this connection.
+    pub fn get_serv_name(&self) -> &str {
+        &self.serv_name
+    }
+
+    /// Get current nick. Not that this returns the nick we're currently trying when the nick is
+    /// not yet accepted. See `is_nick_accepted`.
+    // FIXME: This allocates a String
+    pub fn get_nick(&self) -> String {
+        self.state.get_nick()
+    }
+
+    /// Is current nick accepted by the server?
+    // TODO: Do we really need this?
+    pub fn is_nick_accepted(&self) -> bool {
+        self.state.is_nick_accepted()
+    }
+
+    /// Send a message directly to the server.
+    pub fn raw_msg(&mut self, msg: String) {
+        self.msg_chan.try_send(Cmd::Msg(msg)).unwrap()
+    }
+
+    /// Split a privmsg to multiple messages so that each message is, when the hostname and nick
+    /// prefix added by the server, fits in one IRC message.
+    ///
+    /// `extra_len`: Size (in bytes) for a prefix/suffix etc. that'll be added to each line.
+    pub fn split_privmsg<'a>(&self, extra_len: usize, msg: &'a str) -> utils::SplitIterator<'a> {
+        // Max msg len calculation adapted from hexchat
+        // (src/common/outbound.c:split_up_text)
+        let mut max = 512; // RFC 2812
+        max -= 3; // :, !, @
+        max -= 13; // " PRIVMSG ", " ", :, \r, \n
+        max -= self.get_nick().len();
+        max -= extra_len;
+        match self.state.get_usermask() {
+            None => {
+                max -= 9; // max username
+                max -= 64; // max possible hostname (63) + '@'
+                           // NOTE(osa): I think hexchat has an error here, it
+                           // uses 65
+            }
+            Some(ref usermask) => {
+                max -= usermask.len();
+            }
+        }
+
+        assert!(max > 0);
+
+        utils::split_iterator(msg, max)
+    }
+
+    /// Send a privmsg. Note that this method does not split long messages into smaller messages;
+    /// use `split_privmsg` for that.
+    pub fn privmsg(&mut self, target: &str, msg: &str, ctcp_action: bool) {
+        let wire_fn = if ctcp_action { wire::privmsg } else { wire::ctcp_action };
+        self.msg_chan.try_send(Cmd::Msg(wire_fn(target, msg))).unwrap();
+    }
+
+    pub fn ctcp_action(&mut self, target: &str, msg: &str) {
+
+    }
+
     /// Join a channel.
     pub fn join(&mut self, chan: &str) {
         let chans: [&str; 1] = [chan];
-        self.msg_chan.try_send(Cmd::Msg(wire::join(&chans))).unwrap()
+        self.msg_chan
+            .try_send(Cmd::Msg(wire::join(&chans)))
+            .unwrap()
     }
 }
 
@@ -97,6 +176,8 @@ enum Cmd {
 }
 
 fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
+    let serv_name = server_info.addr.clone();
+
     //
     // Create communication channels
     //
@@ -110,6 +191,9 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
     //
     // Create the main loop task
     //
+
+    let irc_state = State::new(server_info.clone());
+    let irc_state_clone = irc_state.clone();
 
     tokio::spawn(async move {
         // Main loop just tries to (re)connect
@@ -136,8 +220,8 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
             {
                 Err(io_err) => {
                     snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                    // Wait 30 seconds before looping
-                    tokio::timer::delay(tokio::clock::now() + Duration::from_secs(30)).await;
+                    tokio::timer::delay(tokio::clock::now() + Duration::from_secs(RECONNECT_SECS))
+                        .await;
                     continue;
                 }
                 Ok(addr_iter) => addr_iter,
@@ -178,6 +262,14 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
             // Do the business
             //
 
+            // Reset the connection state
+            irc_state.reset();
+            // Introduce self
+            snd_msg.try_send(wire::nick(&irc_state.get_nick())).unwrap();
+            snd_msg
+                .try_send(wire::user(&server_info.hostname, &server_info.realname))
+                .unwrap();
+
             // Spawn a task for outgoing messages.
             let mut snd_ev_clone = snd_ev.clone();
             tokio::spawn(async move {
@@ -191,7 +283,8 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
             });
 
             let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
-            let mut irc_state = State::new(&server_info, &mut snd_msg);
+
+            // TODO: Introduce self here
 
             loop {
                 let mut read_buf: [u8; 1024] = [0; 1024];
@@ -230,5 +323,12 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
         }
     });
 
-    (Client { msg_chan: snd_cmd }, rcv_ev)
+    (
+        Client {
+            msg_chan: snd_cmd,
+            serv_name,
+            state: irc_state_clone,
+        },
+        rcv_ev,
+    )
 }
