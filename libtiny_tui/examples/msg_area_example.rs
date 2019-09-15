@@ -1,44 +1,16 @@
-extern crate libc;
-extern crate mio;
-extern crate term_input;
-extern crate termbox_simple;
-extern crate tiny;
-
 use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
 use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
-use std::fs::File;
-use std::io::Read;
 
 use term_input::{Event, Input};
-use tiny::config::Colors;
-use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
+use libtiny_tui::{MsgTarget, TUIRet, TUI, Colors};
 
 fn main() {
     let mut tui = TUI::new(Colors::default());
     tui.new_server_tab("debug");
-    let debug_tab = MsgTarget::Server { serv_name: "debug" };
-
-    tui.add_msg(
-        "Loading word list for auto-completion ...",
-        Timestamp::now(),
-        &debug_tab,
-    );
-    tui.draw();
-
-    {
-        let mut contents = String::new();
-        let mut file = File::open("/usr/share/dict/american-english").unwrap();
-        file.read_to_string(&mut contents).unwrap();
-        for word in contents.lines() {
-            tui.add_nick(word, None, &debug_tab);
-        }
-    }
-
-    tui.add_msg("Done.", Timestamp::now(), &debug_tab);
     tui.draw();
 
     let poll = Poll::new().unwrap();
@@ -50,12 +22,13 @@ fn main() {
     )
     .unwrap();
 
-    let mut input = Input::new();
     let mut ev_buffer: Vec<Event> = Vec::new();
+    let mut input = Input::new();
     let mut events = Events::with_capacity(10);
     'mainloop: loop {
         match poll.poll(&mut events, None) {
             Err(_) => {
+                // usually SIGWINCH, which is caught by term_input
                 tui.resize();
                 tui.draw();
             }
@@ -66,8 +39,8 @@ fn main() {
                         TUIRet::Input { msg, .. } => {
                             tui.add_msg(
                                 &msg.into_iter().collect::<String>(),
-                                Timestamp::now(),
-                                &debug_tab,
+                                time::now(),
+                                &MsgTarget::Server { serv_name: "debug" },
                             );
                         }
                         TUIRet::Abort => {
