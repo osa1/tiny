@@ -27,7 +27,6 @@ use messaging::{MessagingUI, Timestamp};
 use tab::Tab;
 use term_input::{Arrow, Event, Key};
 use termbox_simple::{OutputMode, Termbox};
-use trie::Trie;
 use widget::WidgetRet;
 
 #[derive(Debug)]
@@ -55,28 +54,18 @@ pub enum TUIRet {
 /// Target of a message to be shown on TUI.
 pub enum MsgTarget<'a> {
     /// Show the message in the server tab.
-    Server {
-        serv_name: &'a str,
-    },
+    Server { serv_name: &'a str },
     /// Show the message in the channel tab.
     Chan {
         serv_name: &'a str,
         chan_name: &'a str,
     },
     /// Show the message in the privmsg tab.
-    User {
-        serv_name: &'a str,
-        nick: &'a str,
-    },
+    User { serv_name: &'a str, nick: &'a str },
     /// Show the message in all tabs of a server.
-    AllServTabs {
-        serv_name: &'a str,
-    },
+    AllServTabs { serv_name: &'a str },
     /// Show the message in all server tabs that have the user. (i.e. channels, privmsg tabs)
-    AllUserTabs {
-        serv_name: &'a str,
-        nick: &'a str,
-    },
+    AllUserTabs { serv_name: &'a str, nick: &'a str },
     /// Show the message in currently active tab.
     CurrentTab,
 }
@@ -424,7 +413,7 @@ impl TUI {
         }
     }
 
-    pub fn keypressed(&mut self, key: Key) -> TUIRet {
+    fn keypressed(&mut self, key: Key) -> TUIRet {
         match self.tabs[self.active_idx].widget.keypressed(key) {
             WidgetRet::KeyHandled => TUIRet::KeyHandled,
             WidgetRet::KeyIgnored => self.handle_keypress(key),
@@ -554,10 +543,10 @@ impl TUI {
         }
     }
 
-    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<&Trie> {
+    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<Vec<String>> {
         match self.find_chan_tab_idx(serv_name, chan_name) {
             None => None,
-            Some(i) => Some(self.tabs[i].widget.get_nicks()),
+            Some(i) => Some(self.tabs[i].widget.get_nicks().to_strings("")),
         }
     }
 }

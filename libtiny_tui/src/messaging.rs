@@ -21,7 +21,7 @@ use crate::{
 
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.
-pub struct MessagingUI {
+pub(crate) struct MessagingUI {
     /// Incoming and sent messages appear
     msg_area: MsgArea,
 
@@ -49,7 +49,7 @@ pub struct MessagingUI {
 
 /// Like `time::Tm`, but we only care about hour and minute parts.
 #[derive(PartialEq, Eq, Clone, Copy)]
-pub struct Timestamp {
+pub(crate) struct Timestamp {
     hour: i32,
     min: i32,
 }
@@ -79,7 +79,7 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub fn new(width: i32, height: i32, status: bool) -> MessagingUI {
+    pub(crate) fn new(width: i32, height: i32, status: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
             input_field: TextField::new(width),
@@ -95,7 +95,7 @@ impl MessagingUI {
         }
     }
 
-    pub fn set_nick(&mut self, nick: String) {
+    pub(crate) fn set_nick(&mut self, nick: String) {
         self.current_nick = Some(nick);
         // update text field size
         let w = self.width;
@@ -103,7 +103,7 @@ impl MessagingUI {
         self.resize(w, h);
     }
 
-    pub fn get_nick(&self) -> Option<&str> {
+    pub(crate) fn get_nick(&self) -> Option<&str> {
         self.current_nick.as_ref().map(String::as_str)
     }
 
@@ -114,7 +114,7 @@ impl MessagingUI {
         }
     }
 
-    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
 
         if let Some(ref nick) = self.current_nick {
@@ -146,7 +146,7 @@ impl MessagingUI {
         }
     }
 
-    pub fn keypressed(&mut self, key: Key) -> WidgetRet {
+    pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
             Key::Ctrl('c') => {
                 self.toggle_exit_dialogue();
@@ -209,7 +209,7 @@ impl MessagingUI {
         }
     }
 
-    pub fn resize(&mut self, width: i32, height: i32) {
+    pub(crate) fn resize(&mut self, width: i32, height: i32) {
         self.width = width;
         self.height = height;
         self.msg_area.resize(width, height - 1);
@@ -237,22 +237,22 @@ impl MessagingUI {
         }
     }
 
-    pub fn get_nicks(&self) -> &Trie {
+    pub(crate) fn get_nicks(&self) -> &Trie {
         &self.nicks
     }
 
     /// Get contents of the input field and clear it.
-    pub fn flush_input_field(&mut self) -> String {
+    pub(crate) fn flush_input_field(&mut self) -> String {
         self.input_field.flush()
     }
 
     /// Add a line to input field history.
-    pub fn add_input_field_history(&mut self, str: &str) {
+    pub(crate) fn add_input_field_history(&mut self, str: &str) {
         self.input_field.add_history(str)
     }
 
     /// Set input field contents.
-    pub fn set_input_field(&mut self, str: &str) {
+    pub(crate) fn set_input_field(&mut self, str: &str) {
         self.input_field.set(str)
     }
 
@@ -279,7 +279,7 @@ impl MessagingUI {
         self.last_activity_ts = Some(ts);
     }
 
-    pub fn show_topic(&mut self, topic: &str, ts: Timestamp) {
+    pub(crate) fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
         self.msg_area
@@ -289,7 +289,7 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub fn add_client_err_msg(&mut self, msg: &str) {
+    pub(crate) fn add_client_err_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
         self.msg_area
@@ -298,7 +298,7 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub fn add_client_notify_msg(&mut self, msg: &str) {
+    pub(crate) fn add_client_notify_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
         self.msg_area
@@ -308,7 +308,7 @@ impl MessagingUI {
         self.reset_activity_line();
     }
 
-    pub fn add_client_msg(&mut self, msg: &str) {
+    pub(crate) fn add_client_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
         self.msg_area
@@ -318,7 +318,7 @@ impl MessagingUI {
         self.reset_activity_line();
     }
 
-    pub fn add_privmsg(
+    pub(crate) fn add_privmsg(
         &mut self,
         sender: &str,
         msg: &str,
@@ -359,7 +359,7 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub fn add_msg(&mut self, msg: &str, ts: Timestamp) {
+    pub(crate) fn add_msg(&mut self, msg: &str, ts: Timestamp) {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
@@ -369,7 +369,7 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
+    pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
@@ -379,7 +379,7 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.msg_area.clear();
     }
 
@@ -397,11 +397,11 @@ impl MessagingUI {
 // Keeping nick list up-to-date
 
 impl MessagingUI {
-    pub fn clear_nicks(&mut self) {
+    pub(crate) fn clear_nicks(&mut self) {
         self.nicks.clear();
     }
 
-    pub fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
+    pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
         if self.show_status && !self.nicks.contains(nick) {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
@@ -418,7 +418,7 @@ impl MessagingUI {
         self.nicks.insert(nick);
     }
 
-    pub fn part(&mut self, nick: &str, ts: Option<Timestamp>) {
+    pub(crate) fn part(&mut self, nick: &str, ts: Option<Timestamp>) {
         self.nicks.remove(nick);
 
         if self.show_status {
@@ -437,7 +437,7 @@ impl MessagingUI {
 
     /// `state` == `None` means toggle
     /// `state` == `Some(state)` means set it to `state`
-    pub fn set_or_toggle_ignore(&mut self, state: Option<bool>) {
+    pub(crate) fn set_or_toggle_ignore(&mut self, state: Option<bool>) {
         self.show_status = state.unwrap_or(!self.show_status);
         if self.show_status {
             self.add_client_notify_msg("Ignore disabled");
@@ -446,11 +446,11 @@ impl MessagingUI {
         }
     }
 
-    pub fn get_ignore_state(&self) -> bool {
+    pub(crate) fn get_ignore_state(&self) -> bool {
         self.show_status
     }
 
-    pub fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
+    pub(crate) fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
         self.nicks.remove(old_nick);
         self.nicks.insert(new_nick);
 
@@ -466,7 +466,7 @@ impl MessagingUI {
         });
     }
 
-    pub fn has_nick(&self, nick: &str) -> bool {
+    pub(crate) fn has_nick(&self, nick: &str) -> bool {
         self.nicks.contains(nick)
     }
 

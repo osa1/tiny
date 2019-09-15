@@ -1,22 +1,22 @@
-pub struct Trie {
+pub(crate) struct Trie {
     vec: Vec<(char, Box<Trie>)>,
     word: bool,
 }
 
 impl Trie {
-    pub fn new() -> Trie {
+    pub(crate) fn new() -> Trie {
         Trie {
             vec: vec![],
             word: false,
         }
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.vec.clear();
         self.word = false;
     }
 
-    pub fn insert(&mut self, str: &str) {
+    pub(crate) fn insert(&mut self, str: &str) {
         let mut trie_ptr: *mut Trie = &mut *self;
         for char in str.chars() {
             trie_ptr = get_char_node_for_insert(trie_ptr, char);
@@ -27,7 +27,7 @@ impl Trie {
         }
     }
 
-    pub fn contains(&self, str: &str) -> bool {
+    pub(crate) fn contains(&self, str: &str) -> bool {
         let mut trie = self;
         for char in str.chars() {
             if let Some(trie_) = get_char_node_for_lookup(trie, char) {
@@ -39,7 +39,7 @@ impl Trie {
         trie.word
     }
 
-    pub fn remove(&mut self, str: &str) {
+    pub(crate) fn remove(&mut self, str: &str) {
         let mut chars = str.chars();
         if let Some(char) = chars.next() {
             if let Ok(idx) = self.vec.binary_search_by(|&(char_, _)| char_.cmp(&char)) {
@@ -58,7 +58,7 @@ impl Trie {
     }
 
     // TODO: We need an Iterator instance instead.
-    pub fn to_strings(&self, prefix: &str) -> Vec<String> {
+    pub(crate) fn to_strings(&self, prefix: &str) -> Vec<String> {
         let mut ret = {
             if self.word {
                 vec![prefix.to_owned()]
@@ -77,7 +77,7 @@ impl Trie {
     }
 
     // TODO: We need an Iterator instance instead.
-    pub fn drop_pfx(&self, prefix: &mut dyn Iterator<Item = char>) -> Vec<String> {
+    pub(crate) fn drop_pfx(&self, prefix: &mut dyn Iterator<Item = char>) -> Vec<String> {
         let mut trie = self;
         for char in prefix {
             if let Some(trie_) = get_char_node_for_lookup(trie, char) {

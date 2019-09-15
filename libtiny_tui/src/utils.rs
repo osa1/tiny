@@ -1,4 +1,4 @@
-pub struct InsertIterator<'iter, A: 'iter> {
+pub(crate) struct InsertIterator<'iter, A: 'iter> {
     insert_point: usize,
     current_idx: usize,
     iter_orig: &'iter mut dyn Iterator<Item = A>,
@@ -22,7 +22,7 @@ impl<'iter, A> Iterator for InsertIterator<'iter, A> {
     }
 }
 
-pub fn insert_iter<'iter, A>(
+pub(crate) fn insert_iter<'iter, A>(
     iter_orig: &'iter mut dyn Iterator<Item = A>,
     iter_insert: &'iter mut dyn Iterator<Item = A>,
     insert_point: usize,
@@ -37,7 +37,7 @@ pub fn insert_iter<'iter, A>(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub fn is_nick_char(c: char) -> bool {
+pub(crate) fn is_nick_char(c: char) -> bool {
     // from RFC 2812:
     //
     // nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
@@ -90,7 +90,7 @@ fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Translate IRC color codes using the callback, and remove ASCII control chars from the input.
-pub fn translate_irc_control_chars(
+pub(crate) fn translate_irc_control_chars(
     str: &str,
     push_color: fn(ret: &mut String, fg: u8, bg: Option<u8>),
 ) -> String {
@@ -135,7 +135,7 @@ pub fn translate_irc_control_chars(
 }
 
 /// Like `translate_irc_control_chars`, but skips color codes.
-pub fn remove_irc_control_chars(str: &str) -> String {
+pub(crate) fn remove_irc_control_chars(str: &str) -> String {
     fn push_color(_ret: &mut String, _fg: u8, _bg: Option<u8>) {}
     translate_irc_control_chars(str, push_color)
 }
