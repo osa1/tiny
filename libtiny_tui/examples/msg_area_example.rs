@@ -1,12 +1,7 @@
-use mio::unix::EventedFd;
-use mio::Events;
-use mio::Poll;
-use mio::PollOpt;
-use mio::Ready;
-use mio::Token;
+use mio::{unix::EventedFd, Events, Poll, PollOpt, Ready, Token};
 
+use libtiny_tui::{Colors, MsgTarget, TUIRet, TUI};
 use term_input::{Event, Input};
-use libtiny_tui::{MsgTarget, TUIRet, TUI, Colors};
 
 fn main() {
     let mut tui = TUI::new(Colors::default());

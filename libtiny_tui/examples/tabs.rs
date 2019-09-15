@@ -1,13 +1,8 @@
 // Open a lot of tabs. 10 servers tabs, each one having 3 channels.
 
-use mio::unix::EventedFd;
-use mio::Events;
-use mio::Poll;
-use mio::PollOpt;
-use mio::Ready;
-use mio::Token;
+use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
+use mio::{unix::EventedFd, Events, Poll, PollOpt, Ready, Token};
 use term_input::{Event, Input};
-use libtiny_tui::{MsgTarget, TUIRet, TUI, Colors, MsgSource, TabStyle};
 
 fn main() {
     let mut tui = TUI::new(Colors::default());

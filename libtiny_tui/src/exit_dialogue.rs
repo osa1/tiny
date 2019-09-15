@@ -3,12 +3,12 @@ use termbox_simple::Termbox;
 
 use crate::{config::Colors, widget::WidgetRet};
 
-pub struct ExitDialogue {
+pub(crate) struct ExitDialogue {
     width: i32,
 }
 
 impl ExitDialogue {
-    pub fn new(width: i32) -> ExitDialogue {
+    pub(crate) fn new(width: i32) -> ExitDialogue {
         ExitDialogue { width }
     }
 }
@@ -16,11 +16,11 @@ impl ExitDialogue {
 static MSG: &str = "Really quit?";
 
 impl ExitDialogue {
-    pub fn resize(&mut self, width: i32) {
+    pub(crate) fn resize(&mut self, width: i32) {
         self.width = width;
     }
 
-    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         tb.hide_cursor();
 
         let mut col = 0;
@@ -47,7 +47,7 @@ impl ExitDialogue {
         }
     }
 
-    pub fn keypressed(&self, key: Key) -> WidgetRet {
+    pub(crate) fn keypressed(&self, key: Key) -> WidgetRet {
         match key {
             Key::Char('y') | Key::Char('\r') => WidgetRet::Abort,
             _ => WidgetRet::Remove,

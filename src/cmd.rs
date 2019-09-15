@@ -431,10 +431,7 @@ fn names(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         ref chan_name,
     } = src
     {
-        let nicks_vec = tiny
-            .tui
-            .get_nicks(serv_name, chan_name)
-            .map(|nicks| nicks.to_strings(""));
+        let nicks_vec = tiny.tui.get_nicks(serv_name, chan_name);
         if let Some(nicks_vec) = nicks_vec {
             let target = MsgTarget::Chan {
                 serv_name,

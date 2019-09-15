@@ -1,19 +1,16 @@
-use mio::unix::EventedFd;
-use mio::Events;
-use mio::Poll;
-use mio::PollOpt;
-use mio::Ready;
-use mio::Token;
-use std::fs::File;
-use std::io::Read;
+use mio::{unix::EventedFd, Events, Poll, PollOpt, Ready, Token};
+use std::{fs::File, io::Read};
 
 use term_input::{Event, Input, Key};
 use termbox_simple::*;
 
-use libtiny_tui::Colors;
-use libtiny_tui::msg_area::line::SchemeStyle;
-use libtiny_tui::msg_area::line::SegStyle;
-use libtiny_tui::msg_area::MsgArea;
+use libtiny_tui::{
+    msg_area::{
+        line::{SchemeStyle, SegStyle},
+        MsgArea,
+    },
+    Colors,
+};
 
 fn main() {
     let mut tui = Termbox::init().unwrap();

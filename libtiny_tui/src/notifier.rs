@@ -1,7 +1,6 @@
 extern crate notify_rust;
 
 use self::notify_rust::Notification;
-pub use crate::messaging::Timestamp;
 use crate::{utils::remove_irc_control_chars, MsgTarget};
 
 /// Destktop notification handler

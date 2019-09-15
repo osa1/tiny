@@ -6,7 +6,7 @@ use crate::{config, config::Colors, utils::translate_irc_control_chars};
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
 #[derive(Debug)]
-pub struct Line {
+pub(crate) struct Line {
     /// Line segments.
     segs: Vec<Seg>,
 
@@ -33,7 +33,7 @@ struct Seg {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum SegStyle {
+pub(crate) enum SegStyle {
     /// A specific style. Useful when rendering IRC colors (which should look
     /// the same across color schemes).
     Fixed(config::Style),
@@ -47,7 +47,7 @@ pub enum SegStyle {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum SchemeStyle {
+pub(crate) enum SchemeStyle {
     UserMsg,
     ErrMsg,
     Topic,
@@ -60,7 +60,7 @@ pub enum SchemeStyle {
 }
 
 impl Seg {
-    pub fn style(&self, colors: &Colors) -> config::Style {
+    pub(crate) fn style(&self, colors: &Colors) -> config::Style {
         match self.style {
             SegStyle::Fixed(style) => style,
             SegStyle::Index(idx) => config::Style {
@@ -89,7 +89,7 @@ impl Seg {
 const TERMBOX_COLOR_PREFIX: char = '\x00';
 
 impl Line {
-    pub fn new() -> Line {
+    pub(crate) fn new() -> Line {
         Line {
             segs: vec![],
             current_seg: Seg {
@@ -101,7 +101,7 @@ impl Line {
         }
     }
 
-    pub fn set_style(&mut self, style: SegStyle) {
+    pub(crate) fn set_style(&mut self, style: SegStyle) {
         // Just update the last segment if it's empty
         if self.current_seg.text.is_empty() {
             self.current_seg.style = style;
@@ -117,7 +117,7 @@ impl Line {
         }
     }
 
-    pub fn add_text(&mut self, str: &str) {
+    pub(crate) fn add_text(&mut self, str: &str) {
         fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
             ret.push(TERMBOX_COLOR_PREFIX);
             ret.push(0 as char); // style
@@ -151,7 +151,7 @@ impl Line {
         }
     }
 
-    pub fn add_char(&mut self, char: char) {
+    pub(crate) fn add_char(&mut self, char: char) {
         assert_ne!(char, TERMBOX_COLOR_PREFIX);
         if char.is_whitespace() {
             self.splits.push(self.len_chars);
@@ -162,7 +162,7 @@ impl Line {
 
     /// How many lines does this take when rendered? O(n) where n = number of
     /// split positions in the line (i.e. whitespaces).
-    pub fn rendered_height(&self, width: i32) -> i32 {
+    pub(crate) fn rendered_height(&self, width: i32) -> i32 {
         let mut lines: i32 = 1;
         let mut line_start: i32 = 0;
 
@@ -192,7 +192,7 @@ impl Line {
         lines
     }
 
-    pub fn draw(
+    pub(crate) fn draw(
         &self,
         tb: &mut Termbox,
         colors: &Colors,

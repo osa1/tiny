@@ -1,13 +1,13 @@
-pub mod line;
+pub(crate) mod line;
 
 use std::{cmp::max, mem, str};
 
 use termbox_simple::Termbox;
 
-pub use self::line::{Line, SegStyle};
+pub(crate) use self::line::{Line, SegStyle};
 use crate::config::Colors;
 
-pub struct MsgArea {
+pub(crate) struct MsgArea {
     lines: Vec<Line>,
 
     // Rendering related
@@ -27,7 +27,7 @@ pub struct MsgArea {
 }
 
 impl MsgArea {
-    pub fn new(width: i32, height: i32) -> MsgArea {
+    pub(crate) fn new(width: i32, height: i32) -> MsgArea {
         MsgArea {
             lines: Vec::new(),
             width,
@@ -38,13 +38,13 @@ impl MsgArea {
         }
     }
 
-    pub fn resize(&mut self, width: i32, height: i32) {
+    pub(crate) fn resize(&mut self, width: i32, height: i32) {
         self.width = width;
         self.height = height;
         self.lines_height = None;
     }
 
-    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         // Where to render current line
         let mut row = pos_y + self.height - 1;
 
@@ -104,33 +104,33 @@ impl MsgArea {
         }
     }
 
-    pub fn scroll_up(&mut self) {
+    pub(crate) fn scroll_up(&mut self) {
         if self.scroll < max(0, self.lines_height() - self.height) {
             self.scroll += 1;
         }
     }
 
-    pub fn scroll_down(&mut self) {
+    pub(crate) fn scroll_down(&mut self) {
         if self.scroll > 0 {
             self.scroll -= 1;
         }
     }
 
-    pub fn scroll_top(&mut self) {
+    pub(crate) fn scroll_top(&mut self) {
         self.scroll = max(0, self.lines_height() - self.height);
     }
 
-    pub fn scroll_bottom(&mut self) {
+    pub(crate) fn scroll_bottom(&mut self) {
         self.scroll = 0;
     }
 
-    pub fn page_up(&mut self) {
+    pub(crate) fn page_up(&mut self) {
         for _ in 0..10 {
             self.scroll_up();
         }
     }
 
-    pub fn page_down(&mut self) {
+    pub(crate) fn page_down(&mut self) {
         self.scroll = max(0, self.scroll - 10);
     }
 }
@@ -139,19 +139,19 @@ impl MsgArea {
 // Adding/removing text
 
 impl MsgArea {
-    pub fn set_style(&mut self, style: SegStyle) {
+    pub(crate) fn set_style(&mut self, style: SegStyle) {
         self.line_buf.set_style(style);
     }
 
-    pub fn add_text(&mut self, str: &str) {
+    pub(crate) fn add_text(&mut self, str: &str) {
         self.line_buf.add_text(str);
     }
 
-    pub fn add_char(&mut self, char: char) {
+    pub(crate) fn add_char(&mut self, char: char) {
         self.line_buf.add_char(char);
     }
 
-    pub fn flush_line(&mut self) -> usize {
+    pub(crate) fn flush_line(&mut self) -> usize {
         let line_height = self.line_buf.rendered_height(self.width);
         self.lines
             .push(mem::replace(&mut self.line_buf, Line::new()));
@@ -165,14 +165,14 @@ impl MsgArea {
     }
 
     #[inline]
-    pub fn modify_line<F>(&mut self, idx: usize, f: F)
+    pub(crate) fn modify_line<F>(&mut self, idx: usize, f: F)
     where
         F: Fn(&mut Line),
     {
         f(&mut self.lines[idx]);
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.lines.clear();
         self.scroll = 0;
         self.lines_height = None;

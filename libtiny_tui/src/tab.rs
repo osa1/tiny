@@ -7,13 +7,13 @@ use crate::{
     MsgSource,
 };
 
-pub struct Tab {
-    pub widget: MessagingUI,
-    pub src: MsgSource,
-    pub style: TabStyle,
+pub(crate) struct Tab {
+    pub(crate) widget: MessagingUI,
+    pub(crate) src: MsgSource,
+    pub(crate) style: TabStyle,
     /// Alt-character to use to switch to this tab.
-    pub switch: Option<char>,
-    pub notifier: Notifier,
+    pub(crate) switch: Option<char>,
+    pub(crate) notifier: Notifier,
 }
 
 // NOTE: Keep the variants sorted in increasing significance, to avoid updating
@@ -27,7 +27,7 @@ pub enum TabStyle {
 }
 
 impl TabStyle {
-    pub fn get_style(self, colors: &Colors) -> Style {
+    pub(crate) fn get_style(self, colors: &Colors) -> Style {
         match self {
             TabStyle::Normal => colors.tab_normal,
             TabStyle::NewMsg => colors.tab_new_msg,
@@ -37,27 +37,27 @@ impl TabStyle {
 }
 
 impl Tab {
-    pub fn visible_name(&self) -> &str {
+    pub(crate) fn visible_name(&self) -> &str {
         self.src.visible_name()
     }
 
-    pub fn set_style(&mut self, style: TabStyle) {
+    pub(crate) fn set_style(&mut self, style: TabStyle) {
         self.style = style;
     }
 
-    pub fn update_source<F>(&mut self, f: &F)
+    pub(crate) fn update_source<F>(&mut self, f: &F)
     where
         F: Fn(&mut MsgSource),
     {
         f(&mut self.src)
     }
 
-    pub fn width(&self) -> i32 {
+    pub(crate) fn width(&self) -> i32 {
         // TODO: assuming ASCII string here. We should probably switch to a AsciiStr type.
         self.visible_name().len() as i32 + if self.widget.get_ignore_state() { 0 } else { 3 }
     }
 
-    pub fn draw(
+    pub(crate) fn draw(
         &self,
         tb: &mut Termbox,
         colors: &Colors,

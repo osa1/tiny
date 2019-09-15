@@ -12,7 +12,7 @@ use crate::{config::Colors, termbox, trie::Trie, utils, widget::WidgetRet};
 const SCROLLOFF: i32 = 5;
 const HIST_SIZE: usize = 30;
 
-pub struct TextField {
+pub(crate) struct TextField {
     /// The message that's currently being edited (not yet sent)
     buffer: Vec<char>,
 
@@ -51,7 +51,7 @@ enum Mode {
 }
 
 impl TextField {
-    pub fn new(width: i32) -> TextField {
+    pub(crate) fn new(width: i32) -> TextField {
         TextField {
             buffer: Vec::with_capacity(512),
             cursor: 0,
@@ -62,13 +62,13 @@ impl TextField {
         }
     }
 
-    pub fn resize(&mut self, width: i32) {
+    pub(crate) fn resize(&mut self, width: i32) {
         self.width = width;
         let cursor = self.cursor;
         self.move_cursor(cursor);
     }
 
-    pub fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         match self.mode {
             Mode::Edit => {
                 draw_line(
@@ -150,7 +150,7 @@ impl TextField {
         }
     }
 
-    pub fn keypressed(&mut self, key: Key) -> WidgetRet {
+    pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
             Key::Char('\r') => {
                 if self.line_len() > 0 {
@@ -373,17 +373,17 @@ impl TextField {
     }
 
     /// Get contents of the text field and clear it.
-    pub fn flush(&mut self) -> String {
+    pub(crate) fn flush(&mut self) -> String {
         self.cursor = 0;
         self.buffer.drain(..).collect()
     }
 
     /// Add a line to the text field history.
-    pub fn add_history(&mut self, str: &str) {
+    pub(crate) fn add_history(&mut self, str: &str) {
         self.history.push(str.chars().collect());
     }
 
-    pub fn set(&mut self, str: &str) {
+    pub(crate) fn set(&mut self, str: &str) {
         self.mode = Mode::Edit;
         self.buffer = str.chars().collect();
         self.move_cursor_to_end();
@@ -598,7 +598,7 @@ fn draw_line(
 }
 
 impl TextField {
-    pub fn autocomplete(&mut self, dict: &Trie) {
+    pub(crate) fn autocomplete(&mut self, dict: &Trie) {
         if self.in_autocomplete() {
             // AWFUL CODE YO
             self.keypressed(Key::Arrow(Arrow::Up));
