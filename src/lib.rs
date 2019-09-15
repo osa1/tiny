@@ -1,12 +1,6 @@
 #![cfg_attr(test, feature(test))]
-#![feature(allocator_api)]
-#![feature(const_fn)]
 #![feature(drain_filter)]
-#![feature(nll)]
 #![feature(ptr_offset_from)]
-
-#[global_allocator]
-static ALLOC: std::alloc::System = std::alloc::System;
 
 #[macro_use]
 mod utils;
