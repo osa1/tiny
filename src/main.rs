@@ -213,13 +213,95 @@ fn handle_conn_ev(tui: &mut TUI, client: &libtiny::Client, ev: libtiny::Event) {
 fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) {
     use libtiny::wire::*;
 
-    // let pfx = msg.pfx;
+    let pfx = msg.pfx;
     match msg.cmd {
         Cmd::PRIVMSG {
             target,
             msg,
             is_notice,
-        } => unimplemented!(),
+            is_action,
+        } => {
+            let pfx = match pfx {
+                Some(pfx) => pfx,
+                None => {
+                    // TODO: log this?
+                    return;
+                }
+            };
+
+            // sender to be shown in the UI
+            let origin = match pfx {
+                Pfx::Server(_) => client.get_serv_name(),
+                Pfx::User { ref nick, .. } => nick,
+            };
+
+            /*
+            match target {
+                wire::MsgTarget::Chan(chan) => {
+                    let msg_target = MsgTarget::Chan {
+                        serv_name: conn.get_serv_name(),
+                        chan_name: &chan,
+                    };
+                    // highlight the message if it mentions us
+                    if msg.find(conn.get_nick()).is_some() {
+                        self.tui.add_privmsg_highlight(
+                            origin,
+                            msg,
+                            ts,
+                            &msg_target,
+                            is_ctcp_action,
+                        );
+                        self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
+                        let mentions_target = MsgTarget::Server {
+                            serv_name: "mentions",
+                        };
+                        self.tui.add_msg(
+                            &format!(
+                                "{} in {}:{}: {}",
+                                origin,
+                                conn.get_serv_name(),
+                                chan,
+                                msg
+                            ),
+                            ts,
+                            &mentions_target,
+                        );
+                        self.tui
+                            .set_tab_style(TabStyle::Highlight, &mentions_target);
+                    } else {
+                        self.tui
+                            .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
+                        self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                    }
+                }
+                wire::MsgTarget::User(target) => {
+                    let serv_name = conn.get_serv_name();
+                    let msg_target = {
+                        match pfx {
+                            Pfx::Server(_) => MsgTarget::Server { serv_name },
+                            Pfx::User { ref nick, .. } => {
+                                // show NOTICE messages in server tabs if we don't have a tab
+                                // for the sender already (see #21)
+                                if is_notice && !self.tui.does_user_tab_exist(serv_name, nick) {
+                                    MsgTarget::Server { serv_name }
+                                } else {
+                                    MsgTarget::User { serv_name, nick }
+                                }
+                            }
+                        }
+                    };
+                    self.tui
+                        .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
+                    if target == conn.get_nick() {
+                        self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
+                    } else {
+                        // not sure if this case can happen
+                        self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                    }
+                }
+            }
+            */
+        }
         Cmd::JOIN { chan } => unimplemented!(),
         Cmd::PART { chan, .. } => unimplemented!(),
         Cmd::QUIT { .. } => unimplemented!(),

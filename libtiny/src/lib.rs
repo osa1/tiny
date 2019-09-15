@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 #![feature(drain_filter)]
+#![feature(test)]
 
 mod state;
 pub mod utils;
@@ -147,12 +148,14 @@ impl Client {
     /// Send a privmsg. Note that this method does not split long messages into smaller messages;
     /// use `split_privmsg` for that.
     pub fn privmsg(&mut self, target: &str, msg: &str, ctcp_action: bool) {
-        let wire_fn = if ctcp_action { wire::privmsg } else { wire::ctcp_action };
-        self.msg_chan.try_send(Cmd::Msg(wire_fn(target, msg))).unwrap();
-    }
-
-    pub fn ctcp_action(&mut self, target: &str, msg: &str) {
-
+        let wire_fn = if ctcp_action {
+            wire::privmsg
+        } else {
+            wire::action
+        };
+        self.msg_chan
+            .try_send(Cmd::Msg(wire_fn(target, msg)))
+            .unwrap();
     }
 
     /// Join a channel.
