@@ -6,9 +6,50 @@ use crate::{
     Event, ServerInfo,
 };
 
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Sender;
 
-pub(crate) struct State<'a> {
+#[derive(Clone)]
+pub struct State {
+    inner: Arc<Mutex<StateInner>>,
+}
+
+impl State {
+    pub(crate) fn new(server_info: ServerInfo) -> State {
+        State {
+            inner: Arc::new(Mutex::new(StateInner::new(server_info))),
+        }
+    }
+
+    pub(crate) fn reset(&self) {
+        self.inner.lock().unwrap().reset()
+    }
+
+    pub(crate) fn update(
+        &self,
+        msg: &Msg,
+        snd_ev: &mut Sender<Event>,
+        snd_irc_msg: &mut Sender<String>,
+    ) {
+        self.inner.lock().unwrap().update(msg, snd_ev, snd_irc_msg)
+    }
+
+    // FIXME: This allocates a new String
+    pub(crate) fn get_nick(&self) -> String {
+        self.inner.lock().unwrap().current_nick.clone()
+    }
+
+    // FIXME: Maybe use RwLock instead of Mutex
+    pub(crate) fn is_nick_accepted(&self) -> bool {
+        self.inner.lock().unwrap().nick_accepted
+    }
+
+    pub(crate) fn get_usermask(&self) -> Option<String> {
+        self.inner.lock().unwrap().usermask.clone()
+    }
+}
+
+struct StateInner {
     /// Nicks to try, with this order.
     nicks: Vec<String>,
 
@@ -43,22 +84,22 @@ pub(crate) struct State<'a> {
     nick_accepted: bool,
 
     /// Server information
-    server_info: &'a ServerInfo,
+    server_info: ServerInfo,
 }
 
-impl<'a> State<'a> {
-    pub(crate) fn new(server_info: &'a ServerInfo, snd_irc_msg: &mut Sender<String>) -> State<'a> {
+impl StateInner {
+    fn new(server_info: ServerInfo) -> StateInner {
         // Introduce self
-        snd_irc_msg
-            .try_send(wire::nick(&server_info.nicks[0]))
-            .unwrap();
-        snd_irc_msg
-            .try_send(wire::user(&server_info.hostname, &server_info.realname))
-            .unwrap();
+        // snd_irc_msg
+        //     .try_send(wire::nick(&server_info.nicks[0]))
+        //     .unwrap();
+        // snd_irc_msg
+        //     .try_send(wire::user(&server_info.hostname, &server_info.realname))
+        //     .unwrap();
 
         let current_nick = server_info.nicks[0].to_owned();
         let chans = server_info.auto_join.clone();
-        State {
+        StateInner {
             nicks: server_info.nicks.clone(),
             current_nick_idx: 0,
             current_nick,
@@ -69,6 +110,15 @@ impl<'a> State<'a> {
             nick_accepted: false,
             server_info,
         }
+    }
+
+    fn reset(&mut self) {
+        self.nicks = self.server_info.nicks.clone();
+        self.current_nick_idx = 0;
+        self.current_nick = self.nicks[0].clone();
+        self.chans = self.server_info.auto_join.clone();
+        self.servername = None;
+        self.usermask = None;
     }
 
     fn get_next_nick(&mut self) -> &str {
@@ -87,20 +137,13 @@ impl<'a> State<'a> {
         &self.current_nick
     }
 
-    pub(crate) fn update(
-        &mut self,
-        msg: &Msg,
-        snd_ev: &mut Sender<Event>,
-        snd_irc_msg: &mut Sender<String>,
-    ) {
+    fn update(&mut self, msg: &Msg, snd_ev: &mut Sender<Event>, snd_irc_msg: &mut Sender<String>) {
         let Msg { ref pfx, ref cmd } = msg;
 
         use Cmd::*;
         match cmd {
             PING { server } => {
-                snd_irc_msg
-                    .try_send(wire::pong(server))
-                    .unwrap();
+                snd_irc_msg.try_send(wire::pong(server)).unwrap();
             }
 
             //
@@ -159,9 +202,7 @@ impl<'a> State<'a> {
             Reply { num: 001, .. } => {
                 snd_ev.try_send(Event::Connected).unwrap();
                 snd_ev
-                    .try_send(Event::NickChange {
-                        new_nick: self.current_nick.clone(),
-                    })
+                    .try_send(Event::NickChange(self.current_nick.clone()))
                     .unwrap();
                 // TODO: identify via nickserv
                 self.nick_accepted = true;
@@ -195,13 +236,9 @@ impl<'a> State<'a> {
                     let new_nick = self.get_next_nick();
                     println!("new nick: {}", new_nick);
                     snd_ev
-                        .try_send(Event::NickChange {
-                            new_nick: new_nick.to_owned(),
-                        })
+                        .try_send(Event::NickChange(new_nick.to_owned()))
                         .unwrap();
-                    snd_irc_msg
-                        .try_send(wire::nick(new_nick))
-                        .unwrap();
+                    snd_irc_msg.try_send(wire::nick(new_nick)).unwrap();
                 }
             }
 
@@ -212,9 +249,7 @@ impl<'a> State<'a> {
                 if let Some(Pfx::User { nick: old_nick, .. }) = pfx {
                     if old_nick == &self.current_nick {
                         snd_ev
-                            .try_send(Event::NickChange {
-                                new_nick: new_nick.to_owned(),
-                            })
+                            .try_send(Event::NickChange(new_nick.to_owned()))
                             .unwrap();
                         if !self.nicks.contains(new_nick) {
                             self.nicks.push(new_nick.to_owned());
