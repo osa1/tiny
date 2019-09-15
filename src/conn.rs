@@ -7,8 +7,6 @@ use std::result;
 use std::str;
 
 use crate::config;
-use crate::logger::LogFile;
-use crate::logger::Logger;
 use crate::stream::{Stream, StreamErr};
 use crate::utils;
 use crate::wire;
@@ -307,7 +305,7 @@ impl<'poll> Conn<'poll> {
     ////////////////////////////////////////////////////////////////////////////
     // Tick handling
 
-    pub fn tick(&mut self, evs: &mut Vec<ConnEv>, mut debug_out: LogFile) {
+    pub fn tick(&mut self, evs: &mut Vec<ConnEv>) {
         update_status!(
             self,
             status,
@@ -320,16 +318,12 @@ impl<'poll> Conn<'poll> {
                     if ticks == PING_TICKS {
                         match self.servername {
                             None => {
-                                debug_out.write_line(format_args!(
-                                    "{}: Can't send PING, servername unknown",
-                                    self.serv_addr
-                                ));
+                                // debug_out.write_line(format_args!(
+                                //     "{}: Can't send PING, servername unknown",
+                                //     self.serv_addr
+                                // ));
                             }
                             Some(ref host_) => {
-                                debug_out.write_line(format_args!(
-                                    "{}: Ping timeout, sending PING",
-                                    self.serv_addr
-                                ));
                                 wire::ping(&mut stream, host_).unwrap();
                             }
                         }
@@ -509,7 +503,7 @@ impl<'poll> Conn<'poll> {
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
-    pub fn read_ready(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
+    pub fn read_ready(&mut self, evs: &mut Vec<ConnEv>) {
         let mut read_buf: [u8; 512] = [0; 512];
 
         if let Some(stream) = self.status.get_stream_mut() {
@@ -522,22 +516,19 @@ impl<'poll> Conn<'poll> {
                 Ok(bytes_read) => {
                     self.reset_ticks();
                     self.in_buf.extend(&read_buf[0..bytes_read]);
-                    self.handle_msgs(evs, logger);
+                    self.handle_msgs(evs);
                 }
             }
         }
     }
 
-    fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
-        while let Some(msg) = Msg::read(
-            &mut self.in_buf,
-            Some(logger.get_raw_serv_logs(&self.serv_addr)),
-        ) {
-            self.handle_msg(msg, evs, logger);
+    fn handle_msgs(&mut self, evs: &mut Vec<ConnEv>) {
+        while let Some(msg) = Msg::read(&mut self.in_buf) {
+            self.handle_msg(msg, evs);
         }
     }
 
-    fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>, logger: &mut Logger) {
+    fn handle_msg(&mut self, msg: Msg, evs: &mut Vec<ConnEv>) {
         if let Msg {
             cmd:
                 Cmd::CAP {
@@ -609,9 +600,6 @@ impl<'poll> Conn<'poll> {
         {
             if nick == self.get_nick() {
                 let usermask = format!("{}!{}", nick, user);
-                logger
-                    .get_debug_logs()
-                    .write_line(format_args!("usermask set: {}", usermask));
                 self.usermask = Some(usermask);
             }
         }
@@ -628,9 +616,6 @@ impl<'poll> Conn<'poll> {
             // :is now your hidden host (set by services.)
             if params.len() == 3 {
                 let usermask = format!("{}!~{}@{}", self.get_nick(), self.hostname, params[1]);
-                logger
-                    .get_debug_logs()
-                    .write_line(format_args!("usermask set: {}", usermask));
                 self.usermask = Some(usermask);
             }
         }
@@ -654,9 +639,9 @@ impl<'poll> Conn<'poll> {
             let param = &params[1];
             match wire::find_byte(param.as_bytes(), b'=') {
                 None => {
-                    logger
-                        .get_debug_logs()
-                        .write_line(format_args!("can't parse RPL_USERHOST: {}", params[1]));
+                    // logger
+                    //     .get_debug_logs()
+                    //     .write_line(format_args!("can't parse RPL_USERHOST: {}", params[1]));
                 }
                 Some(mut i) => {
                     if param.as_bytes().get(i + 1) == Some(&b'+')
@@ -666,9 +651,6 @@ impl<'poll> Conn<'poll> {
                     }
                     let usermask = (&param[i..]).trim();
                     self.usermask = Some(usermask.to_owned());
-                    logger
-                        .get_debug_logs()
-                        .write_line(format_args!("usermask set: {}", usermask));
                 }
             }
         }
@@ -700,15 +682,12 @@ impl<'poll> Conn<'poll> {
 
             match parse_servername(params) {
                 None => {
-                    logger.get_debug_logs().write_line(format_args!(
-                        "{} Can't parse hostname from params: {:?}",
-                        self.serv_addr, params
-                    ));
+                    // logger.get_debug_logs().write_line(format_args!(
+                    //     "{} Can't parse hostname from params: {:?}",
+                    //     self.serv_addr, params
+                    // ));
                 }
                 Some(servername) => {
-                    logger
-                        .get_debug_logs()
-                        .write_line(format_args!("{} host: {}", self.serv_addr, servername));
                     self.servername = Some(servername);
                 }
             }

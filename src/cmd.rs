@@ -189,9 +189,9 @@ fn reconnect(tiny: &mut Tiny, src: MsgSource) {
             }
         },
         None => {
-            tiny.logger
-                .get_debug_logs()
-                .write_line(format_args!("Can't reconnect to {}", src.serv_name()));
+            // tiny.logger
+            //     .get_debug_logs()
+            //     .write_line(format_args!("Can't reconnect to {}", src.serv_name()));
         }
     }
 }
