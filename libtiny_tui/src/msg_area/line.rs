@@ -1,10 +1,7 @@
 use std::mem;
-use termbox_simple;
-use termbox_simple::Termbox;
+use termbox_simple::{self, Termbox};
 
-use crate::config;
-use crate::config::Colors;
-use crate::utils::translate_irc_control_chars;
+use crate::{config, config::Colors, utils::translate_irc_control_chars};
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
@@ -51,23 +48,15 @@ pub enum SegStyle {
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum SchemeStyle {
-    Clear,
     UserMsg,
     ErrMsg,
     Topic,
-    Cursor,
     Join,
     Part,
     Nick,
     Faded,
-    ExitDialogue,
     Highlight,
-    Completion,
     Timestamp,
-    TabActive,
-    TabNormal,
-    TabNewMsg,
-    TabHighlight,
 }
 
 impl Seg {
@@ -75,29 +64,21 @@ impl Seg {
         match self.style {
             SegStyle::Fixed(style) => style,
             SegStyle::Index(idx) => config::Style {
-                fg: colors.nick[idx % colors.nick.len()] as u16,
+                fg: u16::from(colors.nick[idx % colors.nick.len()]),
                 bg: colors.user_msg.bg,
             },
             SegStyle::SchemeStyle(sty) => {
                 use self::SchemeStyle::*;
                 match sty {
-                    Clear => colors.clear,
                     UserMsg => colors.user_msg,
                     ErrMsg => colors.err_msg,
                     Topic => colors.topic,
-                    Cursor => colors.cursor,
                     Join => colors.join,
                     Part => colors.part,
                     Nick => colors.nick_change,
                     Faded => colors.faded,
-                    ExitDialogue => colors.exit_dialogue,
                     Highlight => colors.highlight,
-                    Completion => colors.completion,
                     Timestamp => colors.timestamp,
-                    TabActive => colors.tab_active,
-                    TabNormal => colors.tab_normal,
-                    TabNewMsg => colors.tab_new_msg,
-                    TabHighlight => colors.tab_highlight,
                 }
             }
         }
@@ -156,8 +137,8 @@ impl Line {
                 let st = iter.next().unwrap() as u8;
                 let fg = iter.next().unwrap() as u8;
                 let bg = iter.next().unwrap() as u8;
-                let fg = ((st as u16) << 8) | (fg as u16);
-                let bg = bg as u16;
+                let fg = (u16::from(st) << 8) | u16::from(fg);
+                let bg = u16::from(bg);
                 let style = config::Style { fg, bg };
                 self.set_style(SegStyle::Fixed(style));
             } else if char > '\x08' {
@@ -177,10 +158,6 @@ impl Line {
         }
         self.current_seg.text.push(char);
         self.len_chars += 1;
-    }
-
-    pub fn len_chars(&self) -> i32 {
-        self.len_chars
     }
 
     /// How many lines does this take when rendered? O(n) where n = number of
@@ -233,7 +210,7 @@ impl Line {
         let mut char_idx: i32 = 0;
 
         let last_seg: [&Seg; 1] = [&self.current_seg];
-        for seg in self.segs.iter().chain(last_seg.into_iter().map(|s| *s)) {
+        for seg in self.segs.iter().chain(last_seg.iter().map(|s| *s)) {
             let sty = seg.style(colors);
 
             for char in seg.text.chars() {
@@ -324,8 +301,7 @@ mod tests {
 
     use self::test::Bencher;
     use super::*;
-    use std::fs::File;
-    use std::io::Read;
+    use std::{fs::File, io::Read};
 
     #[test]
     fn height_test_1() {

@@ -8,24 +8,6 @@
 #[global_allocator]
 static ALLOC: std::alloc::System = std::alloc::System;
 
-#[cfg(test)]
-extern crate quickcheck;
-
-extern crate dirs;
-extern crate libc;
-extern crate mio;
-extern crate native_tls;
-extern crate net2;
-extern crate serde;
-extern crate serde_yaml;
-extern crate tempfile;
-extern crate time;
-
-extern crate term_input;
-extern crate termbox_simple;
-
-extern crate take_mut;
-
 #[macro_use]
 mod utils;
 
@@ -34,10 +16,7 @@ mod cmd_line_args;
 pub mod config;
 mod conn;
 mod logger;
-mod notifier;
 mod stream;
-pub mod trie;
-pub mod tui;
 mod wire;
 
 use mio::unix::EventedFd;
@@ -50,13 +29,14 @@ use mio::Token;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::time::Instant;
+use time::Tm;
 
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use conn::{Conn, ConnErr, ConnEv};
+use libtiny_tui::{MsgSource, MsgTarget, TUIRet, TabStyle, TUI, Colors};
 use logger::Logger;
 use term_input::{Event, Input};
-use tui::{MsgSource, MsgTarget, TUIRet, TabStyle, Timestamp, TUI};
 use wire::{Cmd, Msg, Pfx};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +106,7 @@ impl<'poll> Tiny<'poll> {
         servers: Vec<config::Server>,
         defaults: config::Defaults,
         log_dir: String,
-        colors: config::Colors,
+        colors: Colors,
         config_path: PathBuf,
     ) {
         let poll = Poll::new().unwrap();
@@ -163,7 +143,7 @@ impl<'poll> Tiny<'poll> {
                     conns.push(conn);
                 }
                 Err(err) => {
-                    tui.add_err_msg(&connect_err_msg(&err), Timestamp::now(), &msg_target);
+                    tui.add_err_msg(&connect_err_msg(&err), time::now(), &msg_target);
                 }
             }
         }
@@ -363,7 +343,7 @@ impl<'poll> Tiny<'poll> {
         };
 
         let conn = find_conn(&mut self.conns, serv_name).unwrap();
-        let ts = Timestamp::now();
+        let ts = time::now();
         let extra_len = msg_target.len() as i32
             + if ctcp_action {
                 9 // "\0x1ACTION \0x1".len()
@@ -406,7 +386,7 @@ impl<'poll> Tiny<'poll> {
                      Will try to reconnect in {} seconds.",
                     conn::RECONNECT_TICKS
                 ),
-                Timestamp::now(),
+                time::now(),
                 &MsgTarget::AllServTabs {
                     serv_name: self.conns[conn_idx].get_serv_name(),
                 },
@@ -426,7 +406,7 @@ impl<'poll> Tiny<'poll> {
             ConnEv::Connected => {
                 self.tui.add_msg(
                     "Connected.",
-                    Timestamp::now(),
+                    time::now(),
                     &MsgTarget::AllServTabs {
                         serv_name: self.conns[conn_idx].get_serv_name(),
                     },
@@ -442,7 +422,7 @@ impl<'poll> Tiny<'poll> {
                         "Disconnected. Will try to reconnect in {} seconds.",
                         conn::RECONNECT_TICKS
                     ),
-                    Timestamp::now(),
+                    time::now(),
                     &target,
                 );
                 self.tui.clear_nicks(&target);
@@ -460,7 +440,7 @@ impl<'poll> Tiny<'poll> {
                     Err(err) => {
                         self.tui.add_err_msg(
                             &reconnect_err_msg(&err),
-                            Timestamp::now(),
+                            time::now(),
                             &MsgTarget::AllServTabs {
                                 serv_name: conn.get_serv_name(),
                             },
@@ -473,14 +453,14 @@ impl<'poll> Tiny<'poll> {
                 conn.enter_disconnect_state();
                 self.tui.add_err_msg(
                     &reconnect_err_msg(&err),
-                    Timestamp::now(),
+                    time::now(),
                     &MsgTarget::AllServTabs {
                         serv_name: conn.get_serv_name(),
                     },
                 );
             }
             ConnEv::Msg(msg) => {
-                self.handle_msg(conn_idx, msg, Timestamp::now());
+                self.handle_msg(conn_idx, msg, time::now());
             }
             ConnEv::NickChange(new_nick) => {
                 let conn = &self.conns[conn_idx];
@@ -489,7 +469,7 @@ impl<'poll> Tiny<'poll> {
         }
     }
 
-    fn handle_msg(&mut self, conn_idx: usize, msg: Msg, ts: Timestamp) {
+    fn handle_msg(&mut self, conn_idx: usize, msg: Msg, ts: Tm) {
         let conn = &self.conns[conn_idx];
         let pfx = msg.pfx;
         match msg.cmd {
@@ -597,7 +577,7 @@ impl<'poll> Tiny<'poll> {
                         self.tui.new_chan_tab(serv_name, &chan);
                     } else {
                         let nick = drop_nick_prefix(&nick);
-                        let ts = Some(Timestamp::now());
+                        let ts = Some(time::now());
                         self.tui.add_nick(
                             nick,
                             ts,
@@ -631,7 +611,7 @@ impl<'poll> Tiny<'poll> {
                             .write_line(format_args!("PART: {}", nick));
                         self.tui.remove_nick(
                             &nick,
-                            Some(Timestamp::now()),
+                            Some(time::now()),
                             &MsgTarget::Chan {
                                 serv_name,
                                 chan_name: &chan,
@@ -651,7 +631,7 @@ impl<'poll> Tiny<'poll> {
                     let serv_name = conn.get_serv_name();
                     self.tui.remove_nick(
                         nick,
-                        Some(Timestamp::now()),
+                        Some(time::now()),
                         &MsgTarget::AllUserTabs { serv_name, nick },
                     );
                 }
@@ -670,7 +650,7 @@ impl<'poll> Tiny<'poll> {
                     self.tui.rename_nick(
                         old_nick,
                         &nick,
-                        Timestamp::now(),
+                        time::now(),
                         &MsgTarget::AllUserTabs {
                             serv_name,
                             nick: old_nick,
@@ -690,7 +670,7 @@ impl<'poll> Tiny<'poll> {
                     // Nick change request from user failed. Just show an error message.
                     self.tui.add_err_msg(
                         "Nickname is already in use",
-                        Timestamp::now(),
+                        time::now(),
                         &MsgTarget::AllServTabs {
                             serv_name: conn.get_serv_name(),
                         },
@@ -705,7 +685,7 @@ impl<'poll> Tiny<'poll> {
             Cmd::ERROR { ref msg } => {
                 let serv_name = conn.get_serv_name();
                 self.tui
-                    .add_err_msg(msg, Timestamp::now(), &MsgTarget::AllServTabs { serv_name });
+                    .add_err_msg(msg, time::now(), &MsgTarget::AllServTabs { serv_name });
             }
 
             Cmd::TOPIC {
@@ -714,7 +694,7 @@ impl<'poll> Tiny<'poll> {
             } => {
                 self.tui.show_topic(
                     topic,
-                    Timestamp::now(),
+                    time::now(),
                     &MsgTarget::Chan {
                         serv_name: conn.get_serv_name(),
                         chan_name: chan,
@@ -735,7 +715,7 @@ impl<'poll> Tiny<'poll> {
                             };
                             self.tui.add_err_msg(
                                 "Server rejected using SASL authenication capability",
-                                Timestamp::now(),
+                                time::now(),
                                 &msg_target,
                             );
                         }
@@ -747,7 +727,7 @@ impl<'poll> Tiny<'poll> {
                             };
                             self.tui.add_err_msg(
                                 "Server does not support SASL authenication",
-                                Timestamp::now(),
+                                time::now(),
                                 &msg_target,
                             );
                         }
@@ -778,7 +758,7 @@ impl<'poll> Tiny<'poll> {
                     let msg = &params[1];
                     self.tui.add_msg(
                         msg,
-                        Timestamp::now(),
+                        time::now(),
                         &MsgTarget::Server {
                             serv_name: conn.get_serv_name(),
                         },
@@ -792,7 +772,7 @@ impl<'poll> Tiny<'poll> {
                     let msg = params.into_iter().collect::<Vec<String>>().join(" ");
                     self.tui.add_msg(
                         &msg,
-                        Timestamp::now(),
+                        time::now(),
                         &MsgTarget::Server {
                             serv_name: conn.get_serv_name(),
                         },
@@ -801,7 +781,7 @@ impl<'poll> Tiny<'poll> {
                     let msg = &params[params.len() - 1];
                     self.tui.add_msg(
                         msg,
-                        Timestamp::now(),
+                        time::now(),
                         &MsgTarget::Server {
                             serv_name: conn.get_serv_name(),
                         },
@@ -816,7 +796,7 @@ impl<'poll> Tiny<'poll> {
                     let topic = &params[params.len() - 1];
                     self.tui.show_topic(
                         topic,
-                        Timestamp::now(),
+                        time::now(),
                         &MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
                             chan_name: chan,
@@ -875,7 +855,7 @@ impl<'poll> Tiny<'poll> {
                             self.tui.add_privmsg(
                                 &msg_serv_name,
                                 &params.join(" "),
-                                Timestamp::now(),
+                                time::now(),
                                 &msg_target,
                                 false,
                             );
@@ -901,7 +881,7 @@ impl<'poll> Tiny<'poll> {
                     self.tui.add_privmsg(
                         &msg_serv_name,
                         &params.join(" "),
-                        Timestamp::now(),
+                        time::now(),
                         &msg_target,
                         false,
                     );

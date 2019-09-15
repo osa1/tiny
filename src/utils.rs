@@ -1,42 +1,3 @@
-pub struct InsertIterator<'iter, A: 'iter> {
-    insert_point: usize,
-    current_idx: usize,
-    iter_orig: &'iter mut dyn Iterator<Item = A>,
-    iter_insert: &'iter mut dyn Iterator<Item = A>,
-}
-
-impl<'iter, A> Iterator for InsertIterator<'iter, A> {
-    type Item = A;
-
-    fn next(&mut self) -> Option<A> {
-        if self.current_idx >= self.insert_point {
-            if let Some(a) = self.iter_insert.next() {
-                Some(a)
-            } else {
-                self.iter_orig.next()
-            }
-        } else {
-            self.current_idx += 1;
-            self.iter_orig.next()
-        }
-    }
-}
-
-pub fn insert_iter<'iter, A>(
-    iter_orig: &'iter mut dyn Iterator<Item = A>,
-    iter_insert: &'iter mut dyn Iterator<Item = A>,
-    insert_point: usize,
-) -> InsertIterator<'iter, A> {
-    InsertIterator {
-        insert_point,
-        current_idx: 0,
-        iter_orig,
-        iter_insert,
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 use std::str::SplitWhitespace;
 
 /// Like `std::str::SplitWhitespace`, but returns beginning indices rather than slices.
@@ -149,92 +110,6 @@ pub fn is_nick_char(c: char) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-use std::iter::Peekable;
-use std::str::Chars;
-
-/// Parse at least one, at most two digits. Does not consume the iterator when
-/// result is `None`.
-fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
-    fn to_dec(ch: char) -> Option<u8> {
-        ch.to_digit(10).map(|c| c as u8)
-    }
-
-    let c1_char = *chars.peek()?;
-    let c1_digit = match to_dec(c1_char) {
-        None => {
-            return None;
-        }
-        Some(c1_digit) => {
-            chars.next();
-            c1_digit
-        }
-    };
-
-    match chars.peek().cloned() {
-        None => Some(c1_digit),
-        Some(c2) => match to_dec(c2) {
-            None => Some(c1_digit),
-            Some(c2_digit) => {
-                chars.next();
-                Some(c1_digit * 10 + c2_digit)
-            }
-        },
-    }
-}
-
-/// Translate IRC color codes using the callback, and remove ASCII control chars from the input.
-pub fn translate_irc_control_chars(
-    str: &str,
-    push_color: fn(ret: &mut String, fg: u8, bg: Option<u8>),
-) -> String {
-    let mut ret = String::with_capacity(str.len());
-    let mut iter = str.chars().peekable();
-
-    while let Some(char) = iter.next() {
-        if char == '\x03' {
-            match parse_color_code(&mut iter) {
-                None => {
-                    // just skip the control char
-                }
-                Some(fg) => {
-                    if let Some(char) = iter.peek().cloned() {
-                        if char == ',' {
-                            iter.next(); // consume ','
-                            match parse_color_code(&mut iter) {
-                                None => {
-                                    // comma was not part of the color code,
-                                    // add it to the new string
-                                    push_color(&mut ret, fg, None);
-                                    ret.push(char);
-                                }
-                                Some(bg) => {
-                                    push_color(&mut ret, fg, Some(bg));
-                                }
-                            }
-                        } else {
-                            push_color(&mut ret, fg, None);
-                        }
-                    } else {
-                        push_color(&mut ret, fg, None);
-                    }
-                }
-            }
-        } else if !char.is_ascii_control() {
-            ret.push(char);
-        }
-    }
-
-    ret
-}
-
-/// Like `translate_irc_control_chars`, but skips color codes.
-pub fn remove_irc_control_chars(str: &str) -> String {
-    fn push_color(_ret: &mut String, _fg: u8, _bg: Option<u8>) {}
-    translate_irc_control_chars(str, push_color)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 #[cfg(test)]
 mod tests {
 
@@ -242,17 +117,6 @@ mod tests {
 
     use super::*;
     use quickcheck::QuickCheck;
-
-    #[test]
-    fn insert_iter_test() {
-        let mut range1 = 0..5;
-        let mut range2 = 5..10;
-        let iter = insert_iter(&mut range1, &mut range2, 3);
-        assert_eq!(
-            iter.collect::<Vec<i32>>(),
-            vec![0, 1, 2, 5, 6, 7, 8, 9, 3, 4]
-        )
-    }
 
     #[test]
     fn split_ws_idx() {
@@ -355,25 +219,5 @@ mod tests {
         QuickCheck::new()
             .tests(1000)
             .quickcheck(prop as fn(String, u8) -> bool);
-    }
-
-    #[test]
-    fn test_parse_color_code() {
-        assert_eq!(parse_color_code(&mut "1".chars().peekable()), Some(1));
-        assert_eq!(parse_color_code(&mut "01".chars().peekable()), Some(1));
-        assert_eq!(parse_color_code(&mut "1,".chars().peekable()), Some(1));
-    }
-
-    #[test]
-    fn test_translate_irc_control_chars() {
-        assert_eq!(
-            remove_irc_control_chars("  Le Voyageur imprudent  "),
-            "  Le Voyageur imprudent  "
-        );
-        assert_eq!(remove_irc_control_chars("\x0301,02foo"), "foo");
-        assert_eq!(remove_irc_control_chars("\x0301,2foo"), "foo");
-        assert_eq!(remove_irc_control_chars("\x031,2foo"), "foo");
-        assert_eq!(remove_irc_control_chars("\x031,foo"), ",foo");
-        assert_eq!(remove_irc_control_chars("\x03,foo"), ",foo");
     }
 }

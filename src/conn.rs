@@ -391,7 +391,7 @@ impl<'poll> Conn<'poll> {
                 {
                     ConnStatus::PingPong {
                         ticks_passed: 0,
-                        stream
+                        stream,
                     }
                 }
                 ConnStatus::Disconnected { .. } => status,
