@@ -7,8 +7,11 @@ use crate::{utils::remove_irc_control_chars, MsgTarget};
 /// Destktop notification handler
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Notifier {
+    /// Notifications are disabled.
     Off,
+    /// Generate notifications only for mentions.
     Mentions,
+    /// Generate notificastions for all messages.
     Messages,
 }
 
@@ -18,7 +21,7 @@ fn notify(summary: &str, body: &str) {
 }
 
 impl Notifier {
-    pub fn notify_privmsg(
+    pub(crate) fn notify_privmsg(
         &mut self,
         sender: &str,
         msg: &str,
