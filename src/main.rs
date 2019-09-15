@@ -7,7 +7,7 @@ mod utils;
 
 mod cmd;
 mod cmd_line_args;
-pub mod config;
+mod config;
 mod conn;
 mod stream;
 mod wire;
@@ -33,7 +33,7 @@ use wire::{Cmd, Msg, Pfx};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn run() {
+fn main() {
     let CmdLineArgs {
         servers: server_args,
         config_path,
@@ -55,7 +55,7 @@ pub fn run() {
                 servers,
                 defaults,
                 colors,
-                log_dir: _,
+                // log_dir: _,
             }) => {
                 let servers = if !server_args.is_empty() {
                     // connect only to servers that match at least one of
@@ -82,7 +82,7 @@ pub fn run() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Tiny<'poll> {
+struct Tiny<'poll> {
     conns: Vec<Conn<'poll>>,
     defaults: config::Defaults,
     tui: TUI,
@@ -93,7 +93,7 @@ pub struct Tiny<'poll> {
 const STDIN_TOKEN: Token = Token(libc::STDIN_FILENO as usize);
 
 impl<'poll> Tiny<'poll> {
-    pub fn run(
+    fn run(
         servers: Vec<config::Server>,
         defaults: config::Defaults,
         colors: Colors,

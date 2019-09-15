@@ -10,77 +10,77 @@ use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
-pub struct SASLAuth {
-    pub username: String,
-    pub password: String,
+pub(crate) struct SASLAuth {
+    pub(crate) username: String,
+    pub(crate) password: String,
 }
 
 #[derive(Clone, Deserialize)]
-pub struct Server {
+pub(crate) struct Server {
     /// Address of the server
-    pub addr: String,
+    pub(crate) addr: String,
 
     /// Port of the server
-    pub port: u16,
+    pub(crate) port: u16,
 
     /// Use tls
     #[serde(default)]
-    pub tls: bool,
+    pub(crate) tls: bool,
 
     /// Server password (optional)
     #[serde(default)]
-    pub pass: Option<String>,
+    pub(crate) pass: Option<String>,
 
     /// Hostname to be used in connection registration
-    pub hostname: String,
+    pub(crate) hostname: String,
 
     /// Real name to be used in connection registration
-    pub realname: String,
+    pub(crate) realname: String,
 
     /// Nicks to try when connecting to this server. tiny tries these sequentially, and starts
     /// adding trailing underscores to the last one if none of the nicks are available.
-    pub nicks: Vec<String>,
+    pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
     #[serde(default)]
-    pub join: Vec<String>,
+    pub(crate) join: Vec<String>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
-    pub nickserv_ident: Option<String>,
+    pub(crate) nickserv_ident: Option<String>,
 
     /// Authenication method
     #[serde(rename = "sasl")]
-    pub sasl_auth: Option<SASLAuth>,
+    pub(crate) sasl_auth: Option<SASLAuth>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
 #[derive(Clone, Deserialize)]
-pub struct Defaults {
-    pub nicks: Vec<String>,
-    pub hostname: String,
-    pub realname: String,
+pub(crate) struct Defaults {
+    pub(crate) nicks: Vec<String>,
+    pub(crate) hostname: String,
+    pub(crate) realname: String,
     #[serde(default)]
-    pub join: Vec<String>,
+    pub(crate) join: Vec<String>,
     #[serde(default)]
-    pub tls: bool,
+    pub(crate) tls: bool,
 }
 
 #[derive(Deserialize)]
-pub struct Config {
-    pub servers: Vec<Server>,
-    pub defaults: Defaults,
+pub(crate) struct Config {
+    pub(crate) servers: Vec<Server>,
+    pub(crate) defaults: Defaults,
     #[serde(default)]
-    pub colors: libtiny_tui::Colors,
-    pub log_dir: String,
+    pub(crate) colors: libtiny_tui::Colors,
+    // pub(crate) log_dir: String,
 }
 
-pub fn get_default_config_path() -> PathBuf {
+pub(crate) fn get_default_config_path() -> PathBuf {
     let mut config_path = home_dir().unwrap();
     config_path.push(".tinyrc.yml");
     config_path
 }
 
-pub fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
+pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
     let contents = {
         let mut str = String::new();
         let mut file = File::open(config_path).unwrap();
@@ -95,7 +95,7 @@ fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
     serde_yaml::from_str(&contents)
 }
 
-pub fn generate_default_config(config_path: &Path) {
+pub(crate) fn generate_default_config(config_path: &Path) {
     if let Some(parent) = config_path.parent() {
         let _ = ::std::fs::create_dir_all(parent);
     }

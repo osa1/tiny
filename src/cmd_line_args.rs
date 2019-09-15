@@ -1,15 +1,15 @@
 use std::env::Args;
 use std::path::PathBuf;
 
-pub struct CmdLineArgs {
+pub(crate) struct CmdLineArgs {
     /// Servers to connect to
-    pub servers: Vec<String>,
+    pub(crate) servers: Vec<String>,
 
     /// Path to config file
-    pub config_path: Option<PathBuf>,
+    pub(crate) config_path: Option<PathBuf>,
 }
 
-pub fn parse_cmd_line_args(args: Args) -> CmdLineArgs {
+pub(crate) fn parse_cmd_line_args(args: Args) -> CmdLineArgs {
     let mut parsed_args = CmdLineArgs {
         servers: Vec::new(),
         config_path: None,

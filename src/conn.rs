@@ -12,7 +12,7 @@ use crate::utils;
 use crate::wire;
 use crate::wire::{Cmd, Msg, Pfx};
 
-pub struct Conn<'poll> {
+pub(crate) struct Conn<'poll> {
     serv_addr: String,
     serv_port: u16,
     tls: bool,
@@ -65,7 +65,7 @@ pub struct Conn<'poll> {
     nick_accepted: bool,
 }
 
-pub type ConnErr = StreamErr;
+pub(crate) type ConnErr = StreamErr;
 
 /// How many ticks to wait before sending a ping to the server.
 const PING_TICKS: u8 = 60;
@@ -73,7 +73,7 @@ const PING_TICKS: u8 = 60;
 /// disconnect.
 const PONG_TICKS: u8 = 60;
 /// How many ticks to wait after a disconnect or a socket error.
-pub const RECONNECT_TICKS: u8 = 30;
+pub(crate) const RECONNECT_TICKS: u8 = 30;
 
 enum ConnStatus<'poll> {
     PingPong {
@@ -124,10 +124,10 @@ impl<'poll> ConnStatus<'poll> {
     }
 }
 
-pub type Result<T> = result::Result<T, StreamErr>;
+pub(crate) type Result<T> = result::Result<T, StreamErr>;
 
 #[derive(Debug)]
-pub enum ConnEv {
+pub(crate) enum ConnEv {
     /// Connected to the server + registered
     Connected,
     ///
@@ -157,7 +157,7 @@ fn introduce<W: Write>(
 }
 
 impl<'poll> Conn<'poll> {
-    pub fn new(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
+    pub(crate) fn new(server: config::Server, poll: &'poll Poll) -> Result<Conn<'poll>> {
         let mut stream =
             Stream::new(poll, &server.addr, server.port, server.tls).map_err(StreamErr::from)?;
 
@@ -201,7 +201,7 @@ impl<'poll> Conn<'poll> {
         })
     }
 
-    pub fn reconnect(&mut self, new_serv: Option<(&str, u16)>) -> Result<()> {
+    pub(crate) fn reconnect(&mut self, new_serv: Option<(&str, u16)>) -> Result<()> {
         // drop existing connection first
         let old_stream = ::std::mem::replace(
             &mut self.status,
@@ -239,19 +239,19 @@ impl<'poll> Conn<'poll> {
         }
     }
 
-    pub fn get_conn_tok(&self) -> Option<Token> {
+    pub(crate) fn get_conn_tok(&self) -> Option<Token> {
         self.status.get_stream().map(|s| s.get_tok())
     }
 
-    pub fn get_serv_name(&self) -> &str {
+    pub(crate) fn get_serv_name(&self) -> &str {
         &self.serv_addr
     }
 
-    pub fn get_nick(&self) -> &str {
+    pub(crate) fn get_nick(&self) -> &str {
         &self.nicks[self.current_nick_idx]
     }
 
-    pub fn is_nick_accepted(&self) -> bool {
+    pub(crate) fn is_nick_accepted(&self) -> bool {
         self.nick_accepted
     }
 
@@ -297,7 +297,7 @@ impl<'poll> Conn<'poll> {
         });
     }
 
-    pub fn enter_disconnect_state(&mut self) {
+    pub(crate) fn enter_disconnect_state(&mut self) {
         self.status = ConnStatus::Disconnected { ticks_passed: 0 };
         self.nick_accepted = false;
     }
@@ -305,7 +305,7 @@ impl<'poll> Conn<'poll> {
     ////////////////////////////////////////////////////////////////////////////
     // Tick handling
 
-    pub fn tick(&mut self, evs: &mut Vec<ConnEv>) {
+    pub(crate) fn tick(&mut self, evs: &mut Vec<ConnEv>) {
         update_status!(
             self,
             status,
@@ -399,7 +399,7 @@ impl<'poll> Conn<'poll> {
     /// Send a nick message. Does not mean we will be successfully changing the nick, the new nick
     /// may be in use or for some other reason server may reject the request. Expect ERR_NICKINUSE
     /// or NICK message in response.
-    pub fn send_nick(&mut self, nick: &str) {
+    pub(crate) fn send_nick(&mut self, nick: &str) {
         self.status.get_stream_mut().map(|stream| {
             wire::nick(stream, nick).unwrap();
         });
@@ -416,7 +416,11 @@ impl<'poll> Conn<'poll> {
 
     /// `extra_len`: Size (in bytes) for a prefix/suffix etc. that'll be added to each line.
     /// Strings returned by the iterator will have enough room for that.
-    pub fn split_privmsg<'a>(&self, extra_len: i32, msg: &'a str) -> utils::SplitIterator<'a> {
+    pub(crate) fn split_privmsg<'a>(
+        &self,
+        extra_len: i32,
+        msg: &'a str,
+    ) -> utils::SplitIterator<'a> {
         // Max msg len calculation adapted from hexchat
         // (src/common/outbound.c:split_up_text)
         let mut max: i32 = 512; // RFC 2812
@@ -444,19 +448,19 @@ impl<'poll> Conn<'poll> {
     // FIXME: This crashes with an assertion error when the message is too long
     // to fit into 512 bytes. Need to make sure `split_privmsg` is called before
     // this.
-    pub fn privmsg(&mut self, target: &str, msg: &str) {
+    pub(crate) fn privmsg(&mut self, target: &str, msg: &str) {
         self.status.get_stream_mut().map(|stream| {
             wire::privmsg(stream, target, msg).unwrap();
         });
     }
 
-    pub fn ctcp_action(&mut self, target: &str, msg: &str) {
+    pub(crate) fn ctcp_action(&mut self, target: &str, msg: &str) {
         self.status.get_stream_mut().map(|stream| {
             wire::ctcp_action(stream, target, msg).unwrap();
         });
     }
 
-    pub fn join(&mut self, chans: &[&str]) {
+    pub(crate) fn join(&mut self, chans: &[&str]) {
         self.status.get_stream_mut().map(|stream| {
             wire::join(stream, chans).unwrap();
         });
@@ -464,21 +468,21 @@ impl<'poll> Conn<'poll> {
         // after RPL_TOPIC)
     }
 
-    pub fn part(&mut self, chan: &str) {
+    pub(crate) fn part(&mut self, chan: &str) {
         self.status.get_stream_mut().map(|stream| {
             wire::part(stream, chan).unwrap();
         });
         self.auto_join.drain_filter(|chan_| chan_ == chan);
     }
 
-    pub fn away(&mut self, msg: Option<&str>) {
+    pub(crate) fn away(&mut self, msg: Option<&str>) {
         self.away_status = msg.map(|s| s.to_string());
         self.status.get_stream_mut().map(|stream| {
             wire::away(stream, msg).unwrap();
         });
     }
 
-    pub fn raw_msg(&mut self, msg: &str) {
+    pub(crate) fn raw_msg(&mut self, msg: &str) {
         self.status.get_stream_mut().map(|stream| {
             write!(stream, "{}\r\n", msg).unwrap();
         });
@@ -487,7 +491,7 @@ impl<'poll> Conn<'poll> {
     ////////////////////////////////////////////////////////////////////////////
     // Sending messages
 
-    pub fn write_ready(&mut self, evs: &mut Vec<ConnEv>) {
+    pub(crate) fn write_ready(&mut self, evs: &mut Vec<ConnEv>) {
         if let Some(stream) = self.status.get_stream_mut() {
             match stream.write_ready() {
                 Err(err) => {
@@ -503,7 +507,7 @@ impl<'poll> Conn<'poll> {
     ////////////////////////////////////////////////////////////////////////////
     // Receiving messages
 
-    pub fn read_ready(&mut self, evs: &mut Vec<ConnEv>) {
+    pub(crate) fn read_ready(&mut self, evs: &mut Vec<ConnEv>) {
         let mut read_buf: [u8; 512] = [0; 512];
 
         if let Some(stream) = self.status.get_stream_mut() {
