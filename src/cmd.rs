@@ -1,9 +1,9 @@
 use super::Tiny;
 use crate::config;
 use crate::conn::Conn;
-use crate::notifier::Notifier;
-use crate::tui::{MsgSource, MsgTarget, Timestamp};
 use crate::utils;
+use libtiny_tui::Notifier;
+use libtiny_tui::{MsgSource, MsgTarget};
 use mio::Poll;
 use std::error::Error;
 
@@ -181,7 +181,7 @@ fn reconnect(tiny: &mut Tiny, src: MsgSource) {
             Err(err) => {
                 tiny.tui.add_err_msg(
                     &super::reconnect_err_msg(&err),
-                    Timestamp::now(),
+                    time::now(),
                     &MsgTarget::AllServTabs {
                         serv_name: conn.get_serv_name(),
                     },
@@ -230,7 +230,7 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
             Err(err) => {
                 tiny.tui.add_err_msg(
                     &super::reconnect_err_msg(&err),
-                    Timestamp::now(),
+                    time::now(),
                     &MsgTarget::AllServTabs {
                         serv_name: conn.get_serv_name(),
                     },
@@ -270,7 +270,7 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
         }
         Err(err) => {
             tiny.tui
-                .add_err_msg(&super::connect_err_msg(&err), Timestamp::now(), &msg_target);
+                .add_err_msg(&super::connect_err_msg(&err), time::now(), &msg_target);
         }
     }
 }

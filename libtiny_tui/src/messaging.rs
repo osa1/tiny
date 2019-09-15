@@ -3,20 +3,21 @@ use termbox_simple::Termbox;
 
 use std::convert::From;
 
-use time;
-use time::Tm;
+use time::{self, Tm};
 
-use crate::config;
-use crate::config::Colors;
-use crate::config::Style;
-use crate::trie::Trie;
-use crate::tui::exit_dialogue::ExitDialogue;
-use crate::tui::msg_area::line::SchemeStyle;
-use crate::tui::msg_area::line::SegStyle;
-use crate::tui::msg_area::MsgArea;
-use crate::tui::termbox;
-use crate::tui::text_field::TextField;
-use crate::tui::widget::WidgetRet;
+use crate::{
+    config,
+    config::{Colors, Style},
+    exit_dialogue::ExitDialogue,
+    msg_area::{
+        line::{SchemeStyle, SegStyle},
+        MsgArea,
+    },
+    termbox,
+    text_field::TextField,
+    trie::Trie,
+    widget::WidgetRet,
+};
 
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.
@@ -54,10 +55,6 @@ pub struct Timestamp {
 }
 
 impl Timestamp {
-    pub fn now() -> Timestamp {
-        Timestamp::from(time::now())
-    }
-
     fn stamp(self, msg_area: &mut MsgArea) {
         msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::Timestamp));
         msg_area.add_text(&format!("{:02}:{:02} ", self.hour, self.min));
@@ -124,7 +121,7 @@ impl MessagingUI {
             if self.draw_current_nick {
                 let nick_color = colors.nick[self.get_nick_color(nick) % colors.nick.len()];
                 let style = Style {
-                    fg: nick_color as u16,
+                    fg: u16::from(nick_color),
                     bg: colors.user_msg.bg,
                 };
                 termbox::print_chars(tb, pos_x, pos_y + self.height - 1, style, nick.chars());

@@ -1,14 +1,12 @@
-use std::cmp::{max, min};
-use std::mem;
+use std::{
+    cmp::{max, min},
+    mem,
+};
 
 use term_input::{Arrow, Key};
 use termbox_simple::Termbox;
 
-use crate::config::Colors;
-use crate::trie::Trie;
-use crate::tui::termbox;
-use crate::tui::widget::WidgetRet;
-use crate::utils;
+use crate::{config::Colors, termbox, trie::Trie, utils, widget::WidgetRet};
 
 // TODO: Make these settings
 const SCROLLOFF: i32 = 5;

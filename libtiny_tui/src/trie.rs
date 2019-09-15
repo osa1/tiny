@@ -179,8 +179,7 @@ mod benchs {
 
     use self::test::Bencher;
     use super::*;
-    use std::fs::File;
-    use std::io::Read;
+    use std::{fs::File, io::Read};
 
     #[bench]
     fn bench_trie_build(b: &mut Bencher) {

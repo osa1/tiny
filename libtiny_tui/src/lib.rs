@@ -1,24 +1,32 @@
-pub mod exit_dialogue;
-pub mod messaging;
-pub mod msg_area;
-pub mod tab;
-pub mod termbox;
-pub mod text_field;
-pub mod widget;
+#![cfg_attr(test, feature(test))]
+#![allow(clippy::new_without_default)]
+
+mod config;
+mod exit_dialogue;
+mod messaging;
+mod msg_area;
+mod notifier;
+mod tab;
+mod termbox;
+mod text_field;
+mod trie;
+mod utils;
+mod widget;
 
 use std::str;
+use time::Tm;
 
-pub use self::messaging::Timestamp;
-use crate::config::Colors;
-use crate::config::Style;
-use crate::notifier::Notifier;
-use crate::trie::Trie;
-use crate::tui::messaging::MessagingUI;
-pub use crate::tui::tab::Tab;
-pub use crate::tui::tab::TabStyle;
-use crate::tui::widget::WidgetRet;
+pub use config::Colors;
+pub use notifier::Notifier;
+pub use tab::TabStyle;
+
+use config::Style;
+use messaging::{MessagingUI, Timestamp};
+use tab::Tab;
 use term_input::{Arrow, Event, Key};
 use termbox_simple::{OutputMode, Termbox};
+use trie::Trie;
+use widget::WidgetRet;
 
 #[derive(Debug)]
 pub enum TUIRet {
@@ -1001,12 +1009,13 @@ impl TUI {
         &mut self,
         sender: &str,
         msg: &str,
-        ts: Timestamp,
+        ts: Tm,
         target: &MsgTarget,
         ctcp_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_privmsg(sender, msg, ts, false, ctcp_action);
+            tab.widget
+                .add_privmsg(sender, msg, Timestamp::from(ts), false, ctcp_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
                 tab.notifier
@@ -1020,12 +1029,13 @@ impl TUI {
         &mut self,
         sender: &str,
         msg: &str,
-        ts: Timestamp,
+        ts: Tm,
         target: &MsgTarget,
         ctcp_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_privmsg(sender, msg, ts, true, ctcp_action);
+            tab.widget
+                .add_privmsg(sender, msg, Timestamp::from(ts), true, ctcp_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
                 tab.notifier
@@ -1036,23 +1046,23 @@ impl TUI {
 
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
-    pub fn add_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
+    pub fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_msg(msg, ts);
+            tab.widget.add_msg(msg, Timestamp::from(ts));
         });
     }
 
     /// Error messages related with the protocol - e.g. can't join a channel,
     /// nickname is in use etc. Timestamped and logged.
-    pub fn add_err_msg(&mut self, msg: &str, ts: Timestamp, target: &MsgTarget) {
+    pub fn add_err_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_err_msg(msg, ts);
+            tab.widget.add_err_msg(msg, Timestamp::from(ts));
         });
     }
 
-    pub fn show_topic(&mut self, title: &str, ts: Timestamp, target: &MsgTarget) {
+    pub fn show_topic(&mut self, title: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.show_topic(title, ts);
+            tab.widget.show_topic(title, Timestamp::from(ts));
         });
     }
 
@@ -1062,27 +1072,21 @@ impl TUI {
         });
     }
 
-    pub fn add_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
+    pub fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.join(nick, ts);
+            tab.widget.join(nick, ts.map(Timestamp::from));
         });
     }
 
-    pub fn remove_nick(&mut self, nick: &str, ts: Option<Timestamp>, target: &MsgTarget) {
+    pub fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.part(nick, ts);
+            tab.widget.part(nick, ts.map(Timestamp::from));
         });
     }
 
-    pub fn rename_nick(
-        &mut self,
-        old_nick: &str,
-        new_nick: &str,
-        ts: Timestamp,
-        target: &MsgTarget,
-    ) {
+    pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.nick(old_nick, new_nick, ts);
+            tab.widget.nick(old_nick, new_nick, Timestamp::from(ts));
             tab.update_source(&|src: &mut MsgSource| {
                 if let MsgSource::User { ref mut nick, .. } = *src {
                     nick.clear();
@@ -1271,10 +1275,10 @@ impl From<::std::env::VarError> for PasteError {
 /// FIXME: Ideally this function should get a `Termbox` argument and return a new `Termbox` because
 /// we shutdown the current termbox instance and initialize it again after running $EDITOR.
 pub fn paste_lines(tf: String, str: &str) -> Result<Vec<String>, PasteError> {
-    use std::io::Read;
-    use std::io::Write;
-    use std::io::{Seek, SeekFrom};
-    use std::process::Command;
+    use std::{
+        io::{Read, Seek, SeekFrom, Write},
+        process::Command,
+    };
 
     use termbox_simple::*;
 

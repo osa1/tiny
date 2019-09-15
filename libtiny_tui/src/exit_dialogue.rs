@@ -1,8 +1,7 @@
 use term_input::Key;
 use termbox_simple::Termbox;
 
-use crate::config::Colors;
-use crate::tui::widget::WidgetRet;
+use crate::{config::Colors, widget::WidgetRet};
 
 pub struct ExitDialogue {
     width: i32,
@@ -14,7 +13,7 @@ impl ExitDialogue {
     }
 }
 
-static MSG: &'static str = "Really quit?";
+static MSG: &str = "Really quit?";
 
 impl ExitDialogue {
     pub fn resize(&mut self, width: i32) {

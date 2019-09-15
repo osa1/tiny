@@ -1,13 +1,10 @@
 pub mod line;
 
-use std::cmp::max;
-use std::mem;
-use std::str;
+use std::{cmp::max, mem, str};
 
 use termbox_simple::Termbox;
 
-pub use self::line::Line;
-pub use self::line::SegStyle;
+pub use self::line::{Line, SegStyle};
 use crate::config::Colors;
 
 pub struct MsgArea {
