@@ -8,12 +8,6 @@
 //! Keyboard events are read from stdin. We look for byte strings of key combinations that we care
 //! about. E.g. Alt-arrow keys, C-w etc.
 
-extern crate libc;
-extern crate mio;
-extern crate nix;
-extern crate tokio;
-extern crate tokio_net;
-
 use nix::sys::signal;
 use nix::sys::signal::{sigaction, SigAction, SigHandler, SigSet, Signal};
 

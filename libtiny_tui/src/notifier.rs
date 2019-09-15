@@ -1,6 +1,4 @@
-extern crate notify_rust;
-
-use self::notify_rust::Notification;
+use notify_rust::Notification;
 use crate::{utils::remove_irc_control_chars, MsgTarget};
 
 /// Destktop notification handler

@@ -2,8 +2,6 @@
 //
 // - Better error reporting
 
-extern crate libc;
-
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::BitOr;

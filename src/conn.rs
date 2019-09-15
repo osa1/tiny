@@ -1,5 +1,3 @@
-extern crate base64;
-
 use mio::Poll;
 use mio::Token;
 use std::io::Write;

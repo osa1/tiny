@@ -652,8 +652,6 @@ impl TextField {
 #[cfg(test)]
 mod tests {
 
-    extern crate test;
-
     use super::*;
     use term_input::{Arrow, Key};
 

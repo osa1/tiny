@@ -1,5 +1,3 @@
-extern crate libc;
-
 pub const TB_DEFAULT: u16 = 0x00;
 pub const TB_BLACK: u16 = 0x01;
 pub const TB_RED: u16 = 0x02;

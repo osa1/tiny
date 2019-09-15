@@ -7,6 +7,7 @@ description = "A hacked version of termbox (see README)"
 repository = "https://github.com/osa1/tiny"
 license = "MIT"
 build = "build.rs"
+edition = "2018"
 
 [dependencies]
 libc = "0.2"

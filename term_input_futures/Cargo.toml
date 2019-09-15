@@ -5,6 +5,7 @@ authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "Input handling for xterm-compatible terminals"
 repository = "https://github.com/osa1/tiny"
 license = "MIT"
+edition = "2018"
 
 [dependencies]
 futures = "0.1"

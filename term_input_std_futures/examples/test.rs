@@ -1,14 +1,10 @@
 #![feature(async_closure)]
 
-extern crate libc;
-extern crate term_input_std_futures;
-extern crate tokio;
-
 use futures::stream::StreamExt;
 use std::io;
 use std::io::Write;
 
-use term_input_std_futures::{Event, Input, Key};
+use term_input::{Event, Input, Key};
 
 fn main() {
     // put the terminal in non-buffering, no-enchoing mode

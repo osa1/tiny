@@ -113,8 +113,6 @@ pub(crate) fn is_nick_char(c: char) -> bool {
 #[cfg(test)]
 mod tests {
 
-    extern crate test;
-
     use super::*;
     use quickcheck::QuickCheck;
 
