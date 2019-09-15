@@ -15,7 +15,6 @@ mod cmd;
 mod cmd_line_args;
 pub mod config;
 mod conn;
-mod logger;
 mod stream;
 mod wire;
 
@@ -34,8 +33,7 @@ use time::Tm;
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use conn::{Conn, ConnErr, ConnEv};
-use libtiny_tui::{MsgSource, MsgTarget, TUIRet, TabStyle, TUI, Colors};
-use logger::Logger;
+use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
 use term_input::{Event, Input};
 use wire::{Cmd, Msg, Pfx};
 
@@ -63,7 +61,7 @@ pub fn run() {
                 servers,
                 defaults,
                 colors,
-                log_dir,
+                log_dir: _,
             }) => {
                 let servers = if !server_args.is_empty() {
                     // connect only to servers that match at least one of
@@ -82,7 +80,7 @@ pub fn run() {
                 } else {
                     servers
                 };
-                Tiny::run(servers, defaults, log_dir, colors, config_path)
+                Tiny::run(servers, defaults, colors, config_path)
             }
         }
     }
@@ -95,7 +93,6 @@ pub struct Tiny<'poll> {
     defaults: config::Defaults,
     tui: TUI,
     input_ev_handler: Input,
-    logger: Logger,
     config_path: PathBuf,
 }
 
@@ -105,7 +102,6 @@ impl<'poll> Tiny<'poll> {
     pub fn run(
         servers: Vec<config::Server>,
         defaults: config::Defaults,
-        log_dir: String,
         colors: Colors,
         config_path: PathBuf,
     ) {
@@ -153,7 +149,6 @@ impl<'poll> Tiny<'poll> {
             defaults,
             tui,
             input_ev_handler: Input::new(),
-            logger: Logger::new(PathBuf::from(log_dir)),
             config_path: config_path.to_owned(),
         };
 
@@ -182,10 +177,10 @@ impl<'poll> Tiny<'poll> {
                         } else {
                             match find_token_conn_idx(&tiny.conns, token) {
                                 None => {
-                                    tiny.logger.get_debug_logs().write_line(format_args!(
-                                        "BUG: Can't find Token in conns: {:?}",
-                                        event.token()
-                                    ));
+                                    // tiny.logger.get_debug_logs().write_line(format_args!(
+                                    //     "BUG: Can't find Token in conns: {:?}",
+                                    //     event.token()
+                                    // ));
                                 }
                                 Some(conn_idx) => {
                                     tiny.handle_socket(event.readiness(), conn_idx, &mut conn_evs);
@@ -198,7 +193,7 @@ impl<'poll> Tiny<'poll> {
                         for conn_idx in 0..tiny.conns.len() {
                             {
                                 let conn = &mut tiny.conns[conn_idx];
-                                conn.tick(&mut conn_evs, tiny.logger.get_debug_logs());
+                                conn.tick(&mut conn_evs);
                             }
                             tiny.handle_conn_evs(conn_idx, &mut conn_evs);
                         }
@@ -220,12 +215,6 @@ impl<'poll> Tiny<'poll> {
                     abort = true;
                 }
                 TUIRet::Input { msg, from } => {
-                    self.logger.get_debug_logs().write_line(format_args!(
-                        "Input source: {:#?}, msg: {}",
-                        from,
-                        msg.iter().cloned().collect::<String>()
-                    ));
-
                     // We know msg has at least one character as the TUI won't accept it otherwise.
                     if msg[0] == '/' {
                         let msg_str: String = (&msg[1..]).into_iter().cloned().collect();
@@ -235,10 +224,6 @@ impl<'poll> Tiny<'poll> {
                     }
                 }
                 TUIRet::Lines { lines, from } => {
-                    self.logger.get_debug_logs().write_line(format_args!(
-                        "Input source: {:#?}, lines: {:?}",
-                        from, lines
-                    ));
                     for line in lines {
                         self.send_msg(&from, &line, false);
                     }
@@ -246,10 +231,10 @@ impl<'poll> Tiny<'poll> {
                 TUIRet::KeyHandled => {}
                 TUIRet::EventIgnored(Event::FocusGained)
                 | TUIRet::EventIgnored(Event::FocusLost) => {}
-                ev => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("Ignoring event: {:?}", ev));
+                _ev => {
+                    // self.logger
+                    //     .get_debug_logs()
+                    //     .write_line(format_args!("Ignoring event: {:?}", ev));
                 }
             }
         }
@@ -366,7 +351,7 @@ impl<'poll> Tiny<'poll> {
 
     fn handle_socket(&mut self, readiness: Ready, conn_idx: usize, evs: &mut Vec<ConnEv>) {
         if readiness.is_readable() {
-            self.conns[conn_idx].read_ready(evs, &mut self.logger);
+            self.conns[conn_idx].read_ready(evs);
         }
         // Handle `ConnEv`s first before checking other readiness events. Reason: we sometimes
         // realize that the connection is closed/got broken at this point even though a write
@@ -481,11 +466,11 @@ impl<'poll> Tiny<'poll> {
                 let pfx = match pfx {
                     Some(pfx) => pfx,
                     None => {
-                        self.logger.get_debug_logs().write_line(format_args!(
-                            "PRIVMSG or NOTICE without prefix \
-                             target: {:?} msg: {:?}",
-                            target, msg
-                        ));
+                        // self.logger.get_debug_logs().write_line(format_args!(
+                        //     "PRIVMSG or NOTICE without prefix \
+                        //      target: {:?} msg: {:?}",
+                        //     target, msg
+                        // ));
                         return;
                     }
                 };
@@ -500,9 +485,6 @@ impl<'poll> Tiny<'poll> {
 
                 match target {
                     wire::MsgTarget::Chan(chan) => {
-                        self.logger
-                            .get_chan_logs(conn.get_serv_name(), &chan)
-                            .write_line(format_args!("PRIVMSG: {}", msg));
                         let msg_target = MsgTarget::Chan {
                             serv_name: conn.get_serv_name(),
                             chan_name: &chan,
@@ -570,9 +552,6 @@ impl<'poll> Tiny<'poll> {
             Cmd::JOIN { chan } => match pfx {
                 Some(Pfx::User { nick, .. }) => {
                     let serv_name = conn.get_serv_name();
-                    self.logger
-                        .get_chan_logs(serv_name, &chan)
-                        .write_line(format_args!("JOIN: {}", nick));
                     if nick == conn.get_nick() {
                         self.tui.new_chan_tab(serv_name, &chan);
                     } else {
@@ -595,10 +574,10 @@ impl<'poll> Tiny<'poll> {
                         }
                     }
                 }
-                pfx => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
+                _pfx => {
+                    // self.logger
+                    //     .get_debug_logs()
+                    //     .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
                 }
             },
 
@@ -606,9 +585,6 @@ impl<'poll> Tiny<'poll> {
                 Some(Pfx::User { nick, .. }) => {
                     if nick != conn.get_nick() {
                         let serv_name = conn.get_serv_name();
-                        self.logger
-                            .get_chan_logs(serv_name, &chan)
-                            .write_line(format_args!("PART: {}", nick));
                         self.tui.remove_nick(
                             &nick,
                             Some(time::now()),
@@ -619,10 +595,10 @@ impl<'poll> Tiny<'poll> {
                         );
                     }
                 }
-                pfx => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("Weird PART message pfx {:?}", pfx));
+                _pfx => {
+                    // self.logger
+                    //     .get_debug_logs()
+                    //     .write_line(format_args!("Weird PART message pfx {:?}", pfx));
                 }
             },
 
@@ -635,10 +611,10 @@ impl<'poll> Tiny<'poll> {
                         &MsgTarget::AllUserTabs { serv_name, nick },
                     );
                 }
-                pfx => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
+                _pfx => {
+                    // self.logger
+                    //     .get_debug_logs()
+                    //     .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
                 }
             },
 
@@ -657,10 +633,10 @@ impl<'poll> Tiny<'poll> {
                         },
                     );
                 }
-                pfx => {
-                    self.logger
-                        .get_debug_logs()
-                        .write_line(format_args!("Weird NICK message pfx {:?}", pfx));
+                _pfx => {
+                    // self.logger
+                    //     .get_debug_logs()
+                    //     .write_line(format_args!("Weird NICK message pfx {:?}", pfx));
                 }
             },
 
@@ -733,10 +709,10 @@ impl<'poll> Tiny<'poll> {
                         }
                     }
                     "ACK" => {}
-                    cmd => {
-                        self.logger
-                            .get_debug_logs()
-                            .write_line(format_args!("CAP subcommand {} is not handled", cmd));
+                    _cmd => {
+                        // self.logger
+                        //     .get_debug_logs()
+                        //     .write_line(format_args!("CAP subcommand {} is not handled", cmd));
                     }
                 };
             }
@@ -861,18 +837,18 @@ impl<'poll> Tiny<'poll> {
                             );
                             self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                         }
-                        pfx => {
+                        _pfx => {
                             // add everything else to debug file
-                            self.logger.get_debug_logs().write_line(format_args!(
-                                "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
-                                pfx, n, params
-                            ));
+                            // self.logger.get_debug_logs().write_line(format_args!(
+                            //     "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
+                            //     pfx, n, params
+                            // ));
                         }
                     }
                 }
             }
 
-            Cmd::Other { cmd, params } => match pfx {
+            Cmd::Other { cmd: _, params } => match pfx {
                 Some(Pfx::Server(msg_serv_name)) => {
                     let conn_serv_name = conn.get_serv_name();
                     let msg_target = MsgTarget::Server {
@@ -887,13 +863,13 @@ impl<'poll> Tiny<'poll> {
                     );
                     self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                 }
-                pfx => {
-                    self.logger.get_debug_logs().write_line(format_args!(
-                        "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
-                        pfx,
-                        cmd,
-                        params.join(" "),
-                    ));
+                _pfx => {
+                    // self.logger.get_debug_logs().write_line(format_args!(
+                    //     "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
+                    //     pfx,
+                    //     cmd,
+                    //     params.join(" "),
+                    // ));
                 }
             },
         }

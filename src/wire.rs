@@ -4,8 +4,6 @@ use std;
 use std::io::Write;
 use std::str;
 
-use crate::logger::LogFile;
-
 pub fn pass<W: Write>(sink: &mut W, pass: &str) -> std::io::Result<()> {
     write!(sink, "PASS {}\r\n", pass)
 }
@@ -190,7 +188,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 impl Msg {
     /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
     /// Otherwise the buffer is left unchanged.
-    pub fn read(buf: &mut Vec<u8>, logger: Option<LogFile>) -> Option<Msg> {
+    pub fn read(buf: &mut Vec<u8>) -> Option<Msg> {
         // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
         // using this hacky method instead.
         let crlf_idx = {
@@ -202,17 +200,6 @@ impl Msg {
 
         let ret = {
             let mut slice: &[u8] = &buf[0..crlf_idx];
-
-            if let Some(mut logger) = logger {
-                match str::from_utf8(slice) {
-                    Ok(str) => {
-                        logger.write_line(format_args!("< {}", str));
-                    }
-                    Err(e) => {
-                        logger.write_line(format_args!("< (non-utf8: {:?}) {:?}", e, slice));
-                    }
-                }
-            }
 
             let pfx: Option<Pfx> = {
                 if slice[0] == b':' {
