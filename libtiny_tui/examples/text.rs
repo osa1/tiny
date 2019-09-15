@@ -1,9 +1,3 @@
-extern crate libc;
-extern crate mio;
-extern crate term_input;
-extern crate termbox_simple;
-extern crate tiny;
-
 use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
@@ -16,10 +10,10 @@ use std::io::Read;
 use term_input::{Event, Input, Key};
 use termbox_simple::*;
 
-use tiny::config::Colors;
-use tiny::tui::msg_area::line::SchemeStyle;
-use tiny::tui::msg_area::line::SegStyle;
-use tiny::tui::msg_area::MsgArea;
+use libtiny_tui::Colors;
+use libtiny_tui::msg_area::line::SchemeStyle;
+use libtiny_tui::msg_area::line::SegStyle;
+use libtiny_tui::msg_area::MsgArea;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();

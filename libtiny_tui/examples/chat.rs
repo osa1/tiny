@@ -1,12 +1,5 @@
 // In a chat window add dozens of nicks, each printing some random lines.
 
-extern crate libc;
-extern crate mio;
-extern crate term_input;
-extern crate termbox_simple;
-extern crate time;
-extern crate tiny;
-
 use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
@@ -17,8 +10,7 @@ use std::fs::File;
 use std::io::Read;
 
 use term_input::{Event, Input};
-use tiny::config::Colors;
-use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
+use libtiny_tui::{MsgTarget, TUIRet, TUI, Colors};
 
 fn main() {
     let chan_target = MsgTarget::Chan {
@@ -29,7 +21,7 @@ fn main() {
     let mut tui = TUI::new(Colors::default());
     tui.new_server_tab("debug");
     tui.new_chan_tab("debug", "chan");
-    tui.show_topic("This is channel topic", Timestamp::now(), &chan_target);
+    tui.show_topic("This is channel topic", time::now(), &chan_target);
     tui.draw();
 
     {
@@ -38,7 +30,7 @@ fn main() {
         file.read_to_string(&mut text).unwrap();
 
         for (line_idx, line) in text.lines().enumerate() {
-            let now = Timestamp::now();
+            let now = time::now();
             let nick = format!("nick_{}", line_idx);
             tui.add_nick(&nick, Some(now), &chan_target);
             tui.add_privmsg(&nick, line, now, &chan_target, false);
@@ -79,7 +71,7 @@ fn main() {
                             } else {
                                 tui.add_msg(
                                     &msg.into_iter().collect::<String>(),
-                                    Timestamp::now(),
+                                    time::now(),
                                     &MsgTarget::Server { serv_name: "debug" },
                                 );
                             }
@@ -90,14 +82,14 @@ fn main() {
                         TUIRet::EventIgnored(Event::FocusGained) => {
                             tui.add_msg(
                                 "focus gained",
-                                Timestamp::now(),
+                                time::now(),
                                 &MsgTarget::Server { serv_name: "debug" },
                             );
                         }
                         TUIRet::EventIgnored(Event::FocusLost) => {
                             tui.add_msg(
                                 "focus lost",
-                                Timestamp::now(),
+                                time::now(),
                                 &MsgTarget::Server { serv_name: "debug" },
                             );
                         }

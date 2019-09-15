@@ -421,7 +421,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            Msg::read(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "nick".to_owned(),
@@ -446,7 +446,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            Msg::read(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
                 cmd: Cmd::PRIVMSG {
@@ -487,7 +487,7 @@ mod tests {
         .unwrap();
 
         let mut msgs = vec![];
-        while let Some(msg) = Msg::read(&mut buf, None) {
+        while let Some(msg) = Msg::read(&mut buf) {
             msgs.push(msg);
         }
 
@@ -499,7 +499,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@123.123.123.123 PART #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            Msg::read(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
@@ -518,7 +518,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@192.168.0.1 JOIN #haskell\r\n").unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            Msg::read(&mut buf),
             Some(Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
@@ -565,7 +565,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            Msg::read(&mut buf, None),
+            Msg::read(&mut buf),
             Some(Msg {
                 pfx: None,
                 cmd: Cmd::ERROR {

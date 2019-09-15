@@ -4,7 +4,8 @@
 mod config;
 mod exit_dialogue;
 mod messaging;
-mod msg_area;
+// FIXME: This is "pub" to be able to use in an example
+pub mod msg_area;
 mod notifier;
 mod tab;
 mod termbox;

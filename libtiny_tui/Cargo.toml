@@ -25,5 +25,9 @@ term_input = { path = "../term_input", version = "0.1.5" }
 termbox_simple = { path = "../termbox", version = "0.2.3" }
 time = "0.1"
 
+[dev-dependencies]
+mio = "0.6.9"
+libc = "0.2.22"
+
 [profile.release]
 lto = true

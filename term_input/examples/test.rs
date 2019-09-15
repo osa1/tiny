@@ -1,7 +1,3 @@
-extern crate libc;
-extern crate mio;
-extern crate term_input;
-
 use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;

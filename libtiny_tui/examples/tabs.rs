@@ -1,11 +1,5 @@
 // Open a lot of tabs. 10 servers tabs, each one having 3 channels.
 
-extern crate libc;
-extern crate mio;
-extern crate term_input;
-extern crate termbox_simple;
-extern crate tiny;
-
 use mio::unix::EventedFd;
 use mio::Events;
 use mio::Poll;
@@ -13,10 +7,7 @@ use mio::PollOpt;
 use mio::Ready;
 use mio::Token;
 use term_input::{Event, Input};
-use tiny::config::Colors;
-use tiny::tui::MsgSource;
-use tiny::tui::TabStyle;
-use tiny::tui::{MsgTarget, TUIRet, Timestamp, TUI};
+use libtiny_tui::{MsgTarget, TUIRet, TUI, Colors, MsgSource, TabStyle};
 
 fn main() {
     let mut tui = TUI::new(Colors::default());
@@ -85,7 +76,7 @@ fn main() {
                                         tui.add_privmsg(
                                             "me",
                                             &msg_string,
-                                            Timestamp::now(),
+                                            time::now(),
                                             &MsgTarget::Chan {
                                                 serv_name: &serv_name,
                                                 chan_name: &chan_name,
