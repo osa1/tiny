@@ -5,6 +5,7 @@ mod config;
 mod exit_dialogue;
 mod messaging;
 // FIXME: This is "pub" to be able to use in an example
+#[doc(hidden)]
 pub mod msg_area;
 mod notifier;
 mod tab;
@@ -53,30 +54,29 @@ pub enum TUIRet {
 
 /// Target of a message to be shown on TUI.
 pub enum MsgTarget<'a> {
+    /// Show the message in the server tab.
     Server {
         serv_name: &'a str,
     },
+    /// Show the message in the channel tab.
     Chan {
         serv_name: &'a str,
         chan_name: &'a str,
     },
+    /// Show the message in the privmsg tab.
     User {
         serv_name: &'a str,
         nick: &'a str,
     },
-
     /// Show the message in all tabs of a server.
     AllServTabs {
         serv_name: &'a str,
     },
-
-    /// Show the message all server tabs that have the user. (i.e. channels,
-    /// privmsg tabs)
+    /// Show the message in all server tabs that have the user. (i.e. channels, privmsg tabs)
     AllUserTabs {
         serv_name: &'a str,
         nick: &'a str,
     },
-
     /// Show the message in currently active tab.
     CurrentTab,
 }
@@ -415,12 +415,6 @@ impl TUI {
                         self.add_client_err_msg(
                             "Can't paste multi-line string: \
                              can't parse $EDITOR (not unicode)",
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    PasteError::PastedCmd => {
-                        self.add_client_err_msg(
-                            "One of the pasted lines looks like a command.",
                             &MsgTarget::CurrentTab,
                         );
                     }
@@ -1245,11 +1239,9 @@ impl TUI {
 }
 
 #[derive(Debug)]
-pub enum PasteError {
+enum PasteError {
     Io(::std::io::Error),
     Var(::std::env::VarError),
-    /// One of the lines looks like a command. This is something we don't support yet.
-    PastedCmd,
 }
 
 impl From<::std::io::Error> for PasteError {
@@ -1275,7 +1267,7 @@ impl From<::std::env::VarError> for PasteError {
 ///
 /// FIXME: Ideally this function should get a `Termbox` argument and return a new `Termbox` because
 /// we shutdown the current termbox instance and initialize it again after running $EDITOR.
-pub fn paste_lines(tf: String, str: &str) -> Result<Vec<String>, PasteError> {
+fn paste_lines(tf: String, str: &str) -> Result<Vec<String>, PasteError> {
     use std::{
         io::{Read, Seek, SeekFrom, Write},
         process::Command,
