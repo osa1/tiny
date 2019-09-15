@@ -4,35 +4,35 @@ use std;
 use std::io::Write;
 use std::str;
 
-pub fn pass<W: Write>(sink: &mut W, pass: &str) -> std::io::Result<()> {
+pub(crate) fn pass<W: Write>(sink: &mut W, pass: &str) -> std::io::Result<()> {
     write!(sink, "PASS {}\r\n", pass)
 }
 
-pub fn user<W: Write>(sink: &mut W, hostname: &str, realname: &str) -> std::io::Result<()> {
+pub(crate) fn user<W: Write>(sink: &mut W, hostname: &str, realname: &str) -> std::io::Result<()> {
     write!(sink, "USER {} 8 * :{}\r\n", hostname, realname)
 }
 
-pub fn nick<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
+pub(crate) fn nick<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "NICK {}\r\n", arg)
 }
 
-pub fn ping<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
+pub(crate) fn ping<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "PING {}\r\n", arg)
 }
 
-pub fn pong<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
+pub(crate) fn pong<W: Write>(sink: &mut W, arg: &str) -> std::io::Result<()> {
     write!(sink, "PONG {}\r\n", arg)
 }
 
-pub fn join<W: Write>(sink: &mut W, chans: &[&str]) -> std::io::Result<()> {
+pub(crate) fn join<W: Write>(sink: &mut W, chans: &[&str]) -> std::io::Result<()> {
     write!(sink, "JOIN {}\r\n", chans.join(","))
 }
 
-pub fn part<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
+pub(crate) fn part<W: Write>(sink: &mut W, channel: &str) -> std::io::Result<()> {
     write!(sink, "PART {}\r\n", channel)
 }
 
-pub fn privmsg<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
+pub(crate) fn privmsg<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
     // IRC messages need to be shorter than 512 bytes (see RFC 1459 or 2812). This should be dealt
     // with at call sites as we can't show how we split messages into multiple messages in the UI
     // at this point.
@@ -40,36 +40,40 @@ pub fn privmsg<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::R
     write!(sink, "PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
-pub fn ctcp_action<W: Write>(sink: &mut W, msgtarget: &str, msg: &str) -> std::io::Result<()> {
+pub(crate) fn ctcp_action<W: Write>(
+    sink: &mut W,
+    msgtarget: &str,
+    msg: &str,
+) -> std::io::Result<()> {
     assert!(msgtarget.len() + msg.len() + 21 <= 512); // See comments in `privmsg`
     write!(sink, "PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
 }
 
-pub fn away<W: Write>(sink: &mut W, msg: Option<&str>) -> std::io::Result<()> {
+pub(crate) fn away<W: Write>(sink: &mut W, msg: Option<&str>) -> std::io::Result<()> {
     match msg {
         None => write!(sink, "AWAY\r\n"),
         Some(msg) => write!(sink, "AWAY :{}\r\n", msg),
     }
 }
 
-pub fn cap_ls<W: Write>(sink: &mut W) -> std::io::Result<()> {
+pub(crate) fn cap_ls<W: Write>(sink: &mut W) -> std::io::Result<()> {
     write!(sink, "CAP LS\r\n")
 }
 
-pub fn cap_req<W: Write>(sink: &mut W, cap_identifiers: &[&str]) -> std::io::Result<()> {
+pub(crate) fn cap_req<W: Write>(sink: &mut W, cap_identifiers: &[&str]) -> std::io::Result<()> {
     write!(sink, "CAP REQ :{}\r\n", cap_identifiers.join(" "))
 }
 
-pub fn cap_end<W: Write>(sink: &mut W) -> std::io::Result<()> {
+pub(crate) fn cap_end<W: Write>(sink: &mut W) -> std::io::Result<()> {
     write!(sink, "CAP END\r\n")
 }
 
-pub fn authenticate<W: Write>(sink: &mut W, msg: &str) -> std::io::Result<()> {
+pub(crate) fn authenticate<W: Write>(sink: &mut W, msg: &str) -> std::io::Result<()> {
     write!(sink, "AUTHENTICATE {}\r\n", msg)
 }
 
 /*
-pub fn quit<W : Write>(mut sink: W, msg : Option<&str>) -> std::io::Result<()> {
+pub(crate) fn quit<W : Write>(mut sink: W, msg : Option<&str>) -> std::io::Result<()> {
     match msg {
         None => write!(sink, "QUIT\r\n"),
         Some(msg) => write!(sink, "QUIT {}\r\n", msg)
@@ -82,7 +86,7 @@ pub fn quit<W : Write>(mut sink: W, msg : Option<&str>) -> std::io::Result<()> {
 /// > If the prefix is missing from the message, it is assumed to have originated from the
 /// > connection from which it was received from.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Pfx {
+pub(crate) enum Pfx {
     Server(String),
 
     /// <nick>!<user>@<host>
@@ -94,19 +98,19 @@ pub enum Pfx {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum MsgTarget {
+pub(crate) enum MsgTarget {
     Chan(String),
     User(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Msg {
-    pub pfx: Option<Pfx>,
-    pub cmd: Cmd,
+pub(crate) struct Msg {
+    pub(crate) pfx: Option<Pfx>,
+    pub(crate) cmd: Cmd,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Cmd {
+pub(crate) enum Cmd {
     /// A PRIVMSG or NOTICE. Check `is_notice` field.
     PRIVMSG {
         // TODO: In theory this should be a list of targets, but in practice I've never
@@ -188,7 +192,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 impl Msg {
     /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
     /// Otherwise the buffer is left unchanged.
-    pub fn read(buf: &mut Vec<u8>) -> Option<Msg> {
+    pub(crate) fn read(buf: &mut Vec<u8>) -> Option<Msg> {
         // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
         // using this hacky method instead.
         let crlf_idx = {
@@ -371,7 +375,7 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     ret
 }
 
-pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
+pub(crate) fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
     for (byte_idx, byte) in buf.iter().enumerate() {
         if *byte == byte0 {
             return Some(byte_idx);
@@ -382,7 +386,7 @@ pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
 
 static CTCP_PREFIX: &'static str = "\x01ACTION ";
 
-pub fn check_ctcp_action_msg(msg: &str) -> (&str, bool) {
+pub(crate) fn check_ctcp_action_msg(msg: &str) -> (&str, bool) {
     let msg_bytes = msg.as_bytes();
     if msg_bytes.len() >= 8 && &msg_bytes[..8] == CTCP_PREFIX.as_bytes() {
         (

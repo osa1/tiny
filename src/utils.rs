@@ -1,7 +1,7 @@
 use std::str::SplitWhitespace;
 
 /// Like `std::str::SplitWhitespace`, but returns beginning indices rather than slices.
-pub struct SplitWhitespaceIndices<'a> {
+pub(crate) struct SplitWhitespaceIndices<'a> {
     inner: SplitWhitespace<'a>,
     str: &'a str,
 }
@@ -16,7 +16,7 @@ impl<'a> Iterator for SplitWhitespaceIndices<'a> {
     }
 }
 
-pub fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
+pub(crate) fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
     SplitWhitespaceIndices {
         inner: str.split_whitespace(),
         str,
@@ -25,14 +25,14 @@ pub fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub struct SplitIterator<'a> {
+pub(crate) struct SplitIterator<'a> {
     s: Option<&'a str>,
     max: usize,
 }
 
 /// Iterate over subslices that are at most `max` long (in bytes). Splits are
 /// made on whitespace characters when possible.
-pub fn split_iterator(s: &str, max: usize) -> SplitIterator {
+pub(crate) fn split_iterator(s: &str, max: usize) -> SplitIterator {
     SplitIterator { s: Some(s), max }
 }
 
@@ -92,7 +92,7 @@ impl<'a> Iterator for SplitIterator<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub fn is_nick_char(c: char) -> bool {
+pub(crate) fn is_nick_char(c: char) -> bool {
     // from RFC 2812:
     //
     // nickname   =  ( letter / special ) *8( letter / digit / special / "-" )

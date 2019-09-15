@@ -13,13 +13,9 @@ edition = "2018"
 [badges]
 travis-ci = { repository = "osa1/tiny" }
 
-[lib]
-name = "tiny"
-path = "src/lib.rs"
-
 [[bin]]
 name = "tiny"
-path = "bin/main.rs"
+path = "src/main.rs"
 
 [dependencies]
 base64 = "0.6.0"

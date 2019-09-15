@@ -7,19 +7,19 @@ use libtiny_tui::{MsgSource, MsgTarget};
 use mio::Poll;
 use std::error::Error;
 
-pub struct Cmd {
+pub(crate) struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
-    pub name: &'static str,
+    pub(crate) name: &'static str,
 
     // Command help message. Shown in `/help`.
-    // pub help: &'static str,
+    // pub(crate) help: &'static str,
     /// Command function.
-    pub cmd_fn: for<'a, 'b> fn(&str, poll: &'b Poll, &'a mut Tiny<'b>, MsgSource),
+    pub(crate) cmd_fn: for<'a, 'b> fn(&str, poll: &'b Poll, &'a mut Tiny<'b>, MsgSource),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum ParseCmdResult<'a> {
+pub(crate) enum ParseCmdResult<'a> {
     /// Command name parsing successful
     Ok {
         cmd: &'static Cmd,
@@ -34,7 +34,7 @@ pub enum ParseCmdResult<'a> {
     Unknown,
 }
 
-pub fn parse_cmd(cmd: &str) -> ParseCmdResult {
+pub(crate) fn parse_cmd(cmd: &str) -> ParseCmdResult {
     match cmd.split_whitespace().next() {
         None => ParseCmdResult::Unknown,
         Some(cmd_name) => {
