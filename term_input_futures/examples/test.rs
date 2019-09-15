@@ -1,8 +1,3 @@
-extern crate futures;
-extern crate libc;
-extern crate term_input_futures;
-extern crate tokio;
-
 use std::io;
 use std::io::Write;
 

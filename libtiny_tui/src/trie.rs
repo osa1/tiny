@@ -123,8 +123,6 @@ fn get_char_node_for_lookup(trie: &Trie, char: char) -> Option<&Trie> {
 #[cfg(test)]
 mod tests {
 
-    extern crate test;
-
     use super::*;
 
     #[test]
@@ -174,8 +172,6 @@ mod tests {
 
 #[cfg(test)]
 mod benchs {
-
-    extern crate test;
 
     use self::test::Bencher;
     use super::*;
