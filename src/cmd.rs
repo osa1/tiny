@@ -1,10 +1,10 @@
-use crate::config;
+// use crate::config;
 use crate::utils;
 use libtiny::Client;
 use libtiny_tui::Notifier;
 use libtiny_tui::TUI;
 use libtiny_tui::{MsgSource, MsgTarget};
-use std::error::Error;
+// use std::error::Error;
 
 pub(crate) struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
@@ -86,7 +86,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&'static Cmd; 11] = [
+static CMDS: [&Cmd; 11] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
@@ -109,7 +109,7 @@ static AWAY_CMD: Cmd = Cmd {
     cmd_fn: away,
 };
 
-fn away(args: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
+fn away(args: &str, _: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     let msg = if args.is_empty() { None } else { Some(args) };
     if let Some(client) = find_client(clients, src.serv_name()) {
         client.away(msg);
@@ -123,7 +123,7 @@ static CLEAR_CMD: Cmd = Cmd {
     cmd_fn: clear,
 };
 
-fn clear(args: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
+fn clear(_: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
     tui.clear(&src.to_target());
 }
 
@@ -299,7 +299,7 @@ static IGNORE_CMD: Cmd = Cmd {
     cmd_fn: ignore,
 };
 
-fn ignore(args: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
+fn ignore(_: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
     match src {
         MsgSource::Serv { serv_name } => {
             tui.toggle_ignore(&MsgTarget::AllServTabs {
@@ -357,7 +357,7 @@ static ME_CMD: Cmd = Cmd {
 };
 
 fn me(args: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
-    if args.len() == 0 {
+    if args.is_empty() {
         return tui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
     crate::send_msg(tui, clients, &src, args.to_string(), true);

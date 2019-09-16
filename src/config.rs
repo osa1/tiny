@@ -129,7 +129,7 @@ mod tests {
         match serde_yaml::from_str(&get_default_config_yaml()) {
             Err(yaml_err) => {
                 println!("{}", yaml_err);
-                assert!(false);
+                panic!();
             }
             Ok(Config { servers, .. }) => {
                 assert_eq!(
