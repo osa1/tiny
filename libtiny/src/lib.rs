@@ -13,6 +13,7 @@ use std::{net::ToSocketAddrs, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    runtime::Runtime,
     sync::mpsc,
 };
 
@@ -89,8 +90,8 @@ pub struct Client {
 
 impl Client {
     /// Create a new client. Spawns two `tokio` tasks.
-    pub fn new(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
-        connect(server_info)
+    pub fn new(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receiver<Event>) {
+        connect(server_info, runtime)
     }
 
     /// Get host name of this connection.
@@ -185,7 +186,7 @@ enum Cmd {
     Msg(String),
 }
 
-fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
+fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //
@@ -205,7 +206,7 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
     let irc_state = State::new(server_info.clone());
     let irc_state_clone = irc_state.clone();
 
-    tokio::spawn(async move {
+    runtime.spawn(async move {
         // Main loop just tries to (re)connect
         'connect: loop {
             // Channel for the sender task. Messages are complete IRC messages (including the
