@@ -165,6 +165,14 @@ impl Client {
             .try_send(Cmd::Msg(wire::join(&chans)))
             .unwrap()
     }
+
+    pub fn away(&mut self, msg: Option<&str>) {
+        unimplemented!()
+    }
+
+    pub fn nick(&mut self, new_nick: &str) {
+        unimplemented!()
+    }
 }
 
 //

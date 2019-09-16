@@ -3,9 +3,9 @@
 #![feature(ptr_offset_from)]
 
 // #[macro_use]
-// mod utils;
+mod utils;
 
-// mod cmd;
+mod cmd;
 mod cmd_line_args;
 mod config;
 // mod conn;
