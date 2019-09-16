@@ -106,7 +106,7 @@ fn run(
             nickserv_ident: server.nickserv_ident,
         };
 
-        let (client, mut rcv_ev) = libtiny::Client::new(server_info);
+        let (client, mut rcv_ev) = libtiny::Client::new(server_info, &executor);
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
