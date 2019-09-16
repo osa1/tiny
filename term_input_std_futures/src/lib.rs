@@ -1,3 +1,5 @@
+#![allow(clippy::new_without_default)]
+
 //! Interprets the terminal events we care about:
 //!
 //!   - Resize events.
@@ -115,7 +117,7 @@ static XTERM_END: [u8; 3] = [27, 91, 70];
 static XTERM_HOME_2: [u8; 3] = [27, 79, 72];
 static XTERM_END_2: [u8; 3] = [27, 79, 70];
 
-static XTERM_KEY_SEQS: [(&'static [u8], Event); 27] = [
+static XTERM_KEY_SEQS: [(&[u8], Event); 27] = [
     (
         &XTERM_ALT_ARROW_DOWN,
         Event::Key(Key::AltArrow(Arrow::Down)),
@@ -309,7 +311,7 @@ fn read_chars<'a>(mut buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<
                 }
             }
             evs.push_back(Event::String(string));
-            return buf_slice;
+            buf_slice
         }
     })
 }
@@ -371,19 +373,19 @@ fn utf8_char_len(byte: u8) -> Option<u8> {
 fn get_utf8_char(buf: &[u8], len: u8) -> char {
     let codepoint: u32 = {
         if len == 1 {
-            (buf[0] & 0b0111_1111) as u32
+            u32::from(buf[0] & 0b0111_1111)
         } else if len == 2 {
-            (((buf[0] & 0b0001_1111) as u32) << 6) + ((buf[1] & 0b0011_1111) as u32)
+            ((u32::from(buf[0] & 0b0001_1111)) << 6) + (u32::from(buf[1] & 0b0011_1111))
         } else if len == 3 {
-            (((buf[0] & 0b0000_1111) as u32) << 12)
-                + (((buf[1] & 0b0011_1111) as u32) << 6)
-                + ((buf[2] & 0b0011_1111) as u32)
+            ((u32::from(buf[0] & 0b0000_1111)) << 12)
+                + ((u32::from(buf[1] & 0b0011_1111)) << 6)
+                + (u32::from(buf[2] & 0b0011_1111))
         } else {
             debug_assert!(len == 4);
-            (((buf[0] & 0b0000_0111) as u32) << 18)
-                + (((buf[1] & 0b0011_1111) as u32) << 12)
-                + (((buf[2] & 0b0011_1111) as u32) << 6)
-                + ((buf[3] & 0b0011_1111) as u32)
+            ((u32::from(buf[0] & 0b0000_0111)) << 18)
+                + ((u32::from(buf[1] & 0b0011_1111)) << 12)
+                + ((u32::from(buf[2] & 0b0011_1111)) << 6)
+                + (u32::from(buf[3] & 0b0011_1111))
         }
     };
 
