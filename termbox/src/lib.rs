@@ -160,16 +160,16 @@ fn char_to_utf8(c: char) -> u32 {
     if code < MAX_ONE_B {
         code as u32
     } else if code < MAX_TWO_B {
-        ((((code >> 6 & 0x1F) as u8 | TAG_TWO_B) as u32) << 8)
-            + (((code & 0x3F) as u8 | TAG_CONT) as u32)
+        ((u32::from((code >> 6 & 0x1F) as u8 | TAG_TWO_B)) << 8)
+            + u32::from((code & 0x3F) as u8 | TAG_CONT)
     } else if code < MAX_THREE_B {
-        ((((code >> 12 & 0x0F) as u8 | TAG_THREE_B) as u32) << 16)
-            + ((((code >> 6 & 0x3F) as u8 | TAG_CONT) as u32) << 8)
-            + (((code & 0x3F) as u8 | TAG_CONT) as u32)
+        (u32::from((code >> 12 & 0x0F) as u8 | TAG_THREE_B) << 16)
+            + (u32::from((code >> 6 & 0x3F) as u8 | TAG_CONT) << 8)
+            + (u32::from((code & 0x3F) as u8 | TAG_CONT))
     } else {
-        ((((code >> 18 & 0x07) as u8 | TAG_FOUR_B) as u32) << 24)
-            + ((((code >> 12 & 0x3F) as u8 | TAG_CONT) as u32) << 16)
-            + ((((code >> 6 & 0x3F) as u8 | TAG_CONT) as u32) << 8)
-            + (((code & 0x3F) as u8 | TAG_CONT) as u32)
+        ((u32::from((code >> 18 & 0x07) as u8 | TAG_FOUR_B)) << 24)
+            + ((u32::from((code >> 12 & 0x3F) as u8 | TAG_CONT)) << 16)
+            + ((u32::from((code >> 6 & 0x3F) as u8 | TAG_CONT)) << 8)
+            + (u32::from((code & 0x3F) as u8 | TAG_CONT))
     }
 }

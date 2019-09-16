@@ -1,5 +1,7 @@
 #![cfg_attr(test, feature(test))]
+#![allow(clippy::cognitive_complexity)]
 #![allow(clippy::new_without_default)]
+#![allow(clippy::too_many_arguments)]
 
 mod config;
 mod exit_dialogue;

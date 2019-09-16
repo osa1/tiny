@@ -113,7 +113,9 @@ fn run(
         // Spawn a task to handle connection events
         executor.spawn(async move {
             while let Some(ev) = rcv_ev.next().await {
-                handle_conn_ev(&mut *tui_clone.lock().unwrap(), &client_clone, ev);
+                let mut tui_lock = tui_clone.lock().unwrap();
+                handle_conn_ev(&mut *tui_lock, &client_clone, ev);
+                tui_lock.draw();
             }
         });
 

@@ -119,7 +119,7 @@ impl StateInner {
 
     fn get_next_nick(&mut self) -> &str {
         self.current_nick_idx += 1;
-        println!("current_nick_idx: {}", self.current_nick_idx);
+        // println!("current_nick_idx: {}", self.current_nick_idx);
         if self.current_nick_idx >= self.nicks.len() {
             let n_underscores = self.current_nick_idx - self.nicks.len() + 1;
             let mut new_nick = self.nicks.last().unwrap().to_string();
@@ -230,7 +230,7 @@ impl StateInner {
                 // ERR_NICKNAMEINUSE. If we don't have a nick already try next nick.
                 if !self.nick_accepted {
                     let new_nick = self.get_next_nick();
-                    println!("new nick: {}", new_nick);
+                    // println!("new nick: {}", new_nick);
                     snd_ev
                         .try_send(Event::NickChange(new_nick.to_owned()))
                         .unwrap();

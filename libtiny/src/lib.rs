@@ -228,7 +228,7 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
             let serv_name = server_info.addr.clone();
             let port = server_info.port;
 
-            println!("Resolving address");
+            eprintln!("Resolving address");
 
             let mut addr_iter = match tokio_executor::blocking::run(move || {
                 (serv_name.as_str(), port).to_socket_addrs()
@@ -244,7 +244,7 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
                 Ok(addr_iter) => addr_iter,
             };
 
-            println!("Address resolved");
+            eprintln!("Address resolved");
 
             let addr = match addr_iter.next() {
                 None => {
@@ -258,20 +258,20 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
             // Establish TCP connection to the server
             //
 
-            println!("Establishing connection ...");
+            eprintln!("Establishing connection ...");
 
             let stream = match TcpStream::connect(&addr).await {
                 Err(io_err) => {
                     snd_ev.try_send(Event::IoErr(io_err)).unwrap();
                     snd_ev.try_send(Event::Disconnected).unwrap();
                     // Wait 30 seconds before looping
-                    tokio::timer::delay(tokio::clock::now() + Duration::from_secs(30)).await;
+                    tokio::timer::delay(tokio::clock::now() + Duration::from_secs(RECONNECT_SECS)).await;
                     continue;
                 }
                 Ok(stream) => stream,
             };
 
-            println!("Done");
+            eprintln!("Done");
 
             let (mut read_half, mut write_half) = stream.split();
 
@@ -292,7 +292,7 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
             tokio::spawn(async move {
                 while let Some(msg) = rcv_msg.next().await {
                     if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
-                        println!("IO error when writing: {:?}", io_err);
+                        eprintln!("IO error when writing: {:?}", io_err);
                         snd_ev_clone.try_send(Event::IoErr(io_err)).unwrap();
                         return;
                     }
@@ -310,7 +310,7 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
                     cmd = rcv_cmd_fused.next() => {
                         match cmd {
                             None => {
-                                println!("main loop: command channel terminated from the other end");
+                                eprintln!("main loop: command channel terminated from the other end");
                                 // That's OK, rcv_cmd_fused will never be ready again
                             }
                             Some(Cmd::Msg(irc_msg)) => {
@@ -321,7 +321,7 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
                     bytes = read_half.read(&mut read_buf).fuse() => {
                         match bytes {
                             Err(io_err) => {
-                                println!("main loop: error when reading from socket: {:?}", io_err);
+                                eprintln!("main loop: error when reading from socket: {:?}", io_err);
                                 snd_ev.try_send(Event::IoErr(io_err)).unwrap();
                                 snd_ev.try_send(Event::Disconnected).unwrap();
                                 continue 'connect;
@@ -329,7 +329,7 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
                             Ok(bytes) => {
                                 parse_buf.extend_from_slice(&read_buf[0..bytes]);
                                 while let Some(msg) = wire::parse_irc_msg(&mut parse_buf) {
-                                    println!("parsed msg: {:?}", msg);
+                                    eprintln!("parsed msg: {:?}", msg);
                                     irc_state.update(&msg, &mut snd_ev, &mut snd_msg);
                                 }
                             }
