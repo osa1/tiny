@@ -243,7 +243,7 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
             match target {
                 wire::MsgTarget::Chan(chan) => {
                     let tui_msg_target = MsgTarget::Chan {
-                        serv_name: &client.get_serv_name(),
+                        serv_name: client.get_serv_name(),
                         chan_name: &chan,
                     };
                     // highlight the message if it mentions us
@@ -335,7 +335,7 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
                     &nick,
                     Some(time::now()),
                     &MsgTarget::Chan {
-                        serv_name: &client.get_serv_name(),
+                        serv_name: client.get_serv_name(),
                         chan_name: &chan,
                     },
                 );
@@ -354,7 +354,10 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
             tui.remove_nick(
                 &nick,
                 Some(time::now()),
-                &MsgTarget::AllUserTabs { serv_name: &client.get_serv_name(), nick: &nick },
+                &MsgTarget::AllUserTabs {
+                    serv_name: client.get_serv_name(),
+                    nick: &nick,
+                },
             );
         }
 
@@ -372,24 +375,208 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
                 &nick,
                 time::now(),
                 &MsgTarget::AllUserTabs {
-                    serv_name: &client.get_serv_name(),
+                    serv_name: client.get_serv_name(),
                     nick: &old_nick,
                 },
             );
         }
 
-        Cmd::Reply { num: 433, .. } => unimplemented!(),
-        Cmd::PING { .. } | Cmd::PONG { .. } => unimplemented!(),
-        Cmd::ERROR { msg } => unimplemented!(),
-        Cmd::TOPIC { chan, topic } => unimplemented!(),
+        Cmd::Reply { num: 433, .. } => {
+            // ERR_NICKNAMEINUSE
+            if client.is_nick_accepted() {
+                // Nick change request from user failed. Just show an error message.
+                tui.add_err_msg(
+                    "Nickname is already in use",
+                    time::now(),
+                    &MsgTarget::AllServTabs {
+                        serv_name: client.get_serv_name(),
+                    },
+                );
+            }
+        }
+
+        Cmd::PING { .. } | Cmd::PONG { .. } => {
+            // Ignore
+        }
+
+        Cmd::ERROR { msg } => {
+            tui.add_err_msg(
+                &msg,
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv_name: client.get_serv_name(),
+                },
+            );
+        }
+
+        Cmd::TOPIC { chan, topic } => {
+            tui.show_topic(
+                &topic,
+                time::now(),
+                &MsgTarget::Chan {
+                    serv_name: client.get_serv_name(),
+                    chan_name: &chan,
+                },
+            );
+        }
+
         Cmd::CAP {
             client,
             subcommand,
             params,
         } => unimplemented!(),
+
         Cmd::AUTHENTICATE { .. } => unimplemented!(),
-        Cmd::Reply { num: n, params } => unimplemented!(),
-        Cmd::Other { cmd: _, params } => unimplemented!(),
+
+        Cmd::Reply { num: n, params } => {
+            if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
+                    || n == 251 /* RPL_LUSERCLIENT */
+                    || n == 255 /* RPL_LUSERME */
+                    || n == 372 /* RPL_MOTD */
+                    || n == 375 /* RPL_MOTDSTART */
+                    || n == 376
+            /* RPL_ENDOFMOTD */
+            {
+                debug_assert_eq!(params.len(), 2);
+                let msg = &params[1];
+                tui.add_msg(
+                    msg,
+                    time::now(),
+                    &MsgTarget::Server {
+                        serv_name: client.get_serv_name(),
+                    },
+                );
+            } else if n == 4 // RPL_MYINFO
+                    || n == 5 // RPL_BOUNCE
+                    || (n >= 252 && n <= 254)
+            /* RPL_LUSEROP, RPL_LUSERUNKNOWN, */
+            /* RPL_LUSERCHANNELS */
+            {
+                let msg = params.into_iter().collect::<Vec<String>>().join(" ");
+                tui.add_msg(
+                    &msg,
+                    time::now(),
+                    &MsgTarget::Server {
+                        serv_name: client.get_serv_name(),
+                    },
+                );
+            } else if n == 265 || n == 266 || n == 250 {
+                let msg = &params[params.len() - 1];
+                tui.add_msg(
+                    msg,
+                    time::now(),
+                    &MsgTarget::Server {
+                        serv_name: client.get_serv_name(),
+                    },
+                );
+            }
+            // RPL_TOPIC
+            else if n == 332 {
+                // FIXME: RFC 2812 says this will have 2 arguments, but freenode
+                // sends 3 arguments (extra one being our nick).
+                assert!(params.len() == 3 || params.len() == 2);
+                let chan = &params[params.len() - 2];
+                let topic = &params[params.len() - 1];
+                tui.show_topic(
+                    topic,
+                    time::now(),
+                    &MsgTarget::Chan {
+                        serv_name: client.get_serv_name(),
+                        chan_name: chan,
+                    },
+                );
+            }
+            // RPL_NAMREPLY: List of users in a channel
+            else if n == 353 {
+                let chan = &params[2];
+                let chan_target = MsgTarget::Chan {
+                    serv_name: client.get_serv_name(),
+                    chan_name: chan,
+                };
+
+                for nick in params[3].split_whitespace() {
+                    tui.add_nick(drop_nick_prefix(nick), None, &chan_target);
+                }
+            }
+            // RPL_ENDOFNAMES: End of NAMES list
+            else if n == 366 {
+            }
+            // RPL_UNAWAY or RPL_NOWAWAY
+            else if n == 305 || n == 306 {
+                let msg = &params[1];
+                tui.add_client_msg(
+                    msg,
+                    &MsgTarget::AllServTabs {
+                        serv_name: client.get_serv_name(),
+                    },
+                );
+            }
+            // ERR_NOSUCHNICK
+            else if n == 401 {
+                let nick = &params[1];
+                let msg = &params[2];
+                let serv_name = client.get_serv_name();
+                tui.add_client_msg(msg, &MsgTarget::User { serv_name, nick });
+            // RPL_AWAY
+            } else if n == 301 {
+                let serv_name = client.get_serv_name();
+                let nick = &params[1];
+                let msg = &params[2];
+                tui.add_client_msg(
+                    &format!("{} is away: {}", nick, msg),
+                    &MsgTarget::User { serv_name, nick },
+                );
+            } else {
+                match pfx {
+                    Some(Pfx::Server(msg_serv_name)) => {
+                        let conn_serv_name = client.get_serv_name();
+                        let msg_target = MsgTarget::Server {
+                            serv_name: conn_serv_name,
+                        };
+                        tui.add_privmsg(
+                            &msg_serv_name,
+                            &params.join(" "),
+                            time::now(),
+                            &msg_target,
+                            false,
+                        );
+                        tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                    }
+                    _pfx => {
+                        // add everything else to debug file
+                        // self.logger.get_debug_logs().write_line(format_args!(
+                        //     "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
+                        //     pfx, n, params
+                        // ));
+                    }
+                }
+            }
+        }
+
+        Cmd::Other { cmd: _, params } => match pfx {
+            Some(Pfx::Server(msg_serv_name)) => {
+                let conn_serv_name = client.get_serv_name();
+                let msg_target = MsgTarget::Server {
+                    serv_name: conn_serv_name,
+                };
+                tui.add_privmsg(
+                    &msg_serv_name,
+                    &params.join(" "),
+                    time::now(),
+                    &msg_target,
+                    false,
+                );
+                tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+            }
+            _pfx => {
+                // self.logger.get_debug_logs().write_line(format_args!(
+                //     "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
+                //     pfx,
+                //     cmd,
+                //     params.join(" "),
+                // ));
+            }
+        },
     }
 }
 
@@ -613,44 +800,6 @@ impl<'poll> Tiny<'poll> {
         let pfx = msg.pfx;
         match msg.cmd {
 
-            Cmd::Reply { num: 433, .. } => {
-                // ERR_NICKNAMEINUSE
-                if conn.is_nick_accepted() {
-                    // Nick change request from user failed. Just show an error message.
-                    self.tui.add_err_msg(
-                        "Nickname is already in use",
-                        time::now(),
-                        &MsgTarget::AllServTabs {
-                            serv_name: conn.get_serv_name(),
-                        },
-                    );
-                }
-            }
-
-            Cmd::PING { .. } | Cmd::PONG { .. } =>
-                // ignore
-                {}
-
-            Cmd::ERROR { ref msg } => {
-                let serv_name = conn.get_serv_name();
-                self.tui
-                    .add_err_msg(msg, time::now(), &MsgTarget::AllServTabs { serv_name });
-            }
-
-            Cmd::TOPIC {
-                ref chan,
-                ref topic,
-            } => {
-                self.tui.show_topic(
-                    topic,
-                    time::now(),
-                    &MsgTarget::Chan {
-                        serv_name: conn.get_serv_name(),
-                        chan_name: chan,
-                    },
-                );
-            }
-
             Cmd::CAP {
                 client: _,
                 ref subcommand,
@@ -693,158 +842,6 @@ impl<'poll> Tiny<'poll> {
             Cmd::AUTHENTICATE { .. } =>
                 // ignore
                 {}
-
-            Cmd::Reply { num: n, params } => {
-                if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
-                        || n == 251 /* RPL_LUSERCLIENT */
-                        || n == 255 /* RPL_LUSERME */
-                        || n == 372 /* RPL_MOTD */
-                        || n == 375 /* RPL_MOTDSTART */
-                        || n == 376
-                /* RPL_ENDOFMOTD */
-                {
-                    debug_assert_eq!(params.len(), 2);
-                    let msg = &params[1];
-                    self.tui.add_msg(
-                        msg,
-                        time::now(),
-                        &MsgTarget::Server {
-                            serv_name: conn.get_serv_name(),
-                        },
-                    );
-                } else if n == 4 // RPL_MYINFO
-                        || n == 5 // RPL_BOUNCE
-                        || (n >= 252 && n <= 254)
-                /* RPL_LUSEROP, RPL_LUSERUNKNOWN, */
-                /* RPL_LUSERCHANNELS */
-                {
-                    let msg = params.into_iter().collect::<Vec<String>>().join(" ");
-                    self.tui.add_msg(
-                        &msg,
-                        time::now(),
-                        &MsgTarget::Server {
-                            serv_name: conn.get_serv_name(),
-                        },
-                    );
-                } else if n == 265 || n == 266 || n == 250 {
-                    let msg = &params[params.len() - 1];
-                    self.tui.add_msg(
-                        msg,
-                        time::now(),
-                        &MsgTarget::Server {
-                            serv_name: conn.get_serv_name(),
-                        },
-                    );
-                }
-                // RPL_TOPIC
-                else if n == 332 {
-                    // FIXME: RFC 2812 says this will have 2 arguments, but freenode
-                    // sends 3 arguments (extra one being our nick).
-                    assert!(params.len() == 3 || params.len() == 2);
-                    let chan = &params[params.len() - 2];
-                    let topic = &params[params.len() - 1];
-                    self.tui.show_topic(
-                        topic,
-                        time::now(),
-                        &MsgTarget::Chan {
-                            serv_name: conn.get_serv_name(),
-                            chan_name: chan,
-                        },
-                    );
-                }
-                // RPL_NAMREPLY: List of users in a channel
-                else if n == 353 {
-                    let chan = &params[2];
-                    let chan_target = MsgTarget::Chan {
-                        serv_name: conn.get_serv_name(),
-                        chan_name: chan,
-                    };
-
-                    for nick in params[3].split_whitespace() {
-                        self.tui
-                            .add_nick(drop_nick_prefix(nick), None, &chan_target);
-                    }
-                }
-                // RPL_ENDOFNAMES: End of NAMES list
-                else if n == 366 {
-                }
-                // RPL_UNAWAY or RPL_NOWAWAY
-                else if n == 305 || n == 306 {
-                    let msg = &params[1];
-                    self.tui.add_client_msg(
-                        msg,
-                        &MsgTarget::AllServTabs {
-                            serv_name: conn.get_serv_name(),
-                        },
-                    );
-                }
-                // ERR_NOSUCHNICK
-                else if n == 401 {
-                    let nick = &params[1];
-                    let msg = &params[2];
-                    let serv_name = conn.get_serv_name();
-                    self.tui
-                        .add_client_msg(msg, &MsgTarget::User { serv_name, nick });
-                // RPL_AWAY
-                } else if n == 301 {
-                    let serv_name = conn.get_serv_name();
-                    let nick = &params[1];
-                    let msg = &params[2];
-                    self.tui.add_client_msg(
-                        &format!("{} is away: {}", nick, msg),
-                        &MsgTarget::User { serv_name, nick },
-                    );
-                } else {
-                    match pfx {
-                        Some(Pfx::Server(msg_serv_name)) => {
-                            let conn_serv_name = conn.get_serv_name();
-                            let msg_target = MsgTarget::Server {
-                                serv_name: conn_serv_name,
-                            };
-                            self.tui.add_privmsg(
-                                &msg_serv_name,
-                                &params.join(" "),
-                                time::now(),
-                                &msg_target,
-                                false,
-                            );
-                            self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
-                        }
-                        _pfx => {
-                            // add everything else to debug file
-                            // self.logger.get_debug_logs().write_line(format_args!(
-                            //     "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
-                            //     pfx, n, params
-                            // ));
-                        }
-                    }
-                }
-            }
-
-            Cmd::Other { cmd: _, params } => match pfx {
-                Some(Pfx::Server(msg_serv_name)) => {
-                    let conn_serv_name = conn.get_serv_name();
-                    let msg_target = MsgTarget::Server {
-                        serv_name: conn_serv_name,
-                    };
-                    self.tui.add_privmsg(
-                        &msg_serv_name,
-                        &params.join(" "),
-                        time::now(),
-                        &msg_target,
-                        false,
-                    );
-                    self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
-                }
-                _pfx => {
-                    // self.logger.get_debug_logs().write_line(format_args!(
-                    //     "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
-                    //     pfx,
-                    //     cmd,
-                    //     params.join(" "),
-                    // ));
-                }
-            },
         }
     }
 }
