@@ -94,6 +94,8 @@ fn run(
     );
     tui.draw();
 
+    // One task for each client to handle IRC events
+    // One task for stdin
     let executor = tokio::runtime::Runtime::new().unwrap();
 
     // A reference to the TUI will be shared with each connection event handler
@@ -134,6 +136,7 @@ fn run(
             match mb_ev {
                 Err(io_err) => {
                     println!("term input error: {:?}", io_err);
+                    // TODO: Close connections here
                     return;
                 }
                 Ok(ev) => {
@@ -211,9 +214,11 @@ fn handle_conn_ev(tui: &mut TUI, client: &libtiny::Client, ev: libtiny::Event) {
 }
 
 fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) {
-    use libtiny::wire::*;
+    use libtiny::wire;
+    use libtiny::wire::{Cmd, Pfx};
 
     let pfx = msg.pfx;
+    let ts = time::now();
     match msg.cmd {
         Cmd::PRIVMSG {
             target,
@@ -235,54 +240,39 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
                 Pfx::User { ref nick, .. } => nick,
             };
 
-            /*
             match target {
                 wire::MsgTarget::Chan(chan) => {
-                    let msg_target = MsgTarget::Chan {
-                        serv_name: conn.get_serv_name(),
+                    let tui_msg_target = MsgTarget::Chan {
+                        serv_name: &client.get_serv_name(),
                         chan_name: &chan,
                     };
                     // highlight the message if it mentions us
-                    if msg.find(conn.get_nick()).is_some() {
-                        self.tui.add_privmsg_highlight(
-                            origin,
-                            msg,
-                            ts,
-                            &msg_target,
-                            is_ctcp_action,
-                        );
-                        self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
+                    if msg.find(&client.get_nick()).is_some() {
+                        tui.add_privmsg_highlight(origin, &msg, ts, &tui_msg_target, is_action);
+                        tui.set_tab_style(TabStyle::Highlight, &tui_msg_target);
                         let mentions_target = MsgTarget::Server {
                             serv_name: "mentions",
                         };
-                        self.tui.add_msg(
-                            &format!(
-                                "{} in {}:{}: {}",
-                                origin,
-                                conn.get_serv_name(),
-                                chan,
-                                msg
-                            ),
+                        tui.add_msg(
+                            &format!("{} in {}:{}: {}", origin, client.get_serv_name(), chan, msg),
                             ts,
                             &mentions_target,
                         );
-                        self.tui
-                            .set_tab_style(TabStyle::Highlight, &mentions_target);
+                        tui.set_tab_style(TabStyle::Highlight, &mentions_target);
                     } else {
-                        self.tui
-                            .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
-                        self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                        tui.add_privmsg(origin, &msg, ts, &tui_msg_target, is_action);
+                        tui.set_tab_style(TabStyle::NewMsg, &tui_msg_target);
                     }
                 }
                 wire::MsgTarget::User(target) => {
-                    let serv_name = conn.get_serv_name();
+                    let serv_name = client.get_serv_name();
                     let msg_target = {
                         match pfx {
                             Pfx::Server(_) => MsgTarget::Server { serv_name },
                             Pfx::User { ref nick, .. } => {
                                 // show NOTICE messages in server tabs if we don't have a tab
                                 // for the sender already (see #21)
-                                if is_notice && !self.tui.does_user_tab_exist(serv_name, nick) {
+                                if is_notice && !tui.does_user_tab_exist(serv_name, nick) {
                                     MsgTarget::Server { serv_name }
                                 } else {
                                     MsgTarget::User { serv_name, nick }
@@ -290,17 +280,15 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
                             }
                         }
                     };
-                    self.tui
-                        .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
-                    if target == conn.get_nick() {
-                        self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
+                    tui.add_privmsg(origin, &msg, ts, &msg_target, is_action);
+                    if target == client.get_nick() {
+                        tui.set_tab_style(TabStyle::Highlight, &msg_target);
                     } else {
                         // not sure if this case can happen
-                        self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                        tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
                 }
             }
-            */
         }
         Cmd::JOIN { chan } => unimplemented!(),
         Cmd::PART { chan, .. } => unimplemented!(),
@@ -325,7 +313,7 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event)
     match tui.handle_input_event(ev) {
         TUIRet::Abort => {
             // TODO: abort here
-        },
+        }
         TUIRet::KeyHandled => {}
         TUIRet::KeyIgnored(_) => {}
         TUIRet::EventIgnored(ev) => {
