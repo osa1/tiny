@@ -290,6 +290,7 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
                 }
             }
         }
+
         Cmd::JOIN { chan } => {
             let nick = match pfx {
                 Some(Pfx::User { nick, .. }) => nick,
@@ -320,9 +321,63 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
                 }
             }
         }
-        Cmd::PART { chan, .. } => unimplemented!(),
-        Cmd::QUIT { .. } => unimplemented!(),
-        Cmd::NICK { nick } => unimplemented!(),
+
+        Cmd::PART { chan, .. } => {
+            let nick = match pfx {
+                Some(Pfx::User { nick, .. }) => nick,
+                _ => {
+                    // TODO: log this?
+                    return;
+                }
+            };
+            if nick != client.get_nick() {
+                tui.remove_nick(
+                    &nick,
+                    Some(time::now()),
+                    &MsgTarget::Chan {
+                        serv_name: &client.get_serv_name(),
+                        chan_name: &chan,
+                    },
+                );
+            }
+        }
+
+        Cmd::QUIT { .. } => {
+            let nick = match pfx {
+                Some(Pfx::User { nick, .. }) => nick,
+                _ => {
+                    // TODO: log this?
+                    return;
+                }
+            };
+
+            tui.remove_nick(
+                &nick,
+                Some(time::now()),
+                &MsgTarget::AllUserTabs { serv_name: &client.get_serv_name(), nick: &nick },
+            );
+        }
+
+        Cmd::NICK { nick } => {
+            let old_nick = match pfx {
+                Some(Pfx::User { nick, .. }) => nick,
+                _ => {
+                    // TODO: log this?
+                    return;
+                }
+            };
+
+            tui.rename_nick(
+                &old_nick,
+                &nick,
+                time::now(),
+                &MsgTarget::AllUserTabs {
+                    serv_name: &client.get_serv_name(),
+                    nick: &old_nick,
+                },
+            );
+        }
+
         Cmd::Reply { num: 433, .. } => unimplemented!(),
         Cmd::PING { .. } | Cmd::PONG { .. } => unimplemented!(),
         Cmd::ERROR { msg } => unimplemented!(),
@@ -557,65 +612,6 @@ impl<'poll> Tiny<'poll> {
         let conn = &self.conns[conn_idx];
         let pfx = msg.pfx;
         match msg.cmd {
-
-            Cmd::PART { chan, .. } => match pfx {
-                Some(Pfx::User { nick, .. }) => {
-                    if nick != conn.get_nick() {
-                        let serv_name = conn.get_serv_name();
-                        self.tui.remove_nick(
-                            &nick,
-                            Some(time::now()),
-                            &MsgTarget::Chan {
-                                serv_name,
-                                chan_name: &chan,
-                            },
-                        );
-                    }
-                }
-                _pfx => {
-                    // self.logger
-                    //     .get_debug_logs()
-                    //     .write_line(format_args!("Weird PART message pfx {:?}", pfx));
-                }
-            },
-
-            Cmd::QUIT { .. } => match pfx {
-                Some(Pfx::User { ref nick, .. }) => {
-                    let serv_name = conn.get_serv_name();
-                    self.tui.remove_nick(
-                        nick,
-                        Some(time::now()),
-                        &MsgTarget::AllUserTabs { serv_name, nick },
-                    );
-                }
-                _pfx => {
-                    // self.logger
-                    //     .get_debug_logs()
-                    //     .write_line(format_args!("Weird QUIT message pfx {:?}", pfx));
-                }
-            },
-
-            Cmd::NICK { nick } => match pfx {
-                Some(Pfx::User {
-                    nick: ref old_nick, ..
-                }) => {
-                    let serv_name = conn.get_serv_name();
-                    self.tui.rename_nick(
-                        old_nick,
-                        &nick,
-                        time::now(),
-                        &MsgTarget::AllUserTabs {
-                            serv_name,
-                            nick: old_nick,
-                        },
-                    );
-                }
-                _pfx => {
-                    // self.logger
-                    //     .get_debug_logs()
-                    //     .write_line(format_args!("Weird NICK message pfx {:?}", pfx));
-                }
-            },
 
             Cmd::Reply { num: 433, .. } => {
                 // ERR_NICKNAMEINUSE
