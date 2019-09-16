@@ -210,7 +210,7 @@ impl Line {
         let mut char_idx: i32 = 0;
 
         let last_seg: [&Seg; 1] = [&self.current_seg];
-        for seg in self.segs.iter().chain(last_seg.iter().map(|s| *s)) {
+        for seg in self.segs.iter().chain(last_seg.iter().copied()) {
             let sty = seg.style(colors);
 
             for char in seg.text.chars() {
@@ -297,9 +297,9 @@ fn irc_color_to_termbox(irc_color: u8) -> u8 {
 #[cfg(test)]
 mod tests {
 
-    use test::Bencher;
     use super::*;
     use std::{fs::File, io::Read};
+    use test::Bencher;
 
     #[test]
     fn height_test_1() {

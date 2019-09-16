@@ -1,5 +1,5 @@
-use notify_rust::Notification;
 use crate::{utils::remove_irc_control_chars, MsgTarget};
+use notify_rust::Notification;
 
 /// Destktop notification handler
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
