@@ -290,7 +290,36 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
                 }
             }
         }
-        Cmd::JOIN { chan } => unimplemented!(),
+        Cmd::JOIN { chan } => {
+            let nick = match pfx {
+                Some(Pfx::User { nick, .. }) => nick,
+                _ => {
+                    // TODO: log this?
+                    return;
+                }
+            };
+
+            let serv_name = client.get_serv_name();
+            if nick == client.get_nick() {
+                tui.new_chan_tab(serv_name, &chan);
+            } else {
+                let nick = drop_nick_prefix(&nick);
+                let ts = Some(time::now());
+                tui.add_nick(
+                    nick,
+                    ts,
+                    &MsgTarget::Chan {
+                        serv_name,
+                        chan_name: &chan,
+                    },
+                );
+                // Also update the private message tab if it exists
+                // Nothing will be shown if the user already known to be online by the tab
+                if tui.does_user_tab_exist(serv_name, nick) {
+                    tui.add_nick(nick, ts, &MsgTarget::User { serv_name, nick });
+                }
+            }
+        }
         Cmd::PART { chan, .. } => unimplemented!(),
         Cmd::QUIT { .. } => unimplemented!(),
         Cmd::NICK { nick } => unimplemented!(),
@@ -528,128 +557,6 @@ impl<'poll> Tiny<'poll> {
         let conn = &self.conns[conn_idx];
         let pfx = msg.pfx;
         match msg.cmd {
-            Cmd::PRIVMSG {
-                target,
-                msg,
-                is_notice,
-            } => {
-                let pfx = match pfx {
-                    Some(pfx) => pfx,
-                    None => {
-                        // self.logger.get_debug_logs().write_line(format_args!(
-                        //     "PRIVMSG or NOTICE without prefix \
-                        //      target: {:?} msg: {:?}",
-                        //     target, msg
-                        // ));
-                        return;
-                    }
-                };
-
-                // sender to be shown in the UI
-                let origin = match pfx {
-                    Pfx::Server(_) => conn.get_serv_name(),
-                    Pfx::User { ref nick, .. } => nick,
-                };
-
-                let (msg, is_ctcp_action) = wire::check_ctcp_action_msg(&msg);
-
-                match target {
-                    wire::MsgTarget::Chan(chan) => {
-                        let msg_target = MsgTarget::Chan {
-                            serv_name: conn.get_serv_name(),
-                            chan_name: &chan,
-                        };
-                        // highlight the message if it mentions us
-                        if msg.find(conn.get_nick()).is_some() {
-                            self.tui.add_privmsg_highlight(
-                                origin,
-                                msg,
-                                ts,
-                                &msg_target,
-                                is_ctcp_action,
-                            );
-                            self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
-                            let mentions_target = MsgTarget::Server {
-                                serv_name: "mentions",
-                            };
-                            self.tui.add_msg(
-                                &format!(
-                                    "{} in {}:{}: {}",
-                                    origin,
-                                    conn.get_serv_name(),
-                                    chan,
-                                    msg
-                                ),
-                                ts,
-                                &mentions_target,
-                            );
-                            self.tui
-                                .set_tab_style(TabStyle::Highlight, &mentions_target);
-                        } else {
-                            self.tui
-                                .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
-                            self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
-                        }
-                    }
-                    wire::MsgTarget::User(target) => {
-                        let serv_name = conn.get_serv_name();
-                        let msg_target = {
-                            match pfx {
-                                Pfx::Server(_) => MsgTarget::Server { serv_name },
-                                Pfx::User { ref nick, .. } => {
-                                    // show NOTICE messages in server tabs if we don't have a tab
-                                    // for the sender already (see #21)
-                                    if is_notice && !self.tui.does_user_tab_exist(serv_name, nick) {
-                                        MsgTarget::Server { serv_name }
-                                    } else {
-                                        MsgTarget::User { serv_name, nick }
-                                    }
-                                }
-                            }
-                        };
-                        self.tui
-                            .add_privmsg(origin, msg, ts, &msg_target, is_ctcp_action);
-                        if target == conn.get_nick() {
-                            self.tui.set_tab_style(TabStyle::Highlight, &msg_target);
-                        } else {
-                            // not sure if this case can happen
-                            self.tui.set_tab_style(TabStyle::NewMsg, &msg_target);
-                        }
-                    }
-                }
-            }
-
-            Cmd::JOIN { chan } => match pfx {
-                Some(Pfx::User { nick, .. }) => {
-                    let serv_name = conn.get_serv_name();
-                    if nick == conn.get_nick() {
-                        self.tui.new_chan_tab(serv_name, &chan);
-                    } else {
-                        let nick = drop_nick_prefix(&nick);
-                        let ts = Some(time::now());
-                        self.tui.add_nick(
-                            nick,
-                            ts,
-                            &MsgTarget::Chan {
-                                serv_name,
-                                chan_name: &chan,
-                            },
-                        );
-                        // Also update the private message tab if it exists
-                        // Nothing will be shown if the user already known to be online by the
-                        // tab
-                        if self.tui.does_user_tab_exist(serv_name, nick) {
-                            self.tui
-                                .add_nick(nick, ts, &MsgTarget::User { serv_name, nick });
-                        }
-                    }
-                }
-                _pfx => {
-                    // self.logger
-                    //     .get_debug_logs()
-                    //     .write_line(format_args!("Weird JOIN message pfx {:?}", pfx));
-                }
-            },
 
             Cmd::PART { chan, .. } => match pfx {
                 Some(Pfx::User { nick, .. }) => {
