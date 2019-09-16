@@ -1,10 +1,9 @@
-use super::Tiny;
 use crate::config;
-use crate::conn::Conn;
 use crate::utils;
+use libtiny::Client;
 use libtiny_tui::Notifier;
+use libtiny_tui::TUI;
 use libtiny_tui::{MsgSource, MsgTarget};
-use mio::Poll;
 use std::error::Error;
 
 pub(crate) struct Cmd {
@@ -14,7 +13,7 @@ pub(crate) struct Cmd {
     // Command help message. Shown in `/help`.
     // pub(crate) help: &'static str,
     /// Command function.
-    pub(crate) cmd_fn: for<'a, 'b> fn(&str, poll: &'b Poll, &'a mut Tiny<'b>, MsgSource),
+    pub(crate) cmd_fn: for<'a, 'b> fn(&str, &mut TUI, &mut Vec<Client>, MsgSource),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,8 +68,27 @@ pub(crate) fn parse_cmd(cmd: &str) -> ParseCmdResult {
     }
 }
 
+fn find_client_idx(clients: &[Client], serv_name: &str) -> Option<usize> {
+    for (client_idx, client) in clients.iter().enumerate() {
+        if client.get_serv_name() == serv_name {
+            return Some(client_idx);
+        }
+    }
+    None
+}
+
+fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a mut Client> {
+    match find_client_idx(clients, serv_name) {
+        None => None,
+        Some(idx) => Some(&mut clients[idx]),
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static CMDS: [&'static Cmd; 0] = [];
+
+/*
 static CMDS: [&'static Cmd; 14] = [
     &AWAY_CMD,
     &CLEAR_CMD,
@@ -87,6 +105,7 @@ static CMDS: [&'static Cmd; 14] = [
     &RELOAD_CMD,
     &SWITCH_CMD,
 ];
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,10 +114,10 @@ static AWAY_CMD: Cmd = Cmd {
     cmd_fn: away,
 };
 
-fn away(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn away(args: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     let msg = if args.is_empty() { None } else { Some(args) };
-    if let Some(conn) = super::find_conn(&mut tiny.conns, src.serv_name()) {
-        conn.away(msg);
+    if let Some(client) = find_client(clients, src.serv_name()) {
+        client.away(msg);
     }
 }
 
@@ -109,8 +128,8 @@ static CLEAR_CMD: Cmd = Cmd {
     cmd_fn: clear,
 };
 
-fn clear(_: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
-    tiny.tui.clear(&src.to_target());
+fn clear(args: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
+    tui.clear(&src.to_target());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -120,29 +139,31 @@ static CLOSE_CMD: Cmd = Cmd {
     cmd_fn: close,
 };
 
-fn close(_: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn close(_: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     match src {
         MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
             // ignore
         }
         MsgSource::Serv { serv_name } => {
-            tiny.tui.close_server_tab(&serv_name);
-            let conn_idx = super::find_conn_idx(&tiny.conns, &serv_name).unwrap();
-            tiny.conns.remove(conn_idx);
+            tui.close_server_tab(&serv_name);
+            let client_idx = find_client_idx(&clients, &serv_name).unwrap();
+            // TODO: this probably won't close the connection?
+            clients.remove(client_idx);
         }
         MsgSource::Chan {
             serv_name,
             chan_name,
         } => {
-            tiny.tui.close_chan_tab(&serv_name, &chan_name);
-            tiny.part(&serv_name, &chan_name);
+            tui.close_chan_tab(&serv_name, &chan_name);
+            // tiny.part(&serv_name, &chan_name); FIXME
         }
         MsgSource::User { serv_name, nick } => {
-            tiny.tui.close_user_tab(&serv_name, &nick);
+            tui.close_user_tab(&serv_name, &nick);
         }
     }
 }
 
+/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static CONNECT_CMD: Cmd = Cmd {
@@ -415,6 +436,7 @@ fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
 
     tiny.send_msg(&src, msg, false);
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -423,7 +445,7 @@ static NAMES_CMD: Cmd = Cmd {
     cmd_fn: names,
 };
 
-fn names(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn names(args: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
 
     if let MsgSource::Chan {
@@ -431,31 +453,28 @@ fn names(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         ref chan_name,
     } = src
     {
-        let nicks_vec = tiny.tui.get_nicks(serv_name, chan_name);
+        let nicks_vec = tui.get_nicks(serv_name, chan_name);
         if let Some(nicks_vec) = nicks_vec {
             let target = MsgTarget::Chan {
                 serv_name,
                 chan_name,
             };
             if words.is_empty() {
-                tiny.tui.add_client_msg(
+                tui.add_client_msg(
                     &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
                     &target,
                 );
             } else {
                 let nick = words[0];
                 if nicks_vec.iter().any(|v| v == nick) {
-                    tiny.tui
-                        .add_client_msg(&format!("{} is online", nick), &target);
+                    tui.add_client_msg(&format!("{} is online", nick), &target);
                 } else {
-                    tiny.tui
-                        .add_client_msg(&format!("{} is not in the channel", nick), &target);
+                    tui.add_client_msg(&format!("{} is not in the channel", nick), &target);
                 }
             }
         }
     } else {
-        tiny.tui
-            .add_client_err_msg("/names only supported in chan tabs", &MsgTarget::CurrentTab);
+        tui.add_client_err_msg("/names only supported in chan tabs", &MsgTarget::CurrentTab);
     }
 }
 
@@ -466,21 +485,21 @@ static NICK_CMD: Cmd = Cmd {
     cmd_fn: nick,
 };
 
-fn nick(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn nick(args: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() == 1 {
-        if let Some(conn) = super::find_conn(&mut tiny.conns, src.serv_name()) {
+        if let Some(client) = find_client(clients, src.serv_name()) {
             let new_nick = words[0];
-            conn.send_nick(new_nick);
+            client.nick(new_nick);
         }
     } else {
-        tiny.tui
-            .add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
+        tui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 static RELOAD_CMD: Cmd = Cmd {
     name: "reload",
     cmd_fn: reload,
@@ -498,6 +517,7 @@ fn reload(_: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
         }
     }
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -506,14 +526,12 @@ static SWITCH_CMD: Cmd = Cmd {
     cmd_fn: switch,
 };
 
-fn switch(args: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
+fn switch(args: &str, tui: &mut TUI, _: &mut Vec<Client>, _: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() != 1 {
-        return tiny
-            .tui
-            .add_client_err_msg("/switch usage: /switch <tab name>", &MsgTarget::CurrentTab);
+        return tui.add_client_err_msg("/switch usage: /switch <tab name>", &MsgTarget::CurrentTab);
     }
-    tiny.tui.switch(words[0]);
+    tui.switch(words[0]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -523,36 +541,35 @@ static NOTIFY_CMD: Cmd = Cmd {
     cmd_fn: notify,
 };
 
-fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn notify(args: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
 
     let mut show_usage = || {
-        tiny.tui.add_client_err_msg(
+        tui.add_client_err_msg(
             "/notify usage: /notify [off|mentions|messages]",
             &MsgTarget::CurrentTab,
         )
     };
 
     if words.is_empty() {
-        tiny.tui.show_notify_mode(&MsgTarget::CurrentTab);
+        tui.show_notify_mode(&MsgTarget::CurrentTab);
     } else if words.len() != 1 {
         show_usage();
     } else {
         let notifier = match words[0] {
             "off" => {
-                tiny.tui
-                    .add_client_notify_msg("Notifications turned off", &MsgTarget::CurrentTab);
+                tui.add_client_notify_msg("Notifications turned off", &MsgTarget::CurrentTab);
                 Notifier::Off
             }
             "mentions" => {
-                tiny.tui.add_client_notify_msg(
+                tui.add_client_notify_msg(
                     "Notifications enabled for mentions",
                     &MsgTarget::CurrentTab,
                 );
                 Notifier::Mentions
             }
             "messages" => {
-                tiny.tui.add_client_notify_msg(
+                tui.add_client_notify_msg(
                     "Notifications enabled for all messages",
                     &MsgTarget::CurrentTab,
                 );
@@ -577,12 +594,13 @@ fn notify(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
                 ref nick,
             } => MsgTarget::User { serv_name, nick },
         };
-        tiny.tui.set_notifier(notifier, &tab_target);
+        tui.set_notifier(notifier, &tab_target);
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -620,3 +638,5 @@ mod tests {
         assert_eq!(split_msg_args("foo ,bar"), Some(("foo", ",bar")));
     }
 }
+
+*/
