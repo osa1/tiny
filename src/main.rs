@@ -1,31 +1,22 @@
 #![cfg_attr(test, feature(test))]
 #![feature(drain_filter)]
 #![feature(ptr_offset_from)]
-
-// #[macro_use]
-mod utils;
+#![allow(clippy::zero_prefixed_literal)]
 
 mod cmd;
 mod cmd_line_args;
 mod config;
-// mod conn;
-// mod stream;
-// mod wire;
+mod utils;
 
 use futures_util::stream::StreamExt;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-// use std::time::Duration;
-// use std::time::Instant;
-// use time::Tm;
 
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
-// use conn::{Conn, ConnErr, ConnEv};
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
 use term_input::{Event, Input};
-// use wire::{Cmd, Msg, Pfx};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -421,12 +412,50 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
         }
 
         Cmd::CAP {
-            client,
-            subcommand,
-            params,
-        } => unimplemented!(),
+            client: _,
+            subcommand: _,
+            params: _,
+        } => {
+            /*
+            match subcommand.as_ref() {
+                "NAK" => {
+                    if params.iter().any(|cap| cap.as_str() == "sasl") {
+                        let msg_target = MsgTarget::Server {
+                            serv_name: conn.get_serv_name(),
+                        };
+                        self.tui.add_err_msg(
+                            "Server rejected using SASL authenication capability",
+                            time::now(),
+                            &msg_target,
+                        );
+                    }
+                }
+                "LS" => {
+                    if !params.iter().any(|cap| cap.as_str() == "sasl") {
+                        let msg_target = MsgTarget::Server {
+                            serv_name: conn.get_serv_name(),
+                        };
+                        self.tui.add_err_msg(
+                            "Server does not support SASL authenication",
+                            time::now(),
+                            &msg_target,
+                        );
+                    }
+                }
+                "ACK" => {}
+                _cmd => {
+                    // self.logger
+                    //     .get_debug_logs()
+                    //     .write_line(format_args!("CAP subcommand {} is not handled", cmd));
+                }
+            }
+            */
+            unimplemented!();
+        }
 
-        Cmd::AUTHENTICATE { .. } => unimplemented!(),
+        Cmd::AUTHENTICATE { .. } => {
+            // Ignore
+        }
 
         Cmd::Reply { num: n, params } => {
             if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
@@ -593,7 +622,7 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event)
         TUIRet::Input { msg, from } => {
             // We know msg has at least one character as the TUI won't accept it otherwise.
             if msg[0] == '/' {
-                let cmd_str: String = (&msg[1..]).into_iter().cloned().collect();
+                let cmd_str: String = (&msg[1..]).iter().cloned().collect();
                 handle_cmd(tui, clients, from, &cmd_str)
             } else {
                 let msg_str: String = msg.into_iter().collect();
@@ -659,10 +688,9 @@ fn send_msg(
 
     // `tui_target`: Where to show the message on TUI
     // `msg_target`: Actual PRIVMSG target to send to the server
-    // `serv_name`: Server name to find connection in `clients`
-    let (tui_target, msg_target, serv_name) = {
+    let (tui_target, msg_target) = {
         match src {
-            MsgSource::Serv { ref serv_name } => {
+            MsgSource::Serv { .. } => {
                 // we don't split raw messages to 512-bytes long chunks
                 client.raw_msg(msg);
                 return;
@@ -677,7 +705,6 @@ fn send_msg(
                     chan_name,
                 },
                 chan_name,
-                serv_name,
             ),
 
             MsgSource::User {
@@ -691,7 +718,7 @@ fn send_msg(
                 } else {
                     MsgTarget::User { serv_name, nick }
                 };
-                (msg_target, nick, serv_name)
+                (msg_target, nick)
             }
         }
     };
@@ -710,160 +737,6 @@ fn send_msg(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/*
-impl<'poll> Tiny<'poll> {
-    fn handle_cmd(&mut self, poll: &'poll Poll, src: MsgSource, msg: &str) {
-        match parse_cmd(msg) {
-            ParseCmdResult::Ok { cmd, rest } => {
-                (cmd.cmd_fn)(rest, poll, self, src);
-            }
-            // ParseCmdResult::Ambiguous(vec) => {
-            //     self.tui.add_client_err_msg(
-            //         &format!("Unsupported command: \"/{}\"", msg),
-            //         &MsgTarget::CurrentTab,
-            //     );
-            //     self.tui.add_client_err_msg(
-            //         &format!("Did you mean one of {:?} ?", vec),
-            //         &MsgTarget::CurrentTab,
-            //     );
-            // },
-            ParseCmdResult::Unknown => self.tui.add_client_err_msg(
-                &format!("Unsupported command: \"/{}\"", msg),
-                &MsgTarget::CurrentTab,
-            ),
-        }
-    }
-
-    fn part(&mut self, serv_name: &str, chan: &str) {
-        let conn = find_conn(&mut self.conns, serv_name).unwrap();
-        conn.part(chan);
-    }
-
-    fn send_msg(&mut self, _: &MsgSource, _: &str, _: bool) {
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-
-    fn handle_conn_ev(&mut self, conn_idx: usize, ev: ConnEv) {
-        match ev {
-            ConnEv::Connected => {
-                self.tui.add_msg(
-                    "Connected.",
-                    time::now(),
-                    &MsgTarget::AllServTabs {
-                        serv_name: self.conns[conn_idx].get_serv_name(),
-                    },
-                );
-            }
-            ConnEv::Disconnected => {
-                let conn = &mut self.conns[conn_idx];
-                let target = MsgTarget::AllServTabs {
-                    serv_name: conn.get_serv_name(),
-                };
-                self.tui.add_err_msg(
-                    &format!(
-                        "Disconnected. Will try to reconnect in {} seconds.",
-                        conn::RECONNECT_TICKS
-                    ),
-                    time::now(),
-                    &target,
-                );
-                self.tui.clear_nicks(&target);
-            }
-            ConnEv::WantReconnect => {
-                let conn = &mut self.conns[conn_idx];
-                self.tui.add_client_msg(
-                    "Connecting...",
-                    &MsgTarget::AllServTabs {
-                        serv_name: conn.get_serv_name(),
-                    },
-                );
-                match conn.reconnect(None) {
-                    Ok(()) => {}
-                    Err(err) => {
-                        self.tui.add_err_msg(
-                            &reconnect_err_msg(&err),
-                            time::now(),
-                            &MsgTarget::AllServTabs {
-                                serv_name: conn.get_serv_name(),
-                            },
-                        );
-                    }
-                }
-            }
-            ConnEv::Err(err) => {
-                let conn = &mut self.conns[conn_idx];
-                conn.enter_disconnect_state();
-                self.tui.add_err_msg(
-                    &reconnect_err_msg(&err),
-                    time::now(),
-                    &MsgTarget::AllServTabs {
-                        serv_name: conn.get_serv_name(),
-                    },
-                );
-            }
-            ConnEv::Msg(msg) => {
-                self.handle_msg(conn_idx, msg, time::now());
-            }
-            ConnEv::NickChange(new_nick) => {
-                let conn = &self.conns[conn_idx];
-                self.tui.set_nick(conn.get_serv_name(), &new_nick);
-            }
-        }
-    }
-
-    fn handle_msg(&mut self, conn_idx: usize, msg: Msg, ts: Tm) {
-        let conn = &self.conns[conn_idx];
-        let pfx = msg.pfx;
-        match msg.cmd {
-
-            Cmd::CAP {
-                client: _,
-                ref subcommand,
-                ref params,
-            } => {
-                match subcommand.as_ref() {
-                    "NAK" => {
-                        if params.iter().any(|cap| cap.as_str() == "sasl") {
-                            let msg_target = MsgTarget::Server {
-                                serv_name: conn.get_serv_name(),
-                            };
-                            self.tui.add_err_msg(
-                                "Server rejected using SASL authenication capability",
-                                time::now(),
-                                &msg_target,
-                            );
-                        }
-                    }
-                    "LS" => {
-                        if !params.iter().any(|cap| cap.as_str() == "sasl") {
-                            let msg_target = MsgTarget::Server {
-                                serv_name: conn.get_serv_name(),
-                            };
-                            self.tui.add_err_msg(
-                                "Server does not support SASL authenication",
-                                time::now(),
-                                &msg_target,
-                            );
-                        }
-                    }
-                    "ACK" => {}
-                    _cmd => {
-                        // self.logger
-                        //     .get_debug_logs()
-                        //     .write_line(format_args!("CAP subcommand {} is not handled", cmd));
-                    }
-                };
-            }
-
-            Cmd::AUTHENTICATE { .. } =>
-                // ignore
-                {}
-        }
-    }
-}
-*/
 
 /// Nicks may have prefixes, indicating it is a operator, founder, or
 /// something else.
