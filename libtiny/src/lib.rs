@@ -156,7 +156,7 @@ impl Client {
         };
         self.msg_chan
             .try_send(Cmd::Msg(wire_fn(target, msg)))
-            .unwrap();
+            .unwrap()
     }
 
     /// Join a channel.
@@ -166,12 +166,18 @@ impl Client {
             .unwrap()
     }
 
+    /// Set away status. `None` means not away.
     pub fn away(&mut self, msg: Option<&str>) {
-        unimplemented!()
+        self.state.set_away(msg);
+        self.msg_chan.try_send(Cmd::Msg(wire::away(msg))).unwrap()
     }
 
+    /// Change nick. This may fail (ERR_NICKNAMEINUSE) so wait for confirmation (a NICK message
+    /// back from the server, with the old nick as prefix).
     pub fn nick(&mut self, new_nick: &str) {
-        unimplemented!()
+        self.msg_chan
+            .try_send(Cmd::Msg(wire::nick(new_nick)))
+            .unwrap()
     }
 }
 

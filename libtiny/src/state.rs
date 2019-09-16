@@ -47,6 +47,10 @@ impl State {
     pub(crate) fn get_usermask(&self) -> Option<String> {
         self.inner.lock().unwrap().usermask.clone()
     }
+
+    pub(crate) fn set_away(&self, msg: Option<&str>) {
+        self.inner.lock().unwrap().away_status = msg.map(str::to_owned);
+    }
 }
 
 struct StateInner {
@@ -69,7 +73,7 @@ struct StateInner {
     chans: Vec<String>,
 
     /// Away reason if away mode is on. `None` otherwise. TODO: I don't think the message is used?
-    // away_status: Option<String>,
+    away_status: Option<String>,
 
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
     servername: Option<String>,
@@ -89,14 +93,6 @@ struct StateInner {
 
 impl StateInner {
     fn new(server_info: ServerInfo) -> StateInner {
-        // Introduce self
-        // snd_irc_msg
-        //     .try_send(wire::nick(&server_info.nicks[0]))
-        //     .unwrap();
-        // snd_irc_msg
-        //     .try_send(wire::user(&server_info.hostname, &server_info.realname))
-        //     .unwrap();
-
         let current_nick = server_info.nicks[0].to_owned();
         let chans = server_info.auto_join.clone();
         StateInner {
@@ -104,7 +100,7 @@ impl StateInner {
             current_nick_idx: 0,
             current_nick,
             chans,
-            // away_status: None,
+            away_status: None,
             servername: None,
             usermask: None,
             nick_accepted: false,

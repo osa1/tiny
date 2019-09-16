@@ -51,7 +51,6 @@ pub(crate) fn action(msgtarget: &str, msg: &str) -> String {
     format!("PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
 }
 
-/*
 pub(crate) fn away(msg: Option<&str>) -> String {
     match msg {
         None => format!("AWAY\r\n"),
@@ -59,6 +58,7 @@ pub(crate) fn away(msg: Option<&str>) -> String {
     }
 }
 
+/*
 pub(crate) fn cap_ls() -> String {
     "CAP LS\r\n".to_string()
 }
