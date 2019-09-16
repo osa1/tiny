@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 // use std::time::Instant;
 // use time::Tm;
 
-// use cmd::{parse_cmd, ParseCmdResult};
+use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 // use conn::{Conn, ConnErr, ConnEv};
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
@@ -594,7 +594,7 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event)
             // We know msg has at least one character as the TUI won't accept it otherwise.
             if msg[0] == '/' {
                 let cmd_str: String = (&msg[1..]).into_iter().cloned().collect();
-                handle_cmd(tui, clients, &cmd_str)
+                handle_cmd(tui, clients, from, &cmd_str)
             } else {
                 let msg_str: String = msg.into_iter().collect();
                 send_msg(tui, clients, &from, msg_str, false)
@@ -608,8 +608,26 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event)
     }
 }
 
-fn handle_cmd(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, cmd: &str) {
-    unimplemented!()
+fn handle_cmd(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, src: MsgSource, cmd: &str) {
+    match parse_cmd(cmd) {
+        ParseCmdResult::Ok { cmd, rest } => {
+            (cmd.cmd_fn)(rest, tui, clients, src);
+        }
+        // ParseCmdResult::Ambiguous(vec) => {
+        //     self.tui.add_client_err_msg(
+        //         &format!("Unsupported command: \"/{}\"", msg),
+        //         &MsgTarget::CurrentTab,
+        //     );
+        //     self.tui.add_client_err_msg(
+        //         &format!("Did you mean one of {:?} ?", vec),
+        //         &MsgTarget::CurrentTab,
+        //     );
+        // },
+        ParseCmdResult::Unknown => tui.add_client_err_msg(
+            &format!("Unsupported command: \"/{}\"", cmd),
+            &MsgTarget::CurrentTab,
+        ),
+    }
 }
 
 fn send_msg(

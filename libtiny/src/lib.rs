@@ -159,8 +159,7 @@ impl Client {
     }
 
     /// Join a channel.
-    pub fn join(&mut self, chan: &str) {
-        let chans: [&str; 1] = [chan];
+    pub fn join(&mut self, chans: &[&str]) {
         self.msg_chan
             .try_send(Cmd::Msg(wire::join(&chans)))
             .unwrap()
