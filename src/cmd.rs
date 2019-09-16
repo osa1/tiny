@@ -86,15 +86,11 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&'static Cmd; 0] = [];
-
-/*
-static CMDS: [&'static Cmd; 14] = [
+static CMDS: [&'static Cmd; 11] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
-    &CONNECT_CMD,
-    &HELP_CMD,
+    // &CONNECT_CMD,
     &IGNORE_CMD,
     &JOIN_CMD,
     &ME_CMD,
@@ -102,10 +98,9 @@ static CMDS: [&'static Cmd; 14] = [
     &NAMES_CMD,
     &NICK_CMD,
     &NOTIFY_CMD,
-    &RELOAD_CMD,
+    // &RELOAD_CMD,
     &SWITCH_CMD,
 ];
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -295,17 +290,7 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
         }
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static HELP_CMD: Cmd = Cmd {
-    name: "help",
-    cmd_fn: help,
-};
-
-fn help(_: &str, _: &Poll, _: &mut Tiny, _: MsgSource) {
-    // TODO
-}
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -314,10 +299,10 @@ static IGNORE_CMD: Cmd = Cmd {
     cmd_fn: ignore,
 };
 
-fn ignore(_: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn ignore(args: &str, tui: &mut TUI, _: &mut Vec<Client>, src: MsgSource) {
     match src {
         MsgSource::Serv { serv_name } => {
-            tiny.tui.toggle_ignore(&MsgTarget::AllServTabs {
+            tui.toggle_ignore(&MsgTarget::AllServTabs {
                 serv_name: &serv_name,
             });
         }
@@ -325,13 +310,13 @@ fn ignore(_: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
             serv_name,
             chan_name,
         } => {
-            tiny.tui.toggle_ignore(&MsgTarget::Chan {
+            tui.toggle_ignore(&MsgTarget::Chan {
                 serv_name: &serv_name,
                 chan_name: &chan_name,
             });
         }
         MsgSource::User { serv_name, nick } => {
-            tiny.tui.toggle_ignore(&MsgTarget::User {
+            tui.toggle_ignore(&MsgTarget::User {
                 serv_name: &serv_name,
                 nick: &nick,
             });
@@ -346,18 +331,18 @@ static JOIN_CMD: Cmd = Cmd {
     cmd_fn: join,
 };
 
-fn join(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn join(args: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     let words = args.split_whitespace().collect::<Vec<_>>();
     if words.is_empty() {
-        return tiny.tui.add_client_err_msg(
+        return tui.add_client_err_msg(
             "/join usage: /join chan1[,chan2...]",
             &MsgTarget::CurrentTab,
         );
     }
 
-    match super::find_conn(&mut tiny.conns, src.serv_name()) {
-        Some(conn) => conn.join(&words),
-        None => tiny.tui.add_client_err_msg(
+    match find_client(clients, src.serv_name()) {
+        Some(client) => client.join(&words),
+        None => tui.add_client_err_msg(
             &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
             &MsgTarget::CurrentTab,
         ),
@@ -371,13 +356,11 @@ static ME_CMD: Cmd = Cmd {
     cmd_fn: me,
 };
 
-fn me(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn me(args: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     if args.len() == 0 {
-        return tiny
-            .tui
-            .add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
+        return tui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
-    tiny.send_msg(&src, args, true);
+    crate::send_msg(tui, clients, &src, args.to_string(), true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -405,10 +388,9 @@ fn split_msg_args(args: &str) -> Option<(&str, &str)> {
     target_msg
 }
 
-fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
+fn msg(args: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     let mut fail = || {
-        tiny.tui
-            .add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
+        tui.add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
     };
 
     let (target, msg) = match split_msg_args(args) {
@@ -422,7 +404,10 @@ fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         }
     };
 
-    let src = if tiny.conns.iter().any(|conn| conn.get_serv_name() == target) {
+    let src = if clients
+        .iter()
+        .any(|client| client.get_serv_name() == target)
+    {
         MsgSource::Serv {
             serv_name: target.to_owned(),
         }
@@ -434,9 +419,8 @@ fn msg(args: &str, _: &Poll, tiny: &mut Tiny, src: MsgSource) {
         }
     };
 
-    tiny.send_msg(&src, msg, false);
+    crate::send_msg(tui, clients, &src, msg.to_owned(), false);
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
