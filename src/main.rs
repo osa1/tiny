@@ -9,9 +9,11 @@ mod config;
 mod utils;
 
 use futures_util::stream::StreamExt;
-use std::error::Error;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::{
+    error::Error,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
@@ -210,8 +212,10 @@ fn handle_conn_ev(tui: &mut TUI, client: &libtiny::Client, ev: libtiny::Event) {
 }
 
 fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) {
-    use libtiny::wire;
-    use libtiny::wire::{Cmd, Pfx};
+    use libtiny::{
+        wire,
+        wire::{Cmd, Pfx},
+    };
 
     let pfx = msg.pfx;
     let ts = time::now();

@@ -1,5 +1,4 @@
-use std::env::Args;
-use std::path::PathBuf;
+use std::{env::Args, path::PathBuf};
 
 pub(crate) struct CmdLineArgs {
     /// Servers to connect to

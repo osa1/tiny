@@ -1,9 +1,7 @@
 // use crate::config;
 use crate::utils;
 use libtiny::Client;
-use libtiny_tui::Notifier;
-use libtiny_tui::TUI;
-use libtiny_tui::{MsgSource, MsgTarget};
+use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
 // use std::error::Error;
 
 pub(crate) struct Cmd {
