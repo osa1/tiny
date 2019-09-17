@@ -84,8 +84,10 @@ pub(crate) fn authenticate(msg: &str) -> String {
 }
 */
 
-/// <prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
+/// `<prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]`
+///
 /// From RFC 2812:
+///
 /// > If the prefix is missing from the message, it is assumed to have originated from the
 /// > connection from which it was received from.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -397,7 +399,7 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     ret
 }
 
-pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
+pub(crate) fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
     for (byte_idx, byte) in buf.iter().enumerate() {
         if *byte == byte0 {
             return Some(byte_idx);
