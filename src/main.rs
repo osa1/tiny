@@ -133,7 +133,10 @@ fn run(
                     return;
                 }
                 Ok(ev) => {
-                    handle_input_ev(&mut *tui.lock().unwrap(), &mut clients, ev);
+                    let abort = handle_input_ev(&mut *tui.lock().unwrap(), &mut clients, ev);
+                    if abort {
+                        return;
+                    }
                 }
             }
             tui.lock().unwrap().draw();
@@ -611,10 +614,13 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
     }
 }
 
-fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event) {
+fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event) -> bool {
     match tui.handle_input_event(ev) {
         TUIRet::Abort => {
-            // TODO: abort here
+            for client in clients {
+                client.quit(None);
+            }
+            return true; // abort
         }
         TUIRet::KeyHandled => {}
         TUIRet::KeyIgnored(_) => {}
@@ -637,6 +643,8 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event)
             }
         }
     }
+
+    false // continue
 }
 
 fn handle_cmd(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, src: MsgSource, cmd: &str) {
