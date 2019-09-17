@@ -30,7 +30,7 @@ time = "0.1"
 
 libtiny = { path = "libtiny" }
 libtiny_tui = { path = "libtiny_tui" }
-term_input = { path = "term_input_std_futures" }
+term_input = { path = "term_input" }
 tokio = { version = "0.2.0-alpha.2", features = ["timer"] }
 tokio-executor = "0.2.0-alpha.2"
 futures-util-preview = "0.3.0-alpha.18"
