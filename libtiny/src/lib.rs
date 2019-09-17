@@ -3,7 +3,7 @@
 #![feature(test)]
 
 mod state;
-pub mod utils;
+mod utils;
 pub mod wire;
 
 use state::State;
@@ -89,12 +89,12 @@ pub struct Client {
 }
 
 impl Client {
-    /// Create a new client. Spawns two `tokio` tasks.
+    /// Create a new client. Spawns two `tokio` tasks on the given `runtime`.
     pub fn new(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receiver<Event>) {
         connect(server_info, runtime)
     }
 
-    /// Get host name of this connection.
+    /// Get host name of this connection. Just a reference to the given `ServerInfo`'s `hostname`.
     pub fn get_serv_name(&self) -> &str {
         &self.serv_name
     }
@@ -112,16 +112,22 @@ impl Client {
         self.state.is_nick_accepted()
     }
 
-    /// Send a message directly to the server.
+    /// Send a message directly to the server. "\r\n" suffix is added by this method.
     pub fn raw_msg(&mut self, msg: String) {
-        self.msg_chan.try_send(Cmd::Msg(msg)).unwrap()
+        self.msg_chan
+            .try_send(Cmd::Msg(format!("{}\r\n", msg)))
+            .unwrap()
     }
 
     /// Split a privmsg to multiple messages so that each message is, when the hostname and nick
     /// prefix added by the server, fits in one IRC message.
     ///
     /// `extra_len`: Size (in bytes) for a prefix/suffix etc. that'll be added to each line.
-    pub fn split_privmsg<'a>(&self, extra_len: usize, msg: &'a str) -> utils::SplitIterator<'a> {
+    pub fn split_privmsg<'a>(
+        &self,
+        extra_len: usize,
+        msg: &'a str,
+    ) -> impl Iterator<Item = &'a str> {
         // Max msg len calculation adapted from hexchat
         // (src/common/outbound.c:split_up_text)
         let mut max = 512; // RFC 2812
@@ -159,7 +165,7 @@ impl Client {
             .unwrap()
     }
 
-    /// Join a channel.
+    /// Join the given list of channels.
     pub fn join(&mut self, chans: &[&str]) {
         self.msg_chan
             .try_send(Cmd::Msg(wire::join(&chans)))
