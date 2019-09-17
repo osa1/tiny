@@ -21,7 +21,7 @@ path = "src/lib.rs"
 notify-rust = "3"
 serde = { version = "1.0.8", features = ["derive"] }
 tempfile = "3.0.3"
-term_input = { path = "../term_input_std_futures" }
+term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox", version = "0.2.3" }
 time = "0.1"
 
