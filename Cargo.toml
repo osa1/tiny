@@ -20,20 +20,15 @@ path = "src/main.rs"
 [dependencies]
 base64 = "0.6.0"
 dirs = "1.0.2"
-libc = "0.2.22"
-native-tls = "0.2.2"
-net2 = "0.2.23"
-serde = { version = "1.0.8", features = ["derive"] }
-serde_yaml = "0.7.1"
-take_mut = "0.2.0"
-time = "0.1"
-
+futures-util-preview = "0.3.0-alpha.18"
 libtiny = { path = "libtiny" }
 libtiny_tui = { path = "libtiny_tui" }
+serde = { version = "1.0.8", features = ["derive"] }
+serde_yaml = "0.7.1"
 term_input = { path = "term_input" }
+time = "0.1"
 tokio = { version = "0.2.0-alpha.2", features = ["timer"] }
 tokio-executor = "0.2.0-alpha.2"
-futures-util-preview = "0.3.0-alpha.18"
 
 [profile.release]
 lto = true
