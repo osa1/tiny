@@ -331,6 +331,7 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
                                 while let Some(msg) = wire::parse_irc_msg(&mut parse_buf) {
                                     eprintln!("parsed msg: {:?}", msg);
                                     irc_state.update(&msg, &mut snd_ev, &mut snd_msg);
+                                    snd_ev.try_send(Event::Msg(msg)).unwrap();
                                 }
                             }
                         }
