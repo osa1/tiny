@@ -179,6 +179,13 @@ impl Client {
             .try_send(Cmd::Msg(wire::nick(new_nick)))
             .unwrap()
     }
+
+    /// Send a QUIT message to the server, with optional "reason". This stops the client; so the
+    /// sender end of the `Cmd` channel and the receiver end of the IRC message channel (for
+    /// outgoing messages) will be dropped.
+    pub fn quit(&mut self, reason: Option<String>) {
+        self.msg_chan.try_send(Cmd::Quit(reason)).unwrap();
+    }
 }
 
 //
@@ -190,6 +197,9 @@ enum Cmd {
     /// Send this IRC message to the server. Note that this needs to be a valid IRC message
     /// (including the trailing "\r\n").
     Msg(String),
+    /// Close the connection. This sends a QUIT message to the server (with optional "reason") and
+    /// then all tasks return.
+    Quit(Option<String>),
 }
 
 fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receiver<Event>) {
@@ -315,6 +325,13 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
                             }
                             Some(Cmd::Msg(irc_msg)) => {
                                 snd_msg.try_send(irc_msg).unwrap();
+                            }
+                            Some(Cmd::Quit(reason)) => {
+                                snd_msg.send(wire::quit(reason)).await.unwrap();
+                                // This drops the sender end of the channel that the sender task
+                                // uses, which in turn causes the sender task to return. Somewhat
+                                // hacky?
+                                return;
                             }
                         }
                     }

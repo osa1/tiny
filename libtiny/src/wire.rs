@@ -10,6 +10,14 @@ pub(crate) fn pass(pass: &str) -> String {
 }
 */
 
+// FIXME: Option<String> because going from Option<String> to Option<&str> is too painful...
+pub(crate) fn quit(reason: Option<String>) -> String {
+    match reason {
+        None => "QUIT\r\n".to_string(),
+        Some(reason) => format!("QUIT :{}\r\n", reason),
+    }
+}
+
 pub(crate) fn user(hostname: &str, realname: &str) -> String {
     format!("USER {} 8 * :{}\r\n", hostname, realname)
 }
@@ -53,7 +61,7 @@ pub(crate) fn action(msgtarget: &str, msg: &str) -> String {
 
 pub(crate) fn away(msg: Option<&str>) -> String {
     match msg {
-        None => format!("AWAY\r\n"),
+        None => "AWAY\r\n".to_string(),
         Some(msg) => format!("AWAY :{}\r\n", msg),
     }
 }
