@@ -3,11 +3,11 @@
 use dirs::home_dir;
 use serde::Deserialize;
 use serde_yaml;
-use std::fs::File;
-use std::io::Read;
-use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) struct SASLAuth {
