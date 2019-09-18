@@ -69,7 +69,6 @@ mod tests {
     extern crate test;
 
     use super::*;
-    use quickcheck::QuickCheck;
 
     #[test]
     fn test_split_iterator_1() {
@@ -119,41 +118,5 @@ mod tests {
         let iter = split_iterator("", 0);
         let ret: Vec<&str> = vec![];
         assert_eq!(iter.into_iter().collect::<Vec<&str>>(), ret);
-    }
-
-    #[test]
-    fn split_iterator_prop_1() {
-        fn prop(s: String, max: u8) -> bool {
-            // at least one character shoudl fit into the buffer
-            if max < 4 {
-                return true;
-            }
-            // println!("trying s: {}, max: {}", s, max);
-            for slice in split_iterator(&s, max as usize) {
-                if slice.len() > max as usize {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        QuickCheck::new()
-            .tests(1000)
-            .quickcheck(prop as fn(String, u8) -> bool);
-    }
-
-    #[test]
-    fn split_iterator_prop_2() {
-        fn prop(s: String, max: u8) -> bool {
-            if max < 4 {
-                return true;
-            }
-            let len: usize = split_iterator(&s, max as usize).map(str::len).sum();
-            len == s.len()
-        }
-
-        QuickCheck::new()
-            .tests(1000)
-            .quickcheck(prop as fn(String, u8) -> bool);
     }
 }
