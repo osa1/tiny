@@ -18,6 +18,7 @@ use std::{
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
+use libtiny::{IrcClient, Client};
 use term_input::{Event, Input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +95,7 @@ fn run(
     // A reference to the TUI will be shared with each connection event handler
     let tui = Arc::new(Mutex::new(tui));
 
-    let mut clients: Vec<libtiny::Client> = Vec::with_capacity(servers.len());
+    let mut clients: Vec<IrcClient> = Vec::with_capacity(servers.len());
 
     // TODO: Initialize server tabs here; otherwise we get server tabs in some random order
     // depending on stuff
@@ -111,7 +112,7 @@ fn run(
             nickserv_ident: server.nickserv_ident,
         };
 
-        let (client, mut rcv_ev) = libtiny::Client::new(server_info, &executor);
+        let (client, mut rcv_ev) = IrcClient::new(server_info, &executor);
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
@@ -151,7 +152,7 @@ fn run(
     executor.shutdown_on_idle();
 }
 
-fn handle_conn_ev(tui: &mut TUI, client: &libtiny::Client, ev: libtiny::Event) {
+fn handle_conn_ev(tui: &mut TUI, client: &IrcClient, ev: libtiny::Event) {
     use libtiny::Event::*;
     match ev {
         Connecting => {
@@ -227,7 +228,7 @@ fn handle_conn_ev(tui: &mut TUI, client: &libtiny::Client, ev: libtiny::Event) {
     }
 }
 
-fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) {
+fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
     use libtiny::{
         wire,
         wire::{Cmd, Pfx},
@@ -634,7 +635,7 @@ fn handle_msg(tui: &mut TUI, client: &libtiny::Client, msg: libtiny::wire::Msg) 
     }
 }
 
-fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event) -> bool {
+fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<IrcClient>, ev: Event) -> bool {
     match tui.handle_input_event(ev) {
         TUIRet::Abort => {
             for client in clients {
@@ -667,7 +668,7 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, ev: Event)
     false // continue
 }
 
-fn handle_cmd(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, src: MsgSource, cmd: &str) {
+fn handle_cmd(tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource, cmd: &str) {
     match parse_cmd(cmd) {
         ParseCmdResult::Ok { cmd, rest } => {
             (cmd.cmd_fn)(rest, tui, clients, src);
@@ -691,7 +692,7 @@ fn handle_cmd(tui: &mut TUI, clients: &mut Vec<libtiny::Client>, src: MsgSource,
 
 fn send_msg(
     tui: &mut TUI,
-    clients: &mut Vec<libtiny::Client>,
+    clients: &mut Vec<IrcClient>,
     src: &MsgSource,
     msg: String,
     ctcp_action: bool,
