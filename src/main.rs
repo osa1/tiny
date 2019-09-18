@@ -96,6 +96,8 @@ fn run(
 
     let mut clients: Vec<libtiny::Client> = Vec::with_capacity(servers.len());
 
+    // TODO: Initialize server tabs here; otherwise we get server tabs in some random order
+    // depending on stuff
     for server in servers.iter().cloned() {
         let server_info = libtiny::ServerInfo {
             addr: server.addr,

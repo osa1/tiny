@@ -141,7 +141,8 @@ fn close(_: &str, tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
             tui.close_server_tab(&serv_name);
             let client_idx = find_client_idx(&clients, &serv_name).unwrap();
             // TODO: this probably won't close the connection?
-            clients.remove(client_idx);
+            let mut client = clients.remove(client_idx);
+            client.quit(None);
         }
         MsgSource::Chan {
             serv_name,
