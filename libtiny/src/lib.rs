@@ -3,16 +3,17 @@
 #![feature(test)]
 
 mod state;
+mod stream;
 mod utils;
 pub mod wire;
 
 use state::State;
+use stream::{Stream, StreamError};
 
 use futures::{future::FutureExt, select, stream::StreamExt};
 use std::{net::ToSocketAddrs, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
     runtime::Runtime,
     sync::mpsc,
 };
@@ -31,6 +32,9 @@ pub struct ServerInfo {
 
     /// Server port
     pub port: u16,
+
+    /// Use TLS?
+    pub tls: bool,
 
     /// Server password.
     pub pass: Option<String>,
@@ -61,12 +65,23 @@ pub enum Event {
     Disconnected,
     /// An IO error happened.
     IoErr(std::io::Error),
+    /// A TLS error happened
+    TlsErr(native_tls::Error),
     /// Client couldn't resolve host address.
     CantResolveAddr,
     /// Nick changed.
     NickChange(String),
     /// A message from the server
     Msg(wire::Msg),
+}
+
+impl From<StreamError> for Event {
+    fn from(err: StreamError) -> Event {
+        match err {
+            StreamError::TlsError(tls_err) => Event::TlsErr(tls_err),
+            StreamError::IoError(io_err) => Event::IoErr(io_err),
+        }
+    }
 }
 
 /// IRC client.
@@ -246,8 +261,9 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
 
             eprintln!("Resolving address");
 
+            let serv_name_clone = serv_name.clone();
             let mut addr_iter = match tokio_executor::blocking::run(move || {
-                (serv_name.as_str(), port).to_socket_addrs()
+                (serv_name_clone.as_str(), port).to_socket_addrs()
             })
             .await
             {
@@ -276,20 +292,28 @@ fn connect(server_info: ServerInfo, runtime: &Runtime) -> (Client, mpsc::Receive
 
             eprintln!("Establishing connection ...");
 
-            let stream = match TcpStream::connect(&addr).await {
-                Err(io_err) => {
-                    snd_ev.try_send(Event::IoErr(io_err)).unwrap();
+            let mb_stream = if server_info.tls {
+                Stream::new_tls(addr, &serv_name).await
+            } else {
+                Stream::new_tcp(addr).await
+            };
+
+            let stream = match mb_stream {
+                Ok(stream) => stream,
+                Err(err) => {
+                    snd_ev.try_send(Event::from(err)).unwrap();
                     snd_ev.try_send(Event::Disconnected).unwrap();
                     // Wait 30 seconds before looping
                     tokio::timer::delay(tokio::clock::now() + Duration::from_secs(RECONNECT_SECS)).await;
                     continue;
                 }
-                Ok(stream) => stream,
             };
+
+            let (mut read_half, mut write_half) = tokio::io::split(stream);
 
             eprintln!("Done");
 
-            let (mut read_half, mut write_half) = stream.split();
+            // let (mut read_half, mut write_half) = tokio::io::split(stream);
 
             //
             // Do the business

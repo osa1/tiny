@@ -100,6 +100,7 @@ fn run(
         let server_info = libtiny::ServerInfo {
             addr: server.addr,
             port: server.port,
+            tls: server.tls,
             pass: server.pass,
             hostname: server.hostname,
             realname: server.realname,
@@ -130,7 +131,7 @@ fn run(
         while let Some(mb_ev) = input.next().await {
             match mb_ev {
                 Err(io_err) => {
-                    println!("term input error: {:?}", io_err);
+                    eprintln!("term input error: {:?}", io_err);
                     // TODO: Close connections here
                     return;
                 }
@@ -184,6 +185,19 @@ fn handle_conn_ev(tui: &mut TUI, client: &libtiny::Client, ev: libtiny::Event) {
             tui.add_err_msg(
                 &format!(
                     "Connection error: {}. Will try to reconnect in {} seconds.",
+                    err.description(),
+                    libtiny::RECONNECT_SECS
+                ),
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv_name: client.get_serv_name(),
+                },
+            );
+        }
+        TlsErr(err) => {
+            tui.add_err_msg(
+                &format!(
+                    "TLS error: {}. Will try to reconnect in {} seconds.",
                     err.description(),
                     libtiny::RECONNECT_SECS
                 ),
