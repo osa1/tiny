@@ -27,8 +27,8 @@ serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 term_input = { path = "term_input" }
 time = "0.1"
-tokio = { version = "0.2.0-alpha.2", features = ["timer"] }
-tokio-executor = "0.2.0-alpha.2"
+tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"] }
+tokio-executor = { git = "https://github.com/tokio-rs/tokio.git" }
 
 [profile.release]
 lto = true
