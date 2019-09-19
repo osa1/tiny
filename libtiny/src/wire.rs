@@ -4,11 +4,9 @@
 
 use std::{self, str};
 
-/*
 pub(crate) fn pass(pass: &str) -> String {
     format!("PASS {}\r\n", pass)
 }
-*/
 
 // FIXME: Option<String> because going from Option<String> to Option<&str> is too painful...
 pub(crate) fn quit(reason: Option<String>) -> String {
