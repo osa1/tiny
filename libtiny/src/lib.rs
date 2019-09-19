@@ -104,16 +104,21 @@ pub struct IrcClient {
 }
 
 impl IrcClient {
-    /// Create a new client. Spawns two `tokio` tasks on the given `runtime`.
+    /// Create a new client. Spawns two `tokio` tasks on the given `runtime`. If not given, tasks
+    /// are created on the default executor using `tokio::spawn`.
     pub fn new(
         server_info: ServerInfo,
-        runtime: &mut Runtime,
+        runtime: Option<&mut Runtime>,
     ) -> (IrcClient, mpsc::Receiver<Event>) {
         connect(server_info, runtime)
     }
 }
 
 impl Client for IrcClient {
+    fn reconnect(&mut self, port: Option<u16>) {
+        self.msg_chan.try_send(Cmd::Reconnect(port)).unwrap()
+    }
+
     fn get_serv_name(&self) -> &str {
         &self.serv_name
     }
@@ -201,12 +206,14 @@ enum Cmd {
     /// Send this IRC message to the server. Note that this needs to be a valid IRC message
     /// (including the trailing "\r\n").
     Msg(String),
+    /// Reconnect to the server, possibly using a new port.
+    Reconnect(Option<u16>),
     /// Close the connection. This sends a QUIT message to the server (with optional "reason") and
     /// then all tasks return.
     Quit(Option<String>),
 }
 
-fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::Receiver<Event>) {
+fn connect(server_info: ServerInfo, runtime: Option<&mut Runtime>) -> (IrcClient, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //
@@ -226,7 +233,10 @@ fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::
     let irc_state = State::new(server_info.clone());
     let irc_state_clone = irc_state.clone();
 
-    runtime.spawn(async move {
+    // We allow changing ports when reconnecting, so `mut`
+    let mut port = server_info.port;
+
+    let main_loop_task = async move {
         // Main loop just tries to (re)connect
         'connect: loop {
             // Channel for the sender task. Messages are complete IRC messages (including the
@@ -240,7 +250,6 @@ fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::
             //
 
             let serv_name = server_info.addr.clone();
-            let port = server_info.port;
 
             eprintln!("Resolving address");
 
@@ -339,6 +348,12 @@ fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::
                             Some(Cmd::Msg(irc_msg)) => {
                                 snd_msg.try_send(irc_msg).unwrap();
                             }
+                            Some(Cmd::Reconnect(mb_port)) => {
+                                if let Some(new_port) = mb_port {
+                                    port = new_port;
+                                }
+                                continue 'connect;
+                            }
                             Some(Cmd::Quit(reason)) => {
                                 snd_msg.send(wire::quit(reason)).await.unwrap();
                                 // This drops the sender end of the channel that the sender task
@@ -369,7 +384,12 @@ fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::
                 }
             }
         }
-    });
+    };
+
+    match runtime {
+        Some(runtime) => { runtime.spawn(main_loop_task); }
+        None => { tokio::runtime::current_thread::spawn(main_loop_task); }
+    }
 
     (
         IrcClient {
