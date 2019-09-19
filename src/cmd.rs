@@ -581,7 +581,6 @@ fn notify(args: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: M
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -619,5 +618,3 @@ mod tests {
         assert_eq!(split_msg_args("foo ,bar"), Some(("foo", ",bar")));
     }
 }
-
-*/
