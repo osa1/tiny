@@ -52,6 +52,15 @@ pub struct ServerInfo {
     /// Nickserv password. Sent to NickServ on connecting to the server and nick change, before
     /// join commands.
     pub nickserv_ident: Option<String>,
+
+    /// SASL authentication credentials,
+    pub sasl_auth: Option<SASLAuth>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SASLAuth {
+    pub username: String,
+    pub password: String,
 }
 
 /// IRC client events. Returned by `Client` to the users via a channel.
@@ -316,13 +325,14 @@ fn connect(
             // Reset the connection state
             irc_state.reset();
             // Introduce self
-            if let Some(ref pass) = server_info.pass {
-                snd_msg.try_send(wire::pass(pass)).unwrap();
+            if server_info.sasl_auth.is_some() {
+                // Will introduce self after getting a response to this LS command.
+                // This is to avoid getting stuck during nick registration. See the
+                // discussion in #91.
+                snd_msg.try_send(wire::cap_ls()).unwrap();
+            } else {
+                irc_state.introduce(&mut snd_msg);
             }
-            snd_msg.try_send(wire::nick(&irc_state.get_nick())).unwrap();
-            snd_msg
-                .try_send(wire::user(&server_info.hostname, &server_info.realname))
-                .unwrap();
 
             // Spawn a task for outgoing messages.
             let mut snd_ev_clone = snd_ev.clone();

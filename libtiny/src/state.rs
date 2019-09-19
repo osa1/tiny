@@ -34,6 +34,10 @@ impl State {
         self.inner.lock().unwrap().update(msg, snd_ev, snd_irc_msg)
     }
 
+    pub(crate) fn introduce(&self, snd_irc_msg: &mut Sender<String>) {
+        self.inner.lock().unwrap().introduce(snd_irc_msg)
+    }
+
     // FIXME: This allocates a new String
     pub(crate) fn get_nick(&self) -> String {
         self.inner.lock().unwrap().current_nick.clone()
@@ -119,6 +123,21 @@ impl StateInner {
         self.chans = self.server_info.auto_join.clone();
         self.servername = None;
         self.usermask = None;
+    }
+
+    fn introduce(&mut self, snd_irc_msg: &mut Sender<String>) {
+        if let Some(ref pass) = self.server_info.pass {
+            snd_irc_msg.try_send(wire::pass(pass)).unwrap();
+        }
+        snd_irc_msg
+            .try_send(wire::nick(&self.current_nick))
+            .unwrap();
+        snd_irc_msg
+            .try_send(wire::user(
+                &self.server_info.hostname,
+                &self.server_info.realname,
+            ))
+            .unwrap();
     }
 
     fn get_next_nick(&mut self) -> &str {
@@ -282,6 +301,50 @@ impl StateInner {
                     let chan = &params[params.len() - 2];
                     if !self.chans.contains(chan) {
                         self.chans.push(chan.to_owned());
+                    }
+                }
+            }
+
+            //
+            // SASL authentication
+            //
+            CAP {
+                client: _,
+                subcommand,
+                params,
+            } => {
+                match subcommand.as_ref() {
+                    "ACK" => {
+                        if params.iter().any(|cap| cap.as_str() == "sasl") {
+                            snd_irc_msg.try_send(wire::authenticate("PLAIN")).unwrap();
+                        }
+                    }
+                    "NAK" => {
+                        snd_irc_msg.try_send(wire::cap_end()).unwrap();
+                    }
+                    "LS" => {
+                        self.introduce(snd_irc_msg);
+                        if params.iter().any(|cap| cap == "sasl") {
+                            snd_irc_msg.try_send(wire::cap_req(&["sasl"])).unwrap();
+                            // Will wait for CAP ... ACK from server before authentication.
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            AUTHENTICATE { ref param } => {
+                if param.as_str() == "+" {
+                    // Empty AUTHENTICATE response; server accepted the specified SASL mechanism
+                    // (PLAIN)
+                    if let Some(ref auth) = self.server_info.sasl_auth {
+                        let msg = format!(
+                            "{}\x00{}\x00{}",
+                            auth.username, auth.username, auth.password
+                        );
+                        snd_irc_msg
+                            .try_send(wire::authenticate(&base64::encode(&msg)))
+                            .unwrap();
                     }
                 }
             }

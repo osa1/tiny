@@ -64,7 +64,6 @@ pub(crate) fn away(msg: Option<&str>) -> String {
     }
 }
 
-/*
 pub(crate) fn cap_ls() -> String {
     "CAP LS\r\n".to_string()
 }
@@ -80,7 +79,6 @@ pub(crate) fn cap_end() -> String {
 pub(crate) fn authenticate(msg: &str) -> String {
     format!("AUTHENTICATE {}\r\n", msg)
 }
-*/
 
 /// `<prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]`
 ///
