@@ -137,7 +137,8 @@ fn run(
                     return;
                 }
                 Ok(ev) => {
-                    let abort = handle_input_ev(&mut *tui.borrow_mut(), &mut clients, ev);
+                    let abort =
+                        handle_input_ev(&config_path, &mut *tui.borrow_mut(), &mut clients, ev);
                     if abort {
                         return;
                     }
@@ -633,7 +634,12 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
     }
 }
 
-fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<IrcClient>, ev: Event) -> bool {
+fn handle_input_ev(
+    config_path: &PathBuf,
+    tui: &mut TUI,
+    clients: &mut Vec<IrcClient>,
+    ev: Event,
+) -> bool {
     match tui.handle_input_event(ev) {
         TUIRet::Abort => {
             for client in clients {
@@ -650,7 +656,7 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<IrcClient>, ev: Event) -> bo
             // We know msg has at least one character as the TUI won't accept it otherwise.
             if msg[0] == '/' {
                 let cmd_str: String = (&msg[1..]).iter().cloned().collect();
-                handle_cmd(tui, clients, from, &cmd_str)
+                handle_cmd(config_path, tui, clients, from, &cmd_str)
             } else {
                 let msg_str: String = msg.into_iter().collect();
                 send_msg(tui, clients, &from, msg_str, false)
@@ -666,10 +672,16 @@ fn handle_input_ev(tui: &mut TUI, clients: &mut Vec<IrcClient>, ev: Event) -> bo
     false // continue
 }
 
-fn handle_cmd(tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource, cmd: &str) {
+fn handle_cmd(
+    config_path: &PathBuf,
+    tui: &mut TUI,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+    cmd: &str,
+) {
     match parse_cmd(cmd) {
         ParseCmdResult::Ok { cmd, rest } => {
-            (cmd.cmd_fn)(rest, tui, clients, src);
+            (cmd.cmd_fn)(rest, config_path, tui, clients, src);
         }
         // ParseCmdResult::Ambiguous(vec) => {
         //     self.tui.add_client_err_msg(
