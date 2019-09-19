@@ -292,6 +292,7 @@ fn connect_(
             nicks: defaults.nicks.clone(),
             auto_join: defaults.join.clone(),
             nickserv_ident: None,
+            sasl_auth: None,
         },
         None,
     );

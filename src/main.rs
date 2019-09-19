@@ -110,6 +110,10 @@ fn run(
             nicks: server.nicks,
             auto_join: server.join,
             nickserv_ident: server.nickserv_ident,
+            sasl_auth: server.sasl_auth.map(|auth| libtiny::SASLAuth {
+                username: auth.username,
+                password: auth.password,
+            }),
         };
 
         let (client, rcv_ev) = IrcClient::new(server_info, Some(&mut executor));
@@ -444,17 +448,16 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
 
         Cmd::CAP {
             client: _,
-            subcommand: _,
-            params: _,
+            subcommand,
+            params,
         } => {
-            /*
             match subcommand.as_ref() {
                 "NAK" => {
                     if params.iter().any(|cap| cap.as_str() == "sasl") {
                         let msg_target = MsgTarget::Server {
-                            serv_name: conn.get_serv_name(),
+                            serv_name: client.get_serv_name(),
                         };
-                        self.tui.add_err_msg(
+                        tui.add_err_msg(
                             "Server rejected using SASL authenication capability",
                             time::now(),
                             &msg_target,
@@ -464,9 +467,9 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
                 "LS" => {
                     if !params.iter().any(|cap| cap.as_str() == "sasl") {
                         let msg_target = MsgTarget::Server {
-                            serv_name: conn.get_serv_name(),
+                            serv_name: client.get_serv_name(),
                         };
-                        self.tui.add_err_msg(
+                        tui.add_err_msg(
                             "Server does not support SASL authenication",
                             time::now(),
                             &msg_target,
@@ -480,8 +483,6 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
                     //     .write_line(format_args!("CAP subcommand {} is not handled", cmd));
                 }
             }
-            */
-            unimplemented!();
         }
 
         Cmd::AUTHENTICATE { .. } => {
