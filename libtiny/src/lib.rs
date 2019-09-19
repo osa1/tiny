@@ -213,7 +213,10 @@ enum Cmd {
     Quit(Option<String>),
 }
 
-fn connect(server_info: ServerInfo, runtime: Option<&mut Runtime>) -> (IrcClient, mpsc::Receiver<Event>) {
+fn connect(
+    server_info: ServerInfo,
+    runtime: Option<&mut Runtime>,
+) -> (IrcClient, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //
@@ -261,8 +264,7 @@ fn connect(server_info: ServerInfo, runtime: Option<&mut Runtime>) -> (IrcClient
             {
                 Err(io_err) => {
                     snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                    tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS))
-                        .await;
+                    tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
                     continue;
                 }
                 Ok(addr_iter) => addr_iter,
@@ -387,8 +389,12 @@ fn connect(server_info: ServerInfo, runtime: Option<&mut Runtime>) -> (IrcClient
     };
 
     match runtime {
-        Some(runtime) => { runtime.spawn(main_loop_task); }
-        None => { tokio::runtime::current_thread::spawn(main_loop_task); }
+        Some(runtime) => {
+            runtime.spawn(main_loop_task);
+        }
+        None => {
+            tokio::runtime::current_thread::spawn(main_loop_task);
+        }
     }
 
     (

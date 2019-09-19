@@ -192,7 +192,7 @@ static CONNECT_CMD: Cmd = Cmd {
     cmd_fn: connect,
 };
 
-fn connect<'a, 'b>(
+fn connect(
     args: &str,
     _: &PathBuf,
     defaults: &config::Defaults,
@@ -200,7 +200,7 @@ fn connect<'a, 'b>(
     clients: &mut Vec<IrcClient>,
     src: MsgSource,
 ) {
-    let words: Vec<&str> = args.split_whitespace().into_iter().collect();
+    let words: Vec<&str> = args.split_whitespace().collect();
 
     match words.len() {
         0 => reconnect(&mut *tui.borrow_mut(), clients, src),
@@ -234,7 +234,7 @@ fn reconnect(tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
     }
 }
 
-fn connect_<'a, 'b>(
+fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
     defaults: &config::Defaults,
