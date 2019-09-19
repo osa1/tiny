@@ -316,6 +316,9 @@ fn connect(
             // Reset the connection state
             irc_state.reset();
             // Introduce self
+            if let Some(ref pass) = server_info.pass {
+                snd_msg.try_send(wire::pass(pass)).unwrap();
+            }
             snd_msg.try_send(wire::nick(&irc_state.get_nick())).unwrap();
             snd_msg
                 .try_send(wire::user(&server_info.hostname, &server_info.realname))
