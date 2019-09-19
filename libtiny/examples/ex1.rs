@@ -38,7 +38,7 @@ fn main() {
 
     executor.spawn(async {
         println!("Sleeping for 3 seconds before the second connection");
-        tokio::timer::delay(tokio::clock::now() + Duration::from_secs(3)).await;
+        tokio::timer::delay_for(Duration::from_secs(3)).await;
         let (mut client, mut rcv_ev) = Client::new(server_info);
 
         println!("client created, spawning incoming msg handler task");
@@ -50,7 +50,7 @@ fn main() {
         });
 
         println!("sleeping for 5 seconds before joining #justtesting");
-        tokio::timer::delay(tokio::clock::now() + Duration::from_secs(5)).await;
+        tokio::timer::delay_for(Duration::from_secs(5)).await;
         client.join("#justtesting");
     });
 

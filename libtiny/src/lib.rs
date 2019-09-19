@@ -252,7 +252,7 @@ fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::
             {
                 Err(io_err) => {
                     snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                    tokio::timer::delay(tokio::clock::now() + Duration::from_secs(RECONNECT_SECS))
+                    tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS))
                         .await;
                     continue;
                 }
@@ -287,7 +287,7 @@ fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::
                     snd_ev.try_send(Event::from(err)).unwrap();
                     snd_ev.try_send(Event::Disconnected).unwrap();
                     // Wait 30 seconds before looping
-                    tokio::timer::delay(tokio::clock::now() + Duration::from_secs(RECONNECT_SECS)).await;
+                    tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
                     continue;
                 }
             };
