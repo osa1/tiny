@@ -57,6 +57,9 @@ struct StateInner {
     /// Nicks to try, with this order.
     nicks: Vec<String>,
 
+    /// NickServ passowrd.
+    nickserv_ident: Option<String>,
+
     /// An index to `nicks`. When out of range we add `current_nick_idx - nicks.length()`
     /// underscores to the last nick in `nicks`
     current_nick_idx: usize,
@@ -97,6 +100,7 @@ impl StateInner {
         let chans = server_info.auto_join.clone();
         StateInner {
             nicks: server_info.nicks.clone(),
+            nickserv_ident: server_info.nickserv_ident.clone(),
             current_nick_idx: 0,
             current_nick,
             chans,
@@ -200,8 +204,12 @@ impl StateInner {
                 snd_ev
                     .try_send(Event::NickChange(self.current_nick.clone()))
                     .unwrap();
-                // TODO: identify via nickserv
                 self.nick_accepted = true;
+                if let Some(ref pwd) = self.nickserv_ident {
+                    snd_irc_msg
+                        .try_send(wire::privmsg("NickServ", &format!("identify {}", pwd)))
+                        .unwrap();
+                }
             }
 
             //
