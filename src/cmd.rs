@@ -1,6 +1,6 @@
 // use crate::config;
 use crate::utils;
-use libtiny::{IrcClient, Client};
+use libtiny::{Client, IrcClient};
 use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
 // use std::error::Error;
 
