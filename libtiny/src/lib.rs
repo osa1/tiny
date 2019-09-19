@@ -14,11 +14,9 @@ use stream::{Stream, StreamError};
 
 use futures::{future::FutureExt, select, stream::StreamExt};
 use std::{net::ToSocketAddrs, time::Duration};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    runtime::Runtime,
-    sync::mpsc,
-};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::runtime::current_thread::Runtime;
+use tokio::sync::mpsc;
 
 //
 // Public API
@@ -107,7 +105,10 @@ pub struct IrcClient {
 
 impl IrcClient {
     /// Create a new client. Spawns two `tokio` tasks on the given `runtime`.
-    pub fn new(server_info: ServerInfo, runtime: &Runtime) -> (IrcClient, mpsc::Receiver<Event>) {
+    pub fn new(
+        server_info: ServerInfo,
+        runtime: &mut Runtime,
+    ) -> (IrcClient, mpsc::Receiver<Event>) {
         connect(server_info, runtime)
     }
 }
@@ -205,7 +206,7 @@ enum Cmd {
     Quit(Option<String>),
 }
 
-fn connect(server_info: ServerInfo, runtime: &Runtime) -> (IrcClient, mpsc::Receiver<Event>) {
+fn connect(server_info: ServerInfo, runtime: &mut Runtime) -> (IrcClient, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //

@@ -9,16 +9,15 @@ mod config;
 mod utils;
 
 use futures_util::stream::StreamExt;
-use std::{
-    error::Error,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::cell::RefCell;
+use std::error::Error;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
+use libtiny::{Client, IrcClient};
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
-use libtiny::{IrcClient, Client};
 use term_input::{Event, Input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,16 +89,16 @@ fn run(
 
     // One task for each client to handle IRC events
     // One task for stdin
-    let executor = tokio::runtime::Runtime::new().unwrap();
+    let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
 
     // A reference to the TUI will be shared with each connection event handler
-    let tui = Arc::new(Mutex::new(tui));
+    let tui = Rc::new(RefCell::new(tui));
 
     let mut clients: Vec<IrcClient> = Vec::with_capacity(servers.len());
 
-    // TODO: Initialize server tabs here; otherwise we get server tabs in some random order
-    // depending on stuff
     for server in servers.iter().cloned() {
+        tui.borrow_mut().new_server_tab(&server.addr);
+
         let server_info = libtiny::ServerInfo {
             addr: server.addr,
             port: server.port,
@@ -112,16 +111,15 @@ fn run(
             nickserv_ident: server.nickserv_ident,
         };
 
-        let (client, mut rcv_ev) = IrcClient::new(server_info, &executor);
+        let (client, mut rcv_ev) = IrcClient::new(server_info, &mut executor);
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
         // Spawn a task to handle connection events
         executor.spawn(async move {
             while let Some(ev) = rcv_ev.next().await {
-                let mut tui_lock = tui_clone.lock().unwrap();
-                handle_conn_ev(&mut *tui_lock, &client_clone, ev);
-                tui_lock.draw();
+                handle_conn_ev(&mut *tui_clone.borrow_mut(), &client_clone, ev);
+                tui_clone.borrow_mut().draw();
             }
         });
 
@@ -139,17 +137,17 @@ fn run(
                     return;
                 }
                 Ok(ev) => {
-                    let abort = handle_input_ev(&mut *tui.lock().unwrap(), &mut clients, ev);
+                    let abort = handle_input_ev(&mut *tui.borrow_mut(), &mut clients, ev);
                     if abort {
                         return;
                     }
                 }
             }
-            tui.lock().unwrap().draw();
+            tui.borrow_mut().draw();
         }
     });
 
-    executor.shutdown_on_idle();
+    executor.run().unwrap(); // unwraps RunError
 }
 
 fn handle_conn_ev(tui: &mut TUI, client: &IrcClient, ev: libtiny::Event) {
