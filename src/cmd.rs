@@ -1,9 +1,13 @@
 use crate::config;
 use crate::utils;
-use libtiny::{Client, IrcClient};
+use libtiny::{Client, IrcClient, ServerInfo};
 use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
+use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
+use std::rc::Rc;
+
+type TUIRef = Rc<RefCell<TUI>>;
 
 pub(crate) struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
@@ -12,7 +16,8 @@ pub(crate) struct Cmd {
     // Command help message. Shown in `/help`.
     // pub(crate) help: &'static str,
     /// Command function.
-    pub(crate) cmd_fn: for<'a, 'b> fn(&str, &PathBuf, &mut TUI, &mut Vec<IrcClient>, MsgSource),
+    pub(crate) cmd_fn:
+        for<'a, 'b> fn(&str, &PathBuf, &config::Defaults, TUIRef, &mut Vec<IrcClient>, MsgSource),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,11 +90,11 @@ fn find_client<'a>(clients: &'a mut Vec<IrcClient>, serv_name: &str) -> Option<&
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 12] = [
+static CMDS: [&Cmd; 13] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
-    // &CONNECT_CMD,
+    &CONNECT_CMD,
     &IGNORE_CMD,
     &JOIN_CMD,
     &ME_CMD,
@@ -108,7 +113,14 @@ static AWAY_CMD: Cmd = Cmd {
     cmd_fn: away,
 };
 
-fn away(args: &str, _: &PathBuf, _: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn away(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    _: TUIRef,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
     let msg = if args.is_empty() { None } else { Some(args) };
     if let Some(client) = find_client(clients, src.serv_name()) {
         client.away(msg);
@@ -122,8 +134,15 @@ static CLEAR_CMD: Cmd = Cmd {
     cmd_fn: clear,
 };
 
-fn clear(_: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
-    tui.clear(&src.to_target());
+fn clear(
+    _: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    _: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
+    tui.borrow_mut().clear(&src.to_target());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +152,15 @@ static CLOSE_CMD: Cmd = Cmd {
     cmd_fn: close,
 };
 
-fn close(_: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn close(
+    _: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
+    let mut tui = tui.borrow_mut();
     match src {
         MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
             // ignore
@@ -158,7 +185,6 @@ fn close(_: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src:
     }
 }
 
-/*
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static CONNECT_CMD: Cmd = Cmd {
@@ -166,17 +192,24 @@ static CONNECT_CMD: Cmd = Cmd {
     cmd_fn: connect,
 };
 
-fn connect<'a, 'b>(args: &str, poll: &'b Poll, tiny: &'a mut Tiny<'b>, src: MsgSource) {
+fn connect<'a, 'b>(
+    args: &str,
+    _: &PathBuf,
+    defaults: &config::Defaults,
+    tui: TUIRef,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
     let words: Vec<&str> = args.split_whitespace().into_iter().collect();
 
     match words.len() {
-        0 => reconnect(tiny, src),
-        1 => connect_(words[0], None, poll, tiny),
-        2 => connect_(words[0], Some(words[1]), poll, tiny),
+        0 => reconnect(&mut *tui.borrow_mut(), clients, src),
+        1 => connect_(words[0], None, defaults, tui, clients),
+        2 => connect_(words[0], Some(words[1]), defaults, tui, clients),
         _ =>
         // wat
         {
-            tiny.tui.add_client_err_msg(
+            tui.borrow_mut().add_client_err_msg(
                 "/connect usage: /connect <host>:<port> or /connect (to reconnect)",
                 &MsgTarget::CurrentTab,
             )
@@ -184,26 +217,15 @@ fn connect<'a, 'b>(args: &str, poll: &'b Poll, tiny: &'a mut Tiny<'b>, src: MsgS
     }
 }
 
-fn reconnect(tiny: &mut Tiny, src: MsgSource) {
-    tiny.tui.add_client_msg(
+fn reconnect(tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+    tui.add_client_msg(
         "Reconnecting...",
         &MsgTarget::AllServTabs {
             serv_name: src.serv_name(),
         },
     );
-    match super::find_conn(&mut tiny.conns, src.serv_name()) {
-        Some(conn) => match conn.reconnect(None) {
-            Ok(()) => {}
-            Err(err) => {
-                tiny.tui.add_err_msg(
-                    &super::reconnect_err_msg(&err),
-                    time::now(),
-                    &MsgTarget::AllServTabs {
-                        serv_name: conn.get_serv_name(),
-                    },
-                );
-            }
-        },
+    match find_client(clients, src.serv_name()) {
+        Some(client) => client.reconnect(None),
         None => {
             // tiny.logger
             //     .get_debug_logs()
@@ -212,7 +234,15 @@ fn reconnect(tiny: &mut Tiny, src: MsgSource) {
     }
 }
 
-fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &'a mut Tiny<'b>) {
+fn connect_<'a, 'b>(
+    serv_addr: &str,
+    pass: Option<&str>,
+    defaults: &config::Defaults,
+    tui_ref: TUIRef,
+    clients: &mut Vec<IrcClient>,
+) {
+    let mut tui = tui_ref.borrow_mut();
+
     fn split_port(s: &str) -> Option<(&str, &str)> {
         s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
     }
@@ -221,13 +251,12 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
     let (serv_name, serv_port) = {
         match split_port(serv_addr) {
             None => {
-                return tiny
-                    .tui
+                return tui
                     .add_client_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
             }
             Some((serv_name, serv_port)) => match serv_port.parse::<u16>() {
                 Err(err) => {
-                    return tiny.tui.add_client_err_msg(
+                    return tui.add_client_err_msg(
                         &format!("connect: Can't parse port {}: {}", serv_port, err),
                         &MsgTarget::CurrentTab,
                     );
@@ -238,21 +267,9 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
     };
 
     // if we already connected to this server reconnect using new port
-    if let Some(conn) = super::find_conn(&mut tiny.conns, serv_name) {
-        tiny.tui
-            .add_client_msg("Connecting...", &MsgTarget::AllServTabs { serv_name });
-        match conn.reconnect(Some((serv_name, serv_port))) {
-            Ok(()) => {}
-            Err(err) => {
-                tiny.tui.add_err_msg(
-                    &super::reconnect_err_msg(&err),
-                    time::now(),
-                    &MsgTarget::AllServTabs {
-                        serv_name: conn.get_serv_name(),
-                    },
-                );
-            }
-        }
+    if let Some(client) = find_client(clients, serv_name) {
+        tui.add_client_msg("Connecting...", &MsgTarget::AllServTabs { serv_name });
+        client.reconnect(Some(serv_port));
         return;
     }
 
@@ -260,37 +277,32 @@ fn connect_<'a, 'b>(serv_addr: &str, pass: Option<&str>, poll: &'b Poll, tiny: &
     // can't move the rest to an else branch because of borrowchk
 
     // otherwise create a new Conn, tab etc.
-    tiny.tui.new_server_tab(serv_name);
+    tui.new_server_tab(serv_name);
     let msg_target = MsgTarget::Server { serv_name };
-    tiny.tui.add_client_msg("Connecting...", &msg_target);
+    tui.add_client_msg("Connecting...", &msg_target);
 
-    let conn_ret = Conn::new(
-        config::Server {
+    let (client, rcv_ev) = IrcClient::new(
+        ServerInfo {
             addr: serv_name.to_owned(),
             port: serv_port,
-            tls: tiny.defaults.tls,
-            hostname: tiny.defaults.hostname.clone(),
-            realname: tiny.defaults.realname.clone(),
+            tls: defaults.tls,
+            hostname: defaults.hostname.clone(),
+            realname: defaults.realname.clone(),
             pass: pass.map(str::to_owned),
-            nicks: tiny.defaults.nicks.clone(),
-            join: tiny.defaults.join.clone(),
+            nicks: defaults.nicks.clone(),
+            auto_join: defaults.join.clone(),
             nickserv_ident: None,
-            sasl_auth: None,
         },
-        poll,
+        None,
     );
 
-    match conn_ret {
-        Ok(conn) => {
-            tiny.conns.push(conn);
-        }
-        Err(err) => {
-            tiny.tui
-                .add_err_msg(&super::connect_err_msg(&err), time::now(), &msg_target);
-        }
-    }
+    // Spawn TUI task
+    let tui_clone = tui_ref.clone();
+    let client_clone = client.clone();
+    tokio::runtime::current_thread::spawn(crate::tui_task(rcv_ev, tui_clone, client_clone));
+
+    clients.push(client);
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -299,10 +311,17 @@ static IGNORE_CMD: Cmd = Cmd {
     cmd_fn: ignore,
 };
 
-fn ignore(_: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
+fn ignore(
+    _: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    _: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
     match src {
         MsgSource::Serv { serv_name } => {
-            tui.toggle_ignore(&MsgTarget::AllServTabs {
+            tui.borrow_mut().toggle_ignore(&MsgTarget::AllServTabs {
                 serv_name: &serv_name,
             });
         }
@@ -310,13 +329,13 @@ fn ignore(_: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgS
             serv_name,
             chan_name,
         } => {
-            tui.toggle_ignore(&MsgTarget::Chan {
+            tui.borrow_mut().toggle_ignore(&MsgTarget::Chan {
                 serv_name: &serv_name,
                 chan_name: &chan_name,
             });
         }
         MsgSource::User { serv_name, nick } => {
-            tui.toggle_ignore(&MsgTarget::User {
+            tui.borrow_mut().toggle_ignore(&MsgTarget::User {
                 serv_name: &serv_name,
                 nick: &nick,
             });
@@ -331,10 +350,17 @@ static JOIN_CMD: Cmd = Cmd {
     cmd_fn: join,
 };
 
-fn join(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn join(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
     let words = args.split_whitespace().collect::<Vec<_>>();
     if words.is_empty() {
-        return tui.add_client_err_msg(
+        return tui.borrow_mut().add_client_err_msg(
             "/join usage: /join chan1[,chan2...]",
             &MsgTarget::CurrentTab,
         );
@@ -342,7 +368,7 @@ fn join(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, sr
 
     match find_client(clients, src.serv_name()) {
         Some(client) => client.join(&words),
-        None => tui.add_client_err_msg(
+        None => tui.borrow_mut().add_client_err_msg(
             &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
             &MsgTarget::CurrentTab,
         ),
@@ -356,11 +382,26 @@ static ME_CMD: Cmd = Cmd {
     cmd_fn: me,
 };
 
-fn me(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn me(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
     if args.is_empty() {
-        return tui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
+        return tui
+            .borrow_mut()
+            .add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
-    crate::send_msg(tui, clients, &src, args.to_string(), true);
+    crate::send_msg(
+        &mut *tui.borrow_mut(),
+        clients,
+        &src,
+        args.to_string(),
+        true,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -388,9 +429,17 @@ fn split_msg_args(args: &str) -> Option<(&str, &str)> {
     target_msg
 }
 
-fn msg(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
-    let mut fail = || {
-        tui.add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
+fn msg(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
+    let fail = || {
+        tui.borrow_mut()
+            .add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
     };
 
     let (target, msg) = match split_msg_args(args) {
@@ -419,7 +468,7 @@ fn msg(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src
         }
     };
 
-    crate::send_msg(tui, clients, &src, msg.to_owned(), false);
+    crate::send_msg(&mut *tui.borrow_mut(), clients, &src, msg.to_owned(), false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -429,7 +478,15 @@ static NAMES_CMD: Cmd = Cmd {
     cmd_fn: names,
 };
 
-fn names(args: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
+fn names(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    _: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
+    let mut tui = tui.borrow_mut();
     let words: Vec<&str> = args.split_whitespace().collect();
 
     if let MsgSource::Chan {
@@ -469,7 +526,14 @@ static NICK_CMD: Cmd = Cmd {
     cmd_fn: nick,
 };
 
-fn nick(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn nick(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    clients: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() == 1 {
         if let Some(client) = find_client(clients, src.serv_name()) {
@@ -477,7 +541,8 @@ fn nick(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, sr
             client.nick(new_nick);
         }
     } else {
-        tui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
+        tui.borrow_mut()
+            .add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
     }
 }
 
@@ -488,7 +553,15 @@ static RELOAD_CMD: Cmd = Cmd {
     cmd_fn: reload,
 };
 
-fn reload(_: &str, config_path: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, _: MsgSource) {
+fn reload(
+    _: &str,
+    config_path: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    _: &mut Vec<IrcClient>,
+    _: MsgSource,
+) {
+    let mut tui = tui.borrow_mut();
     match config::parse_config(config_path) {
         Ok(config::Config { colors, .. }) => tui.set_colors(colors),
         Err(err) => {
@@ -507,12 +580,21 @@ static SWITCH_CMD: Cmd = Cmd {
     cmd_fn: switch,
 };
 
-fn switch(args: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, _: MsgSource) {
+fn switch(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    _: &mut Vec<IrcClient>,
+    _: MsgSource,
+) {
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() != 1 {
-        return tui.add_client_err_msg("/switch usage: /switch <tab name>", &MsgTarget::CurrentTab);
+        return tui
+            .borrow_mut()
+            .add_client_err_msg("/switch usage: /switch <tab name>", &MsgTarget::CurrentTab);
     }
-    tui.switch(words[0]);
+    tui.borrow_mut().switch(words[0]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -522,7 +604,16 @@ static NOTIFY_CMD: Cmd = Cmd {
     cmd_fn: notify,
 };
 
-fn notify(args: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
+fn notify(
+    args: &str,
+    _: &PathBuf,
+    _: &config::Defaults,
+    tui: TUIRef,
+    _: &mut Vec<IrcClient>,
+    src: MsgSource,
+) {
+    let mut tui = tui.borrow_mut();
+
     let words: Vec<&str> = args.split_whitespace().collect();
 
     let mut show_usage = || {

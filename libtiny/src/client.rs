@@ -3,6 +3,9 @@
 use crate::utils::SplitIterator;
 
 pub trait Client {
+    /// Reconnect to the server, possibly using a new port.
+    fn reconnect(&mut self, port: Option<u16>);
+
     /// Get host name of this connection.
     fn get_serv_name(&self) -> &str;
 

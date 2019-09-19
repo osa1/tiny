@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
 use std::rc::Rc;
+use tokio::sync::mpsc;
 
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
@@ -111,17 +112,12 @@ fn run(
             nickserv_ident: server.nickserv_ident,
         };
 
-        let (client, mut rcv_ev) = IrcClient::new(server_info, &mut executor);
+        let (client, rcv_ev) = IrcClient::new(server_info, Some(&mut executor));
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
         // Spawn a task to handle connection events
-        executor.spawn(async move {
-            while let Some(ev) = rcv_ev.next().await {
-                handle_conn_ev(&mut *tui_clone.borrow_mut(), &client_clone, ev);
-                tui_clone.borrow_mut().draw();
-            }
-        });
+        executor.spawn(tui_task(rcv_ev, tui_clone, client_clone));
 
         clients.push(client);
     }
@@ -137,8 +133,7 @@ fn run(
                     return;
                 }
                 Ok(ev) => {
-                    let abort =
-                        handle_input_ev(&config_path, &mut *tui.borrow_mut(), &mut clients, ev);
+                    let abort = handle_input_ev(&config_path, &defaults, &tui, &mut clients, ev);
                     if abort {
                         return;
                     }
@@ -149,6 +144,17 @@ fn run(
     });
 
     executor.run().unwrap(); // unwraps RunError
+}
+
+async fn tui_task(
+    mut rcv_ev: mpsc::Receiver<libtiny::Event>,
+    tui: Rc<RefCell<TUI>>,
+    client: IrcClient,
+) {
+    while let Some(ev) = rcv_ev.next().await {
+        handle_conn_ev(&mut *tui.borrow_mut(), &client, ev);
+        tui.borrow_mut().draw();
+    }
 }
 
 fn handle_conn_ev(tui: &mut TUI, client: &IrcClient, ev: libtiny::Event) {
@@ -636,11 +642,13 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
 
 fn handle_input_ev(
     config_path: &PathBuf,
-    tui: &mut TUI,
+    defaults: &config::Defaults,
+    tui: &Rc<RefCell<TUI>>,
     clients: &mut Vec<IrcClient>,
     ev: Event,
 ) -> bool {
-    match tui.handle_input_event(ev) {
+    let tui_ret = tui.borrow_mut().handle_input_event(ev);
+    match tui_ret {
         TUIRet::Abort => {
             for client in clients {
                 client.quit(None);
@@ -656,15 +664,15 @@ fn handle_input_ev(
             // We know msg has at least one character as the TUI won't accept it otherwise.
             if msg[0] == '/' {
                 let cmd_str: String = (&msg[1..]).iter().cloned().collect();
-                handle_cmd(config_path, tui, clients, from, &cmd_str)
+                handle_cmd(config_path, defaults, tui.clone(), clients, from, &cmd_str)
             } else {
                 let msg_str: String = msg.into_iter().collect();
-                send_msg(tui, clients, &from, msg_str, false)
+                send_msg(&mut *tui.borrow_mut(), clients, &from, msg_str, false)
             }
         }
         TUIRet::Lines { lines, from } => {
             for line in lines.into_iter() {
-                send_msg(tui, clients, &from, line, false)
+                send_msg(&mut *tui.borrow_mut(), clients, &from, line, false)
             }
         }
     }
@@ -674,14 +682,15 @@ fn handle_input_ev(
 
 fn handle_cmd(
     config_path: &PathBuf,
-    tui: &mut TUI,
+    defaults: &config::Defaults,
+    tui: Rc<RefCell<TUI>>,
     clients: &mut Vec<IrcClient>,
     src: MsgSource,
     cmd: &str,
 ) {
     match parse_cmd(cmd) {
         ParseCmdResult::Ok { cmd, rest } => {
-            (cmd.cmd_fn)(rest, config_path, tui, clients, src);
+            (cmd.cmd_fn)(rest, config_path, defaults, tui, clients, src);
         }
         // ParseCmdResult::Ambiguous(vec) => {
         //     self.tui.add_client_err_msg(
@@ -693,7 +702,7 @@ fn handle_cmd(
         //         &MsgTarget::CurrentTab,
         //     );
         // },
-        ParseCmdResult::Unknown => tui.add_client_err_msg(
+        ParseCmdResult::Unknown => tui.borrow_mut().add_client_err_msg(
             &format!("Unsupported command: \"/{}\"", cmd),
             &MsgTarget::CurrentTab,
         ),
