@@ -161,9 +161,9 @@ impl Client for IrcClient {
 
     fn privmsg(&mut self, target: &str, msg: &str, ctcp_action: bool) {
         let wire_fn = if ctcp_action {
-            wire::privmsg
-        } else {
             wire::action
+        } else {
+            wire::privmsg
         };
         self.msg_chan
             .try_send(Cmd::Msg(wire_fn(target, msg)))
