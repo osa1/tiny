@@ -1,8 +1,9 @@
-// use crate::config;
+use crate::config;
 use crate::utils;
 use libtiny::{Client, IrcClient};
 use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
-// use std::error::Error;
+use std::error::Error;
+use std::path::PathBuf;
 
 pub(crate) struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
@@ -11,7 +12,7 @@ pub(crate) struct Cmd {
     // Command help message. Shown in `/help`.
     // pub(crate) help: &'static str,
     /// Command function.
-    pub(crate) cmd_fn: for<'a, 'b> fn(&str, &mut TUI, &mut Vec<IrcClient>, MsgSource),
+    pub(crate) cmd_fn: for<'a, 'b> fn(&str, &PathBuf, &mut TUI, &mut Vec<IrcClient>, MsgSource),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,7 +85,7 @@ fn find_client<'a>(clients: &'a mut Vec<IrcClient>, serv_name: &str) -> Option<&
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 11] = [
+static CMDS: [&Cmd; 12] = [
     &AWAY_CMD,
     &CLEAR_CMD,
     &CLOSE_CMD,
@@ -96,7 +97,7 @@ static CMDS: [&Cmd; 11] = [
     &NAMES_CMD,
     &NICK_CMD,
     &NOTIFY_CMD,
-    // &RELOAD_CMD,
+    &RELOAD_CMD,
     &SWITCH_CMD,
 ];
 
@@ -107,7 +108,7 @@ static AWAY_CMD: Cmd = Cmd {
     cmd_fn: away,
 };
 
-fn away(args: &str, _: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn away(args: &str, _: &PathBuf, _: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
     let msg = if args.is_empty() { None } else { Some(args) };
     if let Some(client) = find_client(clients, src.serv_name()) {
         client.away(msg);
@@ -121,7 +122,7 @@ static CLEAR_CMD: Cmd = Cmd {
     cmd_fn: clear,
 };
 
-fn clear(_: &str, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
+fn clear(_: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
     tui.clear(&src.to_target());
 }
 
@@ -132,7 +133,7 @@ static CLOSE_CMD: Cmd = Cmd {
     cmd_fn: close,
 };
 
-fn close(_: &str, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn close(_: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
     match src {
         MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
             // ignore
@@ -298,7 +299,7 @@ static IGNORE_CMD: Cmd = Cmd {
     cmd_fn: ignore,
 };
 
-fn ignore(_: &str, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
+fn ignore(_: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
     match src {
         MsgSource::Serv { serv_name } => {
             tui.toggle_ignore(&MsgTarget::AllServTabs {
@@ -330,7 +331,7 @@ static JOIN_CMD: Cmd = Cmd {
     cmd_fn: join,
 };
 
-fn join(args: &str, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn join(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
     let words = args.split_whitespace().collect::<Vec<_>>();
     if words.is_empty() {
         return tui.add_client_err_msg(
@@ -355,7 +356,7 @@ static ME_CMD: Cmd = Cmd {
     cmd_fn: me,
 };
 
-fn me(args: &str, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn me(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
     if args.is_empty() {
         return tui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
@@ -387,7 +388,7 @@ fn split_msg_args(args: &str) -> Option<(&str, &str)> {
     target_msg
 }
 
-fn msg(args: &str, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn msg(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
     let mut fail = || {
         tui.add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
     };
@@ -428,7 +429,7 @@ static NAMES_CMD: Cmd = Cmd {
     cmd_fn: names,
 };
 
-fn names(args: &str, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
+fn names(args: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
 
     if let MsgSource::Chan {
@@ -468,7 +469,7 @@ static NICK_CMD: Cmd = Cmd {
     cmd_fn: nick,
 };
 
-fn nick(args: &str, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn nick(args: &str, _: &PathBuf, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() == 1 {
         if let Some(client) = find_client(clients, src.serv_name()) {
@@ -482,25 +483,22 @@ fn nick(args: &str, tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 static RELOAD_CMD: Cmd = Cmd {
     name: "reload",
     cmd_fn: reload,
 };
 
-fn reload(_: &str, _: &Poll, tiny: &mut Tiny, _: MsgSource) {
-    match config::parse_config(&tiny.config_path) {
-        Ok(config::Config { colors, .. }) => tiny.tui.set_colors(colors),
+fn reload(_: &str, config_path: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, _: MsgSource) {
+    match config::parse_config(config_path) {
+        Ok(config::Config { colors, .. }) => tui.set_colors(colors),
         Err(err) => {
-            tiny.tui
-                .add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
+            tui.add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
             for line in err.description().lines() {
-                tiny.tui.add_client_err_msg(line, &MsgTarget::CurrentTab);
+                tui.add_client_err_msg(line, &MsgTarget::CurrentTab);
             }
         }
     }
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -509,7 +507,7 @@ static SWITCH_CMD: Cmd = Cmd {
     cmd_fn: switch,
 };
 
-fn switch(args: &str, tui: &mut TUI, _: &mut Vec<IrcClient>, _: MsgSource) {
+fn switch(args: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, _: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() != 1 {
         return tui.add_client_err_msg("/switch usage: /switch <tab name>", &MsgTarget::CurrentTab);
@@ -524,7 +522,7 @@ static NOTIFY_CMD: Cmd = Cmd {
     cmd_fn: notify,
 };
 
-fn notify(args: &str, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
+fn notify(args: &str, _: &PathBuf, tui: &mut TUI, _: &mut Vec<IrcClient>, src: MsgSource) {
     let words: Vec<&str> = args.split_whitespace().collect();
 
     let mut show_usage = || {
