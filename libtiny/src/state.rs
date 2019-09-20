@@ -349,6 +349,14 @@ impl StateInner {
                 }
             }
 
+            Reply { num: 903, .. } | Reply { num: 904, .. } => {
+                // 903: RPL_SASLSUCCESS, 904: ERR_SASLFAIL
+                snd_irc_msg.try_send(wire::cap_end()).unwrap();
+            }
+
+            //
+            // Ignore the rest
+            //
             _ => {}
         }
     }
