@@ -336,7 +336,7 @@ fn connect(
 
             // Spawn a task for outgoing messages.
             let mut snd_ev_clone = snd_ev.clone();
-            tokio::spawn(async move {
+            tokio::runtime::current_thread::spawn(async move {
                 while let Some(msg) = rcv_msg.next().await {
                     if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
                         eprintln!("IO error when writing: {:?}", io_err);
