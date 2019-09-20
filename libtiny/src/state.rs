@@ -1,28 +1,27 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::{
-    wire,
-    wire::{find_byte, Cmd, Msg, Pfx},
-    Event, ServerInfo,
-};
+use crate::wire;
+use crate::wire::{find_byte, Cmd, Msg, Pfx};
+use crate::{Event, ServerInfo};
 
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::rc::Rc;
 use tokio::sync::mpsc::Sender;
 
 #[derive(Clone)]
 pub struct State {
-    inner: Arc<Mutex<StateInner>>,
+    inner: Rc<RefCell<StateInner>>,
 }
 
 impl State {
     pub(crate) fn new(server_info: ServerInfo) -> State {
         State {
-            inner: Arc::new(Mutex::new(StateInner::new(server_info))),
+            inner: Rc::new(RefCell::new(StateInner::new(server_info))),
         }
     }
 
     pub(crate) fn reset(&self) {
-        self.inner.lock().unwrap().reset()
+        self.inner.borrow_mut().reset()
     }
 
     pub(crate) fn update(
@@ -31,29 +30,29 @@ impl State {
         snd_ev: &mut Sender<Event>,
         snd_irc_msg: &mut Sender<String>,
     ) {
-        self.inner.lock().unwrap().update(msg, snd_ev, snd_irc_msg)
+        self.inner.borrow_mut().update(msg, snd_ev, snd_irc_msg)
     }
 
     pub(crate) fn introduce(&self, snd_irc_msg: &mut Sender<String>) {
-        self.inner.lock().unwrap().introduce(snd_irc_msg)
+        self.inner.borrow_mut().introduce(snd_irc_msg)
     }
 
     // FIXME: This allocates a new String
     pub(crate) fn get_nick(&self) -> String {
-        self.inner.lock().unwrap().current_nick.clone()
+        self.inner.borrow_mut().current_nick.clone()
     }
 
     // FIXME: Maybe use RwLock instead of Mutex
     pub(crate) fn is_nick_accepted(&self) -> bool {
-        self.inner.lock().unwrap().nick_accepted
+        self.inner.borrow_mut().nick_accepted
     }
 
     pub(crate) fn get_usermask(&self) -> Option<String> {
-        self.inner.lock().unwrap().usermask.clone()
+        self.inner.borrow_mut().usermask.clone()
     }
 
     pub(crate) fn set_away(&self, msg: Option<&str>) {
-        self.inner.lock().unwrap().away_status = msg.map(str::to_owned);
+        self.inner.borrow_mut().away_status = msg.map(str::to_owned);
     }
 }
 
