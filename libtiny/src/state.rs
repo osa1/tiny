@@ -24,6 +24,10 @@ impl State {
         self.inner.borrow_mut().reset()
     }
 
+    pub(crate) fn send_ping(&self, snd_irc_msg: &mut Sender<String>) {
+        self.inner.borrow_mut().send_ping(snd_irc_msg)
+    }
+
     pub(crate) fn update(
         &self,
         msg: &Msg,
@@ -122,6 +126,12 @@ impl StateInner {
         self.chans = self.server_info.auto_join.clone();
         self.servername = None;
         self.usermask = None;
+    }
+
+    fn send_ping(&mut self, snd_irc_msg: &mut Sender<String>) {
+        if let Some(ref servername) = self.servername {
+            snd_irc_msg.try_send(wire::ping(servername)).unwrap();
+        }
     }
 
     fn introduce(&mut self, snd_irc_msg: &mut Sender<String>) {

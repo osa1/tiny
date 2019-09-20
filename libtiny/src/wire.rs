@@ -24,11 +24,9 @@ pub(crate) fn nick(arg: &str) -> String {
     format!("NICK {}\r\n", arg)
 }
 
-/*
 pub(crate) fn ping(arg: &str) -> String {
     format!("PING {}\r\n", arg)
 }
-*/
 
 pub(crate) fn pong(arg: &str) -> String {
     format!("PONG {}\r\n", arg)
