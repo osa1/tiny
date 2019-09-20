@@ -1,14 +1,16 @@
-#![recursion_limit = "256"]
+#![recursion_limit = "512"]
 #![feature(drain_filter)]
 #![feature(test)]
 
 pub mod client;
+mod pinger;
 mod state;
 mod stream;
 pub mod utils;
 pub mod wire;
 
 pub use client::Client;
+use pinger::Pinger;
 use state::State;
 use stream::{Stream, StreamError};
 
@@ -316,8 +318,6 @@ fn connect(
 
             eprintln!("Done");
 
-            // let (mut read_half, mut write_half) = tokio::io::split(stream);
-
             //
             // Do the business
             //
@@ -346,9 +346,11 @@ fn connect(
                 }
             });
 
-            let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
+            // Spawn pinger task
+            let (mut pinger, rcv_ping_evs) = Pinger::new();
+            let mut rcv_ping_evs_fused = rcv_ping_evs.fuse();
 
-            // TODO: Introduce self here
+            let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
 
             loop {
                 let mut read_buf: [u8; 1024] = [0; 1024];
@@ -390,9 +392,26 @@ fn connect(
                                 parse_buf.extend_from_slice(&read_buf[0..bytes]);
                                 while let Some(msg) = wire::parse_irc_msg(&mut parse_buf) {
                                     eprintln!("parsed msg: {:?}", msg);
+                                    pinger.reset();
                                     irc_state.update(&msg, &mut snd_ev, &mut snd_msg);
                                     snd_ev.try_send(Event::Msg(msg)).unwrap();
                                 }
+                            }
+                        }
+                    }
+                    ping_ev = rcv_ping_evs_fused.next() => {
+                        match ping_ev {
+                            None => {
+                                eprintln!("Ping thread terminated unexpectedly???");
+                            }
+                            Some(pinger::Event::SendPing) => {
+                                irc_state.send_ping(&mut snd_msg);
+                            }
+                            Some(pinger::Event::Disconnect) => {
+                                // TODO: indicate that this is a ping timeout
+                                snd_ev.try_send(Event::Disconnected).unwrap();
+                                // TODO: hopefully dropping the pinger rcv end is enough to stop it?
+                                continue 'connect;
                             }
                         }
                     }
