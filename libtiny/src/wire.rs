@@ -96,15 +96,6 @@ pub enum Pfx {
     },
 }
 
-impl Pfx {
-    pub fn get_nick(&self) -> Option<&str> {
-        match self {
-            Pfx::Server(_) => None,
-            Pfx::User { ref nick, .. } => Some(nick),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum MsgTarget {
     Chan(String),

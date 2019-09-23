@@ -238,15 +238,14 @@ fn handle_conn_ev(tui: &mut TUI, client: &IrcClient, ev: libtiny::Event) {
 }
 
 fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
-    use libtiny::{
-        wire,
-        wire::{Cmd, Pfx},
-    };
+    use libtiny::wire;
+    use libtiny::wire::Cmd::*;
+    use libtiny::wire::Pfx::*;
 
-    let pfx = msg.pfx;
+    let wire::Msg { pfx, cmd } = msg;
     let ts = time::now();
-    match msg.cmd {
-        Cmd::PRIVMSG {
+    match cmd {
+        PRIVMSG {
             target,
             msg,
             is_notice,
@@ -262,8 +261,8 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
 
             // sender to be shown in the UI
             let origin = match pfx {
-                Pfx::Server(_) => client.get_serv_name(),
-                Pfx::User { ref nick, .. } => nick,
+                Server(_) => client.get_serv_name(),
+                User { ref nick, .. } => nick,
             };
 
             match target {
@@ -294,8 +293,8 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
                     let serv_name = client.get_serv_name();
                     let msg_target = {
                         match pfx {
-                            Pfx::Server(_) => MsgTarget::Server { serv_name },
-                            Pfx::User { ref nick, .. } => {
+                            Server(_) => MsgTarget::Server { serv_name },
+                            User { ref nick, .. } => {
                                 // show NOTICE messages in server tabs if we don't have a tab
                                 // for the sender already (see #21)
                                 if is_notice && !tui.does_user_tab_exist(serv_name, nick) {
@@ -317,9 +316,9 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             }
         }
 
-        Cmd::JOIN { chan } => {
+        JOIN { chan } => {
             let nick = match pfx {
-                Some(Pfx::User { nick, .. }) => nick,
+                Some(User { nick, .. }) => nick,
                 _ => {
                     // TODO: log this?
                     return;
@@ -348,9 +347,9 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             }
         }
 
-        Cmd::PART { chan, .. } => {
+        PART { chan, .. } => {
             let nick = match pfx {
-                Some(Pfx::User { nick, .. }) => nick,
+                Some(User { nick, .. }) => nick,
                 _ => {
                     // TODO: log this?
                     return;
@@ -368,9 +367,9 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             }
         }
 
-        Cmd::QUIT { .. } => {
+        QUIT { .. } => {
             let nick = match pfx {
-                Some(Pfx::User { nick, .. }) => nick,
+                Some(User { nick, .. }) => nick,
                 _ => {
                     // TODO: log this?
                     return;
@@ -387,9 +386,9 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             );
         }
 
-        Cmd::NICK { nick } => {
+        NICK { nick } => {
             let old_nick = match pfx {
-                Some(Pfx::User { nick, .. }) => nick,
+                Some(User { nick, .. }) => nick,
                 _ => {
                     // TODO: log this?
                     return;
@@ -407,7 +406,7 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             );
         }
 
-        Cmd::Reply { num: 433, .. } => {
+        Reply { num: 433, .. } => {
             // ERR_NICKNAMEINUSE
             if client.is_nick_accepted() {
                 // Nick change request from user failed. Just show an error message.
@@ -421,11 +420,11 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             }
         }
 
-        Cmd::PING { .. } | Cmd::PONG { .. } => {
+        PING { .. } | PONG { .. } => {
             // Ignore
         }
 
-        Cmd::ERROR { msg } => {
+        ERROR { msg } => {
             tui.add_err_msg(
                 &msg,
                 time::now(),
@@ -435,7 +434,7 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             );
         }
 
-        Cmd::TOPIC { chan, topic } => {
+        TOPIC { chan, topic } => {
             tui.show_topic(
                 &topic,
                 time::now(),
@@ -446,7 +445,7 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             );
         }
 
-        Cmd::CAP {
+        CAP {
             client: _,
             subcommand,
             params,
@@ -485,11 +484,11 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             }
         }
 
-        Cmd::AUTHENTICATE { .. } => {
+        AUTHENTICATE { .. } => {
             // Ignore
         }
 
-        Cmd::Reply { num: n, params } => {
+        Reply { num: n, params } => {
             if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
                     || n == 251 /* RPL_LUSERCLIENT */
                     || n == 255 /* RPL_LUSERME */
@@ -589,7 +588,7 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
                 );
             } else {
                 match pfx {
-                    Some(Pfx::Server(msg_serv_name)) => {
+                    Some(Server(msg_serv_name)) => {
                         let conn_serv_name = client.get_serv_name();
                         let msg_target = MsgTarget::Server {
                             serv_name: conn_serv_name,
@@ -614,8 +613,8 @@ fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
             }
         }
 
-        Cmd::Other { cmd: _, params } => match pfx {
-            Some(Pfx::Server(msg_serv_name)) => {
+        Other { cmd: _, params } => match pfx {
+            Some(Server(msg_serv_name)) => {
                 let conn_serv_name = client.get_serv_name();
                 let msg_target = MsgTarget::Server {
                     serv_name: conn_serv_name,
