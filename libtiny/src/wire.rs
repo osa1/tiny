@@ -78,6 +78,8 @@ pub(crate) fn authenticate(msg: &str) -> String {
     format!("AUTHENTICATE {}\r\n", msg)
 }
 
+/// Sender of a message
+///
 /// `<prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]`
 ///
 /// From RFC 2812:
@@ -96,18 +98,21 @@ pub enum Pfx {
     },
 }
 
+/// Target of a message
 #[derive(Debug, PartialEq, Eq)]
 pub enum MsgTarget {
     Chan(String),
     User(String),
 }
 
+/// An IRC message
 #[derive(Debug, PartialEq, Eq)]
 pub struct Msg {
     pub pfx: Option<Pfx>,
     pub cmd: Cmd,
 }
 
+/// An IRC command or reply
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd {
     /// A PRIVMSG or NOTICE. Check `is_notice` field.
@@ -191,7 +196,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 
 /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
 /// Otherwise the buffer is left unchanged.
-pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
+pub(crate) fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
     // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
     // using this hacky method instead.
     let crlf_idx = {
