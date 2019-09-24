@@ -1,4 +1,4 @@
-pub struct SplitIterator<'a> {
+pub(crate) struct SplitIterator<'a> {
     s: Option<&'a str>,
     max: usize,
 }

@@ -1,21 +1,21 @@
 #![recursion_limit = "512"]
-#![feature(drain_filter)]
 #![feature(test)]
 
-pub mod client;
 mod pinger;
 mod state;
 mod stream;
-pub mod utils;
+mod utils;
 pub mod wire;
 
-pub use client::Client;
 use pinger::Pinger;
 use state::State;
 use stream::{Stream, StreamError};
 
-use futures::{future::FutureExt, select, stream::StreamExt};
-use std::{net::ToSocketAddrs, time::Duration};
+use futures::future::FutureExt;
+use futures::select;
+use futures::stream::StreamExt;
+use std::net::ToSocketAddrs;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::mpsc;
@@ -97,7 +97,7 @@ impl From<StreamError> for Event {
 
 /// IRC client.
 #[derive(Clone)]
-pub struct IrcClient {
+pub struct Client {
     /// Channel to the send commands to the main loop. Usually just for sending messages to the
     /// server.
     msg_chan: mpsc::Sender<Cmd>,
@@ -114,43 +114,55 @@ pub struct IrcClient {
     // with annoying hacks like wrapping it with an `Arc<Mutex<..>>` or something.
 }
 
-impl IrcClient {
+impl Client {
     /// Create a new client. Spawns two `tokio` tasks on the given `runtime`. If not given, tasks
     /// are created on the default executor using `tokio::spawn`.
     pub fn new(
         server_info: ServerInfo,
         runtime: Option<&mut Runtime>,
-    ) -> (IrcClient, mpsc::Receiver<Event>) {
+    ) -> (Client, mpsc::Receiver<Event>) {
         connect(server_info, runtime)
     }
-}
 
-impl Client for IrcClient {
-    fn reconnect(&mut self, port: Option<u16>) {
+    /// Reconnect to the server, possibly using a new port.
+    pub fn reconnect(&mut self, port: Option<u16>) {
         self.msg_chan.try_send(Cmd::Reconnect(port)).unwrap()
     }
 
-    fn get_serv_name(&self) -> &str {
+    /// Get host name of this connection.
+    pub fn get_serv_name(&self) -> &str {
         &self.serv_name
     }
 
+    /// Get current nick. Not that this returns the nick we're currently trying when the nick is
+    /// not yet accepted. See `is_nick_accepted`.
     // FIXME: This allocates a String
-    fn get_nick(&self) -> String {
+    pub fn get_nick(&self) -> String {
         self.state.get_nick()
     }
 
+    /// Is current nick accepted by the server?
     // TODO: Do we really need this?
-    fn is_nick_accepted(&self) -> bool {
+    pub fn is_nick_accepted(&self) -> bool {
         self.state.is_nick_accepted()
     }
 
-    fn raw_msg(&mut self, msg: String) {
+    /// Send a message directly to the server. "\r\n" suffix is added by this method.
+    pub fn raw_msg(&mut self, msg: String) {
         self.msg_chan
             .try_send(Cmd::Msg(format!("{}\r\n", msg)))
             .unwrap()
     }
 
-    fn split_privmsg<'a>(&self, extra_len: usize, msg: &'a str) -> utils::SplitIterator<'a> {
+    /// Split a privmsg to multiple messages so that each message is, when the hostname and nick
+    /// prefix added by the server, fits in one IRC message.
+    ///
+    /// `extra_len`: Size (in bytes) for a prefix/suffix etc. that'll be added to each line.
+    pub fn split_privmsg<'a>(
+        &self,
+        extra_len: usize,
+        msg: &'a str,
+    ) -> impl Iterator<Item = &'a str> {
         // Max msg len calculation adapted from hexchat
         // (src/common/outbound.c:split_up_text)
         let mut max = 512; // RFC 2812
@@ -175,7 +187,9 @@ impl Client for IrcClient {
         utils::split_iterator(msg, max)
     }
 
-    fn privmsg(&mut self, target: &str, msg: &str, ctcp_action: bool) {
+    /// Send a privmsg. Note that this method does not split long messages into smaller messages;
+    /// use `split_privmsg` for that.
+    pub fn privmsg(&mut self, target: &str, msg: &str, ctcp_action: bool) {
         let wire_fn = if ctcp_action {
             wire::action
         } else {
@@ -186,24 +200,31 @@ impl Client for IrcClient {
             .unwrap()
     }
 
-    fn join(&mut self, chans: &[&str]) {
+    /// Join the given list of channels.
+    pub fn join(&mut self, chans: &[&str]) {
         self.msg_chan
             .try_send(Cmd::Msg(wire::join(&chans)))
             .unwrap()
     }
 
-    fn away(&mut self, msg: Option<&str>) {
+    /// Set away status. `None` means not away.
+    pub fn away(&mut self, msg: Option<&str>) {
         self.state.set_away(msg);
         self.msg_chan.try_send(Cmd::Msg(wire::away(msg))).unwrap()
     }
 
-    fn nick(&mut self, new_nick: &str) {
+    /// Change nick. This may fail (ERR_NICKNAMEINUSE) so wait for confirmation (a NICK message
+    /// back from the server, with the old nick as prefix).
+    pub fn nick(&mut self, new_nick: &str) {
         self.msg_chan
             .try_send(Cmd::Msg(wire::nick(new_nick)))
             .unwrap()
     }
 
-    fn quit(&mut self, reason: Option<String>) {
+    /// Send a QUIT message to the server, with optional "reason". This stops the client; so the
+    /// sender end of the `Cmd` channel and the receiver end of the IRC message channel (for
+    /// outgoing messages) will be dropped.
+    pub fn quit(&mut self, reason: Option<String>) {
         self.msg_chan.try_send(Cmd::Quit(reason)).unwrap();
     }
 }
@@ -227,7 +248,7 @@ enum Cmd {
 fn connect(
     server_info: ServerInfo,
     runtime: Option<&mut Runtime>,
-) -> (IrcClient, mpsc::Receiver<Event>) {
+) -> (Client, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //
@@ -430,7 +451,7 @@ fn connect(
     }
 
     (
-        IrcClient {
+        Client {
             msg_chan: snd_cmd,
             serv_name,
             state: irc_state_clone,
