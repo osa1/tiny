@@ -536,6 +536,33 @@ mod tests {
         assert_eq!(buf.len(), 0);
     }
 
+    // Example from https://tools.ietf.org/id/draft-oakley-irc-ctcp-01.html
+    #[test]
+    fn test_ctcp_action_parsing_1() {
+        let mut buf = vec![];
+        write!(
+            &mut buf,
+            ":dan!u@localhost PRIVMSG #ircv3 :\x01ACTION writes some specs!\x01\r\n"
+        )
+        .unwrap();
+        assert_eq!(
+            parse_irc_msg(&mut buf),
+            Some(Msg {
+                pfx: Some(Pfx::User {
+                    nick: "dan".to_owned(),
+                    user: "u@localhost".to_owned(),
+                }),
+                cmd: Cmd::PRIVMSG {
+                    target: MsgTarget::Chan("#ircv3".to_owned()),
+                    msg: "writes some specs!".to_owned(),
+                    is_notice: false,
+                    is_action: true,
+                },
+            })
+        );
+        assert_eq!(buf.len(), 0);
+    }
+
     /*
     #[test]
     fn test_ctcp_action_parsing() {
