@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 
 use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
-use libtiny::{Client, IrcClient};
+use libtiny::Client;
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
 use term_input::{Event, Input};
 
@@ -95,7 +95,7 @@ fn run(
     // A reference to the TUI will be shared with each connection event handler
     let tui = Rc::new(RefCell::new(tui));
 
-    let mut clients: Vec<IrcClient> = Vec::with_capacity(servers.len());
+    let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
     for server in servers.iter().cloned() {
         tui.borrow_mut().new_server_tab(&server.addr);
@@ -116,7 +116,7 @@ fn run(
             }),
         };
 
-        let (client, rcv_ev) = IrcClient::new(server_info, Some(&mut executor));
+        let (client, rcv_ev) = Client::new(server_info, Some(&mut executor));
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
@@ -153,7 +153,7 @@ fn run(
 async fn tui_task(
     mut rcv_ev: mpsc::Receiver<libtiny::Event>,
     tui: Rc<RefCell<TUI>>,
-    client: IrcClient,
+    client: Client,
 ) {
     while let Some(ev) = rcv_ev.next().await {
         handle_conn_ev(&mut *tui.borrow_mut(), &client, ev);
@@ -161,7 +161,7 @@ async fn tui_task(
     }
 }
 
-fn handle_conn_ev(tui: &mut TUI, client: &IrcClient, ev: libtiny::Event) {
+fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny::Event) {
     use libtiny::Event::*;
     match ev {
         Connecting => {
@@ -237,7 +237,7 @@ fn handle_conn_ev(tui: &mut TUI, client: &IrcClient, ev: libtiny::Event) {
     }
 }
 
-fn handle_msg(tui: &mut TUI, client: &IrcClient, msg: libtiny::wire::Msg) {
+fn handle_msg(tui: &mut TUI, client: &Client, msg: libtiny::wire::Msg) {
     use libtiny::wire;
     use libtiny::wire::Cmd::*;
     use libtiny::wire::Pfx::*;
@@ -644,7 +644,7 @@ fn handle_input_ev(
     config_path: &PathBuf,
     defaults: &config::Defaults,
     tui: &Rc<RefCell<TUI>>,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     ev: Event,
 ) -> bool {
     let tui_ret = tui.borrow_mut().handle_input_event(ev);
@@ -684,7 +684,7 @@ fn handle_cmd(
     config_path: &PathBuf,
     defaults: &config::Defaults,
     tui: Rc<RefCell<TUI>>,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
     cmd: &str,
 ) {
@@ -711,7 +711,7 @@ fn handle_cmd(
 
 fn send_msg(
     tui: &mut TUI,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: &MsgSource,
     msg: String,
     ctcp_action: bool,

@@ -1,6 +1,6 @@
 use crate::config;
 use crate::utils;
-use libtiny::{Client, IrcClient, ServerInfo};
+use libtiny::{Client, ServerInfo};
 use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
 use std::cell::RefCell;
 use std::error::Error;
@@ -17,7 +17,7 @@ pub(crate) struct Cmd {
     // pub(crate) help: &'static str,
     /// Command function.
     pub(crate) cmd_fn:
-        for<'a, 'b> fn(&str, &PathBuf, &config::Defaults, TUIRef, &mut Vec<IrcClient>, MsgSource),
+        for<'a, 'b> fn(&str, &PathBuf, &config::Defaults, TUIRef, &mut Vec<Client>, MsgSource),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,7 +72,7 @@ pub(crate) fn parse_cmd(cmd: &str) -> ParseCmdResult {
     }
 }
 
-fn find_client_idx(clients: &[IrcClient], serv_name: &str) -> Option<usize> {
+fn find_client_idx(clients: &[Client], serv_name: &str) -> Option<usize> {
     for (client_idx, client) in clients.iter().enumerate() {
         if client.get_serv_name() == serv_name {
             return Some(client_idx);
@@ -81,7 +81,7 @@ fn find_client_idx(clients: &[IrcClient], serv_name: &str) -> Option<usize> {
     None
 }
 
-fn find_client<'a>(clients: &'a mut Vec<IrcClient>, serv_name: &str) -> Option<&'a mut IrcClient> {
+fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a mut Client> {
     match find_client_idx(clients, serv_name) {
         None => None,
         Some(idx) => Some(&mut clients[idx]),
@@ -118,7 +118,7 @@ fn away(
     _: &PathBuf,
     _: &config::Defaults,
     _: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let msg = if args.is_empty() { None } else { Some(args) };
@@ -139,7 +139,7 @@ fn clear(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    _: &mut Vec<IrcClient>,
+    _: &mut Vec<Client>,
     src: MsgSource,
 ) {
     tui.borrow_mut().clear(&src.to_target());
@@ -157,7 +157,7 @@ fn close(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let mut tui = tui.borrow_mut();
@@ -197,7 +197,7 @@ fn connect(
     _: &PathBuf,
     defaults: &config::Defaults,
     tui: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let words: Vec<&str> = args.split_whitespace().collect();
@@ -217,7 +217,7 @@ fn connect(
     }
 }
 
-fn reconnect(tui: &mut TUI, clients: &mut Vec<IrcClient>, src: MsgSource) {
+fn reconnect(tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
     tui.add_client_msg(
         "Reconnecting...",
         &MsgTarget::AllServTabs {
@@ -239,7 +239,7 @@ fn connect_(
     pass: Option<&str>,
     defaults: &config::Defaults,
     tui_ref: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
 ) {
     let mut tui = tui_ref.borrow_mut();
 
@@ -281,7 +281,7 @@ fn connect_(
     let msg_target = MsgTarget::Server { serv_name };
     tui.add_client_msg("Connecting...", &msg_target);
 
-    let (client, rcv_ev) = IrcClient::new(
+    let (client, rcv_ev) = Client::new(
         ServerInfo {
             addr: serv_name.to_owned(),
             port: serv_port,
@@ -317,7 +317,7 @@ fn ignore(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    _: &mut Vec<IrcClient>,
+    _: &mut Vec<Client>,
     src: MsgSource,
 ) {
     match src {
@@ -356,7 +356,7 @@ fn join(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let words = args.split_whitespace().collect::<Vec<_>>();
@@ -388,7 +388,7 @@ fn me(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
 ) {
     if args.is_empty() {
@@ -435,7 +435,7 @@ fn msg(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let fail = || {
@@ -484,7 +484,7 @@ fn names(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    _: &mut Vec<IrcClient>,
+    _: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let mut tui = tui.borrow_mut();
@@ -532,7 +532,7 @@ fn nick(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    clients: &mut Vec<IrcClient>,
+    clients: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let words: Vec<&str> = args.split_whitespace().collect();
@@ -559,7 +559,7 @@ fn reload(
     config_path: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    _: &mut Vec<IrcClient>,
+    _: &mut Vec<Client>,
     _: MsgSource,
 ) {
     let mut tui = tui.borrow_mut();
@@ -586,7 +586,7 @@ fn switch(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    _: &mut Vec<IrcClient>,
+    _: &mut Vec<Client>,
     _: MsgSource,
 ) {
     let words: Vec<&str> = args.split_whitespace().collect();
@@ -610,7 +610,7 @@ fn notify(
     _: &PathBuf,
     _: &config::Defaults,
     tui: TUIRef,
-    _: &mut Vec<IrcClient>,
+    _: &mut Vec<Client>,
     src: MsgSource,
 ) {
     let mut tui = tui.borrow_mut();

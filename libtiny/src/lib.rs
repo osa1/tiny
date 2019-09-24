@@ -59,6 +59,7 @@ pub struct ServerInfo {
     pub sasl_auth: Option<SASLAuth>,
 }
 
+/// SASL authentication credentials
 #[derive(Debug, Clone)]
 pub struct SASLAuth {
     pub username: String,
