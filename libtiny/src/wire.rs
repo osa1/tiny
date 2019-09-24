@@ -563,31 +563,43 @@ mod tests {
         assert_eq!(buf.len(), 0);
     }
 
-    /*
     #[test]
-    fn test_ctcp_action_parsing() {
-        assert_eq!(
-            check_ctcp_action_msg("\x01ACTION msg contents\x01"),
-            ("msg contents", true)
-        );
-
+    fn test_ctcp_action_parsing_2() {
         // From https://modern.ircdocs.horse/ctcp.html:
         //
         // > The final <delim> MUST be sent, but parsers SHOULD accept incoming messages which lack
         // > it (particularly for CTCP ACTION). This is due to how some software incorrectly
         // > implements message splitting.
+        let mut buf = vec![];
+        write!(
+            &mut buf,
+            ":a!b@c PRIVMSG target :\x01ACTION msg contents\r\n"
+        )
+        .unwrap();
         assert_eq!(
-            check_ctcp_action_msg("\x01ACTION msg contents"),
-            ("msg contents", true)
+            parse_irc_msg(&mut buf).unwrap().cmd,
+            Cmd::PRIVMSG {
+                target: MsgTarget::User("target".to_owned()),
+                msg: "msg contents".to_owned(),
+                is_notice: false,
+                is_action: true,
+            }
         );
+        assert_eq!(buf.len(), 0);
 
-        assert_eq!(check_ctcp_action_msg(""), ("", false));
-
-        assert_eq!(check_ctcp_action_msg("\x01ACTION "), ("", true));
-
-        assert_eq!(check_ctcp_action_msg("\x01ACTION"), ("\x01ACTION", false));
+        let mut buf = vec![];
+        write!(&mut buf, ":a!b@c PRIVMSG target :\x01ACTION \r\n").unwrap();
+        assert_eq!(
+            parse_irc_msg(&mut buf).unwrap().cmd,
+            Cmd::PRIVMSG {
+                target: MsgTarget::User("target".to_owned()),
+                msg: "".to_owned(),
+                is_notice: false,
+                is_action: true,
+            }
+        );
+        assert_eq!(buf.len(), 0);
     }
-    */
 
     #[test]
     fn test_error_parsing() {
