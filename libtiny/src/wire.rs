@@ -252,7 +252,7 @@ pub(crate) fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
                 } else {
                     MsgTarget::User(target.to_owned())
                 };
-                let is_action = msg.len() >= 8 && &msg[..8] == ACTION_PREFIX;
+                let is_action = msg.len() >= 8 && &msg.as_bytes()[..8] == ACTION_PREFIX.as_bytes();
                 let msg = if is_action {
                     if msg.as_bytes()[msg.len() - 1] == 0x01 {
                         &msg[8..msg.len() - 1]
@@ -596,6 +596,21 @@ mod tests {
                 msg: "".to_owned(),
                 is_notice: false,
                 is_action: true,
+            }
+        );
+        assert_eq!(buf.len(), 0);
+
+        // This is a regression test: the slice [..8] takes the substring with only a part of one
+        // of the '’'s.
+        let mut buf = vec![];
+        write!(&mut buf, ":a!b@c PRIVMSG target :’’’’’’’\r\n").unwrap();
+        assert_eq!(
+            parse_irc_msg(&mut buf).unwrap().cmd,
+            Cmd::PRIVMSG {
+                target: MsgTarget::User("target".to_owned()),
+                msg: "’’’’’’’".to_owned(),
+                is_notice: false,
+                is_action: false,
             }
         );
         assert_eq!(buf.len(), 0);
