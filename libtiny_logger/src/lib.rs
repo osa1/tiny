@@ -98,7 +98,7 @@ impl Logger {
                 // TODO
             }
 
-            QUIT { msg } => {
+            QUIT { msg, chans } => {
                 // TODO
             }
 

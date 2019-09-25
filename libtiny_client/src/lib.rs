@@ -448,10 +448,10 @@ fn connect(
                             }
                             Ok(bytes) => {
                                 parse_buf.extend_from_slice(&read_buf[0..bytes]);
-                                while let Some(msg) = wire::parse_irc_msg(&mut parse_buf) {
+                                while let Some(mut msg) = wire::parse_irc_msg(&mut parse_buf) {
                                     eprintln!("parsed msg: {:?}", msg);
                                     pinger.reset();
-                                    irc_state.update(&msg, &mut snd_ev, &mut snd_msg);
+                                    irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
                                     if let Some(ref logger) = logger {
                                         if let Err(err) = logger.borrow_mut().log_incoming_msg(&msg) {
                                             snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
