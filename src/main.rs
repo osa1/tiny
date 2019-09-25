@@ -19,6 +19,7 @@ use cmd::{parse_cmd, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny::Client;
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
+use libtiny_wire as wire;
 use term_input::{Event, Input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -237,10 +238,9 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny::Event) {
     }
 }
 
-fn handle_msg(tui: &mut TUI, client: &Client, msg: libtiny::wire::Msg) {
-    use libtiny::wire;
-    use libtiny::wire::Cmd::*;
-    use libtiny::wire::Pfx::*;
+fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
+    use wire::Cmd::*;
+    use wire::Pfx::*;
 
     let wire::Msg { pfx, cmd } = msg;
     let ts = time::now();

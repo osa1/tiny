@@ -1,0 +1,6 @@
+[package]
+name = "libtiny_wire"
+version = "0.1.0"
+authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+edition = "2018"
+description = "IRC message parsing and generation"

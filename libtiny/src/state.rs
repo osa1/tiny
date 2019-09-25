@@ -1,8 +1,8 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::wire;
-use crate::wire::{find_byte, Cmd, Msg, Pfx};
 use crate::{Event, ServerInfo};
+use libtiny_wire as wire;
+use libtiny_wire::{find_byte, Msg, Pfx};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -168,7 +168,7 @@ impl StateInner {
     fn update(&mut self, msg: &Msg, snd_ev: &mut Sender<Event>, snd_irc_msg: &mut Sender<String>) {
         let Msg { ref pfx, ref cmd } = msg;
 
-        use Cmd::*;
+        use wire::Cmd::*;
         match cmd {
             PING { server } => {
                 snd_irc_msg.try_send(wire::pong(server)).unwrap();

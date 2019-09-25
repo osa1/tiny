@@ -2,47 +2,47 @@
 
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
 
-use std::{self, str};
+use std::str;
 
-pub(crate) fn pass(pass: &str) -> String {
+pub fn pass(pass: &str) -> String {
     format!("PASS {}\r\n", pass)
 }
 
 // FIXME: Option<String> because going from Option<String> to Option<&str> is too painful...
-pub(crate) fn quit(reason: Option<String>) -> String {
+pub fn quit(reason: Option<String>) -> String {
     match reason {
         None => "QUIT\r\n".to_string(),
         Some(reason) => format!("QUIT :{}\r\n", reason),
     }
 }
 
-pub(crate) fn user(hostname: &str, realname: &str) -> String {
+pub fn user(hostname: &str, realname: &str) -> String {
     format!("USER {} 8 * :{}\r\n", hostname, realname)
 }
 
-pub(crate) fn nick(arg: &str) -> String {
+pub fn nick(arg: &str) -> String {
     format!("NICK {}\r\n", arg)
 }
 
-pub(crate) fn ping(arg: &str) -> String {
+pub fn ping(arg: &str) -> String {
     format!("PING {}\r\n", arg)
 }
 
-pub(crate) fn pong(arg: &str) -> String {
+pub fn pong(arg: &str) -> String {
     format!("PONG {}\r\n", arg)
 }
 
-pub(crate) fn join(chans: &[&str]) -> String {
+pub fn join(chans: &[&str]) -> String {
     format!("JOIN {}\r\n", chans.join(","))
 }
 
 /*
-pub(crate) fn part(channel: &str) -> String {
+pub fn part(channel: &str) -> String {
     format!("PART {}\r\n", channel)
 }
 */
 
-pub(crate) fn privmsg(msgtarget: &str, msg: &str) -> String {
+pub fn privmsg(msgtarget: &str, msg: &str) -> String {
     // IRC messages need to be shorter than 512 bytes (see RFC 1459 or 2812). This should be dealt
     // with at call sites as we can't show how we split messages into multiple messages in the UI
     // at this point.
@@ -50,31 +50,31 @@ pub(crate) fn privmsg(msgtarget: &str, msg: &str) -> String {
     format!("PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
-pub(crate) fn action(msgtarget: &str, msg: &str) -> String {
+pub fn action(msgtarget: &str, msg: &str) -> String {
     assert!(msgtarget.len() + msg.len() + 21 <= 512); // See comments in `privmsg`
     format!("PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
 }
 
-pub(crate) fn away(msg: Option<&str>) -> String {
+pub fn away(msg: Option<&str>) -> String {
     match msg {
         None => "AWAY\r\n".to_string(),
         Some(msg) => format!("AWAY :{}\r\n", msg),
     }
 }
 
-pub(crate) fn cap_ls() -> String {
+pub fn cap_ls() -> String {
     "CAP LS\r\n".to_string()
 }
 
-pub(crate) fn cap_req(cap_identifiers: &[&str]) -> String {
+pub fn cap_req(cap_identifiers: &[&str]) -> String {
     format!("CAP REQ :{}\r\n", cap_identifiers.join(" "))
 }
 
-pub(crate) fn cap_end() -> String {
+pub fn cap_end() -> String {
     "CAP END\r\n".to_string()
 }
 
-pub(crate) fn authenticate(msg: &str) -> String {
+pub fn authenticate(msg: &str) -> String {
     format!("AUTHENTICATE {}\r\n", msg)
 }
 
@@ -196,7 +196,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 
 /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
 /// Otherwise the buffer is left unchanged.
-pub(crate) fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
+pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
     // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
     // using this hacky method instead.
     let crlf_idx = {
@@ -389,7 +389,7 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     ret
 }
 
-pub(crate) fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
+pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
     for (byte_idx, byte) in buf.iter().enumerate() {
         if *byte == byte0 {
             return Some(byte_idx);
