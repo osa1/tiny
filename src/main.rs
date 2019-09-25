@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use tokio::sync::mpsc;
 
-use cmd::{parse_cmd, ParseCmdResult};
+use cmd::{parse_cmd, CmdArgs, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny::Client;
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
@@ -46,7 +46,7 @@ fn main() {
                 servers,
                 defaults,
                 colors,
-                // log_dir: _,
+                log_dir,
             }) => {
                 let servers = if !server_args.is_empty() {
                     // connect only to servers that match at least one of
@@ -65,7 +65,7 @@ fn main() {
                 } else {
                     servers
                 };
-                run(servers, defaults, colors, config_path)
+                run(servers, defaults, colors, config_path, log_dir)
             }
         }
     }
@@ -76,6 +76,7 @@ fn run(
     defaults: config::Defaults,
     colors: Colors,
     config_path: PathBuf,
+    log_dir: Option<PathBuf>,
 ) {
     let mut tui = TUI::new(colors);
 
@@ -117,7 +118,7 @@ fn run(
             }),
         };
 
-        let (client, rcv_ev) = Client::new(server_info, Some(&mut executor));
+        let (client, rcv_ev) = Client::new(server_info, Some(&mut executor), log_dir.clone());
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
@@ -138,7 +139,8 @@ fn run(
                     return;
                 }
                 Ok(ev) => {
-                    let abort = handle_input_ev(&config_path, &defaults, &tui, &mut clients, ev);
+                    let abort =
+                        handle_input_ev(&config_path, &log_dir, &defaults, &tui, &mut clients, ev);
                     if abort {
                         return;
                     }
@@ -234,6 +236,12 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny::Event) {
         }
         Msg(msg) => {
             handle_msg(tui, client, msg);
+        }
+        CouldntCreateLogger(err) => {
+            // TODO
+        }
+        LogWriteFailed(err) => {
+            // TODO
         }
     }
 }
@@ -642,6 +650,7 @@ fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
 
 fn handle_input_ev(
     config_path: &PathBuf,
+    log_dir: &Option<PathBuf>,
     defaults: &config::Defaults,
     tui: &Rc<RefCell<TUI>>,
     clients: &mut Vec<Client>,
@@ -664,7 +673,15 @@ fn handle_input_ev(
             // We know msg has at least one character as the TUI won't accept it otherwise.
             if msg[0] == '/' {
                 let cmd_str: String = (&msg[1..]).iter().cloned().collect();
-                handle_cmd(config_path, defaults, tui.clone(), clients, from, &cmd_str)
+                handle_cmd(
+                    config_path,
+                    log_dir,
+                    defaults,
+                    tui.clone(),
+                    clients,
+                    from,
+                    &cmd_str,
+                )
             } else {
                 let msg_str: String = msg.into_iter().collect();
                 send_msg(&mut *tui.borrow_mut(), clients, &from, msg_str, false)
@@ -682,6 +699,7 @@ fn handle_input_ev(
 
 fn handle_cmd(
     config_path: &PathBuf,
+    log_dir: &Option<PathBuf>,
     defaults: &config::Defaults,
     tui: Rc<RefCell<TUI>>,
     clients: &mut Vec<Client>,
@@ -690,7 +708,16 @@ fn handle_cmd(
 ) {
     match parse_cmd(cmd) {
         ParseCmdResult::Ok { cmd, rest } => {
-            (cmd.cmd_fn)(rest, config_path, defaults, tui, clients, src);
+            let cmd_args = CmdArgs {
+                args: rest,
+                config_path,
+                log_dir,
+                defaults,
+                tui,
+                clients,
+                src,
+            };
+            (cmd.cmd_fn)(cmd_args);
         }
         // ParseCmdResult::Ambiguous(vec) => {
         //     self.tui.add_client_err_msg(
@@ -742,7 +769,7 @@ fn send_msg(
         match src {
             MsgSource::Serv { .. } => {
                 // we don't split raw messages to 512-bytes long chunks
-                client.raw_msg(msg);
+                client.raw_msg(&msg);
                 return;
             }
 

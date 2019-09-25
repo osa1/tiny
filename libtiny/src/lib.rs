@@ -6,6 +6,7 @@ mod state;
 mod stream;
 mod utils;
 
+use libtiny_logger::Logger;
 pub use libtiny_wire as wire;
 
 use pinger::Pinger;
@@ -15,7 +16,10 @@ use stream::{Stream, StreamError};
 use futures::future::FutureExt;
 use futures::select;
 use futures::stream::StreamExt;
+use std::cell::RefCell;
 use std::net::ToSocketAddrs;
+use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::current_thread::Runtime;
@@ -86,6 +90,10 @@ pub enum Event {
     NickChange(String),
     /// A message from the server
     Msg(wire::Msg),
+    /// Client couldn't create logger
+    CouldntCreateLogger(std::io::Error),
+    /// Client couldn't write log
+    LogWriteFailed(std::io::Error),
 }
 
 impl From<StreamError> for Event {
@@ -114,6 +122,8 @@ pub struct Client {
     // We can't have a channel to the sender task directly here, because when the sender task
     // returns we lose the receiving end of the channel and there's no way to avoid this except
     // with annoying hacks like wrapping it with an `Arc<Mutex<..>>` or something.
+    logger: Option<Rc<RefCell<Logger>>>,
+    snd_ev: mpsc::Sender<Event>,
 }
 
 impl Client {
@@ -122,8 +132,9 @@ impl Client {
     pub fn new(
         server_info: ServerInfo,
         runtime: Option<&mut Runtime>,
+        log_dir: Option<PathBuf>,
     ) -> (Client, mpsc::Receiver<Event>) {
-        connect(server_info, runtime)
+        connect(server_info, runtime, log_dir)
     }
 
     /// Reconnect to the server, possibly using a new port.
@@ -150,10 +161,15 @@ impl Client {
     }
 
     /// Send a message directly to the server. "\r\n" suffix is added by this method.
-    pub fn raw_msg(&mut self, msg: String) {
+    pub fn raw_msg(&mut self, msg: &str) {
         self.msg_chan
             .try_send(Cmd::Msg(format!("{}\r\n", msg)))
-            .unwrap()
+            .unwrap();
+        if let Some(logger) = &self.logger {
+            if let Err(err) = logger.borrow_mut().log_outgoing_raw_msg(&msg) {
+                self.snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
+            }
+        }
     }
 
     /// Split a privmsg to multiple messages so that each message is, when the hostname and nick
@@ -191,15 +207,20 @@ impl Client {
 
     /// Send a privmsg. Note that this method does not split long messages into smaller messages;
     /// use `split_privmsg` for that.
-    pub fn privmsg(&mut self, target: &str, msg: &str, ctcp_action: bool) {
-        let wire_fn = if ctcp_action {
+    pub fn privmsg(&mut self, target: &str, msg: &str, is_action: bool) {
+        let wire_fn = if is_action {
             wire::action
         } else {
             wire::privmsg
         };
         self.msg_chan
             .try_send(Cmd::Msg(wire_fn(target, msg)))
-            .unwrap()
+            .unwrap();
+        if let Some(logger) = &self.logger {
+            if let Err(err) = logger.borrow_mut().log_outgoing_msg(target, msg, is_action) {
+                self.snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
+            }
+        }
     }
 
     /// Join the given list of channels.
@@ -250,6 +271,7 @@ enum Cmd {
 fn connect(
     server_info: ServerInfo,
     runtime: Option<&mut Runtime>,
+    log_dir: Option<PathBuf>,
 ) -> (Client, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
@@ -259,7 +281,8 @@ fn connect(
 
     // Channel for returning IRC events to user.
     let (mut snd_ev, rcv_ev) = mpsc::channel::<Event>(100);
-    // Channel for commands from user.
+    let snd_ev_clone = snd_ev.clone(); // for Client
+                                       // Channel for commands from user.
     let (snd_cmd, rcv_cmd) = mpsc::channel::<Cmd>(100);
     let mut rcv_cmd_fused = rcv_cmd.fuse();
 
@@ -267,7 +290,18 @@ fn connect(
     // Create the main loop task
     //
 
-    let irc_state = State::new(server_info.clone());
+    let logger = match log_dir {
+        None => None,
+        Some(log_dir) => match Logger::new(log_dir, serv_name.clone()) {
+            Ok(logger) => Some(Rc::new(RefCell::new(logger))),
+            Err(err) => {
+                snd_ev.try_send(Event::CouldntCreateLogger(err)).unwrap();
+                None
+            }
+        },
+    };
+
+    let irc_state = State::new(server_info.clone(), logger.clone());
     let irc_state_clone = irc_state.clone();
 
     // We allow changing ports when reconnecting, so `mut`
@@ -457,6 +491,8 @@ fn connect(
             msg_chan: snd_cmd,
             serv_name,
             state: irc_state_clone,
+            logger,
+            snd_ev: snd_ev_clone,
         },
         rcv_ev,
     )

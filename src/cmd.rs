@@ -4,10 +4,20 @@ use libtiny::{Client, ServerInfo};
 use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
 use std::cell::RefCell;
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 type TUIRef = Rc<RefCell<TUI>>;
+
+pub(crate) struct CmdArgs<'a> {
+    pub args: &'a str,
+    pub config_path: &'a Path,
+    pub log_dir: &'a Option<PathBuf>,
+    pub defaults: &'a config::Defaults,
+    pub tui: TUIRef,
+    pub clients: &'a mut Vec<Client>,
+    pub src: MsgSource,
+}
 
 pub(crate) struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
@@ -16,8 +26,7 @@ pub(crate) struct Cmd {
     // Command help message. Shown in `/help`.
     // pub(crate) help: &'static str,
     /// Command function.
-    pub(crate) cmd_fn:
-        for<'a, 'b> fn(&str, &PathBuf, &config::Defaults, TUIRef, &mut Vec<Client>, MsgSource),
+    pub(crate) cmd_fn: for<'a, 'b> fn(CmdArgs),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,16 +122,13 @@ static AWAY_CMD: Cmd = Cmd {
     cmd_fn: away,
 };
 
-fn away(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    _: TUIRef,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-) {
-    let msg = if args.is_empty() { None } else { Some(args) };
-    if let Some(client) = find_client(clients, src.serv_name()) {
+fn away(args: CmdArgs) {
+    let msg = if args.args.is_empty() {
+        None
+    } else {
+        Some(args.args)
+    };
+    if let Some(client) = find_client(args.clients, args.src.serv_name()) {
         client.away(msg);
     }
 }
@@ -134,14 +140,8 @@ static CLEAR_CMD: Cmd = Cmd {
     cmd_fn: clear,
 };
 
-fn clear(
-    _: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    _: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn clear(args: CmdArgs) {
+    let CmdArgs { tui, src, .. } = args;
     tui.borrow_mut().clear(&src.to_target());
 }
 
@@ -152,14 +152,10 @@ static CLOSE_CMD: Cmd = Cmd {
     cmd_fn: close,
 };
 
-fn close(
-    _: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn close(args: CmdArgs) {
+    let CmdArgs {
+        tui, clients, src, ..
+    } = args;
     let mut tui = tui.borrow_mut();
     match src {
         MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
@@ -192,20 +188,22 @@ static CONNECT_CMD: Cmd = Cmd {
     cmd_fn: connect,
 };
 
-fn connect(
-    args: &str,
-    _: &PathBuf,
-    defaults: &config::Defaults,
-    tui: TUIRef,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn connect(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        log_dir,
+        defaults,
+        tui,
+        clients,
+        src,
+        ..
+    } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
 
     match words.len() {
         0 => reconnect(&mut *tui.borrow_mut(), clients, src),
-        1 => connect_(words[0], None, defaults, tui, clients),
-        2 => connect_(words[0], Some(words[1]), defaults, tui, clients),
+        1 => connect_(words[0], None, defaults, log_dir, tui, clients),
+        2 => connect_(words[0], Some(words[1]), defaults, log_dir, tui, clients),
         _ =>
         // wat
         {
@@ -238,6 +236,7 @@ fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
     defaults: &config::Defaults,
+    log_dir: &Option<PathBuf>,
     tui_ref: TUIRef,
     clients: &mut Vec<Client>,
 ) {
@@ -294,7 +293,8 @@ fn connect_(
             nickserv_ident: None,
             sasl_auth: None,
         },
-        None,
+        None, // tokio executor
+        log_dir.to_owned(),
     );
 
     // Spawn TUI task
@@ -312,14 +312,8 @@ static IGNORE_CMD: Cmd = Cmd {
     cmd_fn: ignore,
 };
 
-fn ignore(
-    _: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    _: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn ignore(args: CmdArgs) {
+    let CmdArgs { tui, src, .. } = args;
     match src {
         MsgSource::Serv { serv_name } => {
             tui.borrow_mut().toggle_ignore(&MsgTarget::AllServTabs {
@@ -351,14 +345,14 @@ static JOIN_CMD: Cmd = Cmd {
     cmd_fn: join,
 };
 
-fn join(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn join(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        tui,
+        clients,
+        src,
+        ..
+    } = args;
     let words = args.split_whitespace().collect::<Vec<_>>();
     if words.is_empty() {
         return tui.borrow_mut().add_client_err_msg(
@@ -383,14 +377,14 @@ static ME_CMD: Cmd = Cmd {
     cmd_fn: me,
 };
 
-fn me(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn me(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        tui,
+        clients,
+        src,
+        ..
+    } = args;
     if args.is_empty() {
         return tui
             .borrow_mut()
@@ -430,14 +424,14 @@ fn split_msg_args(args: &str) -> Option<(&str, &str)> {
     target_msg
 }
 
-fn msg(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn msg(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        tui,
+        clients,
+        src,
+        ..
+    } = args;
     let fail = || {
         tui.borrow_mut()
             .add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
@@ -479,14 +473,8 @@ static NAMES_CMD: Cmd = Cmd {
     cmd_fn: names,
 };
 
-fn names(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    _: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn names(args: CmdArgs) {
+    let CmdArgs { args, tui, src, .. } = args;
     let mut tui = tui.borrow_mut();
     let words: Vec<&str> = args.split_whitespace().collect();
 
@@ -527,14 +515,14 @@ static NICK_CMD: Cmd = Cmd {
     cmd_fn: nick,
 };
 
-fn nick(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn nick(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        tui,
+        clients,
+        src,
+        ..
+    } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() == 1 {
         if let Some(client) = find_client(clients, src.serv_name()) {
@@ -554,14 +542,10 @@ static RELOAD_CMD: Cmd = Cmd {
     cmd_fn: reload,
 };
 
-fn reload(
-    _: &str,
-    config_path: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    _: &mut Vec<Client>,
-    _: MsgSource,
-) {
+fn reload(args: CmdArgs) {
+    let CmdArgs {
+        config_path, tui, ..
+    } = args;
     let mut tui = tui.borrow_mut();
     match config::parse_config(config_path) {
         Ok(config::Config { colors, .. }) => tui.set_colors(colors),
@@ -581,14 +565,8 @@ static SWITCH_CMD: Cmd = Cmd {
     cmd_fn: switch,
 };
 
-fn switch(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    _: &mut Vec<Client>,
-    _: MsgSource,
-) {
+fn switch(args: CmdArgs) {
+    let CmdArgs { args, tui, .. } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() != 1 {
         return tui
@@ -605,14 +583,8 @@ static NOTIFY_CMD: Cmd = Cmd {
     cmd_fn: notify,
 };
 
-fn notify(
-    args: &str,
-    _: &PathBuf,
-    _: &config::Defaults,
-    tui: TUIRef,
-    _: &mut Vec<Client>,
-    src: MsgSource,
-) {
+fn notify(args: CmdArgs) {
+    let CmdArgs { args, tui, src, .. } = args;
     let mut tui = tui.borrow_mut();
 
     let words: Vec<&str> = args.split_whitespace().collect();

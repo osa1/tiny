@@ -44,14 +44,17 @@ impl Logger {
     }
 
     pub fn log_incoming_msg(&mut self, msg: &wire::Msg) -> Result<()> {
-        unimplemented!()
+        // TODO
+        Ok(())
     }
 
-    pub fn log_outgoing_msg(&mut self, target: &str, msg: &str) -> Result<()> {
-        unimplemented!()
+    pub fn log_outgoing_msg(&mut self, target: &str, msg: &str, is_action: bool) -> Result<()> {
+        // TODO
+        Ok(())
     }
 
     pub fn log_outgoing_raw_msg(&mut self, msg: &str) -> Result<()> {
-        unimplemented!()
+        // TODO
+        Ok(())
     }
 }
