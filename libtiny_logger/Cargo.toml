@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 libtiny_wire = { path = "../libtiny_wire" }
+time = "0.1"
