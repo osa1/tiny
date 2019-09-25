@@ -22,6 +22,7 @@ dirs = "1.0.2"
 futures-util-preview = "0.3.0-alpha.18"
 libtiny = { path = "libtiny" }
 libtiny_tui = { path = "libtiny_tui" }
+libtiny_wire = { path = "libtiny_wire" }
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 term_input = { path = "term_input" }

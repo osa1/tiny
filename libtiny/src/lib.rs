@@ -5,7 +5,8 @@ mod pinger;
 mod state;
 mod stream;
 mod utils;
-pub mod wire;
+
+pub use libtiny_wire as wire;
 
 use pinger::Pinger;
 use state::State;
