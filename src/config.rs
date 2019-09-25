@@ -71,7 +71,7 @@ pub(crate) struct Config {
     pub(crate) defaults: Defaults,
     #[serde(default)]
     pub(crate) colors: libtiny_tui::Colors,
-    // pub(crate) log_dir: String,
+    pub(crate) log_dir: Option<PathBuf>,
 }
 
 pub(crate) fn get_default_config_path() -> PathBuf {
