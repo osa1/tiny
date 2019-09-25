@@ -1,0 +1,8 @@
+[package]
+name = "libtiny_logger"
+version = "0.1.0"
+authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+libtiny_wire = { path = "../libtiny_wire" }
