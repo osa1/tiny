@@ -3,7 +3,9 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::Result;
+use std::io::Write;
 use std::path::PathBuf;
+use time;
 
 use libtiny_wire as wire;
 
@@ -56,22 +58,50 @@ impl Logger {
         self.get_file(target)
     }
 
+    fn get_target_file(&mut self, target: &wire::MsgTarget) -> Result<&mut File> {
+        match target {
+            wire::MsgTarget::Chan(target) | wire::MsgTarget::User(target) => self.get_file(target),
+        }
+    }
+
     pub fn log_incoming_msg(&mut self, msg: &wire::Msg) -> Result<()> {
         let wire::Msg { pfx, cmd } = msg;
         let sender = match pfx {
             Some(sender) => sender,
-            None => { return Ok(()); }
+            None => {
+                return Ok(());
+            }
+        };
+        let sender_str = match sender {
+            wire::Pfx::Server(ref s) | wire::Pfx::User { nick: ref s, .. } => s,
         };
 
         use wire::Cmd::*;
-        use wire::MsgTarget;
         match cmd {
-            PRIVMSG { target, msg, is_notice, is_action } => {
-                let target_file = match target {
-                    MsgTarget::Chan(target) | MsgTarget::User(target) =>
-                        self.get_file(target)?
-                };
+            PRIVMSG {
+                target,
+                msg,
+                is_notice: _,
+                is_action,
+            } => {
+                let mut target_file = self.get_target_file(target)?;
+                // TODO: Strip IRC codes from the message
+                // TODO: Handle action messages
+                writeln!(target_file, "[{}] {}: {}", now(), sender_str, msg)?;
             }
+
+            JOIN { chan } => {
+                // TODO
+            }
+
+            PART { chan, .. } => {
+                // TODO
+            }
+
+            QUIT { msg } => {
+                // TODO
+            }
+
             _ => {}
         }
 
@@ -87,4 +117,8 @@ impl Logger {
         // TODO
         Ok(())
     }
+}
+
+fn now() -> String {
+    time::strftime("%H:%M:%S", &time::now()).unwrap()
 }
