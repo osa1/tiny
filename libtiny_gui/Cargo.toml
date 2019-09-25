@@ -22,6 +22,3 @@ gdk = "0.11"
 gio = "0.7"
 glib = "0.8"
 gtk = { version = "0.7", features = ["v3_22_30"] }
-
-[profile.release]
-lto = true
