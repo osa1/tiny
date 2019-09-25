@@ -20,7 +20,7 @@ path = "src/main.rs"
 [dependencies]
 dirs = "1.0.2"
 futures-util-preview = "0.3.0-alpha.18"
-libtiny = { path = "libtiny" }
+libtiny_client = { path = "libtiny_client" }
 libtiny_tui = { path = "libtiny_tui" }
 libtiny_wire = { path = "libtiny_wire" }
 serde = { version = "1.0.8", features = ["derive"] }
