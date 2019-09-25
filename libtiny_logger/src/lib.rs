@@ -43,8 +43,38 @@ impl Logger {
         })
     }
 
+    fn get_file(&mut self, target: &str) -> Result<&mut File> {
+        // *sigh* Double lookup to make borrowchk happy
+        if self.fds.contains_key(target) {
+            return Ok(self.fds.get_mut(target).unwrap());
+        }
+
+        let mut file_path = self.log_dir.clone();
+        file_path.push(&format!("{}.txt", target));
+        let fd = OpenOptions::new().append(true).open(file_path)?;
+        self.fds.insert(target.to_owned(), fd);
+        self.get_file(target)
+    }
+
     pub fn log_incoming_msg(&mut self, msg: &wire::Msg) -> Result<()> {
-        // TODO
+        let wire::Msg { pfx, cmd } = msg;
+        let sender = match pfx {
+            Some(sender) => sender,
+            None => { return Ok(()); }
+        };
+
+        use wire::Cmd::*;
+        use wire::MsgTarget;
+        match cmd {
+            PRIVMSG { target, msg, is_notice, is_action } => {
+                let target_file = match target {
+                    MsgTarget::Chan(target) | MsgTarget::User(target) =>
+                        self.get_file(target)?
+                };
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 
