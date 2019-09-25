@@ -107,6 +107,9 @@ impl StateInner {
             nickserv_ident: server_info.nickserv_ident.clone(),
             current_nick_idx: 0,
             current_nick,
+            // FIXME: This means we won't join any channels...
+            // FIXME: Simply populating this with empty sets won't do it: we lose the join order
+            // that the user specified!
             chans: HashMap::new(),
             away_status: None,
             servername: None,
