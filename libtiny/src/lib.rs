@@ -300,8 +300,9 @@ fn connect(
             }
         },
     };
+    let logger_clone = logger.clone(); // for Client
 
-    let irc_state = State::new(server_info.clone(), logger.clone());
+    let irc_state = State::new(server_info.clone());
     let irc_state_clone = irc_state.clone();
 
     // We allow changing ports when reconnecting, so `mut`
@@ -451,6 +452,11 @@ fn connect(
                                     eprintln!("parsed msg: {:?}", msg);
                                     pinger.reset();
                                     irc_state.update(&msg, &mut snd_ev, &mut snd_msg);
+                                    if let Some(ref logger) = logger {
+                                        if let Err(err) = logger.borrow_mut().log_incoming_msg(&msg) {
+                                            snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
+                                        }
+                                    }
                                     snd_ev.try_send(Event::Msg(msg)).unwrap();
                                 }
                             }
@@ -491,7 +497,7 @@ fn connect(
             msg_chan: snd_cmd,
             serv_name,
             state: irc_state_clone,
-            logger,
+            logger: logger_clone,
             snd_ev: snd_ev_clone,
         },
         rcv_ev,
