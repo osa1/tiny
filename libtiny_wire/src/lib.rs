@@ -139,6 +139,8 @@ pub enum Cmd {
 
     QUIT {
         msg: Option<String>,
+        /// Channels of the user that just quit.
+        chans: Vec<String>,
     },
 
     NICK {
@@ -287,12 +289,12 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
                 }
             }
             MsgType::Cmd("QUIT") if params.is_empty() || params.len() == 1 => {
-                let mb_msg = if params.len() == 1 {
-                    Some(params[0].to_owned())
-                } else {
-                    None
-                };
-                Cmd::QUIT { msg: mb_msg }
+                let mb_msg = params.get(1).map(|s| (*s).to_owned());
+
+                Cmd::QUIT {
+                    msg: mb_msg,
+                    chans: Vec::new(),
+                }
             }
             MsgType::Cmd("NICK") if params.len() == 1 => {
                 let nick = params[0];

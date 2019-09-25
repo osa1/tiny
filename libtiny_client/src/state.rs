@@ -5,6 +5,7 @@ use libtiny_wire as wire;
 use libtiny_wire::{find_byte, Msg, Pfx};
 
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use tokio::sync::mpsc::Sender;
 
@@ -30,7 +31,7 @@ impl State {
 
     pub(crate) fn update(
         &self,
-        msg: &Msg,
+        msg: &mut Msg,
         snd_ev: &mut Sender<Event>,
         snd_irc_msg: &mut Sender<String>,
     ) {
@@ -61,7 +62,7 @@ impl State {
 }
 
 struct StateInner {
-    /// Nicks to try, with this order.
+    /// Nicks to try, in this order.
     nicks: Vec<String>,
 
     /// NickServ passowrd.
@@ -77,10 +78,7 @@ struct StateInner {
 
     /// Currently joined channels. Every channel we join will be added here to be able to re-join
     /// automatically on reconnect and channels we leave will be removed.
-    ///
-    /// Technically a set but we want to join channels in the order given by the user, so using
-    /// `Vec` here.
-    chans: Vec<String>,
+    chans: HashMap<String, HashSet<String>>,
 
     /// Away reason if away mode is on. `None` otherwise. TODO: I don't think the message is used?
     away_status: Option<String>,
@@ -104,13 +102,12 @@ struct StateInner {
 impl StateInner {
     fn new(server_info: ServerInfo) -> StateInner {
         let current_nick = server_info.nicks[0].to_owned();
-        let chans = server_info.auto_join.clone();
         StateInner {
             nicks: server_info.nicks.clone(),
             nickserv_ident: server_info.nickserv_ident.clone(),
             current_nick_idx: 0,
             current_nick,
-            chans,
+            chans: HashMap::new(),
             away_status: None,
             servername: None,
             usermask: None,
@@ -123,7 +120,10 @@ impl StateInner {
         self.nicks = self.server_info.nicks.clone();
         self.current_nick_idx = 0;
         self.current_nick = self.nicks[0].clone();
-        self.chans = self.server_info.auto_join.clone();
+        // Only reset the values here; the key set will be used to join channels
+        for chan in self.chans.values_mut() {
+            chan.clear();
+        }
         self.servername = None;
         self.usermask = None;
     }
@@ -165,8 +165,16 @@ impl StateInner {
         &self.current_nick
     }
 
-    fn update(&mut self, msg: &Msg, snd_ev: &mut Sender<Event>, snd_irc_msg: &mut Sender<String>) {
-        let Msg { ref pfx, ref cmd } = msg;
+    fn update(
+        &mut self,
+        msg: &mut Msg,
+        snd_ev: &mut Sender<Event>,
+        snd_irc_msg: &mut Sender<String>,
+    ) {
+        let Msg {
+            ref pfx,
+            ref mut cmd,
+        } = msg;
 
         use wire::Cmd::*;
         match cmd {
@@ -295,10 +303,9 @@ impl StateInner {
             // RPL_ENDOFMOTD, join channels, set away status (TODO)
             //
             Reply { num: 376, .. } => {
-                if !self.chans.is_empty() {
-                    snd_irc_msg
-                        .try_send(format!("JOIN {}\r\n", self.chans.join(",")))
-                        .unwrap();
+                let chans: Vec<&str> = self.chans.keys().map(String::as_str).collect();
+                if !chans.is_empty() {
+                    snd_irc_msg.try_send(wire::join(&chans)).unwrap();
                 }
             }
 
@@ -308,8 +315,42 @@ impl StateInner {
             Reply { num: 332, params } => {
                 if params.len() == 2 || params.len() == 3 {
                     let chan = &params[params.len() - 2];
-                    if !self.chans.contains(chan) {
-                        self.chans.push(chan.to_owned());
+                    if !self.chans.contains_key(chan) {
+                        self.chans.insert(chan.to_owned(), HashSet::new());
+                    }
+                }
+            }
+
+            //
+            // RPL_NAMREPLY: users in a channel
+            //
+            Reply { num: 353, params } => {
+                let chan = &params[2];
+                use std::collections::hash_map::Entry;
+                match self.chans.entry(chan.to_owned()) {
+                    Entry::Occupied(mut entry) => {
+                        for nick in params[3].split_whitespace() {
+                            entry.get_mut().insert(nick.to_owned());
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(params[3].split_whitespace().map(str::to_owned).collect());
+                    }
+                };
+            }
+
+            QUIT { ref mut chans, .. } => {
+                let nick = match pfx {
+                    Some(Pfx::User { nick, .. }) => nick,
+                    _ => {
+                        // TODO: WAT?
+                        return;
+                    }
+                };
+                for (chan, nicks) in self.chans.iter_mut() {
+                    if nicks.contains(nick) {
+                        chans.push(chan.to_owned());
+                        nicks.remove(nick);
                     }
                 }
             }

@@ -375,23 +375,25 @@ fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
             }
         }
 
-        QUIT { .. } => {
+        QUIT { chans, .. } => {
             let nick = match pfx {
-                Some(User { nick, .. }) => nick,
+                Some(User { ref nick, .. }) => nick,
                 _ => {
                     // TODO: log this?
                     return;
                 }
             };
 
-            tui.remove_nick(
-                &nick,
-                Some(time::now()),
-                &MsgTarget::AllUserTabs {
-                    serv_name: client.get_serv_name(),
-                    nick: &nick,
-                },
-            );
+            for chan in &chans {
+                tui.remove_nick(
+                    nick,
+                    Some(time::now()),
+                    &MsgTarget::Chan {
+                        serv_name: client.get_serv_name(),
+                        chan_name: chan,
+                    },
+                );
+            }
         }
 
         NICK { nick } => {
