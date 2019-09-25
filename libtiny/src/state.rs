@@ -1,7 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
 use crate::{Event, ServerInfo};
-use libtiny_logger::Logger;
 use libtiny_wire as wire;
 use libtiny_wire::{find_byte, Msg, Pfx};
 
@@ -12,14 +11,12 @@ use tokio::sync::mpsc::Sender;
 #[derive(Clone)]
 pub struct State {
     inner: Rc<RefCell<StateInner>>,
-    logger: Option<Rc<RefCell<Logger>>>,
 }
 
 impl State {
-    pub(crate) fn new(server_info: ServerInfo, logger: Option<Rc<RefCell<Logger>>>) -> State {
+    pub(crate) fn new(server_info: ServerInfo) -> State {
         State {
             inner: Rc::new(RefCell::new(StateInner::new(server_info))),
-            logger,
         }
     }
 
@@ -38,11 +35,6 @@ impl State {
         snd_irc_msg: &mut Sender<String>,
     ) {
         self.inner.borrow_mut().update(msg, snd_ev, snd_irc_msg);
-        if let Some(logger) = &self.logger {
-            if let Err(err) = logger.borrow_mut().log_incoming_msg(msg) {
-                snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
-            }
-        }
     }
 
     pub(crate) fn introduce(&self, snd_irc_msg: &mut Sender<String>) {
