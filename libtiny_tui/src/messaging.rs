@@ -466,10 +466,6 @@ impl MessagingUI {
         });
     }
 
-    pub(crate) fn has_nick(&self, nick: &str) -> bool {
-        self.nicks.contains(nick)
-    }
-
     fn reset_activity_line(&mut self) {
         self.last_activity_line = None;
     }

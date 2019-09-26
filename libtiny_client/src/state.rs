@@ -329,7 +329,7 @@ impl StateInner {
             //
             // NICK message sent from the server when our nick change request was successful
             //
-            NICK { nick: new_nick } => {
+            NICK { nick: new_nick, ref mut chans } => {
                 if let Some(Pfx::User { nick: old_nick, .. }) = pfx {
                     if old_nick == &self.current_nick {
                         snd_ev
@@ -338,6 +338,14 @@ impl StateInner {
                         if !self.nicks.contains(new_nick) {
                             self.nicks.push(new_nick.to_owned());
                             self.current_nick_idx = self.nicks.len() - 1;
+                        }
+                    }
+
+                    // Rename the nick in channel states, also populate the chan list
+                    for (chan, nicks) in &mut self.chans {
+                        if nicks.remove(old_nick) {
+                            nicks.insert(new_nick.to_owned());
+                            chans.push(chan.to_owned());
                         }
                     }
                 }

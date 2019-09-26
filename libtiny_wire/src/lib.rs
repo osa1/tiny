@@ -143,6 +143,8 @@ pub enum Cmd {
 
     NICK {
         nick: String,
+        /// Channels of the user.
+        chans: Vec<String>,
     },
 
     PING {
@@ -298,6 +300,7 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
                 let nick = params[0];
                 Cmd::NICK {
                     nick: nick.to_owned(),
+                    chans: Vec::new(),
                 }
             }
             MsgType::Cmd("PING") if params.len() == 1 => Cmd::PING {

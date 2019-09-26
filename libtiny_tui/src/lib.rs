@@ -66,8 +66,6 @@ pub enum MsgTarget<'a> {
     User { serv_name: &'a str, nick: &'a str },
     /// Show the message in all tabs of a server.
     AllServTabs { serv_name: &'a str },
-    /// Show the message in all server tabs that have the user. (i.e. channels, privmsg tabs)
-    AllUserTabs { serv_name: &'a str, nick: &'a str },
     /// Show the message in currently active tab.
     CurrentTab,
 }
@@ -899,30 +897,6 @@ impl TUI {
                 }
             }
 
-            MsgTarget::AllUserTabs { serv_name, nick } => {
-                for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    match tab.src {
-                        MsgSource::Serv { .. } => {}
-                        MsgSource::Chan {
-                            serv_name: ref serv_name_,
-                            ..
-                        } => {
-                            if serv_name_ == serv_name && tab.widget.has_nick(nick) {
-                                target_idxs.push(tab_idx);
-                            }
-                        }
-                        MsgSource::User {
-                            serv_name: ref serv_name_,
-                            nick: ref nick_,
-                        } => {
-                            if serv_name_ == serv_name && nick_ == nick {
-                                target_idxs.push(tab_idx);
-                            }
-                        }
-                    }
-                }
-            }
-
             MsgTarget::CurrentTab => {
                 target_idxs.push(self.active_idx);
             }
@@ -1073,6 +1047,7 @@ impl TUI {
     pub fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, Timestamp::from(ts));
+            // TODO: Does this actually rename the tab?
             tab.update_source(&|src: &mut MsgSource| {
                 if let MsgSource::User { ref mut nick, .. } = *src {
                     nick.clear();
@@ -1121,6 +1096,7 @@ impl TUI {
         self.resize();
     }
 
+    // TODO: Maybe remove this and add a `create: bool` field to MsgTarget::User
     pub fn does_user_tab_exist(&self, serv_name_: &str, nick_: &str) -> bool {
         for tab in &self.tabs {
             if let MsgSource::User {

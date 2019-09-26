@@ -384,19 +384,27 @@ fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
                 }
             };
 
+            let serv_name = client.get_serv_name();
             for chan in &chans {
                 tui.remove_nick(
                     nick,
                     Some(time::now()),
                     &MsgTarget::Chan {
-                        serv_name: client.get_serv_name(),
+                        serv_name,
                         chan_name: chan,
                     },
                 );
             }
+            if tui.does_user_tab_exist(serv_name, nick) {
+                tui.remove_nick(
+                    nick,
+                    Some(time::now()),
+                    &MsgTarget::User { serv_name, nick },
+                );
+            }
         }
 
-        NICK { nick } => {
+        NICK { nick, chans } => {
             let old_nick = match pfx {
                 Some(User { nick, .. }) => nick,
                 _ => {
@@ -405,15 +413,29 @@ fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
                 }
             };
 
-            tui.rename_nick(
-                &old_nick,
-                &nick,
-                time::now(),
-                &MsgTarget::AllUserTabs {
-                    serv_name: client.get_serv_name(),
-                    nick: &old_nick,
-                },
-            );
+            let serv_name = client.get_serv_name();
+            for chan in &chans {
+                tui.rename_nick(
+                    &old_nick,
+                    &nick,
+                    time::now(),
+                    &MsgTarget::Chan {
+                        serv_name,
+                        chan_name: chan,
+                    },
+                );
+            }
+            if tui.does_user_tab_exist(serv_name, &old_nick) {
+                tui.rename_nick(
+                    &old_nick,
+                    &nick,
+                    time::now(),
+                    &MsgTarget::User {
+                        serv_name,
+                        nick: &old_nick,
+                    },
+                );
+            }
         }
 
         Reply { num: 433, .. } => {
