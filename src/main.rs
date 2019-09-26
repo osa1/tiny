@@ -187,16 +187,18 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) -> 
             );
         }
         Disconnected => {
+            let target = MsgTarget::AllServTabs {
+                serv_name: client.get_serv_name(),
+            };
             tui.add_err_msg(
                 &format!(
                     "Disconnected. Will try to reconnect in {} seconds.",
                     libtiny_client::RECONNECT_SECS
                 ),
                 time::now(),
-                &MsgTarget::AllServTabs {
-                    serv_name: client.get_serv_name(),
-                },
+                &target,
             );
+            tui.clear_nicks(&target);
         }
         IoErr(err) => {
             tui.add_err_msg(
