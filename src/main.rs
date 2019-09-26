@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 
 use cmd::{parse_cmd, CmdArgs, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
-use libtiny::Client;
+use libtiny_client::{Client, ServerInfo};
 use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
 use libtiny_wire as wire;
 use term_input::{Event, Input};
@@ -102,7 +102,7 @@ fn run(
     for server in servers.iter().cloned() {
         tui.borrow_mut().new_server_tab(&server.addr);
 
-        let server_info = libtiny::ServerInfo {
+        let server_info = ServerInfo {
             addr: server.addr,
             port: server.port,
             tls: server.tls,
@@ -112,7 +112,7 @@ fn run(
             nicks: server.nicks,
             auto_join: server.join,
             nickserv_ident: server.nickserv_ident,
-            sasl_auth: server.sasl_auth.map(|auth| libtiny::SASLAuth {
+            sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {
                 username: auth.username,
                 password: auth.password,
             }),
@@ -154,7 +154,7 @@ fn run(
 }
 
 async fn tui_task(
-    mut rcv_ev: mpsc::Receiver<libtiny::Event>,
+    mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
     tui: Rc<RefCell<TUI>>,
     client: Client,
 ) {
@@ -164,8 +164,8 @@ async fn tui_task(
     }
 }
 
-fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny::Event) {
-    use libtiny::Event::*;
+fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) {
+    use libtiny_client::Event::*;
     match ev {
         Connecting => {
             tui.add_client_msg(
@@ -188,7 +188,7 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny::Event) {
             tui.add_err_msg(
                 &format!(
                     "Disconnected. Will try to reconnect in {} seconds.",
-                    libtiny::RECONNECT_SECS
+                    libtiny_client::RECONNECT_SECS
                 ),
                 time::now(),
                 &MsgTarget::AllServTabs {
@@ -201,7 +201,7 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny::Event) {
                 &format!(
                     "Connection error: {}. Will try to reconnect in {} seconds.",
                     err.description(),
-                    libtiny::RECONNECT_SECS
+                    libtiny_client::RECONNECT_SECS
                 ),
                 time::now(),
                 &MsgTarget::AllServTabs {
@@ -214,7 +214,7 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny::Event) {
                 &format!(
                     "TLS error: {}. Will try to reconnect in {} seconds.",
                     err.description(),
-                    libtiny::RECONNECT_SECS
+                    libtiny_client::RECONNECT_SECS
                 ),
                 time::now(),
                 &MsgTarget::AllServTabs {

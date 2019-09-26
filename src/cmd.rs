@@ -1,6 +1,6 @@
 use crate::config;
 use crate::utils;
-use libtiny::{Client, ServerInfo};
+use libtiny_client::{Client, ServerInfo};
 use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
 use std::cell::RefCell;
 use std::error::Error;

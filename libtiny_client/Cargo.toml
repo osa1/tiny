@@ -10,13 +10,6 @@ categories = ["network-programming"]
 description = "An IRC client"
 edition = "2018"
 
-[badges]
-travis-ci = { repository = "osa1/tiny" }
-
-[lib]
-name = "libtiny"
-path = "src/lib.rs"
-
 [dependencies]
 base64 = "0.6.0"
 futures-preview = { version = "0.3.0-alpha.18",  features = ["async-await", "nightly"] }
