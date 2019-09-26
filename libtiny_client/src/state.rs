@@ -196,12 +196,26 @@ impl StateInner {
 
             //
             // Setting usermask using JOIN, RPL_USERHOST and 396 (?)
+            // Also initialize the channel state on JOIN
             //
-            JOIN { .. } => {
+            JOIN { chan } => {
                 if let Some(Pfx::User { nick, user }) = pfx {
                     if nick == &self.current_nick {
+                        // Set usermask
                         let usermask = format!("{}!{}", nick, user);
                         self.usermask = Some(usermask);
+
+                        // Initialize channel state
+                        match utils::find_idx(&self.chans, |(s, _)| s == chan) {
+                            None => {
+                                self.chans.push((chan.to_owned(), HashSet::new()));
+                            }
+                            Some(chan_idx) => {
+                                // This happens because we initialize channel states for channels
+                                // that we will join on connection when the client is first created
+                                self.chans[chan_idx].1.clear();
+                            }
+                        }
                     }
                 }
             }
@@ -245,7 +259,25 @@ impl StateInner {
             }
 
             //
-            // RPL_WELCOME
+            // Remove channel state on PART
+            //
+            PART { chan, .. } => {
+                if let Some(Pfx::User { nick, .. }) = pfx {
+                    if nick == &self.current_nick {
+                        match utils::find_idx(&self.chans, |(s, _)| s == chan) {
+                            None => {
+                                eprintln!("Can't find channel state: {}", chan);
+                            }
+                            Some(chan_idx) => {
+                                self.chans.remove(chan_idx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            //
+            // RPL_WELCOME, start introduction sequence and NickServ authentication
             //
             Reply { num: 001, .. } => {
                 snd_ev.try_send(Event::Connected).unwrap();
@@ -261,7 +293,7 @@ impl StateInner {
             }
 
             //
-            // RPL_YOURHOST
+            // RPL_YOURHOST, set servername
             //
             Reply { num: 002, params } => {
                 // 002    RPL_YOURHOST
@@ -280,7 +312,7 @@ impl StateInner {
             }
 
             //
-            // ERR_NICKNAMEINUSE
+            // ERR_NICKNAMEINUSE, try another nick if we don't have a nick yet
             //
             Reply { num: 433, .. } => {
                 // ERR_NICKNAMEINUSE. If we don't have a nick already try next nick.
@@ -322,18 +354,6 @@ impl StateInner {
             }
 
             //
-            // RPL_TOPIC, we've successfully joined a channel
-            //
-            Reply { num: 332, params } => {
-                if params.len() == 2 || params.len() == 3 {
-                    let chan = &params[params.len() - 2];
-                    if let None = utils::find_idx(&self.chans, |(s, _)| s == chan) {
-                        self.chans.push((chan.to_owned(), HashSet::new()));
-                    }
-                }
-            }
-
-            //
             // RPL_NAMREPLY: users in a channel
             //
             Reply { num: 353, params } => {
@@ -352,6 +372,9 @@ impl StateInner {
                 }
             }
 
+            //
+            // QUIT: Update the `chans` field for the channels that the user was in
+            //
             QUIT { ref mut chans, .. } => {
                 let nick = match pfx {
                     Some(Pfx::User { nick, .. }) => nick,

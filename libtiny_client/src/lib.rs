@@ -230,6 +230,11 @@ impl Client {
             .unwrap()
     }
 
+    /// Leave a channel.
+    pub fn part(&mut self, chan: &str) {
+        self.msg_chan.try_send(Cmd::Msg(wire::part(chan))).unwrap();
+    }
+
     /// Set away status. `None` means not away.
     pub fn away(&mut self, msg: Option<&str>) {
         self.state.set_away(msg);

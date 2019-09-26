@@ -173,7 +173,8 @@ fn close(args: CmdArgs) {
             chan_name,
         } => {
             tui.close_chan_tab(&serv_name, &chan_name);
-            // tiny.part(&serv_name, &chan_name); FIXME
+            let client_idx = find_client_idx(&clients, &serv_name).unwrap();
+            clients[client_idx].part(&chan_name);
         }
         MsgSource::User { serv_name, nick } => {
             tui.close_user_tab(&serv_name, &nick);
