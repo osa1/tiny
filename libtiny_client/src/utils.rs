@@ -63,6 +63,15 @@ impl<'a> Iterator for SplitIterator<'a> {
     }
 }
 
+pub(crate) fn find_idx<A: Eq, F: Fn(&A) -> bool>(slice: &[A], f: F) -> Option<usize> {
+    for (idx, a) in slice.iter().enumerate() {
+        if f(a) {
+            return Some(idx);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
 
