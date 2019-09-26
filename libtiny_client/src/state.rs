@@ -329,7 +329,10 @@ impl StateInner {
             //
             // NICK message sent from the server when our nick change request was successful
             //
-            NICK { nick: new_nick, ref mut chans } => {
+            NICK {
+                nick: new_nick,
+                ref mut chans,
+            } => {
                 if let Some(Pfx::User { nick: old_nick, .. }) = pfx {
                     if old_nick == &self.current_nick {
                         snd_ev

@@ -94,6 +94,10 @@ pub enum Event {
     CouldntCreateLogger(std::io::Error),
     /// Client couldn't write log
     LogWriteFailed(std::io::Error),
+
+    /// This is to signal the task that listens for events to stop.
+    // TODO: Maybe try something like making Client non-Clone and sharing Weaks with tasks
+    Closed,
 }
 
 impl From<StreamError> for Event {
@@ -254,6 +258,7 @@ impl Client {
     /// outgoing messages) will be dropped.
     pub fn quit(&mut self, reason: Option<String>) {
         self.msg_chan.try_send(Cmd::Quit(reason)).unwrap();
+        self.snd_ev.try_send(Event::Closed).unwrap();
     }
 }
 
