@@ -36,11 +36,9 @@ pub fn join(chans: &[&str]) -> String {
     format!("JOIN {}\r\n", chans.join(","))
 }
 
-/*
 pub fn part(channel: &str) -> String {
     format!("PART {}\r\n", channel)
 }
-*/
 
 pub fn privmsg(msgtarget: &str, msg: &str) -> String {
     // IRC messages need to be shorter than 512 bytes (see RFC 1459 or 2812). This should be dealt
