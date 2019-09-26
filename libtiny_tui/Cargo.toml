@@ -18,6 +18,7 @@ name = "libtiny_tui"
 path = "src/lib.rs"
 
 [dependencies]
+libtiny_ui = { path = "../libtiny_ui" }
 notify-rust = "3"
 serde = { version = "1.0.8", features = ["derive"] }
 tempfile = "3.0.3"
