@@ -159,12 +159,14 @@ async fn tui_task(
     client: Client,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        handle_conn_ev(&mut *tui.borrow_mut(), &client, ev);
+        if handle_conn_ev(&mut *tui.borrow_mut(), &client, ev) {
+            return;
+        }
         tui.borrow_mut().draw();
     }
 }
 
-fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) {
+fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) -> bool {
     use libtiny_client::Event::*;
     match ev {
         Connecting => {
@@ -243,7 +245,11 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) {
         LogWriteFailed(err) => {
             // TODO
         }
+        Closed => {
+            return true;
+        }
     }
+    false
 }
 
 fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
