@@ -240,10 +240,10 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) -> 
             handle_msg(tui, client, msg);
         }
         CouldntCreateLogger(err) => {
-            // TODO
+            eprintln!("Couldn't create logger: {:?}", err);
         }
         LogWriteFailed(err) => {
-            // TODO
+            eprintln!("Couldn't write log: {:?}", err);
         }
         Closed => {
             return true;
