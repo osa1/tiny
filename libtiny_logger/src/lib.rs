@@ -33,7 +33,11 @@ impl Logger {
 
         let mut server_fd_path = log_dir.clone();
         server_fd_path.push(&format!("{}.txt", serv_name));
-        let server_fd = OpenOptions::new().append(true).open(server_fd_path)?;
+        eprintln!("Trying to open log file: {:?}", server_fd_path);
+        let server_fd = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(server_fd_path)?;
 
         // TODO: Write a "logs started" lines
 
@@ -53,7 +57,10 @@ impl Logger {
 
         let mut file_path = self.log_dir.clone();
         file_path.push(&format!("{}.txt", target));
-        let fd = OpenOptions::new().append(true).open(file_path)?;
+        let fd = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(file_path)?;
         self.fds.insert(target.to_owned(), fd);
         self.get_file(target)
     }
@@ -84,21 +91,38 @@ impl Logger {
                 is_notice: _,
                 is_action,
             } => {
-                let mut target_file = self.get_target_file(target)?;
+                let target_file = self.get_target_file(target)?;
                 // TODO: Strip IRC codes from the message
                 // TODO: Handle action messages
                 writeln!(target_file, "[{}] {}: {}", now(), sender_str, msg)?;
             }
 
             JOIN { chan } => {
-                // TODO
+                let target_file = self.get_file(chan)?;
+                writeln!(
+                    target_file,
+                    "[{}] {} joined the channel.",
+                    now(),
+                    sender_str
+                )?;
             }
 
             PART { chan, .. } => {
-                // TODO
+                let target_file = self.get_file(chan)?;
+                writeln!(target_file, "[{}] {} left the channel.", now(), sender_str)?;
             }
 
             QUIT { msg, chans } => {
+                for chan in chans {
+                    let target_file = self.get_file(chan)?;
+                    writeln!(target_file, "[{}] {} left the server.", now(), sender_str)?;
+                }
+            }
+
+            NICK {
+                nick: new_nick,
+                chans,
+            } => {
                 // TODO
             }
 
