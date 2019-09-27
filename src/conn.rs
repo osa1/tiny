@@ -141,7 +141,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                     };
                     // highlight the message if it mentions us
                     if msg.find(&client.get_nick()).is_some() {
-                        tui.add_privmsg_highlight(origin, &msg, ts, &tui_msg_target, is_action);
+                        tui.add_privmsg(origin, &msg, ts, &tui_msg_target, true, is_action);
                         tui.set_tab_style(TabStyle::Highlight, &tui_msg_target);
                         let mentions_target = MsgTarget::Server {
                             serv_name: "mentions",
@@ -153,7 +153,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                         );
                         tui.set_tab_style(TabStyle::Highlight, &mentions_target);
                     } else {
-                        tui.add_privmsg(origin, &msg, ts, &tui_msg_target, is_action);
+                        tui.add_privmsg(origin, &msg, ts, &tui_msg_target, false, is_action);
                         tui.set_tab_style(TabStyle::NewMsg, &tui_msg_target);
                     }
                 }
@@ -173,7 +173,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                             }
                         }
                     };
-                    tui.add_privmsg(origin, &msg, ts, &msg_target, is_action);
+                    tui.add_privmsg(origin, &msg, ts, &msg_target, false, is_action);
                     if target == client.get_nick() {
                         tui.set_tab_style(TabStyle::Highlight, &msg_target);
                     } else {
@@ -477,6 +477,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                             time::now(),
                             &msg_target,
                             false,
+                            false,
                         );
                         tui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
@@ -502,6 +503,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                     &params.join(" "),
                     time::now(),
                     &msg_target,
+                    false,
                     false,
                 );
                 tui.set_tab_style(TabStyle::NewMsg, &msg_target);
