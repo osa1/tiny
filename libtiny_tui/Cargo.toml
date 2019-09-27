@@ -10,13 +10,6 @@ categories = ["network-programming"]
 description = "An IRC client"
 edition = "2018"
 
-[badges]
-travis-ci = { repository = "osa1/tiny" }
-
-[lib]
-name = "libtiny_tui"
-path = "src/lib.rs"
-
 [dependencies]
 futures-util-preview = "0.3.0-alpha.18"
 libtiny_ui = { path = "../libtiny_ui" }

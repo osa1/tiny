@@ -4,6 +4,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::str;
+use std::str::SplitWhitespace;
 use time::Tm;
 
 pub use crate::config::Colors;
@@ -75,6 +76,117 @@ impl TUI {
             width,
             height,
             h_scroll: 0,
+        }
+    }
+
+    fn ignore(&mut self, src: &MsgSource) {
+        match src {
+            MsgSource::Serv { serv_name } => {
+                self.toggle_ignore(&MsgTarget::AllServTabs {
+                    serv_name: &serv_name,
+                });
+            }
+            MsgSource::Chan {
+                serv_name,
+                chan_name,
+            } => {
+                self.toggle_ignore(&MsgTarget::Chan {
+                    serv_name: &serv_name,
+                    chan_name: &chan_name,
+                });
+            }
+            MsgSource::User { serv_name, nick } => {
+                self.toggle_ignore(&MsgTarget::User {
+                    serv_name: &serv_name,
+                    nick: &nick,
+                });
+            }
+        }
+    }
+
+    fn notify(&mut self, words: &mut SplitWhitespace, src: &MsgSource) {
+        let words: Vec<&str> = words.collect();
+
+        let mut show_usage = || {
+            self.add_client_err_msg(
+                "/notify usage: /notify [off|mentions|messages]",
+                &MsgTarget::CurrentTab,
+            )
+        };
+
+        if words.is_empty() {
+            self.show_notify_mode(&MsgTarget::CurrentTab);
+        } else if words.len() != 1 {
+            show_usage();
+        } else {
+            let notifier = match words[0] {
+                "off" => {
+                    self.add_client_notify_msg("Notifications turned off", &MsgTarget::CurrentTab);
+                    Notifier::Off
+                }
+                "mentions" => {
+                    self.add_client_notify_msg(
+                        "Notifications enabled for mentions",
+                        &MsgTarget::CurrentTab,
+                    );
+                    Notifier::Mentions
+                }
+                "messages" => {
+                    self.add_client_notify_msg(
+                        "Notifications enabled for all messages",
+                        &MsgTarget::CurrentTab,
+                    );
+                    Notifier::Messages
+                }
+                _ => {
+                    return show_usage();
+                }
+            };
+            // can't use `MsgSource::to_target` here, `Serv` case is different
+            let tab_target = match src {
+                MsgSource::Serv { ref serv_name } => MsgTarget::AllServTabs { serv_name },
+                MsgSource::Chan {
+                    ref serv_name,
+                    ref chan_name,
+                } => MsgTarget::Chan {
+                    serv_name,
+                    chan_name,
+                },
+                MsgSource::User {
+                    ref serv_name,
+                    ref nick,
+                } => MsgTarget::User { serv_name, nick },
+            };
+            self.set_notifier(notifier, &tab_target);
+        }
+    }
+
+    pub(crate) fn try_handle_cmd(&mut self, cmd: &str, src: &MsgSource) -> bool {
+        let mut words = cmd.split_whitespace();
+        match words.next() {
+            Some("clear") => {
+                self.clear(&src.to_target());
+                true
+            }
+            Some("ignore") => {
+                self.ignore(src);
+                true
+            }
+            Some("notify") => {
+                self.notify(&mut words, src);
+                true
+            }
+            Some("switch") => {
+                match words.next() {
+                    Some(s) => self.switch(s),
+                    None => self.add_client_err_msg(
+                        "/switch usage: /switch <tab name>",
+                        &MsgTarget::CurrentTab,
+                    ),
+                }
+                true
+            }
+            _ => false,
         }
     }
 
