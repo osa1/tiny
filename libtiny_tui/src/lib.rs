@@ -159,10 +159,17 @@ impl TUI {
     delegate!(set_colors(colors: Colors,));
 
     pub fn does_user_tab_exist(&self, serv_name: &str, nick: &str) -> bool {
-        unimplemented!()
+        match self.inner.upgrade() {
+            Some(tui) => tui.borrow().does_user_tab_exist(serv_name, nick),
+            None => false,
+        }
     }
 
+    // TODO: Remove this, get this information from the client
     pub fn get_nicks(&self, serv_name: &str, chan: &str) -> Option<Vec<String>> {
-        unimplemented!()
+        match self.inner.upgrade() {
+            Some(tui) => tui.borrow().get_nicks(serv_name, chan),
+            None => None,
+        }
     }
 }
