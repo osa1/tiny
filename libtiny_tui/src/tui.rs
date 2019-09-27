@@ -14,7 +14,6 @@ pub use crate::tab::TabStyle;
 use crate::config::Style;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::tab::Tab;
-use crate::widget;
 use crate::widget::WidgetRet;
 use crate::{MsgSource, MsgTarget};
 use term_input::{Arrow, Event, Key};
