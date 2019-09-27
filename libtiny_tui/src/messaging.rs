@@ -324,12 +324,12 @@ impl MessagingUI {
         msg: &str,
         ts: Timestamp,
         highlight: bool,
-        ctcp_action: bool,
+        is_action: bool,
     ) {
         self.reset_activity_line();
         self.add_timestamp(ts);
 
-        if ctcp_action {
+        if is_action {
             self.msg_area
                 .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
             self.msg_area.add_text("** ");
@@ -345,7 +345,7 @@ impl MessagingUI {
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
 
-        if !ctcp_action {
+        if !is_action {
             self.msg_area.add_char(':');
         }
         self.msg_area.add_char(' ');

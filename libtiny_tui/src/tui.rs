@@ -1003,11 +1003,11 @@ impl TUI {
         msg: &str,
         ts: Tm,
         target: &MsgTarget,
-        ctcp_action: bool,
+        is_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget
-                .add_privmsg(sender, msg, Timestamp::from(ts), false, ctcp_action);
+                .add_privmsg(sender, msg, Timestamp::from(ts), false, is_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
                 tab.notifier
@@ -1023,11 +1023,11 @@ impl TUI {
         msg: &str,
         ts: Tm,
         target: &MsgTarget,
-        ctcp_action: bool,
+        is_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget
-                .add_privmsg(sender, msg, Timestamp::from(ts), true, ctcp_action);
+                .add_privmsg(sender, msg, Timestamp::from(ts), true, is_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
                 tab.notifier
