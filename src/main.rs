@@ -187,18 +187,16 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) -> 
             );
         }
         Disconnected => {
-            let target = MsgTarget::AllServTabs {
-                serv_name: client.get_serv_name(),
-            };
+            let serv_name = client.get_serv_name();
             tui.add_err_msg(
                 &format!(
                     "Disconnected. Will try to reconnect in {} seconds.",
                     libtiny_client::RECONNECT_SECS
                 ),
                 time::now(),
-                &target,
+                &MsgTarget::AllServTabs { serv_name },
             );
-            tui.clear_nicks(&target);
+            tui.clear_nicks(serv_name);
         }
         IoErr(err) => {
             tui.add_err_msg(
@@ -475,14 +473,7 @@ fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
         }
 
         TOPIC { chan, topic } => {
-            tui.show_topic(
-                &topic,
-                time::now(),
-                &MsgTarget::Chan {
-                    serv_name: client.get_serv_name(),
-                    chan_name: &chan,
-                },
-            );
+            tui.set_topic(&topic, time::now(), client.get_serv_name(), &chan);
         }
 
         CAP {
@@ -577,14 +568,7 @@ fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
                 assert!(params.len() == 3 || params.len() == 2);
                 let chan = &params[params.len() - 2];
                 let topic = &params[params.len() - 1];
-                tui.show_topic(
-                    topic,
-                    time::now(),
-                    &MsgTarget::Chan {
-                        serv_name: client.get_serv_name(),
-                        chan_name: chan,
-                    },
-                );
+                tui.set_topic(topic, time::now(), client.get_serv_name(), chan);
             }
             // RPL_NAMREPLY: List of users in a channel
             else if n == 353 {

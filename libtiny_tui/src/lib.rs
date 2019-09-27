@@ -954,14 +954,19 @@ impl TUI {
         });
     }
 
-    pub fn show_topic(&mut self, title: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+    pub fn set_topic(&mut self, title: &str, ts: Tm, serv_name: &str, chan_name: &str) {
+        let target = MsgTarget::Chan {
+            serv_name,
+            chan_name,
+        };
+        self.apply_to_target(&target, &|tab: &mut Tab, _| {
             tab.widget.show_topic(title, Timestamp::from(ts));
         });
     }
 
-    pub fn clear_nicks(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+    pub fn clear_nicks(&mut self, serv_name: &str) {
+        let target = MsgTarget::AllServTabs { serv_name };
+        self.apply_to_target(&target, &|tab: &mut Tab, _| {
             tab.widget.clear_nicks();
         });
     }
