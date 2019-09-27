@@ -278,7 +278,7 @@ fn connect_(
     // Spawn TUI task
     let tui_clone = tui.clone();
     let client_clone = client.clone();
-    tokio::runtime::current_thread::spawn(crate::conn_task(rcv_ev, tui_clone, client_clone));
+    tokio::runtime::current_thread::spawn(crate::conn::task(rcv_ev, tui_clone, client_clone));
 
     clients.push(client);
 }
@@ -333,7 +333,7 @@ fn me(args: CmdArgs) {
     if args.is_empty() {
         return tui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
-    crate::send_msg(tui, clients, &src, args.to_string(), true);
+    crate::ui::send_msg(tui, clients, &src, args.to_string(), true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -399,7 +399,7 @@ fn msg(args: CmdArgs) {
         }
     };
 
-    crate::send_msg(&tui, clients, &src, msg.to_owned(), false);
+    crate::ui::send_msg(&tui, clients, &src, msg.to_owned(), false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
