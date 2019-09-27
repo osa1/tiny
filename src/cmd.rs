@@ -1,20 +1,16 @@
 use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
-use libtiny_tui::{MsgSource, MsgTarget, Notifier, TUI};
-use std::cell::RefCell;
+use libtiny_tui::{MsgSource, MsgTarget, TUI};
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
-
-type TUIRef = Rc<RefCell<TUI>>;
 
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
     pub config_path: &'a Path,
     pub log_dir: &'a Option<PathBuf>,
     pub defaults: &'a config::Defaults,
-    pub tui: TUIRef,
+    pub tui: &'a TUI,
     pub clients: &'a mut Vec<Client>,
     pub src: MsgSource,
 }
@@ -99,20 +95,16 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 13] = [
+static CMDS: [&Cmd; 9] = [
     &AWAY_CMD,
-    &CLEAR_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
-    &IGNORE_CMD,
     &JOIN_CMD,
     &ME_CMD,
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
-    &NOTIFY_CMD,
     &RELOAD_CMD,
-    &SWITCH_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,18 +127,6 @@ fn away(args: CmdArgs) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CLEAR_CMD: Cmd = Cmd {
-    name: "clear",
-    cmd_fn: clear,
-};
-
-fn clear(args: CmdArgs) {
-    let CmdArgs { tui, src, .. } = args;
-    tui.borrow_mut().clear(&src.to_target());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 static CLOSE_CMD: Cmd = Cmd {
     name: "close",
     cmd_fn: close,
@@ -156,7 +136,6 @@ fn close(args: CmdArgs) {
     let CmdArgs {
         tui, clients, src, ..
     } = args;
-    let mut tui = tui.borrow_mut();
     match src {
         MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
             // ignore
@@ -202,13 +181,13 @@ fn connect(args: CmdArgs) {
     let words: Vec<&str> = args.split_whitespace().collect();
 
     match words.len() {
-        0 => reconnect(&mut *tui.borrow_mut(), clients, src),
+        0 => reconnect(tui, clients, src),
         1 => connect_(words[0], None, defaults, log_dir, tui, clients),
         2 => connect_(words[0], Some(words[1]), defaults, log_dir, tui, clients),
         _ =>
         // wat
         {
-            tui.borrow_mut().add_client_err_msg(
+            tui.add_client_err_msg(
                 "/connect usage: /connect <host>:<port> or /connect (to reconnect)",
                 &MsgTarget::CurrentTab,
             )
@@ -216,7 +195,7 @@ fn connect(args: CmdArgs) {
     }
 }
 
-fn reconnect(tui: &mut TUI, clients: &mut Vec<Client>, src: MsgSource) {
+fn reconnect(tui: &TUI, clients: &mut Vec<Client>, src: MsgSource) {
     tui.add_client_msg(
         "Reconnecting...",
         &MsgTarget::AllServTabs {
@@ -238,11 +217,9 @@ fn connect_(
     pass: Option<&str>,
     defaults: &config::Defaults,
     log_dir: &Option<PathBuf>,
-    tui_ref: TUIRef,
+    tui: &TUI,
     clients: &mut Vec<Client>,
 ) {
-    let mut tui = tui_ref.borrow_mut();
-
     fn split_port(s: &str) -> Option<(&str, &str)> {
         s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
     }
@@ -299,44 +276,11 @@ fn connect_(
     );
 
     // Spawn TUI task
-    let tui_clone = tui_ref.clone();
+    let tui_clone = tui.clone();
     let client_clone = client.clone();
-    tokio::runtime::current_thread::spawn(crate::tui_task(rcv_ev, tui_clone, client_clone));
+    tokio::runtime::current_thread::spawn(crate::conn_task(rcv_ev, tui_clone, client_clone));
 
     clients.push(client);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static IGNORE_CMD: Cmd = Cmd {
-    name: "ignore",
-    cmd_fn: ignore,
-};
-
-fn ignore(args: CmdArgs) {
-    let CmdArgs { tui, src, .. } = args;
-    match src {
-        MsgSource::Serv { serv_name } => {
-            tui.borrow_mut().toggle_ignore(&MsgTarget::AllServTabs {
-                serv_name: &serv_name,
-            });
-        }
-        MsgSource::Chan {
-            serv_name,
-            chan_name,
-        } => {
-            tui.borrow_mut().toggle_ignore(&MsgTarget::Chan {
-                serv_name: &serv_name,
-                chan_name: &chan_name,
-            });
-        }
-        MsgSource::User { serv_name, nick } => {
-            tui.borrow_mut().toggle_ignore(&MsgTarget::User {
-                serv_name: &serv_name,
-                nick: &nick,
-            });
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -356,7 +300,7 @@ fn join(args: CmdArgs) {
     } = args;
     let words = args.split_whitespace().collect::<Vec<_>>();
     if words.is_empty() {
-        return tui.borrow_mut().add_client_err_msg(
+        return tui.add_client_err_msg(
             "/join usage: /join chan1[,chan2...]",
             &MsgTarget::CurrentTab,
         );
@@ -364,7 +308,7 @@ fn join(args: CmdArgs) {
 
     match find_client(clients, src.serv_name()) {
         Some(client) => client.join(&words),
-        None => tui.borrow_mut().add_client_err_msg(
+        None => tui.add_client_err_msg(
             &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
             &MsgTarget::CurrentTab,
         ),
@@ -387,17 +331,9 @@ fn me(args: CmdArgs) {
         ..
     } = args;
     if args.is_empty() {
-        return tui
-            .borrow_mut()
-            .add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
+        return tui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
-    crate::send_msg(
-        &mut *tui.borrow_mut(),
-        clients,
-        &src,
-        args.to_string(),
-        true,
-    );
+    crate::send_msg(tui, clients, &src, args.to_string(), true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -434,8 +370,7 @@ fn msg(args: CmdArgs) {
         ..
     } = args;
     let fail = || {
-        tui.borrow_mut()
-            .add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
+        tui.add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
     };
 
     let (target, msg) = match split_msg_args(args) {
@@ -464,7 +399,7 @@ fn msg(args: CmdArgs) {
         }
     };
 
-    crate::send_msg(&mut *tui.borrow_mut(), clients, &src, msg.to_owned(), false);
+    crate::send_msg(&tui, clients, &src, msg.to_owned(), false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -476,7 +411,6 @@ static NAMES_CMD: Cmd = Cmd {
 
 fn names(args: CmdArgs) {
     let CmdArgs { args, tui, src, .. } = args;
-    let mut tui = tui.borrow_mut();
     let words: Vec<&str> = args.split_whitespace().collect();
 
     if let MsgSource::Chan {
@@ -531,8 +465,7 @@ fn nick(args: CmdArgs) {
             client.nick(new_nick);
         }
     } else {
-        tui.borrow_mut()
-            .add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
+        tui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
     }
 }
 
@@ -547,7 +480,6 @@ fn reload(args: CmdArgs) {
     let CmdArgs {
         config_path, tui, ..
     } = args;
-    let mut tui = tui.borrow_mut();
     match config::parse_config(config_path) {
         Ok(config::Config { colors, .. }) => tui.set_colors(colors),
         Err(err) => {
@@ -556,91 +488,6 @@ fn reload(args: CmdArgs) {
                 tui.add_client_err_msg(line, &MsgTarget::CurrentTab);
             }
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static SWITCH_CMD: Cmd = Cmd {
-    name: "switch",
-    cmd_fn: switch,
-};
-
-fn switch(args: CmdArgs) {
-    let CmdArgs { args, tui, .. } = args;
-    let words: Vec<&str> = args.split_whitespace().collect();
-    if words.len() != 1 {
-        return tui
-            .borrow_mut()
-            .add_client_err_msg("/switch usage: /switch <tab name>", &MsgTarget::CurrentTab);
-    }
-    tui.borrow_mut().switch(words[0]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static NOTIFY_CMD: Cmd = Cmd {
-    name: "notify",
-    cmd_fn: notify,
-};
-
-fn notify(args: CmdArgs) {
-    let CmdArgs { args, tui, src, .. } = args;
-    let mut tui = tui.borrow_mut();
-
-    let words: Vec<&str> = args.split_whitespace().collect();
-
-    let mut show_usage = || {
-        tui.add_client_err_msg(
-            "/notify usage: /notify [off|mentions|messages]",
-            &MsgTarget::CurrentTab,
-        )
-    };
-
-    if words.is_empty() {
-        tui.show_notify_mode(&MsgTarget::CurrentTab);
-    } else if words.len() != 1 {
-        show_usage();
-    } else {
-        let notifier = match words[0] {
-            "off" => {
-                tui.add_client_notify_msg("Notifications turned off", &MsgTarget::CurrentTab);
-                Notifier::Off
-            }
-            "mentions" => {
-                tui.add_client_notify_msg(
-                    "Notifications enabled for mentions",
-                    &MsgTarget::CurrentTab,
-                );
-                Notifier::Mentions
-            }
-            "messages" => {
-                tui.add_client_notify_msg(
-                    "Notifications enabled for all messages",
-                    &MsgTarget::CurrentTab,
-                );
-                Notifier::Messages
-            }
-            _ => {
-                return show_usage();
-            }
-        };
-        // can't use `MsgSource::to_target` here, `Serv` case is different
-        let tab_target = match src {
-            MsgSource::Serv { ref serv_name } => MsgTarget::AllServTabs { serv_name },
-            MsgSource::Chan {
-                ref serv_name,
-                ref chan_name,
-            } => MsgTarget::Chan {
-                serv_name,
-                chan_name,
-            },
-            MsgSource::User {
-                ref serv_name,
-                ref nick,
-            } => MsgTarget::User { serv_name, nick },
-        };
-        tui.set_notifier(notifier, &tab_target);
     }
 }
 

@@ -25,7 +25,6 @@ libtiny_tui = { path = "libtiny_tui" }
 libtiny_wire = { path = "libtiny_wire" }
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
-term_input = { path = "term_input" }
 time = "0.1"
 tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"] }
 tokio-executor = { git = "https://github.com/tokio-rs/tokio.git" }

@@ -9,18 +9,15 @@ mod config;
 mod utils;
 
 use futures_util::stream::StreamExt;
-use std::cell::RefCell;
 use std::error::Error;
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 
 use cmd::{parse_cmd, CmdArgs, ParseCmdResult};
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny_client::{Client, ServerInfo};
-use libtiny_tui::{Colors, MsgSource, MsgTarget, TUIRet, TabStyle, TUI};
+use libtiny_tui::{Colors, MsgSource, MsgTarget, TabStyle, TUI};
 use libtiny_wire as wire;
-use term_input::{Event, Input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,7 +75,12 @@ fn run(
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
 ) {
-    let mut tui = TUI::new(colors);
+    // One task for each client to handle IRC events
+    // One task for TUI events
+    let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
+
+    // Create TUI task
+    let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
 
     // init "mentions" tab
     tui.new_server_tab("mentions");
@@ -90,17 +92,10 @@ fn run(
     );
     tui.draw();
 
-    // One task for each client to handle IRC events
-    // One task for stdin
-    let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
-
-    // A reference to the TUI will be shared with each connection event handler
-    let tui = Rc::new(RefCell::new(tui));
-
     let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
     for server in servers.iter().cloned() {
-        tui.borrow_mut().new_server_tab(&server.addr);
+        tui.new_server_tab(&server.addr);
 
         let server_info = ServerInfo {
             addr: server.addr,
@@ -118,55 +113,55 @@ fn run(
             }),
         };
 
-        let (client, rcv_ev) = Client::new(server_info, Some(&mut executor), log_dir.clone());
+        let (client, rcv_conn_ev) = Client::new(server_info, Some(&mut executor), log_dir.clone());
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
         // Spawn a task to handle connection events
-        executor.spawn(tui_task(rcv_ev, tui_clone, client_clone));
+        executor.spawn(conn_task(rcv_conn_ev, tui_clone, client_clone));
 
         clients.push(client);
     }
 
-    // Spawn a task for input events
-    executor.spawn(async move {
-        let mut input = Input::new();
-        while let Some(mb_ev) = input.next().await {
-            match mb_ev {
-                Err(io_err) => {
-                    eprintln!("term input error: {:?}", io_err);
-                    // TODO: Close connections here
-                    return;
-                }
-                Ok(ev) => {
-                    let abort =
-                        handle_input_ev(&config_path, &log_dir, &defaults, &tui, &mut clients, ev);
-                    if abort {
-                        return;
-                    }
-                }
-            }
-            tui.borrow_mut().draw();
-        }
-    });
+    // Spawn a task to handle TUI events
+    executor.spawn(tui_task(
+        config_path,
+        log_dir,
+        defaults,
+        tui,
+        clients,
+        rcv_tui_ev,
+    ));
 
     executor.run().unwrap(); // unwraps RunError
 }
 
-async fn tui_task(
-    mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
-    tui: Rc<RefCell<TUI>>,
-    client: Client,
-) {
+async fn conn_task(mut rcv_ev: mpsc::Receiver<libtiny_client::Event>, tui: TUI, client: Client) {
     while let Some(ev) = rcv_ev.next().await {
-        if handle_conn_ev(&mut *tui.borrow_mut(), &client, ev) {
+        if handle_conn_ev(&tui, &client, ev) {
             return;
         }
-        tui.borrow_mut().draw();
+        tui.draw();
     }
 }
 
-fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) -> bool {
+async fn tui_task(
+    config_path: PathBuf,
+    log_dir: Option<PathBuf>,
+    defaults: config::Defaults,
+    tui: TUI,
+    mut clients: Vec<Client>,
+    mut rcv_ev: mpsc::Receiver<libtiny_tui::Event>,
+) {
+    while let Some(ev) = rcv_ev.next().await {
+        if handle_input_ev(&config_path, &log_dir, &defaults, &tui, &mut clients, ev) {
+            return;
+        }
+        tui.draw();
+    }
+}
+
+fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool {
     use libtiny_client::Event::*;
     match ev {
         Connecting => {
@@ -252,7 +247,7 @@ fn handle_conn_ev(tui: &mut TUI, client: &Client, ev: libtiny_client::Event) -> 
     false
 }
 
-fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
+fn handle_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
     use wire::Cmd::*;
     use wire::Pfx::*;
 
@@ -665,48 +660,31 @@ fn handle_msg(tui: &mut TUI, client: &Client, msg: wire::Msg) {
 }
 
 fn handle_input_ev(
-    config_path: &PathBuf,
+    config_path: &Path,
     log_dir: &Option<PathBuf>,
     defaults: &config::Defaults,
-    tui: &Rc<RefCell<TUI>>,
+    tui: &TUI,
     clients: &mut Vec<Client>,
-    ev: Event,
+    ev: libtiny_tui::Event,
 ) -> bool {
-    let tui_ret = tui.borrow_mut().handle_input_event(ev);
-    match tui_ret {
-        TUIRet::Abort => {
+    use libtiny_tui::Event::*;
+    match ev {
+        Abort => {
             for client in clients {
                 client.quit(None);
             }
             return true; // abort
         }
-        TUIRet::KeyHandled => {}
-        TUIRet::KeyIgnored(_) => {}
-        TUIRet::EventIgnored(ev) => {
-            // TODO: log this
+        Msg { msg, source } => {
+            send_msg(tui, clients, &source, msg, false);
         }
-        TUIRet::Input { msg, from } => {
-            // We know msg has at least one character as the TUI won't accept it otherwise.
-            if msg[0] == '/' {
-                let cmd_str: String = (&msg[1..]).iter().cloned().collect();
-                handle_cmd(
-                    config_path,
-                    log_dir,
-                    defaults,
-                    tui.clone(),
-                    clients,
-                    from,
-                    &cmd_str,
-                )
-            } else {
-                let msg_str: String = msg.into_iter().collect();
-                send_msg(&mut *tui.borrow_mut(), clients, &from, msg_str, false)
-            }
-        }
-        TUIRet::Lines { lines, from } => {
+        Lines { lines, source } => {
             for line in lines.into_iter() {
-                send_msg(&mut *tui.borrow_mut(), clients, &from, line, false)
+                send_msg(tui, clients, &source, line, false)
             }
+        }
+        Cmd { cmd, source } => {
+            handle_cmd(config_path, log_dir, defaults, tui, clients, source, &cmd)
         }
     }
 
@@ -714,10 +692,10 @@ fn handle_input_ev(
 }
 
 fn handle_cmd(
-    config_path: &PathBuf,
+    config_path: &Path,
     log_dir: &Option<PathBuf>,
     defaults: &config::Defaults,
-    tui: Rc<RefCell<TUI>>,
+    tui: &TUI,
     clients: &mut Vec<Client>,
     src: MsgSource,
     cmd: &str,
@@ -745,20 +723,14 @@ fn handle_cmd(
         //         &MsgTarget::CurrentTab,
         //     );
         // },
-        ParseCmdResult::Unknown => tui.borrow_mut().add_client_err_msg(
+        ParseCmdResult::Unknown => tui.add_client_err_msg(
             &format!("Unsupported command: \"/{}\"", cmd),
             &MsgTarget::CurrentTab,
         ),
     }
 }
 
-fn send_msg(
-    tui: &mut TUI,
-    clients: &mut Vec<Client>,
-    src: &MsgSource,
-    msg: String,
-    ctcp_action: bool,
-) {
+fn send_msg(tui: &TUI, clients: &mut Vec<Client>, src: &MsgSource, msg: String, ctcp_action: bool) {
     if src.serv_name() == "mentions" {
         tui.add_client_err_msg(
             "Use `/connect <server>` to connect to a server",
