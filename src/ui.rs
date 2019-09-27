@@ -102,7 +102,7 @@ pub(crate) fn send_msg(
     clients: &mut Vec<Client>,
     src: &MsgSource,
     msg: String,
-    ctcp_action: bool,
+    is_action: bool,
 ) {
     if src.serv_name() == "mentions" {
         tui.add_client_err_msg(
@@ -163,13 +163,13 @@ pub(crate) fn send_msg(
 
     let ts = time::now();
     let extra_len = msg_target.len()
-        + if ctcp_action {
+        + if is_action {
             9 // "\0x1ACTION \0x1".len()
         } else {
             0
         };
     for msg in client.split_privmsg(extra_len, &msg) {
-        client.privmsg(msg_target, msg, ctcp_action);
-        tui.add_privmsg(&client.get_nick(), msg, ts, &tui_target, ctcp_action);
+        client.privmsg(msg_target, msg, is_action);
+        tui.add_privmsg(&client.get_nick(), msg, ts, &tui_target, is_action);
     }
 }
