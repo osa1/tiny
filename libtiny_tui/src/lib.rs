@@ -133,19 +133,12 @@ impl TUI {
     delegate!(add_client_err_msg(msg: &str, target: &MsgTarget,));
     delegate!(clear_nicks(serv_name: &str,));
     delegate!(set_nick(serv_name: &str, new_nick: &str,));
-    // TODO: Remove duplication, add a `highlight: bool` parameter
-    delegate!(add_privmsg_highlight(
-        sender: &str,
-        msg: &str,
-        ts: Tm,
-        target: &MsgTarget,
-        is_action: bool,
-    ));
     delegate!(add_privmsg(
         sender: &str,
         msg: &str,
         ts: Tm,
         target: &MsgTarget,
+        highlight: bool,
         is_action: bool,
     ));
     delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));

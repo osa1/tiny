@@ -170,6 +170,6 @@ pub(crate) fn send_msg(
         };
     for msg in client.split_privmsg(extra_len, &msg) {
         client.privmsg(msg_target, msg, is_action);
-        tui.add_privmsg(&client.get_nick(), msg, ts, &tui_target, is_action);
+        tui.add_privmsg(&client.get_nick(), msg, ts, &tui_target, false, is_action);
     }
 }

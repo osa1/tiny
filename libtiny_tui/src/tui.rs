@@ -1003,35 +1003,16 @@ impl TUI {
         msg: &str,
         ts: Tm,
         target: &MsgTarget,
+        highlight: bool,
         is_action: bool,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget
-                .add_privmsg(sender, msg, Timestamp::from(ts), false, is_action);
+                .add_privmsg(sender, msg, Timestamp::from(ts), highlight, is_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
                 tab.notifier
-                    .notify_privmsg(sender, msg, target, nick_, false);
-            }
-        });
-    }
-
-    /// Similar to `add_privmsg`, except the whole message is highlighted.
-    pub fn add_privmsg_highlight(
-        &mut self,
-        sender: &str,
-        msg: &str,
-        ts: Tm,
-        target: &MsgTarget,
-        is_action: bool,
-    ) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget
-                .add_privmsg(sender, msg, Timestamp::from(ts), true, is_action);
-            let nick = tab.widget.get_nick();
-            if let Some(nick_) = nick {
-                tab.notifier
-                    .notify_privmsg(sender, msg, target, nick_, true);
+                    .notify_privmsg(sender, msg, target, nick_, highlight);
             }
         });
     }
