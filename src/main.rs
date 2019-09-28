@@ -80,9 +80,7 @@ fn run(
     tui.new_server_tab("mentions");
     tui.add_client_msg(
         "Any mentions to you will be listed here.",
-        &MsgTarget::Server {
-            serv_name: "mentions",
-        },
+        &MsgTarget::Server { serv: "mentions" },
     );
     tui.draw();
 

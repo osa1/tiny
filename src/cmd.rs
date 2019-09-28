@@ -137,26 +137,23 @@ fn close(args: CmdArgs) {
         tui, clients, src, ..
     } = args;
     match src {
-        MsgSource::Serv { ref serv_name } if serv_name == "mentions" => {
+        MsgSource::Serv { ref serv } if serv == "mentions" => {
             // ignore
         }
-        MsgSource::Serv { serv_name } => {
-            tui.close_server_tab(&serv_name);
-            let client_idx = find_client_idx(&clients, &serv_name).unwrap();
+        MsgSource::Serv { serv } => {
+            tui.close_server_tab(&serv);
+            let client_idx = find_client_idx(&clients, &serv).unwrap();
             // TODO: this probably won't close the connection?
             let mut client = clients.remove(client_idx);
             client.quit(None);
         }
-        MsgSource::Chan {
-            serv_name,
-            chan_name,
-        } => {
-            tui.close_chan_tab(&serv_name, &chan_name);
-            let client_idx = find_client_idx(&clients, &serv_name).unwrap();
-            clients[client_idx].part(&chan_name);
+        MsgSource::Chan { serv, chan } => {
+            tui.close_chan_tab(&serv, &chan);
+            let client_idx = find_client_idx(&clients, &serv).unwrap();
+            clients[client_idx].part(&chan);
         }
-        MsgSource::User { serv_name, nick } => {
-            tui.close_user_tab(&serv_name, &nick);
+        MsgSource::User { serv, nick } => {
+            tui.close_user_tab(&serv, &nick);
         }
     }
 }
@@ -199,7 +196,7 @@ fn reconnect(tui: &TUI, clients: &mut Vec<Client>, src: MsgSource) {
     tui.add_client_msg(
         "Reconnecting...",
         &MsgTarget::AllServTabs {
-            serv_name: src.serv_name(),
+            serv: src.serv_name(),
         },
     );
     match find_client(clients, src.serv_name()) {
@@ -245,7 +242,7 @@ fn connect_(
 
     // if we already connected to this server reconnect using new port
     if let Some(client) = find_client(clients, serv_name) {
-        tui.add_client_msg("Connecting...", &MsgTarget::AllServTabs { serv_name });
+        tui.add_client_msg("Connecting...", &MsgTarget::AllServTabs { serv: serv_name });
         client.reconnect(Some(serv_port));
         return;
     }
@@ -255,7 +252,7 @@ fn connect_(
 
     // otherwise create a new Conn, tab etc.
     tui.new_server_tab(serv_name);
-    let msg_target = MsgTarget::Server { serv_name };
+    let msg_target = MsgTarget::Server { serv: serv_name };
     tui.add_client_msg("Connecting...", &msg_target);
 
     let (client, rcv_ev) = Client::new(
@@ -389,12 +386,12 @@ fn msg(args: CmdArgs) {
         .any(|client| client.get_serv_name() == target)
     {
         MsgSource::Serv {
-            serv_name: target.to_owned(),
+            serv: target.to_owned(),
         }
     } else {
         let serv = src.serv_name();
         MsgSource::User {
-            serv_name: serv.to_owned(),
+            serv: serv.to_owned(),
             nick: target.to_owned(),
         }
     };
@@ -413,17 +410,10 @@ fn names(args: CmdArgs) {
     let CmdArgs { args, tui, src, .. } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
 
-    if let MsgSource::Chan {
-        ref serv_name,
-        ref chan_name,
-    } = src
-    {
-        let nicks_vec = tui.get_nicks(serv_name, chan_name);
+    if let MsgSource::Chan { ref serv, ref chan } = src {
+        let nicks_vec = tui.get_nicks(serv, chan);
         if let Some(nicks_vec) = nicks_vec {
-            let target = MsgTarget::Chan {
-                serv_name,
-                chan_name,
-            };
+            let target = MsgTarget::Chan { serv, chan };
             if words.is_empty() {
                 tui.add_client_msg(
                     &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),

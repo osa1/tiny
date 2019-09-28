@@ -80,23 +80,18 @@ impl TUI {
 
     fn ignore(&mut self, src: &MsgSource) {
         match src {
-            MsgSource::Serv { serv_name } => {
-                self.toggle_ignore(&MsgTarget::AllServTabs {
-                    serv_name: &serv_name,
-                });
+            MsgSource::Serv { serv } => {
+                self.toggle_ignore(&MsgTarget::AllServTabs { serv: &serv });
             }
-            MsgSource::Chan {
-                serv_name,
-                chan_name,
-            } => {
+            MsgSource::Chan { serv, chan } => {
                 self.toggle_ignore(&MsgTarget::Chan {
-                    serv_name: &serv_name,
-                    chan_name: &chan_name,
+                    serv: &serv,
+                    chan: &chan,
                 });
             }
-            MsgSource::User { serv_name, nick } => {
+            MsgSource::User { serv, nick } => {
                 self.toggle_ignore(&MsgTarget::User {
-                    serv_name: &serv_name,
+                    serv: &serv,
                     nick: &nick,
                 });
             }
@@ -143,18 +138,9 @@ impl TUI {
             };
             // can't use `MsgSource::to_target` here, `Serv` case is different
             let tab_target = match src {
-                MsgSource::Serv { ref serv_name } => MsgTarget::AllServTabs { serv_name },
-                MsgSource::Chan {
-                    ref serv_name,
-                    ref chan_name,
-                } => MsgTarget::Chan {
-                    serv_name,
-                    chan_name,
-                },
-                MsgSource::User {
-                    ref serv_name,
-                    ref nick,
-                } => MsgTarget::User { serv_name, nick },
+                MsgSource::Serv { ref serv } => MsgTarget::AllServTabs { serv },
+                MsgSource::Chan { ref serv, ref chan } => MsgTarget::Chan { serv, chan },
+                MsgSource::User { ref serv, ref nick } => MsgTarget::User { serv, nick },
             };
             self.set_notifier(notifier, &tab_target);
         }
@@ -241,14 +227,14 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_server_tab(&mut self, serv_name: &str) -> Option<usize> {
-        match self.find_serv_tab_idx(serv_name) {
+    pub fn new_server_tab(&mut self, serv: &str) -> Option<usize> {
+        match self.find_serv_tab_idx(serv) {
             None => {
                 let tab_idx = self.tabs.len();
                 self.new_tab(
                     tab_idx,
                     MsgSource::Serv {
-                        serv_name: serv_name.to_owned(),
+                        serv: serv.to_owned(),
                     },
                     true,
                     Notifier::Mentions,
@@ -260,10 +246,9 @@ impl TUI {
     }
 
     /// Closes a server tab and all associated channel tabs.
-    pub fn close_server_tab(&mut self, serv_name: &str) {
-        if let Some(tab_idx) = self.find_serv_tab_idx(serv_name) {
-            self.tabs
-                .retain(|tab: &Tab| tab.src.serv_name() != serv_name);
+    pub fn close_server_tab(&mut self, serv: &str) {
+        if let Some(tab_idx) = self.find_serv_tab_idx(serv) {
+            self.tabs.retain(|tab: &Tab| tab.src.serv_name() != serv);
             if self.active_idx == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
@@ -271,22 +256,19 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_chan_tab(&mut self, serv_name: &str, chan_name: &str) -> Option<usize> {
-        match self.find_chan_tab_idx(serv_name, chan_name) {
-            None => match self.find_last_serv_tab_idx(serv_name) {
+    pub fn new_chan_tab(&mut self, serv: &str, chan: &str) -> Option<usize> {
+        match self.find_chan_tab_idx(serv, chan) {
+            None => match self.find_last_serv_tab_idx(serv) {
                 None => {
-                    self.new_server_tab(serv_name);
-                    self.new_chan_tab(serv_name, chan_name)
+                    self.new_server_tab(serv);
+                    self.new_chan_tab(serv, chan)
                 }
                 Some(serv_tab_idx) => {
                     let mut status_val: bool = true;
                     let mut notifier = Notifier::Mentions;
                     for tab in &self.tabs {
-                        if let MsgSource::Serv {
-                            serv_name: ref serv_name_,
-                        } = tab.src
-                        {
-                            if serv_name == serv_name_ {
+                        if let MsgSource::Serv { serv: ref serv_ } = tab.src {
+                            if serv == serv_ {
                                 status_val = tab.widget.get_ignore_state();
                                 notifier = tab.notifier;
                                 break;
@@ -297,8 +279,8 @@ impl TUI {
                     self.new_tab(
                         tab_idx,
                         MsgSource::Chan {
-                            serv_name: serv_name.to_owned(),
-                            chan_name: chan_name.to_owned(),
+                            serv: serv.to_owned(),
+                            chan: chan.to_owned(),
                         },
                         status_val,
                         notifier,
@@ -317,8 +299,8 @@ impl TUI {
         }
     }
 
-    pub fn close_chan_tab(&mut self, serv_name: &str, chan_name: &str) {
-        if let Some(tab_idx) = self.find_chan_tab_idx(serv_name, chan_name) {
+    pub fn close_chan_tab(&mut self, serv: &str, chan: &str) {
+        if let Some(tab_idx) = self.find_chan_tab_idx(serv, chan) {
             self.tabs.remove(tab_idx);
             if self.active_idx == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
@@ -327,18 +309,18 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_user_tab(&mut self, serv_name: &str, nick: &str) -> Option<usize> {
-        match self.find_user_tab_idx(serv_name, nick) {
-            None => match self.find_last_serv_tab_idx(serv_name) {
+    pub fn new_user_tab(&mut self, serv: &str, nick: &str) -> Option<usize> {
+        match self.find_user_tab_idx(serv, nick) {
+            None => match self.find_last_serv_tab_idx(serv) {
                 None => {
-                    self.new_server_tab(serv_name);
-                    self.new_user_tab(serv_name, nick)
+                    self.new_server_tab(serv);
+                    self.new_user_tab(serv, nick)
                 }
                 Some(tab_idx) => {
                     self.new_tab(
                         tab_idx + 1,
                         MsgSource::User {
-                            serv_name: serv_name.to_owned(),
+                            serv: serv.to_owned(),
                             nick: nick.to_owned(),
                         },
                         true,
@@ -355,8 +337,8 @@ impl TUI {
         }
     }
 
-    pub fn close_user_tab(&mut self, serv_name: &str, nick: &str) {
-        if let Some(tab_idx) = self.find_user_tab_idx(serv_name, nick) {
+    pub fn close_user_tab(&mut self, serv: &str, nick: &str) {
+        if let Some(tab_idx) = self.find_user_tab_idx(serv, nick) {
             self.tabs.remove(tab_idx);
             if self.active_idx == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
@@ -574,8 +556,8 @@ impl TUI {
         }
     }
 
-    pub fn get_nicks(&self, serv_name: &str, chan_name: &str) -> Option<Vec<String>> {
-        match self.find_chan_tab_idx(serv_name, chan_name) {
+    pub fn get_nicks(&self, serv: &str, chan: &str) -> Option<Vec<String>> {
+        match self.find_chan_tab_idx(serv, chan) {
             None => None,
             Some(i) => Some(self.tabs[i].widget.get_nicks().to_strings("")),
         }
@@ -740,14 +722,14 @@ impl TUI {
         let mut next_idx = self.active_idx;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             match tab.src {
-                MsgSource::Serv { ref serv_name } => {
-                    if serv_name.contains(string) {
+                MsgSource::Serv { ref serv } => {
+                    if serv.contains(string) {
                         next_idx = tab_idx;
                         break;
                     }
                 }
-                MsgSource::Chan { ref chan_name, .. } => {
-                    if chan_name.contains(string) {
+                MsgSource::Chan { ref chan, .. } => {
+                    if chan.contains(string) {
                         next_idx = tab_idx;
                         break;
                     }
@@ -873,13 +855,10 @@ impl TUI {
         let mut target_idxs: Vec<usize> = Vec::with_capacity(1);
 
         match *target {
-            MsgTarget::Server { serv_name } => {
+            MsgTarget::Server { serv } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if let MsgSource::Serv {
-                        serv_name: ref serv_name_,
-                    } = tab.src
-                    {
-                        if serv_name == serv_name_ {
+                    if let MsgSource::Serv { serv: ref serv_ } = tab.src {
+                        if serv == serv_ {
                             target_idxs.push(tab_idx);
                             break;
                         }
@@ -887,17 +866,14 @@ impl TUI {
                 }
             }
 
-            MsgTarget::Chan {
-                serv_name,
-                chan_name,
-            } => {
+            MsgTarget::Chan { serv, chan } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if let MsgSource::Chan {
-                        serv_name: ref serv_name_,
-                        chan_name: ref chan_name_,
+                        serv: ref serv_,
+                        chan: ref chan_,
                     } = tab.src
                     {
-                        if serv_name == serv_name_ && chan_name == chan_name_ {
+                        if serv == serv_ && chan == chan_ {
                             target_idxs.push(tab_idx);
                             break;
                         }
@@ -905,14 +881,14 @@ impl TUI {
                 }
             }
 
-            MsgTarget::User { serv_name, nick } => {
+            MsgTarget::User { serv, nick } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
                     if let MsgSource::User {
-                        serv_name: ref serv_name_,
+                        serv: ref serv_,
                         nick: ref nick_,
                     } = tab.src
                     {
-                        if serv_name == serv_name_ && nick == nick_ {
+                        if serv == serv_ && nick == nick_ {
                             target_idxs.push(tab_idx);
                             break;
                         }
@@ -920,9 +896,9 @@ impl TUI {
                 }
             }
 
-            MsgTarget::AllServTabs { serv_name } => {
+            MsgTarget::AllServTabs { serv } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if tab.src.serv_name() == serv_name {
+                    if tab.src.serv_name() == serv {
                         target_idxs.push(tab_idx);
                     }
                 }
@@ -947,16 +923,13 @@ impl TUI {
 
     fn maybe_create_tab(&mut self, target: &MsgTarget) -> Option<usize> {
         match *target {
-            MsgTarget::Server { serv_name } | MsgTarget::AllServTabs { serv_name } => {
-                self.new_server_tab(serv_name)
+            MsgTarget::Server { serv } | MsgTarget::AllServTabs { serv } => {
+                self.new_server_tab(serv)
             }
 
-            MsgTarget::Chan {
-                serv_name,
-                chan_name,
-            } => self.new_chan_tab(serv_name, chan_name),
+            MsgTarget::Chan { serv, chan } => self.new_chan_tab(serv, chan),
 
-            MsgTarget::User { serv_name, nick } => self.new_user_tab(serv_name, nick),
+            MsgTarget::User { serv, nick } => self.new_user_tab(serv, nick),
 
             _ => None,
         }
@@ -1032,18 +1005,15 @@ impl TUI {
         });
     }
 
-    pub fn set_topic(&mut self, title: &str, ts: Tm, serv_name: &str, chan_name: &str) {
-        let target = MsgTarget::Chan {
-            serv_name,
-            chan_name,
-        };
+    pub fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &str) {
+        let target = MsgTarget::Chan { serv, chan };
         self.apply_to_target(&target, &|tab: &mut Tab, _| {
             tab.widget.show_topic(title, Timestamp::from(ts));
         });
     }
 
-    pub fn clear_nicks(&mut self, serv_name: &str) {
-        let target = MsgTarget::AllServTabs { serv_name };
+    pub fn clear_nicks(&mut self, serv: &str) {
+        let target = MsgTarget::AllServTabs { serv };
         self.apply_to_target(&target, &|tab: &mut Tab, _| {
             tab.widget.clear_nicks();
         });
@@ -1074,8 +1044,8 @@ impl TUI {
         });
     }
 
-    pub fn set_nick(&mut self, serv_name: &str, new_nick: &str) {
-        let target = MsgTarget::AllServTabs { serv_name };
+    pub fn set_nick(&mut self, serv: &str, new_nick: &str) {
+        let target = MsgTarget::AllServTabs { serv };
         self.apply_to_target(&target, &|tab: &mut Tab, _| {
             tab.widget.set_nick(new_nick.to_owned())
         });
@@ -1086,14 +1056,11 @@ impl TUI {
     }
 
     pub fn toggle_ignore(&mut self, target: &MsgTarget) {
-        if let MsgTarget::AllServTabs { serv_name } = *target {
+        if let MsgTarget::AllServTabs { serv } = *target {
             let mut status_val: bool = false;
             for tab in &self.tabs {
-                if let MsgSource::Serv {
-                    serv_name: ref serv_name_,
-                } = tab.src
-                {
-                    if serv_name == serv_name_ {
+                if let MsgSource::Serv { serv: ref serv_ } = tab.src {
+                    if serv == serv_ {
                         status_val = tab.widget.get_ignore_state();
                         break;
                     }
@@ -1114,14 +1081,10 @@ impl TUI {
     }
 
     // TODO: Maybe remove this and add a `create: bool` field to MsgTarget::User
-    pub fn does_user_tab_exist(&self, serv_name_: &str, nick_: &str) -> bool {
+    pub fn does_user_tab_exist(&self, serv_: &str, nick_: &str) -> bool {
         for tab in &self.tabs {
-            if let MsgSource::User {
-                ref serv_name,
-                ref nick,
-            } = tab.src
-            {
-                if serv_name_ == serv_name && nick_ == nick {
+            if let MsgSource::User { ref serv, ref nick } = tab.src {
+                if serv_ == serv && nick_ == nick {
                     return true;
                 }
             }
@@ -1149,10 +1112,10 @@ impl TUI {
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
 
-    fn find_serv_tab_idx(&self, serv_name_: &str) -> Option<usize> {
+    fn find_serv_tab_idx(&self, serv_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Serv { ref serv_name } = tab.src {
-                if serv_name_ == serv_name {
+            if let MsgSource::Serv { ref serv } = tab.src {
+                if serv_ == serv {
                     return Some(tab_idx);
                 }
             }
@@ -1160,14 +1123,10 @@ impl TUI {
         None
     }
 
-    fn find_chan_tab_idx(&self, serv_name_: &str, chan_name_: &str) -> Option<usize> {
+    fn find_chan_tab_idx(&self, serv_: &str, chan_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Chan {
-                ref serv_name,
-                ref chan_name,
-            } = tab.src
-            {
-                if serv_name_ == serv_name && chan_name_ == chan_name {
+            if let MsgSource::Chan { ref serv, ref chan } = tab.src {
+                if serv_ == serv && chan_ == chan {
                     return Some(tab_idx);
                 }
             }
@@ -1175,14 +1134,10 @@ impl TUI {
         None
     }
 
-    fn find_user_tab_idx(&self, serv_name_: &str, nick_: &str) -> Option<usize> {
+    fn find_user_tab_idx(&self, serv_: &str, nick_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::User {
-                ref serv_name,
-                ref nick,
-            } = tab.src
-            {
-                if serv_name_ == serv_name && nick_ == nick {
+            if let MsgSource::User { ref serv, ref nick } = tab.src {
+                if serv_ == serv && nick_ == nick {
                     return Some(tab_idx);
                 }
             }
@@ -1191,9 +1146,9 @@ impl TUI {
     }
 
     /// Index of the last tab with the given server name.
-    fn find_last_serv_tab_idx(&self, serv_name: &str) -> Option<usize> {
+    fn find_last_serv_tab_idx(&self, serv: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate().rev() {
-            if tab.src.serv_name() == serv_name {
+            if tab.src.serv_name() == serv {
                 return Some(tab_idx);
             }
         }
