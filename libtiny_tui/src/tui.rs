@@ -1081,7 +1081,7 @@ impl TUI {
     }
 
     // TODO: Maybe remove this and add a `create: bool` field to MsgTarget::User
-    pub fn does_user_tab_exist(&self, serv_: &str, nick_: &str) -> bool {
+    pub fn user_tab_exists(&self, serv_: &str, nick_: &str) -> bool {
         for tab in &self.tabs {
             if let MsgSource::User { ref serv, ref nick } = tab.src {
                 if serv_ == serv && nick_ == nick {

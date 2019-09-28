@@ -6,6 +6,7 @@ use futures_util::stream::StreamExt;
 use libtiny_client::Client;
 use libtiny_tui::MsgTarget;
 use libtiny_tui::{MsgSource, TUI};
+use libtiny_ui::UI;
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 

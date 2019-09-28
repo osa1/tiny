@@ -13,6 +13,7 @@ mod utils;
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny_client::{Client, ServerInfo};
 use libtiny_tui::{Colors, MsgTarget, TUI};
+use libtiny_ui::UI;
 use std::path::PathBuf;
 
 fn main() {

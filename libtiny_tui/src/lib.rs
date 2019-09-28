@@ -15,7 +15,7 @@ mod widget;
 
 pub use crate::config::Colors;
 pub use crate::tab::TabStyle;
-pub use libtiny_ui::{MsgSource, MsgTarget};
+pub use libtiny_ui::*;
 
 use futures_util::stream::StreamExt;
 use std::cell::RefCell;
@@ -112,6 +112,16 @@ async fn input_handler(tui: Rc<RefCell<tui::TUI>>, mut snd_ev: mpsc::Sender<Even
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
+        fn $name(&self, $($x: $t,)*) {
+            if let Some(inner) = self.inner.upgrade() {
+                inner.borrow_mut().$name( $( $x, )* );
+            }
+        }
+    }
+}
+
+macro_rules! delegate_pub {
+    ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
         pub fn $name(&self, $($x: $t,)*) {
             if let Some(inner) = self.inner.upgrade() {
                 inner.borrow_mut().$name( $( $x, )* );
@@ -120,8 +130,7 @@ macro_rules! delegate {
     }
 }
 
-impl TUI {
-    delegate!(draw());
+impl UI for TUI {
     delegate!(new_server_tab(serv_name: &str,));
     delegate!(close_server_tab(serv_name: &str,));
     delegate!(new_chan_tab(serv_name: &str, chan: &str,));
@@ -156,14 +165,18 @@ impl TUI {
         chan_name: &str,
     ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
-    delegate!(set_colors(colors: Colors,));
 
-    pub fn does_user_tab_exist(&self, serv_name: &str, nick: &str) -> bool {
+    fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
         match self.inner.upgrade() {
-            Some(tui) => tui.borrow().does_user_tab_exist(serv_name, nick),
+            Some(tui) => tui.borrow().user_tab_exists(serv_name, nick),
             None => false,
         }
     }
+}
+
+impl TUI {
+    delegate_pub!(draw());
+    delegate_pub!(set_colors(colors: Colors,));
 
     // TODO: Remove this, get this information from the client
     pub fn get_nicks(&self, serv_name: &str, chan: &str) -> Option<Vec<String>> {

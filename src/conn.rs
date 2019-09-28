@@ -3,6 +3,7 @@
 use futures_util::stream::StreamExt;
 use libtiny_client::Client;
 use libtiny_tui::{MsgTarget, TabStyle, TUI};
+use libtiny_ui::UI;
 use libtiny_wire as wire;
 use std::error::Error;
 use tokio::sync::mpsc;
@@ -163,7 +164,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                             User { ref nick, .. } => {
                                 // show NOTICE messages in server tabs if we don't have a tab
                                 // for the sender already (see #21)
-                                if is_notice && !tui.does_user_tab_exist(serv, nick) {
+                                if is_notice && !tui.user_tab_exists(serv, nick) {
                                     MsgTarget::Server { serv }
                                 } else {
                                     MsgTarget::User { serv, nick }
@@ -200,7 +201,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                 tui.add_nick(nick, ts, &MsgTarget::Chan { serv, chan: &chan });
                 // Also update the private message tab if it exists
                 // Nothing will be shown if the user already known to be online by the tab
-                if tui.does_user_tab_exist(serv, nick) {
+                if tui.user_tab_exists(serv, nick) {
                     tui.add_nick(nick, ts, &MsgTarget::User { serv, nick });
                 }
             }
@@ -239,7 +240,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
             for chan in &chans {
                 tui.remove_nick(nick, Some(time::now()), &MsgTarget::Chan { serv, chan });
             }
-            if tui.does_user_tab_exist(serv, nick) {
+            if tui.user_tab_exists(serv, nick) {
                 tui.remove_nick(nick, Some(time::now()), &MsgTarget::User { serv, nick });
             }
         }
@@ -262,7 +263,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                     &MsgTarget::Chan { serv, chan },
                 );
             }
-            if tui.does_user_tab_exist(serv, &old_nick) {
+            if tui.user_tab_exists(serv, &old_nick) {
                 tui.rename_nick(
                     &old_nick,
                     &nick,
