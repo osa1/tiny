@@ -45,20 +45,24 @@ impl State {
 
     // FIXME: This allocates a new String
     pub(crate) fn get_nick(&self) -> String {
-        self.inner.borrow_mut().current_nick.clone()
+        self.inner.borrow().current_nick.clone()
     }
 
     // FIXME: Maybe use RwLock instead of Mutex
     pub(crate) fn is_nick_accepted(&self) -> bool {
-        self.inner.borrow_mut().nick_accepted
+        self.inner.borrow().nick_accepted
     }
 
     pub(crate) fn get_usermask(&self) -> Option<String> {
-        self.inner.borrow_mut().usermask.clone()
+        self.inner.borrow().usermask.clone()
     }
 
     pub(crate) fn set_away(&self, msg: Option<&str>) {
         self.inner.borrow_mut().away_status = msg.map(str::to_owned);
+    }
+
+    pub(crate) fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
+        self.inner.borrow().get_chan_nicks(chan)
     }
 }
 
@@ -455,6 +459,15 @@ impl StateInner {
             // Ignore the rest
             //
             _ => {}
+        }
+    }
+
+    fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
+        match utils::find_idx(&self.chans, |(s, _)| s == chan) {
+            None =>
+                vec![], // TODO: Log this, this is probably a bug
+            Some(chan_idx) =>
+                self.chans[chan_idx].1.iter().cloned().collect(),
         }
     }
 }

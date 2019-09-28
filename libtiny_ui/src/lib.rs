@@ -68,7 +68,27 @@ pub enum TabStyle {
     Highlight,
 }
 
+/// UI events
+#[derive(Debug)]
+pub enum Event {
+    Abort,
+    Msg {
+        msg: String,
+        source: MsgSource,
+    },
+    Lines {
+        lines: Vec<String>,
+        source: MsgSource,
+    },
+    Cmd {
+        cmd: String,
+        source: MsgSource,
+    },
+}
+
 pub trait UI {
+    fn draw(&self);
+
     /// Create a new server tab.
     fn new_server_tab(&self, serv: &str);
 

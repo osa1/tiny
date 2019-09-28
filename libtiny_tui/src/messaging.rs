@@ -237,10 +237,6 @@ impl MessagingUI {
         }
     }
 
-    pub(crate) fn get_nicks(&self) -> &Trie {
-        &self.nicks
-    }
-
     /// Get contents of the input field and clear it.
     pub(crate) fn flush_input_field(&mut self) -> String {
         self.input_field.flush()

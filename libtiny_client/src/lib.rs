@@ -260,6 +260,11 @@ impl Client {
         self.msg_chan.try_send(Cmd::Quit(reason)).unwrap();
         self.snd_ev.try_send(Event::Closed).unwrap();
     }
+
+    /// Get all nicks in a channel.
+    pub fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
+        self.state.get_chan_nicks(chan)
+    }
 }
 
 //

@@ -2,30 +2,29 @@
 
 use futures_util::stream::StreamExt;
 use libtiny_client::Client;
-use libtiny_tui::{MsgTarget, TabStyle, TUI};
-use libtiny_ui::UI;
+use libtiny_ui::{MsgTarget, TabStyle, UI};
 use libtiny_wire as wire;
 use std::error::Error;
 use tokio::sync::mpsc;
 
 pub(crate) async fn task(
     mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
-    tui: TUI,
+    ui: impl UI,
     client: Client,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        if handle_conn_ev(&tui, &client, ev) {
+        if handle_conn_ev(&ui, &client, ev) {
             return;
         }
-        tui.draw();
+        ui.draw();
     }
 }
 
-fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool {
+fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bool {
     use libtiny_client::Event::*;
     match ev {
         Connecting => {
-            tui.add_client_msg(
+            ui.add_client_msg(
                 "Connecting...",
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
@@ -33,7 +32,7 @@ fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool
             );
         }
         Connected => {
-            tui.add_msg(
+            ui.add_msg(
                 "Connected.",
                 time::now(),
                 &MsgTarget::AllServTabs {
@@ -43,7 +42,7 @@ fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool
         }
         Disconnected => {
             let serv = client.get_serv_name();
-            tui.add_err_msg(
+            ui.add_err_msg(
                 &format!(
                     "Disconnected. Will try to reconnect in {} seconds.",
                     libtiny_client::RECONNECT_SECS
@@ -51,10 +50,10 @@ fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool
                 time::now(),
                 &MsgTarget::AllServTabs { serv },
             );
-            tui.clear_nicks(serv);
+            ui.clear_nicks(serv);
         }
         IoErr(err) => {
-            tui.add_err_msg(
+            ui.add_err_msg(
                 &format!(
                     "Connection error: {}. Will try to reconnect in {} seconds.",
                     err.description(),
@@ -67,7 +66,7 @@ fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool
             );
         }
         TlsErr(err) => {
-            tui.add_err_msg(
+            ui.add_err_msg(
                 &format!(
                     "TLS error: {}. Will try to reconnect in {} seconds.",
                     err.description(),
@@ -80,7 +79,7 @@ fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool
             );
         }
         CantResolveAddr => {
-            tui.add_err_msg(
+            ui.add_err_msg(
                 "Can't resolve address",
                 time::now(),
                 &MsgTarget::AllServTabs {
@@ -89,10 +88,10 @@ fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool
             );
         }
         NickChange(new_nick) => {
-            tui.set_nick(client.get_serv_name(), &new_nick);
+            ui.set_nick(client.get_serv_name(), &new_nick);
         }
         Msg(msg) => {
-            handle_irc_msg(tui, client, msg);
+            handle_irc_msg(ui, client, msg);
         }
         CouldntCreateLogger(err) => {
             eprintln!("Couldn't create logger: {:?}", err);
@@ -107,7 +106,7 @@ fn handle_conn_ev(tui: &TUI, client: &Client, ev: libtiny_client::Event) -> bool
     false
 }
 
-fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
+fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
     use wire::Cmd::*;
     use wire::Pfx::*;
 
@@ -136,24 +135,24 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
 
             match target {
                 wire::MsgTarget::Chan(chan) => {
-                    let tui_msg_target = MsgTarget::Chan {
+                    let ui_msg_target = MsgTarget::Chan {
                         serv: client.get_serv_name(),
                         chan: &chan,
                     };
                     // highlight the message if it mentions us
                     if msg.find(&client.get_nick()).is_some() {
-                        tui.add_privmsg(origin, &msg, ts, &tui_msg_target, true, is_action);
-                        tui.set_tab_style(TabStyle::Highlight, &tui_msg_target);
+                        ui.add_privmsg(origin, &msg, ts, &ui_msg_target, true, is_action);
+                        ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
                         let mentions_target = MsgTarget::Server { serv: "mentions" };
-                        tui.add_msg(
+                        ui.add_msg(
                             &format!("{} in {}:{}: {}", origin, client.get_serv_name(), chan, msg),
                             ts,
                             &mentions_target,
                         );
-                        tui.set_tab_style(TabStyle::Highlight, &mentions_target);
+                        ui.set_tab_style(TabStyle::Highlight, &mentions_target);
                     } else {
-                        tui.add_privmsg(origin, &msg, ts, &tui_msg_target, false, is_action);
-                        tui.set_tab_style(TabStyle::NewMsg, &tui_msg_target);
+                        ui.add_privmsg(origin, &msg, ts, &ui_msg_target, false, is_action);
+                        ui.set_tab_style(TabStyle::NewMsg, &ui_msg_target);
                     }
                 }
                 wire::MsgTarget::User(target) => {
@@ -164,7 +163,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                             User { ref nick, .. } => {
                                 // show NOTICE messages in server tabs if we don't have a tab
                                 // for the sender already (see #21)
-                                if is_notice && !tui.user_tab_exists(serv, nick) {
+                                if is_notice && !ui.user_tab_exists(serv, nick) {
                                     MsgTarget::Server { serv }
                                 } else {
                                     MsgTarget::User { serv, nick }
@@ -172,12 +171,12 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                             }
                         }
                     };
-                    tui.add_privmsg(origin, &msg, ts, &msg_target, false, is_action);
+                    ui.add_privmsg(origin, &msg, ts, &msg_target, false, is_action);
                     if target == client.get_nick() {
-                        tui.set_tab_style(TabStyle::Highlight, &msg_target);
+                        ui.set_tab_style(TabStyle::Highlight, &msg_target);
                     } else {
                         // not sure if this case can happen
-                        tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                        ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
                 }
             }
@@ -194,15 +193,15 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
 
             let serv = client.get_serv_name();
             if nick == client.get_nick() {
-                tui.new_chan_tab(serv, &chan);
+                ui.new_chan_tab(serv, &chan);
             } else {
                 let nick = drop_nick_prefix(&nick);
                 let ts = Some(time::now());
-                tui.add_nick(nick, ts, &MsgTarget::Chan { serv, chan: &chan });
+                ui.add_nick(nick, ts, &MsgTarget::Chan { serv, chan: &chan });
                 // Also update the private message tab if it exists
                 // Nothing will be shown if the user already known to be online by the tab
-                if tui.user_tab_exists(serv, nick) {
-                    tui.add_nick(nick, ts, &MsgTarget::User { serv, nick });
+                if ui.user_tab_exists(serv, nick) {
+                    ui.add_nick(nick, ts, &MsgTarget::User { serv, nick });
                 }
             }
         }
@@ -216,7 +215,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                 }
             };
             if nick != client.get_nick() {
-                tui.remove_nick(
+                ui.remove_nick(
                     &nick,
                     Some(time::now()),
                     &MsgTarget::Chan {
@@ -238,10 +237,10 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
 
             let serv = client.get_serv_name();
             for chan in &chans {
-                tui.remove_nick(nick, Some(time::now()), &MsgTarget::Chan { serv, chan });
+                ui.remove_nick(nick, Some(time::now()), &MsgTarget::Chan { serv, chan });
             }
-            if tui.user_tab_exists(serv, nick) {
-                tui.remove_nick(nick, Some(time::now()), &MsgTarget::User { serv, nick });
+            if ui.user_tab_exists(serv, nick) {
+                ui.remove_nick(nick, Some(time::now()), &MsgTarget::User { serv, nick });
             }
         }
 
@@ -256,15 +255,15 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
 
             let serv = client.get_serv_name();
             for chan in &chans {
-                tui.rename_nick(
+                ui.rename_nick(
                     &old_nick,
                     &nick,
                     time::now(),
                     &MsgTarget::Chan { serv, chan },
                 );
             }
-            if tui.user_tab_exists(serv, &old_nick) {
-                tui.rename_nick(
+            if ui.user_tab_exists(serv, &old_nick) {
+                ui.rename_nick(
                     &old_nick,
                     &nick,
                     time::now(),
@@ -280,7 +279,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
             // ERR_NICKNAMEINUSE
             if client.is_nick_accepted() {
                 // Nick change request from user failed. Just show an error message.
-                tui.add_err_msg(
+                ui.add_err_msg(
                     "Nickname is already in use",
                     time::now(),
                     &MsgTarget::AllServTabs {
@@ -295,7 +294,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
         }
 
         ERROR { msg } => {
-            tui.add_err_msg(
+            ui.add_err_msg(
                 &msg,
                 time::now(),
                 &MsgTarget::AllServTabs {
@@ -305,7 +304,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
         }
 
         TOPIC { chan, topic } => {
-            tui.set_topic(&topic, time::now(), client.get_serv_name(), &chan);
+            ui.set_topic(&topic, time::now(), client.get_serv_name(), &chan);
         }
 
         CAP {
@@ -319,7 +318,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                         let msg_target = MsgTarget::Server {
                             serv: client.get_serv_name(),
                         };
-                        tui.add_err_msg(
+                        ui.add_err_msg(
                             "Server rejected using SASL authenication capability",
                             time::now(),
                             &msg_target,
@@ -331,7 +330,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                         let msg_target = MsgTarget::Server {
                             serv: client.get_serv_name(),
                         };
-                        tui.add_err_msg(
+                        ui.add_err_msg(
                             "Server does not support SASL authenication",
                             time::now(),
                             &msg_target,
@@ -362,7 +361,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
             {
                 debug_assert_eq!(params.len(), 2);
                 let msg = &params[1];
-                tui.add_msg(
+                ui.add_msg(
                     msg,
                     time::now(),
                     &MsgTarget::Server {
@@ -376,7 +375,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
             /* RPL_LUSERCHANNELS */
             {
                 let msg = params.into_iter().collect::<Vec<String>>().join(" ");
-                tui.add_msg(
+                ui.add_msg(
                     &msg,
                     time::now(),
                     &MsgTarget::Server {
@@ -385,7 +384,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                 );
             } else if n == 265 || n == 266 || n == 250 {
                 let msg = &params[params.len() - 1];
-                tui.add_msg(
+                ui.add_msg(
                     msg,
                     time::now(),
                     &MsgTarget::Server {
@@ -400,7 +399,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                 assert!(params.len() == 3 || params.len() == 2);
                 let chan = &params[params.len() - 2];
                 let topic = &params[params.len() - 1];
-                tui.set_topic(topic, time::now(), client.get_serv_name(), chan);
+                ui.set_topic(topic, time::now(), client.get_serv_name(), chan);
             }
             // RPL_NAMREPLY: List of users in a channel
             else if n == 353 {
@@ -411,7 +410,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                 };
 
                 for nick in params[3].split_whitespace() {
-                    tui.add_nick(drop_nick_prefix(nick), None, &chan_target);
+                    ui.add_nick(drop_nick_prefix(nick), None, &chan_target);
                 }
             }
             // RPL_ENDOFNAMES: End of NAMES list
@@ -420,7 +419,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
             // RPL_UNAWAY or RPL_NOWAWAY
             else if n == 305 || n == 306 {
                 let msg = &params[1];
-                tui.add_client_msg(
+                ui.add_client_msg(
                     msg,
                     &MsgTarget::AllServTabs {
                         serv: client.get_serv_name(),
@@ -432,13 +431,13 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                 let nick = &params[1];
                 let msg = &params[2];
                 let serv = client.get_serv_name();
-                tui.add_client_msg(msg, &MsgTarget::User { serv, nick });
+                ui.add_client_msg(msg, &MsgTarget::User { serv, nick });
             // RPL_AWAY
             } else if n == 301 {
                 let serv = client.get_serv_name();
                 let nick = &params[1];
                 let msg = &params[2];
-                tui.add_client_msg(
+                ui.add_client_msg(
                     &format!("{} is away: {}", nick, msg),
                     &MsgTarget::User { serv, nick },
                 );
@@ -449,7 +448,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                         let msg_target = MsgTarget::Server {
                             serv: conn_serv_name,
                         };
-                        tui.add_privmsg(
+                        ui.add_privmsg(
                             &msg_serv,
                             &params.join(" "),
                             time::now(),
@@ -457,7 +456,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                             false,
                             false,
                         );
-                        tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                        ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
                     _pfx => {
                         // add everything else to debug file
@@ -476,7 +475,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                 let msg_target = MsgTarget::Server {
                     serv: conn_serv_name,
                 };
-                tui.add_privmsg(
+                ui.add_privmsg(
                     &msg_serv,
                     &params.join(" "),
                     time::now(),
@@ -484,7 +483,7 @@ fn handle_irc_msg(tui: &TUI, client: &Client, msg: wire::Msg) {
                     false,
                     false,
                 );
-                tui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                ui.set_tab_style(TabStyle::NewMsg, &msg_target);
             }
             _pfx => {
                 // self.logger.get_debug_logs().write_line(format_args!(

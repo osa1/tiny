@@ -1,8 +1,7 @@
 use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
-use libtiny_tui::{MsgSource, MsgTarget, TUI};
-use libtiny_ui::UI;
+use libtiny_ui::{MsgSource, MsgTarget, UI};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -11,7 +10,7 @@ pub(crate) struct CmdArgs<'a> {
     pub config_path: &'a Path,
     pub log_dir: &'a Option<PathBuf>,
     pub defaults: &'a config::Defaults,
-    pub tui: &'a TUI,
+    pub ui: &'a dyn UI,
     pub clients: &'a mut Vec<Client>,
     pub src: MsgSource,
 }
@@ -96,16 +95,11 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 9] = [
-    &AWAY_CMD,
-    &CLOSE_CMD,
-    &CONNECT_CMD,
-    &JOIN_CMD,
-    &ME_CMD,
-    &MSG_CMD,
-    &NAMES_CMD,
+static CMDS: [&Cmd; 7] = [
+    &AWAY_CMD, &CLOSE_CMD, // &CONNECT_CMD,
+    &JOIN_CMD, &ME_CMD, &MSG_CMD, &NAMES_CMD,
     &NICK_CMD,
-    &RELOAD_CMD,
+    // &RELOAD_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,32 +129,33 @@ static CLOSE_CMD: Cmd = Cmd {
 
 fn close(args: CmdArgs) {
     let CmdArgs {
-        tui, clients, src, ..
+        ui, clients, src, ..
     } = args;
     match src {
         MsgSource::Serv { ref serv } if serv == "mentions" => {
             // ignore
         }
         MsgSource::Serv { serv } => {
-            tui.close_server_tab(&serv);
+            ui.close_server_tab(&serv);
             let client_idx = find_client_idx(&clients, &serv).unwrap();
             // TODO: this probably won't close the connection?
             let mut client = clients.remove(client_idx);
             client.quit(None);
         }
         MsgSource::Chan { serv, chan } => {
-            tui.close_chan_tab(&serv, &chan);
+            ui.close_chan_tab(&serv, &chan);
             let client_idx = find_client_idx(&clients, &serv).unwrap();
             clients[client_idx].part(&chan);
         }
         MsgSource::User { serv, nick } => {
-            tui.close_user_tab(&serv, &nick);
+            ui.close_user_tab(&serv, &nick);
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 static CONNECT_CMD: Cmd = Cmd {
     name: "connect",
     cmd_fn: connect,
@@ -171,7 +166,7 @@ fn connect(args: CmdArgs) {
         args,
         log_dir,
         defaults,
-        tui,
+        ui,
         clients,
         src,
         ..
@@ -179,13 +174,13 @@ fn connect(args: CmdArgs) {
     let words: Vec<&str> = args.split_whitespace().collect();
 
     match words.len() {
-        0 => reconnect(tui, clients, src),
-        1 => connect_(words[0], None, defaults, log_dir, tui, clients),
-        2 => connect_(words[0], Some(words[1]), defaults, log_dir, tui, clients),
+        0 => reconnect(ui, clients, src),
+        1 => connect_(words[0], None, defaults, log_dir, ui, clients),
+        2 => connect_(words[0], Some(words[1]), defaults, log_dir, ui, clients),
         _ =>
         // wat
         {
-            tui.add_client_err_msg(
+            ui.add_client_err_msg(
                 "/connect usage: /connect <host>:<port> or /connect (to reconnect)",
                 &MsgTarget::CurrentTab,
             )
@@ -193,8 +188,8 @@ fn connect(args: CmdArgs) {
     }
 }
 
-fn reconnect(tui: &TUI, clients: &mut Vec<Client>, src: MsgSource) {
-    tui.add_client_msg(
+fn reconnect(ui: &dyn UI, clients: &mut Vec<Client>, src: MsgSource) {
+    ui.add_client_msg(
         "Reconnecting...",
         &MsgTarget::AllServTabs {
             serv: src.serv_name(),
@@ -215,7 +210,7 @@ fn connect_(
     pass: Option<&str>,
     defaults: &config::Defaults,
     log_dir: &Option<PathBuf>,
-    tui: &TUI,
+    ui: &dyn UI,
     clients: &mut Vec<Client>,
 ) {
     fn split_port(s: &str) -> Option<(&str, &str)> {
@@ -226,12 +221,12 @@ fn connect_(
     let (serv_name, serv_port) = {
         match split_port(serv_addr) {
             None => {
-                return tui
+                return ui
                     .add_client_err_msg("connect: Need a <host>:<port>", &MsgTarget::CurrentTab);
             }
             Some((serv_name, serv_port)) => match serv_port.parse::<u16>() {
                 Err(err) => {
-                    return tui.add_client_err_msg(
+                    return ui.add_client_err_msg(
                         &format!("connect: Can't parse port {}: {}", serv_port, err),
                         &MsgTarget::CurrentTab,
                     );
@@ -243,7 +238,7 @@ fn connect_(
 
     // if we already connected to this server reconnect using new port
     if let Some(client) = find_client(clients, serv_name) {
-        tui.add_client_msg("Connecting...", &MsgTarget::AllServTabs { serv: serv_name });
+        ui.add_client_msg("Connecting...", &MsgTarget::AllServTabs { serv: serv_name });
         client.reconnect(Some(serv_port));
         return;
     }
@@ -252,9 +247,9 @@ fn connect_(
     // can't move the rest to an else branch because of borrowchk
 
     // otherwise create a new Conn, tab etc.
-    tui.new_server_tab(serv_name);
+    ui.new_server_tab(serv_name);
     let msg_target = MsgTarget::Server { serv: serv_name };
-    tui.add_client_msg("Connecting...", &msg_target);
+    ui.add_client_msg("Connecting...", &msg_target);
 
     let (client, rcv_ev) = Client::new(
         ServerInfo {
@@ -273,13 +268,14 @@ fn connect_(
         log_dir.to_owned(),
     );
 
-    // Spawn TUI task
-    let tui_clone = tui.clone();
+    // Spawn UI task
+    let ui_clone = ui.clone();
     let client_clone = client.clone();
-    tokio::runtime::current_thread::spawn(crate::conn::task(rcv_ev, tui_clone, client_clone));
+    tokio::runtime::current_thread::spawn(crate::conn::task(rcv_ev, ui_clone, client_clone));
 
     clients.push(client);
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -291,14 +287,14 @@ static JOIN_CMD: Cmd = Cmd {
 fn join(args: CmdArgs) {
     let CmdArgs {
         args,
-        tui,
+        ui,
         clients,
         src,
         ..
     } = args;
     let words = args.split_whitespace().collect::<Vec<_>>();
     if words.is_empty() {
-        return tui.add_client_err_msg(
+        return ui.add_client_err_msg(
             "/join usage: /join chan1[,chan2...]",
             &MsgTarget::CurrentTab,
         );
@@ -306,7 +302,7 @@ fn join(args: CmdArgs) {
 
     match find_client(clients, src.serv_name()) {
         Some(client) => client.join(&words),
-        None => tui.add_client_err_msg(
+        None => ui.add_client_err_msg(
             &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
             &MsgTarget::CurrentTab,
         ),
@@ -323,15 +319,15 @@ static ME_CMD: Cmd = Cmd {
 fn me(args: CmdArgs) {
     let CmdArgs {
         args,
-        tui,
+        ui,
         clients,
         src,
         ..
     } = args;
     if args.is_empty() {
-        return tui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
+        return ui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
-    crate::ui::send_msg(tui, clients, &src, args.to_string(), true);
+    crate::ui::send_msg(ui, clients, &src, args.to_string(), true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -362,13 +358,13 @@ fn split_msg_args(args: &str) -> Option<(&str, &str)> {
 fn msg(args: CmdArgs) {
     let CmdArgs {
         args,
-        tui,
+        ui,
         clients,
         src,
         ..
     } = args;
     let fail = || {
-        tui.add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
+        ui.add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
     };
 
     let (target, msg) = match split_msg_args(args) {
@@ -397,7 +393,7 @@ fn msg(args: CmdArgs) {
         }
     };
 
-    crate::ui::send_msg(&tui, clients, &src, msg.to_owned(), false);
+    crate::ui::send_msg(ui, clients, &src, msg.to_owned(), false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -408,29 +404,32 @@ static NAMES_CMD: Cmd = Cmd {
 };
 
 fn names(args: CmdArgs) {
-    let CmdArgs { args, tui, src, .. } = args;
+    let CmdArgs { args, ui, src, clients, .. } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
 
+    let client = match find_client(clients, src.serv_name()) {
+        None => { return; }
+        Some(client) => client,
+    };
+
     if let MsgSource::Chan { ref serv, ref chan } = src {
-        let nicks_vec = tui.get_nicks(serv, chan);
-        if let Some(nicks_vec) = nicks_vec {
-            let target = MsgTarget::Chan { serv, chan };
-            if words.is_empty() {
-                tui.add_client_msg(
-                    &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
-                    &target,
-                );
+        let nicks_vec = client.get_chan_nicks(chan);
+        let target = MsgTarget::Chan { serv, chan };
+        if words.is_empty() {
+            ui.add_client_msg(
+                &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
+                &target,
+            );
+        } else {
+            let nick = words[0];
+            if nicks_vec.iter().any(|v| v == nick) {
+                ui.add_client_msg(&format!("{} is online", nick), &target);
             } else {
-                let nick = words[0];
-                if nicks_vec.iter().any(|v| v == nick) {
-                    tui.add_client_msg(&format!("{} is online", nick), &target);
-                } else {
-                    tui.add_client_msg(&format!("{} is not in the channel", nick), &target);
-                }
+                ui.add_client_msg(&format!("{} is not in the channel", nick), &target);
             }
         }
     } else {
-        tui.add_client_err_msg("/names only supported in chan tabs", &MsgTarget::CurrentTab);
+        ui.add_client_err_msg("/names only supported in chan tabs", &MsgTarget::CurrentTab);
     }
 }
 
@@ -444,7 +443,7 @@ static NICK_CMD: Cmd = Cmd {
 fn nick(args: CmdArgs) {
     let CmdArgs {
         args,
-        tui,
+        ui,
         clients,
         src,
         ..
@@ -456,12 +455,13 @@ fn nick(args: CmdArgs) {
             client.nick(new_nick);
         }
     } else {
-        tui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
+        ui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
 static RELOAD_CMD: Cmd = Cmd {
     name: "reload",
     cmd_fn: reload,
@@ -469,18 +469,19 @@ static RELOAD_CMD: Cmd = Cmd {
 
 fn reload(args: CmdArgs) {
     let CmdArgs {
-        config_path, tui, ..
+        config_path, ui, ..
     } = args;
     match config::parse_config(config_path) {
-        Ok(config::Config { colors, .. }) => tui.set_colors(colors),
+        Ok(config::Config { colors, .. }) => ui.set_colors(colors),
         Err(err) => {
-            tui.add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
+            ui.add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
             for line in err.description().lines() {
-                tui.add_client_err_msg(line, &MsgTarget::CurrentTab);
+                ui.add_client_err_msg(line, &MsgTarget::CurrentTab);
             }
         }
     }
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
