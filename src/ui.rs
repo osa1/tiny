@@ -29,7 +29,7 @@ fn handle_input_ev(
     config_path: &Path,
     logger: &Option<Logger>,
     defaults: &config::Defaults,
-    ui: &dyn UI,
+    ui: &impl UI,
     clients: &mut Vec<Client>,
     ev: libtiny_ui::Event,
 ) -> bool {
@@ -59,7 +59,7 @@ fn handle_cmd(
     config_path: &Path,
     logger: &Option<Logger>,
     defaults: &config::Defaults,
-    ui: &dyn UI,
+    ui: &impl UI,
     clients: &mut Vec<Client>,
     src: MsgSource,
     cmd: &str,

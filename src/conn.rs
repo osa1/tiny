@@ -20,7 +20,7 @@ pub(crate) async fn task(
     }
 }
 
-fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bool {
+fn handle_conn_ev(ui: &impl UI, client: &Client, ev: libtiny_client::Event) -> bool {
     use libtiny_client::Event::*;
     match ev {
         Connecting => {
@@ -100,7 +100,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
     false
 }
 
-fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
+fn handle_irc_msg(ui: &impl UI, client: &Client, msg: wire::Msg) {
     use wire::Cmd::*;
     use wire::Pfx::*;
 
