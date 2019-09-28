@@ -555,13 +555,6 @@ impl TUI {
             num_visible = num_visible_;
         }
     }
-
-    pub fn get_nicks(&self, serv: &str, chan: &str) -> Option<Vec<String>> {
-        match self.find_chan_tab_idx(serv, chan) {
-            None => None,
-            Some(i) => Some(self.tabs[i].widget.get_nicks().to_strings("")),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

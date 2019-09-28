@@ -30,23 +30,6 @@ pub struct TUI {
     inner: Weak<RefCell<tui::TUI>>,
 }
 
-#[derive(Debug)]
-pub enum Event {
-    Abort,
-    Msg {
-        msg: String,
-        source: MsgSource,
-    },
-    Lines {
-        lines: Vec<String>,
-        source: MsgSource,
-    },
-    Cmd {
-        cmd: String,
-        source: MsgSource,
-    },
-}
-
 impl TUI {
     pub fn run(colors: Colors, runtime: &mut Runtime) -> (TUI, mpsc::Receiver<Event>) {
         let tui = Rc::new(RefCell::new(tui::TUI::new(colors)));
@@ -131,6 +114,7 @@ macro_rules! delegate_pub {
 }
 
 impl UI for TUI {
+    delegate!(draw());
     delegate!(new_server_tab(serv_name: &str,));
     delegate!(close_server_tab(serv_name: &str,));
     delegate!(new_chan_tab(serv_name: &str, chan: &str,));
@@ -177,12 +161,4 @@ impl UI for TUI {
 impl TUI {
     delegate_pub!(draw());
     delegate_pub!(set_colors(colors: Colors,));
-
-    // TODO: Remove this, get this information from the client
-    pub fn get_nicks(&self, serv_name: &str, chan: &str) -> Option<Vec<String>> {
-        match self.inner.upgrade() {
-            Some(tui) => tui.borrow().get_nicks(serv_name, chan),
-            None => None,
-        }
-    }
 }
