@@ -93,12 +93,6 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
         Msg(msg) => {
             handle_irc_msg(ui, client, msg);
         }
-        CouldntCreateLogger(err) => {
-            eprintln!("Couldn't create logger: {:?}", err);
-        }
-        LogWriteFailed(err) => {
-            eprintln!("Couldn't write log: {:?}", err);
-        }
         Closed => {
             return true;
         }

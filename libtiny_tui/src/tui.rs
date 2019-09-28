@@ -840,11 +840,9 @@ impl TUI {
     where
         F: Fn(&mut Tab, bool),
     {
-        // Creating a vector just to make borrow checker happy. Borrow checker
-        // sucks once more. Here it sucks 2x, I can't even create a Vec<&mut Tab>,
-        // I need a Vec<usize>.
-        //
-        // (I could use an array on stack but whatever)
+        // Creating a vector just to make borrow checker happy (I can't have a Vec<&mut Tab>)
+        // I need to collect tabs here because of the "create if not exists" logic.
+        // (see `target_idxs.is_empty()` below)
         let mut target_idxs: Vec<usize> = Vec::with_capacity(1);
 
         match *target {

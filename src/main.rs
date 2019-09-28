@@ -12,6 +12,7 @@ mod utils;
 
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny_client::{Client, ServerInfo};
+use libtiny_logger::Logger;
 use libtiny_tui::{Colors, MsgTarget, TUI};
 use libtiny_ui::UI;
 use std::path::PathBuf;
@@ -77,6 +78,14 @@ fn run(
     // Create TUI task
     let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
 
+    // Create logger
+    let logger = log_dir.and_then(|log_dir| {
+        match Logger::new(log_dir, Box::new(|_err| { /* TODO */ })) {
+            Err(err) => None, // TODO report this
+            Ok(logger) => Some(logger),
+        }
+    });
+
     // init "mentions" tab
     tui.new_server_tab("mentions");
     tui.add_client_msg(
@@ -106,7 +115,7 @@ fn run(
             }),
         };
 
-        let (client, rcv_conn_ev) = Client::new(server_info, Some(&mut executor), log_dir.clone());
+        let (client, rcv_conn_ev) = Client::new(server_info, Some(&mut executor));
         let tui_clone = tui.clone();
         let client_clone = client.clone();
 
@@ -119,7 +128,7 @@ fn run(
     // Spawn a task to handle TUI events
     executor.spawn(ui::task(
         config_path,
-        log_dir,
+        logger,
         defaults,
         tui,
         clients,

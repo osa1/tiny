@@ -464,10 +464,8 @@ impl StateInner {
 
     fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
         match utils::find_idx(&self.chans, |(s, _)| s == chan) {
-            None =>
-                vec![], // TODO: Log this, this is probably a bug
-            Some(chan_idx) =>
-                self.chans[chan_idx].1.iter().cloned().collect(),
+            None => vec![], // TODO: Log this, this is probably a bug
+            Some(chan_idx) => self.chans[chan_idx].1.iter().cloned().collect(),
         }
     }
 }

@@ -1,6 +1,7 @@
 use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
+use libtiny_logger::Logger;
 use libtiny_ui::{MsgSource, MsgTarget, UI};
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -8,7 +9,7 @@ use std::path::{Path, PathBuf};
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
     pub config_path: &'a Path,
-    pub log_dir: &'a Option<PathBuf>,
+    pub logger: &'a Option<Logger>,
     pub defaults: &'a config::Defaults,
     pub ui: &'a dyn UI,
     pub clients: &'a mut Vec<Client>,
@@ -22,7 +23,7 @@ pub(crate) struct Cmd {
     // Command help message. Shown in `/help`.
     // pub(crate) help: &'static str,
     /// Command function.
-    pub(crate) cmd_fn: for<'a, 'b> fn(CmdArgs),
+    pub(crate) cmd_fn: fn(CmdArgs),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,8 +98,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 static CMDS: [&Cmd; 7] = [
     &AWAY_CMD, &CLOSE_CMD, // &CONNECT_CMD,
-    &JOIN_CMD, &ME_CMD, &MSG_CMD, &NAMES_CMD,
-    &NICK_CMD,
+    &JOIN_CMD, &ME_CMD, &MSG_CMD, &NAMES_CMD, &NICK_CMD,
     // &RELOAD_CMD,
 ];
 
@@ -404,11 +404,19 @@ static NAMES_CMD: Cmd = Cmd {
 };
 
 fn names(args: CmdArgs) {
-    let CmdArgs { args, ui, src, clients, .. } = args;
+    let CmdArgs {
+        args,
+        ui,
+        src,
+        clients,
+        ..
+    } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
 
     let client = match find_client(clients, src.serv_name()) {
-        None => { return; }
+        None => {
+            return;
+        }
         Some(client) => client,
     };
 
