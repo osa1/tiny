@@ -33,9 +33,9 @@ impl Notifier {
         let msg = remove_irc_control_chars(msg);
 
         match *target {
-            MsgTarget::Chan { chan_name, .. } => {
+            MsgTarget::Chan { chan, .. } => {
                 if *self == Notifier::Messages || (*self == Notifier::Mentions && mention) {
-                    notify(&format!("{} in {}", sender, chan_name), &msg)
+                    notify(&format!("{} in {}", sender, chan), &msg)
                 }
             }
             MsgTarget::User {

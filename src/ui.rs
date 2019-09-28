@@ -120,7 +120,7 @@ pub(crate) fn send_msg(
     // TODO: For errors:
     //
     // tui.add_client_err_msg(
-    //     &format!("Can't find server: {}", serv_name),
+    //     &format!("Can't find server: {}", serv),
     //     &MsgTarget::CurrentTab,
     // );
 
@@ -134,27 +134,15 @@ pub(crate) fn send_msg(
                 return;
             }
 
-            MsgSource::Chan {
-                ref serv_name,
-                ref chan_name,
-            } => (
-                MsgTarget::Chan {
-                    serv_name,
-                    chan_name,
-                },
-                chan_name,
-            ),
+            MsgSource::Chan { ref serv, ref chan } => (MsgTarget::Chan { serv, chan }, chan),
 
-            MsgSource::User {
-                ref serv_name,
-                ref nick,
-            } => {
+            MsgSource::User { ref serv, ref nick } => {
                 let msg_target = if nick.eq_ignore_ascii_case("nickserv")
                     || nick.eq_ignore_ascii_case("chanserv")
                 {
-                    MsgTarget::Server { serv_name }
+                    MsgTarget::Server { serv }
                 } else {
-                    MsgTarget::User { serv_name, nick }
+                    MsgTarget::User { serv, nick }
                 };
                 (msg_target, nick)
             }

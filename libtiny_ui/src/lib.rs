@@ -3,19 +3,16 @@ use time::Tm;
 /// Target of a message to be shown in a UI.
 pub enum MsgTarget<'a> {
     /// Show the message in the server tab.
-    Server { serv_name: &'a str },
+    Server { serv: &'a str },
 
     /// Show the message in the channel tab.
-    Chan {
-        serv_name: &'a str,
-        chan_name: &'a str,
-    },
+    Chan { serv: &'a str, chan: &'a str },
 
     /// Show the message in the privmsg tab.
-    User { serv_name: &'a str, nick: &'a str },
+    User { serv: &'a str, nick: &'a str },
 
     /// Show the message in all tabs of a server.
-    AllServTabs { serv_name: &'a str },
+    AllServTabs { serv: &'a str },
 
     /// Show the message in currently active tab.
     CurrentTab,
@@ -25,48 +22,36 @@ pub enum MsgTarget<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MsgSource {
     /// Message sent in a server tab.
-    Serv { serv_name: String },
+    Serv { serv: String },
 
     /// Message sent in a channel tab.
-    Chan {
-        serv_name: String,
-        chan_name: String,
-    },
+    Chan { serv: String, chan: String },
 
     /// Message sent in a privmsg tab.
-    User { serv_name: String, nick: String },
+    User { serv: String, nick: String },
 }
 
 impl MsgSource {
     pub fn serv_name(&self) -> &str {
         match *self {
-            MsgSource::Serv { ref serv_name }
-            | MsgSource::Chan { ref serv_name, .. }
-            | MsgSource::User { ref serv_name, .. } => serv_name,
+            MsgSource::Serv { ref serv }
+            | MsgSource::Chan { ref serv, .. }
+            | MsgSource::User { ref serv, .. } => serv,
         }
     }
 
     pub fn to_target(&self) -> MsgTarget {
         match *self {
-            MsgSource::Serv { ref serv_name } => MsgTarget::Server { serv_name },
-            MsgSource::Chan {
-                ref serv_name,
-                ref chan_name,
-            } => MsgTarget::Chan {
-                serv_name,
-                chan_name,
-            },
-            MsgSource::User {
-                ref serv_name,
-                ref nick,
-            } => MsgTarget::User { serv_name, nick },
+            MsgSource::Serv { ref serv } => MsgTarget::Server { serv },
+            MsgSource::Chan { ref serv, ref chan } => MsgTarget::Chan { serv, chan },
+            MsgSource::User { ref serv, ref nick } => MsgTarget::User { serv, nick },
         }
     }
 
     pub fn visible_name(&self) -> &str {
         match *self {
-            MsgSource::Serv { ref serv_name, .. } => serv_name,
-            MsgSource::Chan { ref chan_name, .. } => chan_name,
+            MsgSource::Serv { ref serv, .. } => serv,
+            MsgSource::Chan { ref chan, .. } => chan,
             MsgSource::User { ref nick, .. } => nick,
         }
     }
@@ -137,7 +122,7 @@ pub trait UI {
     fn rename_nick(&self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget);
 
     /// Set topic of given tabs.
-    fn set_topic(&self, topic: &str, ts: Tm, serv_name: &str, chan_name: &str);
+    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &str);
 
     /// Do we have a tab for the given user? This is useful for deciding where to show a PRIVMSG
     /// coming from server; e.g. messages from services sometimes shown in their own tabs,
