@@ -2,6 +2,7 @@ use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
 use libtiny_tui::{MsgSource, MsgTarget, TUI};
+use libtiny_ui::UI;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
