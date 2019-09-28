@@ -163,3 +163,119 @@ pub trait UI {
     /// sometimes in the server tab.
     fn user_tab_exists(&self, serv: &str, nick: &str) -> bool;
 }
+
+/*
+struct CombinedUIs<UI1, UI2> {
+    ui1: UI1,
+    ui2: UI2,
+}
+
+impl<UI1: UI, UI2: UI> UI for CombinedUIs<UI1, UI2> {
+    fn draw(&self) {
+        self.ui1.draw();
+        self.ui2.draw();
+    }
+
+    fn new_server_tab(&self, serv: &str) {
+        self.ui1.new_server_tab(serv);
+        self.ui2.new_server_tab(serv);
+    }
+
+    fn close_server_tab(&self, serv: &str) {
+        self.ui1.close_server_tab(serv);
+        self.ui2.close_server_tab(serv);
+    }
+
+    fn new_chan_tab(&self, serv: &str, chan: &str){
+        self.ui1.new_chan_tab(serv, chan);
+        self.ui2.new_chan_tab(serv, chan);
+    }
+
+    fn close_chan_tab(&self, serv: &str, chan: &str) {
+        self.ui1.close_chan_tab(serv, chan);
+        self.ui2.close_chan_tab(serv, chan);
+    }
+
+    fn close_user_tab(&self, serv: &str, nick: &str) {
+        self.ui1.close_user_tab(serv, nick);
+        self.ui2.close_user_tab(serv, nick);
+    }
+
+    fn add_client_msg(&self, msg: &str, target: &MsgTarget) {
+        self.ui1.add_client_msg(msg, target);
+        self.ui2.add_client_msg(msg, target);
+    }
+
+    fn add_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {
+        self.ui1.add_msg(msg, ts, target);
+        self.ui2.add_msg(msg, ts, target);
+    }
+
+    fn add_err_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {
+        self.ui1.add_err_msg(msg, ts, target);
+        self.ui2.add_err_msg(msg, ts, target);
+    }
+
+    fn add_client_err_msg(&self, msg: &str, target: &MsgTarget) {
+        self.ui1.add_client_err_msg(msg, target);
+        self.ui2.add_client_err_msg(msg, target);
+    }
+
+    fn clear_nicks(&self, serv: &str) {
+        self.ui1.clear_nicks(serv);
+        self.ui2.clear_nicks(serv);
+    }
+
+    fn set_nick(&self, serv: &str, nick: &str) {
+        self.ui1.set_nick(serv, nick);
+        self.ui2.set_nick(serv, nick);
+    }
+
+    fn add_privmsg(
+        &self,
+        sender: &str,
+        msg: &str,
+        ts: Tm,
+        target: &MsgTarget,
+        highlight: bool,
+        is_action: bool,
+    ) {
+        self.ui1.add_privmsg(sender, msg, ts, target, highlight, is_action);
+        self.ui2.add_privmsg(sender, msg, ts, target, highlight, is_action);
+    }
+
+    fn add_nick(&self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
+        self.ui1.add_nick(nick, ts, target);
+        self.ui2.add_nick(nick, ts, target);
+    }
+
+    fn remove_nick(&self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
+        self.ui1.remove_nick(nick, ts, target);
+        self.ui2.remove_nick(nick, ts, target);
+    }
+
+    fn rename_nick(&self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget) {
+        self.ui1.rename_nick(old_nick, new_nick, ts, target);
+        self.ui2.rename_nick(old_nick, new_nick, ts, target);
+    }
+
+    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &str) {
+        self.ui1.set_topic(topic, ts, serv, chan);
+        self.ui2.set_topic(topic, ts, serv, chan);
+    }
+
+    fn set_tab_style(&self, style: TabStyle, target: &MsgTarget) {
+        self.ui1.set_tab_style(style, target);
+        self.ui2.set_tab_style(style, target);
+    }
+
+    fn user_tab_exists(&self, serv: &str, nick: &str) -> bool {
+        // TODO weird
+        self.ui1.user_tab_exists(serv, nick)
+    }
+}
+
+pub fn combine<UI1: UI, UI2: UI>(ui1: UI1, ui2: UI2) -> impl UI {
+    CombinedUIs { ui1, ui2 }
+}
+*/

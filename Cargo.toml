@@ -21,6 +21,7 @@ path = "src/main.rs"
 dirs = "1.0.2"
 futures-util-preview = "0.3.0-alpha.18"
 libtiny_client = { path = "libtiny_client" }
+libtiny_logger = { path = "libtiny_logger" }
 libtiny_tui = { path = "libtiny_tui" }
 libtiny_ui = { path = "libtiny_ui" }
 libtiny_wire = { path = "libtiny_wire" }

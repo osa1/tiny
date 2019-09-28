@@ -6,7 +6,6 @@ mod state;
 mod stream;
 mod utils;
 
-use libtiny_logger::Logger;
 pub use libtiny_wire as wire;
 
 use pinger::Pinger;
@@ -90,10 +89,6 @@ pub enum Event {
     NickChange(String),
     /// A message from the server
     Msg(wire::Msg),
-    /// Client couldn't create logger
-    CouldntCreateLogger(std::io::Error),
-    /// Client couldn't write log
-    LogWriteFailed(std::io::Error),
 
     /// This is to signal the task that listens for events to stop.
     // TODO: Maybe try something like making Client non-Clone and sharing Weaks with tasks
@@ -126,7 +121,6 @@ pub struct Client {
     // We can't have a channel to the sender task directly here, because when the sender task
     // returns we lose the receiving end of the channel and there's no way to avoid this except
     // with annoying hacks like wrapping it with an `Arc<Mutex<..>>` or something.
-    logger: Option<Rc<RefCell<Logger>>>,
     snd_ev: mpsc::Sender<Event>,
 }
 
@@ -136,9 +130,8 @@ impl Client {
     pub fn new(
         server_info: ServerInfo,
         runtime: Option<&mut Runtime>,
-        log_dir: Option<PathBuf>,
     ) -> (Client, mpsc::Receiver<Event>) {
-        connect(server_info, runtime, log_dir)
+        connect(server_info, runtime)
     }
 
     /// Reconnect to the server, possibly using a new port.
@@ -169,11 +162,6 @@ impl Client {
         self.msg_chan
             .try_send(Cmd::Msg(format!("{}\r\n", msg)))
             .unwrap();
-        if let Some(logger) = &self.logger {
-            if let Err(err) = logger.borrow_mut().log_outgoing_raw_msg(&msg) {
-                self.snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
-            }
-        }
     }
 
     /// Split a privmsg to multiple messages so that each message is, when the hostname and nick
@@ -220,11 +208,6 @@ impl Client {
         self.msg_chan
             .try_send(Cmd::Msg(wire_fn(target, msg)))
             .unwrap();
-        if let Some(logger) = &self.logger {
-            if let Err(err) = logger.borrow_mut().log_outgoing_msg(target, msg, is_action) {
-                self.snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
-            }
-        }
     }
 
     /// Join the given list of channels.
@@ -286,7 +269,6 @@ enum Cmd {
 fn connect(
     server_info: ServerInfo,
     runtime: Option<&mut Runtime>,
-    log_dir: Option<PathBuf>,
 ) -> (Client, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
@@ -304,18 +286,6 @@ fn connect(
     //
     // Create the main loop task
     //
-
-    let logger = match log_dir {
-        None => None,
-        Some(log_dir) => match Logger::new(log_dir, serv_name.clone()) {
-            Ok(logger) => Some(Rc::new(RefCell::new(logger))),
-            Err(err) => {
-                snd_ev.try_send(Event::CouldntCreateLogger(err)).unwrap();
-                None
-            }
-        },
-    };
-    let logger_clone = logger.clone(); // for Client
 
     let irc_state = State::new(server_info.clone());
     let irc_state_clone = irc_state.clone();
@@ -467,11 +437,6 @@ fn connect(
                                     eprintln!("parsed msg: {:?}", msg);
                                     pinger.reset();
                                     irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
-                                    if let Some(ref logger) = logger {
-                                        if let Err(err) = logger.borrow_mut().log_incoming_msg(&msg) {
-                                            snd_ev.try_send(Event::LogWriteFailed(err)).unwrap();
-                                        }
-                                    }
                                     snd_ev.try_send(Event::Msg(msg)).unwrap();
                                 }
                             }
@@ -512,7 +477,6 @@ fn connect(
             msg_chan: snd_cmd,
             serv_name,
             state: irc_state_clone,
-            logger: logger_clone,
             snd_ev: snd_ev_clone,
         },
         rcv_ev,

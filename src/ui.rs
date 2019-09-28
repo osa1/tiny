@@ -4,20 +4,21 @@ use crate::cmd::{parse_cmd, CmdArgs, ParseCmdResult};
 use crate::config;
 use futures_util::stream::StreamExt;
 use libtiny_client::Client;
+use libtiny_logger::Logger;
 use libtiny_ui::{MsgSource, MsgTarget, UI};
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 
 pub(crate) async fn task(
     config_path: PathBuf,
-    log_dir: Option<PathBuf>,
+    logger: Option<Logger>,
     defaults: config::Defaults,
     ui: impl UI,
     mut clients: Vec<Client>,
     mut rcv_ev: mpsc::Receiver<libtiny_ui::Event>,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        if handle_input_ev(&config_path, &log_dir, &defaults, &ui, &mut clients, ev) {
+        if handle_input_ev(&config_path, &logger, &defaults, &ui, &mut clients, ev) {
             return;
         }
         ui.draw();
@@ -26,7 +27,7 @@ pub(crate) async fn task(
 
 fn handle_input_ev(
     config_path: &Path,
-    log_dir: &Option<PathBuf>,
+    logger: &Option<Logger>,
     defaults: &config::Defaults,
     ui: &dyn UI,
     clients: &mut Vec<Client>,
@@ -48,9 +49,7 @@ fn handle_input_ev(
                 send_msg(ui, clients, &source, line, false)
             }
         }
-        Cmd { cmd, source } => {
-            handle_cmd(config_path, log_dir, defaults, ui, clients, source, &cmd)
-        }
+        Cmd { cmd, source } => handle_cmd(config_path, logger, defaults, ui, clients, source, &cmd),
     }
 
     false // continue
@@ -58,7 +57,7 @@ fn handle_input_ev(
 
 fn handle_cmd(
     config_path: &Path,
-    log_dir: &Option<PathBuf>,
+    logger: &Option<Logger>,
     defaults: &config::Defaults,
     ui: &dyn UI,
     clients: &mut Vec<Client>,
@@ -70,7 +69,7 @@ fn handle_cmd(
             let cmd_args = CmdArgs {
                 args: rest,
                 config_path,
-                log_dir,
+                logger,
                 defaults,
                 ui,
                 clients,

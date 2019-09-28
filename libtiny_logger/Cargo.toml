@@ -5,5 +5,5 @@ authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-libtiny_wire = { path = "../libtiny_wire" }
+libtiny_ui = { path = "../libtiny_ui" }
 time = "0.1"
