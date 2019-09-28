@@ -57,6 +57,17 @@ impl MsgSource {
     }
 }
 
+// NOTE: Keep the variants sorted in increasing significance, to avoid updating
+// style with higher significance for a less significant style (e.g. updating
+// from `Highlight` to `NewMsg` in `set_tab_style`).
+// TODO: This shouldn't be a part of the API
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TabStyle {
+    Normal,
+    NewMsg,
+    Highlight,
+}
+
 pub trait UI {
     /// Create a new server tab.
     fn new_server_tab(&self, serv: &str);
@@ -123,6 +134,9 @@ pub trait UI {
 
     /// Set topic of given tabs.
     fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &str);
+
+    /// Set style of the given tabs.
+    fn set_tab_style(&self, style: TabStyle, target: &MsgTarget);
 
     /// Do we have a tab for the given user? This is useful for deciding where to show a PRIVMSG
     /// coming from server; e.g. messages from services sometimes shown in their own tabs,

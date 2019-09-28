@@ -1,3 +1,4 @@
+pub use libtiny_ui::TabStyle;
 use termbox_simple::{Termbox, TB_UNDERLINE};
 
 use crate::{
@@ -16,23 +17,11 @@ pub(crate) struct Tab {
     pub(crate) notifier: Notifier,
 }
 
-// NOTE: Keep the variants sorted in increasing significance, to avoid updating
-// style with higher significance for a less significant style (e.g. updating
-// from `Highlight` to `NewMsg` in `set_tab_style`).
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum TabStyle {
-    Normal,
-    NewMsg,
-    Highlight,
-}
-
-impl TabStyle {
-    pub(crate) fn get_style(self, colors: &Colors) -> Style {
-        match self {
-            TabStyle::Normal => colors.tab_normal,
-            TabStyle::NewMsg => colors.tab_new_msg,
-            TabStyle::Highlight => colors.tab_highlight,
-        }
+fn tab_style(style: TabStyle, colors: &Colors) -> Style {
+    match style {
+        TabStyle::Normal => colors.tab_normal,
+        TabStyle::NewMsg => colors.tab_new_msg,
+        TabStyle::Highlight => colors.tab_highlight,
     }
 }
 
@@ -68,7 +57,7 @@ impl Tab {
         let style: Style = if active {
             colors.tab_active
         } else {
-            self.style.get_style(colors)
+            tab_style(self.style, colors)
         };
 
         let mut switch_drawn = false;
