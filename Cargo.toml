@@ -17,6 +17,15 @@ travis-ci = { repository = "osa1/tiny" }
 name = "tiny"
 path = "src/main.rs"
 
+[workspace]
+members = [
+    "libtiny_client",
+    "libtiny_logger",
+    "libtiny_tui",
+    "libtiny_ui",
+    "libtiny_wire",
+]
+
 [dependencies]
 dirs = "1.0.2"
 futures-util-preview = "0.3.0-alpha.18"
