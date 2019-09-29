@@ -168,7 +168,7 @@ impl Line {
 
         for split_idx in 0..self.splits.len() {
             let char_idx = self.splits[split_idx];
-            // eprintln!("rendered_height: char_idx: {}", char_idx);
+            // debug!("rendered_height: char_idx: {}", char_idx);
             let col = char_idx - line_start;
 
             // How many more chars can we render in this line?
@@ -179,11 +179,11 @@ impl Line {
                 // -1 because we don't need to render the last space.
                 *self.splits.get(split_idx + 1).unwrap_or(&self.len_chars) - 1 - char_idx;
 
-            // eprintln!("rendered_height: slots_in_line: {}, chars_until_next_split: {}",
-            //           slots_in_line, chars_until_next_split);
+            // debug!("rendered_height: slots_in_line: {}, chars_until_next_split: {}",
+            //        slots_in_line, chars_until_next_split);
 
             if (chars_until_next_split as i32) > slots_in_line {
-                // eprintln!("splitting at {}", char_idx);
+                // debug!("splitting at {}", char_idx);
                 lines += 1;
                 line_start = char_idx + 1;
             }
@@ -227,10 +227,10 @@ impl Line {
                     assert!(*next_split > char_idx);
                     let chars_until_next_split: i32 = *next_split - char_idx;
 
-                    // eprintln!("chars_until_next_split: {},
-                    //           slots_in_line: {}",
-                    //           chars_until_next_split,
-                    //           slots_in_line);
+                    // debug!("chars_until_next_split: {},
+                    //        slots_in_line: {}",
+                    //        chars_until_next_split,
+                    //        slots_in_line);
 
                     if (chars_until_next_split as i32) <= slots_in_line {
                         // keep rendering chars

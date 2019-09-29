@@ -37,32 +37,25 @@ async fn pinger_task(rcv_rst: mpsc::Receiver<()>, mut snd_ev: mpsc::Sender<Event
             .fuse();
         pin_mut!(delay);
 
-        eprintln!("pinger: select");
         select! {
             () = delay => {
-                eprintln!("pinger: delay yielded");
                 match state {
                     PingerState::SendPing => {
                         state = PingerState::ExpectPong;
-                        eprintln!("pinger: SendPing");
                         snd_ev.try_send(Event::SendPing).unwrap();
                     }
                     PingerState::ExpectPong => {
-                        eprintln!("pinger: Disconnect");
                         snd_ev.try_send(Event::Disconnect).unwrap();
                         return;
                     }
                 }
             }
             cmd = rcv_rst_fused.next() => {
-                eprintln!("pinger: rcv_rst yielded");
                 match cmd {
                     None => {
-                        eprintln!("pinger: Return");
                         return;
                     }
                     Some(()) => {
-                        eprintln!("pinger: Reset");
                         state = PingerState::SendPing;
                     }
                 }

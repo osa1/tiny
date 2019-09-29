@@ -661,8 +661,8 @@ impl TUI {
         }
 
         // Debugging
-        // eprintln!("number of tabs to draw: {}", tab_right - tab_left);
-        // eprintln!("left_arr: {}, right_arr: {}", left_arr, right_arr);
+        // debug!("number of tabs to draw: {}", tab_right - tab_left);
+        // debug!("left_arr: {}, right_arr: {}", left_arr, right_arr);
 
         // finally draw the tabs
         for (tab_idx, tab) in (&self.tabs[tab_left..tab_right]).iter().enumerate() {
