@@ -82,11 +82,23 @@ fn run(
     // Create TUI task
     let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
 
+    // init "mentions" tab
+    tui.new_server_tab("mentions");
+    tui.add_client_msg(
+        "Any mentions to you will be listed here.",
+        &MsgTarget::Server { serv: "mentions" },
+    );
+    tui.draw();
+
     // Create logger
     let report_logger_error = {
         let tui_clone = tui.clone();
         Box::new(move |err: String| {
-            tui_clone.add_client_err_msg(&format!("Logger error: {}", err), &MsgTarget::CurrentTab)
+            // Somehwat hacky -- only tab we have is "mentions" so we show the error there
+            tui_clone.add_client_err_msg(
+                &format!("Logger error: {}", err),
+                &MsgTarget::Server { serv: "mentions" },
+            )
         })
     };
     let logger: Option<Logger> =
@@ -105,14 +117,6 @@ fn run(
         None => Box::new(tui) as Box<dyn UI>,
         Some(logger) => Box::new(libtiny_ui::combine(tui, logger)) as Box<dyn UI>,
     };
-
-    // init "mentions" tab
-    tui.new_server_tab("mentions");
-    tui.add_client_msg(
-        "Any mentions to you will be listed here.",
-        &MsgTarget::Server { serv: "mentions" },
-    );
-    tui.draw();
 
     let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
