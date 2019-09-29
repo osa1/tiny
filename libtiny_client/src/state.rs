@@ -376,12 +376,15 @@ impl StateInner {
                 match utils::find_idx(&self.chans, |(s, _)| s == chan) {
                     None => self.chans.push((
                         chan.to_owned(),
-                        params[3].split_whitespace().map(str::to_owned).collect(),
+                        params[3]
+                            .split_whitespace()
+                            .map(|s| wire::drop_nick_prefix(s).to_owned())
+                            .collect(),
                     )),
                     Some(idx) => {
                         let nick_set = &mut self.chans[idx].1;
                         for nick in params[3].split_whitespace() {
-                            nick_set.insert(nick.to_owned());
+                            nick_set.insert(wire::drop_nick_prefix(nick).to_owned());
                         }
                     }
                 }
