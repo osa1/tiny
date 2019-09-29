@@ -1,5 +1,7 @@
 #![recursion_limit = "512"]
 #![feature(test)]
+#![allow(clippy::unneeded_field_pattern)]
+#![allow(clippy::cognitive_complexity)]
 
 mod pinger;
 mod state;

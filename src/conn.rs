@@ -1,3 +1,6 @@
+#![allow(clippy::cognitive_complexity)]
+#![allow(clippy::unneeded_field_pattern)]
+
 //! IRC event handling
 
 use futures_util::stream::StreamExt;
