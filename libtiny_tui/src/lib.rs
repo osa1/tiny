@@ -1,3 +1,6 @@
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::cognitive_complexity)]
+
 mod config;
 mod exit_dialogue;
 mod messaging;
@@ -64,7 +67,7 @@ async fn input_handler(tui: Rc<RefCell<tui::TUI>>, mut snd_ev: mpsc::Sender<Even
                     Input { msg, from } => {
                         if msg[0] == '/' {
                             // Handle TUI commands, send others to downstream
-                            let cmd: String = (&msg[1..]).into_iter().collect();
+                            let cmd: String = (&msg[1..]).iter().collect();
                             let handled = tui.borrow_mut().try_handle_cmd(&cmd, &from);
                             if !handled {
                                 snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap();
