@@ -79,12 +79,17 @@ fn run(
     let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
 
     // Create logger
-    let logger = log_dir.and_then(|log_dir| {
+    let logger: Option<Logger> = log_dir.and_then(|log_dir| {
         match Logger::new(log_dir, Box::new(|_err| { /* TODO */ })) {
             Err(err) => None, // TODO report this
             Ok(logger) => Some(logger),
         }
     });
+
+    let tui = match logger {
+        None => Box::new(tui) as Box<dyn UI>,
+        Some(logger) => Box::new(libtiny_ui::combine(tui, logger)) as Box<dyn UI>,
+    };
 
     // init "mentions" tab
     tui.new_server_tab("mentions");
@@ -116,7 +121,9 @@ fn run(
         };
 
         let (client, rcv_conn_ev) = Client::new(server_info, Some(&mut executor));
-        let tui_clone = tui.clone();
+        // TODO: Somehow it's quite hard to expose this objekt call with a different name and less
+        // polymorphic type in libtiny_ui ...
+        let tui_clone = libtiny_ui::clone_box(&*tui);
         let client_clone = client.clone();
 
         // Spawn a task to handle connection events
@@ -128,7 +135,6 @@ fn run(
     // Spawn a task to handle TUI events
     executor.spawn(ui::task(
         config_path,
-        logger,
         defaults,
         tui,
         clients,

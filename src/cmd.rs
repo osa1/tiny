@@ -1,7 +1,6 @@
 use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
-use libtiny_logger::Logger;
 use libtiny_ui::{MsgSource, MsgTarget, UI};
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -9,7 +8,6 @@ use std::path::{Path, PathBuf};
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
     pub config_path: &'a Path,
-    pub logger: &'a Option<Logger>,
     pub defaults: &'a config::Defaults,
     pub ui: &'a dyn UI,
     pub clients: &'a mut Vec<Client>,
