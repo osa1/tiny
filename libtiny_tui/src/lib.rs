@@ -166,6 +166,5 @@ impl UI for TUI {
 }
 
 impl TUI {
-    delegate_pub!(draw());
     delegate_pub!(set_colors(colors: Colors,));
 }

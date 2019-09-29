@@ -3,7 +3,7 @@ use notify_rust::Notification;
 
 /// Destktop notification handler
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Notifier {
+pub(crate) enum Notifier {
     /// Notifications are disabled.
     Off,
     /// Generate notifications only for mentions.
