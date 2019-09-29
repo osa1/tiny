@@ -1,4 +1,5 @@
 use time::Tm;
+pub use objekt::clone_box;
 
 /// Target of a message to be shown in a UI.
 pub enum MsgTarget<'a> {
@@ -86,7 +87,7 @@ pub enum Event {
     },
 }
 
-pub trait UI {
+pub trait UI: objekt::Clone {
     fn draw(&self);
 
     /// Create a new server tab.
@@ -164,13 +165,13 @@ pub trait UI {
     fn user_tab_exists(&self, serv: &str, nick: &str) -> bool;
 }
 
-/*
-struct CombinedUIs<UI1, UI2> {
+#[derive(Clone)]
+pub struct CombinedUIs<UI1, UI2> {
     ui1: UI1,
     ui2: UI2,
 }
 
-impl<UI1: UI, UI2: UI> UI for CombinedUIs<UI1, UI2> {
+impl<UI1: UI + Clone, UI2: UI + Clone> UI for CombinedUIs<UI1, UI2> {
     fn draw(&self) {
         self.ui1.draw();
         self.ui2.draw();
@@ -186,7 +187,7 @@ impl<UI1: UI, UI2: UI> UI for CombinedUIs<UI1, UI2> {
         self.ui2.close_server_tab(serv);
     }
 
-    fn new_chan_tab(&self, serv: &str, chan: &str){
+    fn new_chan_tab(&self, serv: &str, chan: &str) {
         self.ui1.new_chan_tab(serv, chan);
         self.ui2.new_chan_tab(serv, chan);
     }
@@ -240,8 +241,10 @@ impl<UI1: UI, UI2: UI> UI for CombinedUIs<UI1, UI2> {
         highlight: bool,
         is_action: bool,
     ) {
-        self.ui1.add_privmsg(sender, msg, ts, target, highlight, is_action);
-        self.ui2.add_privmsg(sender, msg, ts, target, highlight, is_action);
+        self.ui1
+            .add_privmsg(sender, msg, ts, target, highlight, is_action);
+        self.ui2
+            .add_privmsg(sender, msg, ts, target, highlight, is_action);
     }
 
     fn add_nick(&self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
@@ -275,7 +278,30 @@ impl<UI1: UI, UI2: UI> UI for CombinedUIs<UI1, UI2> {
     }
 }
 
-pub fn combine<UI1: UI, UI2: UI>(ui1: UI1, ui2: UI2) -> impl UI {
+impl UI for () {
+    fn draw(&self) {}
+    fn new_server_tab(&self, _: &str) {}
+    fn close_server_tab(&self, _: &str) {}
+    fn new_chan_tab(&self, _: &str, _: &str) {}
+    fn close_chan_tab(&self, _: &str, _: &str) {}
+    fn close_user_tab(&self, _: &str, _: &str) {}
+    fn add_client_msg(&self, _: &str, _: &MsgTarget) {}
+    fn add_msg(&self, _: &str, _: Tm, _: &MsgTarget) {}
+    fn add_err_msg(&self, _: &str, _: Tm, _: &MsgTarget) {}
+    fn add_client_err_msg(&self, _: &str, _: &MsgTarget) {}
+    fn clear_nicks(&self, _: &str) {}
+    fn set_nick(&self, _: &str, _: &str) {}
+    fn add_privmsg(&self, _: &str, _: &str, _: Tm, _: &MsgTarget, _: bool, _: bool) {}
+    fn add_nick(&self, _: &str, _: Option<Tm>, _: &MsgTarget) {}
+    fn remove_nick(&self, _: &str, _: Option<Tm>, _: &MsgTarget) {}
+    fn rename_nick(&self, _: &str, _: &str, _: Tm, _: &MsgTarget) {}
+    fn set_topic(&self, _: &str, _: Tm, _: &str, _: &str) {}
+    fn set_tab_style(&self, _: TabStyle, _: &MsgTarget) {}
+    fn user_tab_exists(&self, _: &str, _: &str) -> bool {
+        false
+    }
+}
+
+pub fn combine<UI1: UI, UI2: UI>(ui1: UI1, ui2: UI2) -> CombinedUIs<UI1, UI2> {
     CombinedUIs { ui1, ui2 }
 }
-*/

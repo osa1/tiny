@@ -9,18 +9,18 @@ use tokio::sync::mpsc;
 
 pub(crate) async fn task(
     mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
-    ui: impl UI,
+    ui: Box<dyn UI>,
     client: Client,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        if handle_conn_ev(&ui, &client, ev) {
+        if handle_conn_ev(&*ui, &client, ev) {
             return;
         }
         ui.draw();
     }
 }
 
-fn handle_conn_ev(ui: &impl UI, client: &Client, ev: libtiny_client::Event) -> bool {
+fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bool {
     use libtiny_client::Event::*;
     match ev {
         Connecting => {
@@ -100,7 +100,7 @@ fn handle_conn_ev(ui: &impl UI, client: &Client, ev: libtiny_client::Event) -> b
     false
 }
 
-fn handle_irc_msg(ui: &impl UI, client: &Client, msg: wire::Msg) {
+fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
     use wire::Cmd::*;
     use wire::Pfx::*;
 
