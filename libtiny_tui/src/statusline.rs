@@ -3,12 +3,12 @@ use crate::notifier::Notifier;
 use crate::termbox::print_chars;
 use termbox_simple::Termbox;
 
-pub fn statusline_visible(width: i32, height: i32) -> bool {
+pub(crate) fn statusline_visible(width: i32, height: i32) -> bool {
     width >= 13 // min necessary
         && height >= 6 // arbitrary
 }
 
-pub fn draw_statusline(
+pub(crate) fn draw_statusline(
     tb: &mut Termbox,
     width: i32,
     colors: &Colors,

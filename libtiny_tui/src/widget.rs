@@ -1,4 +1,4 @@
-pub enum WidgetRet {
+pub(crate) enum WidgetRet {
     /// Key is handled by the widget.
     KeyHandled,
 
