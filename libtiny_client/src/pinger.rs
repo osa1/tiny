@@ -32,7 +32,7 @@ async fn pinger_task(rcv_rst: mpsc::Receiver<()>, mut snd_ev: mpsc::Sender<Event
         // let mut delay = delay_for(Duration::from_secs(30));
         // Instead I need this weird code below. Not sure if this is a bug or not.
         let delay = async {
-            delay_for(Duration::from_secs(30)).await;
+            delay_for(Duration::from_secs(60)).await;
         }
             .fuse();
         pin_mut!(delay);
