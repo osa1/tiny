@@ -401,6 +401,21 @@ pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
     None
 }
 
+/// Nicks may have prefixes, indicating it is a operator, founder, or something else.
+///
+/// Channel Membership Prefixes: http://modern.ircdocs.horse/#channel-membership-prefixes
+///
+/// Returns the nick without prefix.
+pub fn drop_nick_prefix(nick: &str) -> &str {
+    static PREFIXES: [char; 5] = ['~', '&', '@', '%', '+'];
+
+    if PREFIXES.contains(&nick.chars().nth(0).unwrap()) {
+        &nick[1..]
+    } else {
+        nick
+    }
+}
+
 static ACTION_PREFIX: &str = "\x01ACTION ";
 
 #[cfg(test)]

@@ -192,7 +192,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
             if nick == client.get_nick() {
                 ui.new_chan_tab(serv, &chan);
             } else {
-                let nick = drop_nick_prefix(&nick);
+                let nick = wire::drop_nick_prefix(&nick);
                 let ts = Some(time::now());
                 ui.add_nick(nick, ts, &MsgTarget::Chan { serv, chan: &chan });
                 // Also update the private message tab if it exists
@@ -407,7 +407,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 };
 
                 for nick in params[3].split_whitespace() {
-                    ui.add_nick(drop_nick_prefix(nick), None, &chan_target);
+                    ui.add_nick(wire::drop_nick_prefix(nick), None, &chan_target);
                 }
             }
             // RPL_ENDOFNAMES: End of NAMES list
@@ -491,20 +491,5 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 // ));
             }
         },
-    }
-}
-
-/// Nicks may have prefixes, indicating it is a operator, founder, or something else.
-///
-/// Channel Membership Prefixes: http://modern.ircdocs.horse/#channel-membership-prefixes
-///
-/// Returns the nick without prefix.
-fn drop_nick_prefix(nick: &str) -> &str {
-    static PREFIXES: [char; 5] = ['~', '&', '@', '%', '+'];
-
-    if PREFIXES.contains(&nick.chars().nth(0).unwrap()) {
-        &nick[1..]
-    } else {
-        nick
     }
 }
