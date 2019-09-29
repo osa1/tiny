@@ -1,5 +1,5 @@
-use time::Tm;
 pub use objekt::clone_box;
+use time::Tm;
 
 /// Target of a message to be shown in a UI.
 pub enum MsgTarget<'a> {

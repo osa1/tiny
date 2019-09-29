@@ -28,6 +28,9 @@ use time::Tm;
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::mpsc;
 
+#[macro_use]
+extern crate log;
+
 #[derive(Clone)]
 pub struct TUI {
     inner: Weak<RefCell<tui::TUI>>,
@@ -53,7 +56,7 @@ async fn input_handler(tui: Rc<RefCell<tui::TUI>>, mut snd_ev: mpsc::Sender<Even
         use tui::TUIRet::*;
         match mb_ev {
             Err(io_err) => {
-                eprintln!("term input error: {:?}", io_err);
+                debug!("term_input error: {:?}", io_err);
                 return;
             }
             Ok(ev) => {

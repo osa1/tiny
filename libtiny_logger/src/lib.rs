@@ -12,6 +12,9 @@ use time::Tm;
 
 use libtiny_ui::*;
 
+#[macro_use]
+extern crate log;
+
 #[derive(Clone)]
 pub struct Logger {
     inner: Rc<RefCell<LoggerInner>>,
@@ -134,7 +137,7 @@ impl LoggerInner {
 
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
-        eprintln!("Trying to open log file: {:?}", path);
+        debug!("Trying to open log file: {:?}", path);
         let mut fd = report_io_err!(
             self.report_err,
             OpenOptions::new().create(true).append(true).open(path)
@@ -164,7 +167,7 @@ impl LoggerInner {
         let server = self.servers.get_mut(serv).unwrap();
         let mut path = self.log_dir.clone();
         path.push(&format!("{}_{}.txt", serv, chan));
-        eprintln!("Trying to open log file: {:?}", path);
+        debug!("Trying to open log file: {:?}", path);
         let mut fd = report_io_err!(
             self.report_err,
             OpenOptions::new().create(true).append(true).open(path)

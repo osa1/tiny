@@ -71,6 +71,10 @@ fn run(
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
 ) {
+    env_logger::builder()
+        .target(env_logger::Target::Stderr)
+        .init();
+
     // One task for each client to handle IRC events
     // One task for TUI events
     let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();

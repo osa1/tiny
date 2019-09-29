@@ -23,6 +23,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::mpsc;
 
+#[macro_use]
+extern crate log;
+
 //
 // Public API
 //
@@ -307,7 +310,7 @@ fn connect(
 
             let serv_name = server_info.addr.clone();
 
-            eprintln!("Resolving address");
+            debug!("Resolving address");
 
             let serv_name_clone = serv_name.clone();
             let mut addr_iter = match tokio_executor::blocking::run(move || {
@@ -323,7 +326,7 @@ fn connect(
                 Ok(addr_iter) => addr_iter,
             };
 
-            eprintln!("Address resolved");
+            debug!("Address resolved");
 
             let addr = match addr_iter.next() {
                 None => {
@@ -337,7 +340,7 @@ fn connect(
             // Establish TCP connection to the server
             //
 
-            eprintln!("Establishing connection ...");
+            debug!("Establishing connection ...");
 
             let mb_stream = if server_info.tls {
                 Stream::new_tls(addr, &serv_name).await
@@ -358,7 +361,7 @@ fn connect(
 
             let (mut read_half, mut write_half) = tokio::io::split(stream);
 
-            eprintln!("Done");
+            debug!("Done");
 
             //
             // Do the business
@@ -381,7 +384,7 @@ fn connect(
             tokio::runtime::current_thread::spawn(async move {
                 while let Some(msg) = rcv_msg.next().await {
                     if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
-                        eprintln!("IO error when writing: {:?}", io_err);
+                        debug!("IO error when writing: {:?}", io_err);
                         snd_ev_clone.try_send(Event::IoErr(io_err)).unwrap();
                         return;
                     }
@@ -401,7 +404,7 @@ fn connect(
                     cmd = rcv_cmd_fused.next() => {
                         match cmd {
                             None => {
-                                eprintln!("main loop: command channel terminated from the other end");
+                                debug!("main loop: command channel terminated from the other end");
                                 // That's OK, rcv_cmd_fused will never be ready again
                             }
                             Some(Cmd::Msg(irc_msg)) => {
@@ -425,7 +428,7 @@ fn connect(
                     bytes = read_half.read(&mut read_buf).fuse() => {
                         match bytes {
                             Err(io_err) => {
-                                eprintln!("main loop: error when reading from socket: {:?}", io_err);
+                                debug!("main loop: error when reading from socket: {:?}", io_err);
                                 snd_ev.try_send(Event::IoErr(io_err)).unwrap();
                                 snd_ev.try_send(Event::Disconnected).unwrap();
                                 continue 'connect;
@@ -433,7 +436,7 @@ fn connect(
                             Ok(bytes) => {
                                 parse_buf.extend_from_slice(&read_buf[0..bytes]);
                                 while let Some(mut msg) = wire::parse_irc_msg(&mut parse_buf) {
-                                    eprintln!("parsed msg: {:?}", msg);
+                                    debug!("parsed msg: {:?}", msg);
                                     pinger.reset();
                                     irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
                                     snd_ev.try_send(Event::Msg(msg)).unwrap();
@@ -444,7 +447,7 @@ fn connect(
                     ping_ev = rcv_ping_evs_fused.next() => {
                         match ping_ev {
                             None => {
-                                eprintln!("Ping thread terminated unexpectedly???");
+                                debug!("Ping thread terminated unexpectedly???");
                             }
                             Some(pinger::Event::SendPing) => {
                                 irc_state.send_ping(&mut snd_msg);
