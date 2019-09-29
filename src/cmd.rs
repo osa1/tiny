@@ -2,14 +2,13 @@ use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
 use libtiny_ui::{MsgSource, MsgTarget, UI};
-use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
     pub config_path: &'a Path,
     pub defaults: &'a config::Defaults,
-    pub ui: &'a dyn UI,
+    pub ui: &'a Box<dyn UI>,
     pub clients: &'a mut Vec<Client>,
     pub src: MsgSource,
 }
@@ -94,9 +93,15 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 7] = [
-    &AWAY_CMD, &CLOSE_CMD, // &CONNECT_CMD,
-    &JOIN_CMD, &ME_CMD, &MSG_CMD, &NAMES_CMD, &NICK_CMD,
+static CMDS: [&Cmd; 8] = [
+    &AWAY_CMD,
+    &CLOSE_CMD,
+    &CONNECT_CMD,
+    &JOIN_CMD,
+    &ME_CMD,
+    &MSG_CMD,
+    &NAMES_CMD,
+    &NICK_CMD,
     // &RELOAD_CMD,
 ];
 
@@ -153,7 +158,6 @@ fn close(args: CmdArgs) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/*
 static CONNECT_CMD: Cmd = Cmd {
     name: "connect",
     cmd_fn: connect,
@@ -162,7 +166,6 @@ static CONNECT_CMD: Cmd = Cmd {
 fn connect(args: CmdArgs) {
     let CmdArgs {
         args,
-        log_dir,
         defaults,
         ui,
         clients,
@@ -173,8 +176,8 @@ fn connect(args: CmdArgs) {
 
     match words.len() {
         0 => reconnect(ui, clients, src),
-        1 => connect_(words[0], None, defaults, log_dir, ui, clients),
-        2 => connect_(words[0], Some(words[1]), defaults, log_dir, ui, clients),
+        1 => connect_(words[0], None, defaults, ui, clients),
+        2 => connect_(words[0], Some(words[1]), defaults, ui, clients),
         _ =>
         // wat
         {
@@ -186,7 +189,7 @@ fn connect(args: CmdArgs) {
     }
 }
 
-fn reconnect(ui: &dyn UI, clients: &mut Vec<Client>, src: MsgSource) {
+fn reconnect(ui: &Box<dyn UI>, clients: &mut Vec<Client>, src: MsgSource) {
     ui.add_client_msg(
         "Reconnecting...",
         &MsgTarget::AllServTabs {
@@ -207,8 +210,7 @@ fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
     defaults: &config::Defaults,
-    log_dir: &Option<PathBuf>,
-    ui: &dyn UI,
+    ui: &Box<dyn UI>,
     clients: &mut Vec<Client>,
 ) {
     fn split_port(s: &str) -> Option<(&str, &str)> {
@@ -263,17 +265,15 @@ fn connect_(
             sasl_auth: None,
         },
         None, // tokio executor
-        log_dir.to_owned(),
     );
 
     // Spawn UI task
-    let ui_clone = ui.clone();
+    let ui_clone = libtiny_ui::clone_box(&**ui);
     let client_clone = client.clone();
     tokio::runtime::current_thread::spawn(crate::conn::task(rcv_ev, ui_clone, client_clone));
 
     clients.push(client);
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -325,7 +325,7 @@ fn me(args: CmdArgs) {
     if args.is_empty() {
         return ui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
     }
-    crate::ui::send_msg(ui, clients, &src, args.to_string(), true);
+    crate::ui::send_msg(&**ui, clients, &src, args.to_string(), true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -391,7 +391,7 @@ fn msg(args: CmdArgs) {
         }
     };
 
-    crate::ui::send_msg(ui, clients, &src, msg.to_owned(), false);
+    crate::ui::send_msg(&**ui, clients, &src, msg.to_owned(), false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

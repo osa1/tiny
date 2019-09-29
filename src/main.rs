@@ -86,7 +86,7 @@ fn run(
         }
     });
 
-    let tui = match logger {
+    let tui: Box<dyn UI> = match logger {
         None => Box::new(tui) as Box<dyn UI>,
         Some(logger) => Box::new(libtiny_ui::combine(tui, logger)) as Box<dyn UI>,
     };
@@ -133,13 +133,7 @@ fn run(
     }
 
     // Spawn a task to handle TUI events
-    executor.spawn(ui::task(
-        config_path,
-        defaults,
-        tui,
-        clients,
-        rcv_tui_ev,
-    ));
+    executor.spawn(ui::task(config_path, defaults, tui, clients, rcv_tui_ev));
 
     executor.run().unwrap(); // unwraps RunError
 }

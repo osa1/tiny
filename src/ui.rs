@@ -16,7 +16,7 @@ pub(crate) async fn task(
     mut rcv_ev: mpsc::Receiver<libtiny_ui::Event>,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        if handle_input_ev(&config_path, &defaults, &*ui, &mut clients, ev) {
+        if handle_input_ev(&config_path, &defaults, &ui, &mut clients, ev) {
             return;
         }
         ui.draw();
@@ -26,7 +26,7 @@ pub(crate) async fn task(
 fn handle_input_ev(
     config_path: &Path,
     defaults: &config::Defaults,
-    ui: &dyn UI,
+    ui: &Box<dyn UI>,
     clients: &mut Vec<Client>,
     ev: libtiny_ui::Event,
 ) -> bool {
@@ -39,11 +39,11 @@ fn handle_input_ev(
             return true; // abort
         }
         Msg { msg, source } => {
-            send_msg(ui, clients, &source, msg, false);
+            send_msg(&**ui, clients, &source, msg, false);
         }
         Lines { lines, source } => {
             for line in lines.into_iter() {
-                send_msg(ui, clients, &source, line, false)
+                send_msg(&**ui, clients, &source, line, false)
             }
         }
         Cmd { cmd, source } => handle_cmd(config_path, defaults, ui, clients, source, &cmd),
@@ -55,7 +55,7 @@ fn handle_input_ev(
 fn handle_cmd(
     config_path: &Path,
     defaults: &config::Defaults,
-    ui: &dyn UI,
+    ui: &Box<dyn UI>,
     clients: &mut Vec<Client>,
     src: MsgSource,
     cmd: &str,
