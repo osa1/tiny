@@ -220,6 +220,17 @@ impl StateInner {
                                 self.chans[chan_idx].1.clear();
                             }
                         }
+                    } else {
+                        match utils::find_idx(&self.chans, |(s, _)| s == chan) {
+                            Some(chan_idx) => {
+                                self.chans[chan_idx]
+                                    .1
+                                    .insert(wire::drop_nick_prefix(nick).to_owned());
+                            }
+                            None => {
+                                debug!("Can't find channel state for JOIN: {:?}", cmd);
+                            }
+                        }
                     }
                 }
             }
@@ -274,6 +285,15 @@ impl StateInner {
                             }
                             Some(chan_idx) => {
                                 self.chans.remove(chan_idx);
+                            }
+                        }
+                    } else {
+                        match utils::find_idx(&self.chans, |(s, _)| s == chan) {
+                            Some(chan_idx) => {
+                                self.chans[chan_idx].1.remove(wire::drop_nick_prefix(nick));
+                            }
+                            None => {
+                                debug!("Can't find channel state for PART: {:?}", cmd);
                             }
                         }
                     }
