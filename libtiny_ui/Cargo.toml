@@ -2,6 +2,7 @@
 name = "libtiny_ui"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+description = "Defines the interface for the UI implementations for tiny"
 edition = "2018"
 
 [dependencies]
