@@ -127,9 +127,7 @@ impl LoggerInner {
             report_err,
         })
     }
-}
 
-impl LoggerInner {
     fn new_server_tab(&mut self, serv: &str) {
         if self.servers.contains_key(serv) {
             return;
@@ -332,11 +330,17 @@ impl LoggerInner {
                 }
                 let ServerLogs { ref mut users, .. } = self.servers.get_mut(serv).unwrap();
                 if !users.contains_key(nick) {
-                    (self.report_err)(format!(
-                        "Logger: can't find user {} in server {}",
-                        nick, serv
-                    ));
-                    return;
+                    // We don't have a `new_user_tab` trait method so user log files are created
+                    // here
+                    let mut path = self.log_dir.clone();
+                    path.push(&format!("{}_{}.txt", serv, nick));
+                    debug!("Trying to open log file: {:?}", path);
+                    let mut fd = report_io_err!(
+                        self.report_err,
+                        OpenOptions::new().create(true).append(true).open(path)
+                    );
+                    report_io_err!(self.report_err, print_header(&mut fd));
+                    users.insert(nick.to_owned(), fd);
                 }
                 let fd = users.get_mut(nick).unwrap();
                 f(fd);
