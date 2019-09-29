@@ -1,3 +1,6 @@
+// I think borrowed boxing is necessary for objekt::clone_box to work
+#![allow(clippy::borrowed_box)]
+
 use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
@@ -190,19 +193,14 @@ fn connect(args: CmdArgs) {
 }
 
 fn reconnect(ui: &Box<dyn UI>, clients: &mut Vec<Client>, src: MsgSource) {
-    ui.add_client_msg(
-        "Reconnecting...",
-        &MsgTarget::AllServTabs {
-            serv: src.serv_name(),
-        },
-    );
-    match find_client(clients, src.serv_name()) {
-        Some(client) => client.reconnect(None),
-        None => {
-            // tiny.logger
-            //     .get_debug_logs()
-            //     .write_line(format_args!("Can't reconnect to {}", src.serv_name()));
-        }
+    if let Some(client) = find_client(clients, src.serv_name()) {
+        ui.add_client_msg(
+            "Reconnecting...",
+            &MsgTarget::AllServTabs {
+                serv: src.serv_name(),
+            },
+        );
+        client.reconnect(None);
     }
 }
 
