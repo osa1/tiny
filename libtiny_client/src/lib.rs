@@ -17,7 +17,8 @@ use stream::{Stream, StreamError};
 use futures::future::FutureExt;
 use futures::select;
 use futures::stream::StreamExt;
-use std::net::ToSocketAddrs;
+use futures_util::stream::Fuse;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::current_thread::Runtime;
@@ -343,17 +344,24 @@ async fn main_loop(
 
         let serv_name_clone = serv_name.clone();
 
-        let mut addr_iter = match tokio_executor::blocking::run(move || {
-            (serv_name_clone.as_str(), port).to_socket_addrs()
-        })
-        .await
-        {
-            Err(io_err) => {
-                snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
+        let mut addr_iter = match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
+            ResolveAddrResult::Done(addr_iter) => {
+                debug!("resolve_addr: done");
+                addr_iter
+            },
+            ResolveAddrResult::TryWithPort(new_port) => {
+                debug!("resolve_addr: try new port");
+                port = new_port;
+                continue;
+            },
+            ResolveAddrResult::TryReconnect => {
+                debug!("resolve_addr: try again");
                 continue;
             }
-            Ok(addr_iter) => addr_iter,
+            ResolveAddrResult::Return => {
+                debug!("resolve_addr: return");
+                return;
+            }
         };
 
         debug!("Address resolved");
@@ -488,6 +496,67 @@ async fn main_loop(
                             // TODO: hopefully dropping the pinger rcv end is enough to stop it?
                             continue 'connect;
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum ResolveAddrResult {
+    Done(std::vec::IntoIter<SocketAddr>),
+    TryWithPort(u16),
+    TryReconnect,
+    Return,
+}
+
+async fn resolve_addr(
+    serv_name: String,
+    port: u16,
+    rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>,
+    snd_ev: &mut mpsc::Sender<Event>,
+) -> ResolveAddrResult {
+    let mut addr_iter_task =
+        tokio_executor::blocking::run(move || (serv_name.as_str(), port).to_socket_addrs()).fuse();
+
+    use ResolveAddrResult::*;
+
+    loop {
+        select! {
+            addr_iter = addr_iter_task => {
+                match addr_iter {
+                    Err(io_err) => {
+                        snd_ev.try_send(Event::IoErr(io_err)).unwrap();
+                        // FIXME: This blocks the task
+                        tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
+                        continue;
+                    }
+                    Ok(addr_iter) => {
+                        return Done(addr_iter);
+                    }
+                }
+            }
+            cmd = rcv_cmd.next() => {
+                match cmd {
+                    None => {
+                        // Channel closed, return from the main loop
+                        return Return;
+                    }
+                    Some(Cmd::Msg(_)) => {
+                        continue;
+                    }
+                    Some(Cmd::Reconnect(mb_port)) => {
+                        match mb_port {
+                            None => {
+                                return TryReconnect;
+                            }
+                            Some(port) => {
+                                return TryWithPort(port);
+                            }
+                        }
+                    }
+                    Some(Cmd::Quit(_)) => {
+                        return Return;
                     }
                 }
             }
