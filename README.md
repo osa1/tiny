@@ -108,9 +108,6 @@ defaults:
 # Where to put log files
 log_dir: '/home/$USER/tiny_logs'
 
-# Enable/Disable statusline
-statusline: false
-
 # <Color scheme configuration>
 ```
 
@@ -212,39 +209,15 @@ Commands start with `/` character.
   Running this command in a server tab applies it to all channels of that
   server. You can check your notify state in the status line.
 
-## Development
+## Contributing
 
-tiny is in early stages of development. Some of features that you
-might think are essential may be missing. Please open an issue for
-those features (or even better, a pull request!). Remember to add
-yourself to the [list of contributors](#contributors) if you submit a
-pull request.
-
-Being a Rust n00b, I spent a lot of time trying to convince borrow checker,
-failing at that, and either adding bunch of ugly hacks (e.g. instead a loop that
-modifies single element implementing a loop that finds an index and modifying
-that index after the loop), or using a simpler but less efficient code (e.g.
-cloning things redundantly to avoid borrow checking). Still, I think the
-connection manager (`conn.rs`) and UI parts (`tui` module) are not too bad.
-Mess is mostly in `lib.rs` which implements the main logic (command and message
-handling etc.).
-
-Any suggestions / code reviews / pull requests are very welcome!
-
-If you're looking to contribute please see open issues. If you don't know where
-to start, write a comment in the issue you'd like to work on and I'd love to
-help.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Contributors
 
-[Ömer Sinan Ağacan](https://github.com/osa1)
-
-[Abin Simon](https://github.com/meain)
-
-[Umur Gedik](https://github.com/umurgdk)
-
-[Chiu Yue Chun](https://github.com/BrianOn99)
-
-[@wammies](https://github.com/wammies)
-
-[Nick Econopouly](https://github.com/wrycode)
+- [Ömer Sinan Ağacan](https://github.com/osa1)
+- [Abin Simon](https://github.com/meain)
+- [Umur Gedik](https://github.com/umurgdk)
+- [Chiu Yue Chun](https://github.com/BrianOn99)
+- [@wammies](https://github.com/wammies)
+- [Nick Econopouly](https://github.com/wrycode)
