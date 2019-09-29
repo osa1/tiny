@@ -79,12 +79,23 @@ fn run(
     let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
 
     // Create logger
-    let logger: Option<Logger> = log_dir.and_then(|log_dir| {
-        match Logger::new(log_dir, Box::new(|_err| { /* TODO */ })) {
-            Err(err) => None, // TODO report this
+    let report_logger_error = {
+        let tui_clone = tui.clone();
+        Box::new(move |err: String| {
+            tui_clone.add_client_err_msg(&format!("Logger error: {}", err), &MsgTarget::CurrentTab)
+        })
+    };
+    let logger: Option<Logger> =
+        log_dir.and_then(|log_dir| match Logger::new(log_dir, report_logger_error) {
+            Err(err) => {
+                tui.add_client_err_msg(
+                    &format!("Can't create logger: {}", err),
+                    &MsgTarget::CurrentTab,
+                );
+                None
+            }
             Ok(logger) => Some(logger),
-        }
-    });
+        });
 
     let tui: Box<dyn UI> = match logger {
         None => Box::new(tui) as Box<dyn UI>,
