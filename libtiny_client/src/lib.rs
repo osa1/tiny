@@ -279,11 +279,11 @@ fn connect(
     //
 
     // Channel for returning IRC events to user.
-    let (mut snd_ev, rcv_ev) = mpsc::channel::<Event>(100);
+    let (snd_ev, rcv_ev) = mpsc::channel::<Event>(100);
     let snd_ev_clone = snd_ev.clone(); // for Client
-                                       // Channel for commands from user.
+
+    // Channel for commands from user.
     let (snd_cmd, rcv_cmd) = mpsc::channel::<Cmd>(100);
-    let mut rcv_cmd_fused = rcv_cmd.fuse();
 
     //
     // Create the main loop task
@@ -292,185 +292,14 @@ fn connect(
     let irc_state = State::new(server_info.clone());
     let irc_state_clone = irc_state.clone();
 
-    // We allow changing ports when reconnecting, so `mut`
-    let mut port = server_info.port;
-
-    let main_loop_task = async move {
-        // Main loop just tries to (re)connect
-        'connect: loop {
-            // Channel for the sender task. Messages are complete IRC messages (including the
-            // trailing "\r\n") and the task directly sends them to the server.
-            let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
-
-            snd_ev.try_send(Event::Connecting).unwrap();
-
-            //
-            // Resolve IP address
-            //
-
-            let serv_name = server_info.addr.clone();
-
-            debug!("Resolving address");
-
-            let serv_name_clone = serv_name.clone();
-            let mut addr_iter = match tokio_executor::blocking::run(move || {
-                (serv_name_clone.as_str(), port).to_socket_addrs()
-            })
-            .await
-            {
-                Err(io_err) => {
-                    snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                    tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
-                    continue;
-                }
-                Ok(addr_iter) => addr_iter,
-            };
-
-            debug!("Address resolved");
-
-            let addr = match addr_iter.next() {
-                None => {
-                    snd_ev.try_send(Event::CantResolveAddr).unwrap();
-                    break;
-                }
-                Some(addr) => addr,
-            };
-
-            //
-            // Establish TCP connection to the server
-            //
-
-            debug!("Establishing connection ...");
-
-            let mb_stream = if server_info.tls {
-                Stream::new_tls(addr, &serv_name).await
-            } else {
-                Stream::new_tcp(addr).await
-            };
-
-            let stream = match mb_stream {
-                Ok(stream) => stream,
-                Err(err) => {
-                    snd_ev.try_send(Event::from(err)).unwrap();
-                    snd_ev.try_send(Event::Disconnected).unwrap();
-                    // Wait 30 seconds before looping
-                    tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
-                    continue;
-                }
-            };
-
-            let (mut read_half, mut write_half) = tokio::io::split(stream);
-
-            debug!("Done");
-
-            //
-            // Do the business
-            //
-
-            // Reset the connection state
-            irc_state.reset();
-            // Introduce self
-            if server_info.sasl_auth.is_some() {
-                // Will introduce self after getting a response to this LS command.
-                // This is to avoid getting stuck during nick registration. See the
-                // discussion in #91.
-                snd_msg.try_send(wire::cap_ls()).unwrap();
-            } else {
-                irc_state.introduce(&mut snd_msg);
-            }
-
-            // Spawn a task for outgoing messages.
-            let mut snd_ev_clone = snd_ev.clone();
-            tokio::runtime::current_thread::spawn(async move {
-                while let Some(msg) = rcv_msg.next().await {
-                    if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
-                        debug!("IO error when writing: {:?}", io_err);
-                        snd_ev_clone.try_send(Event::IoErr(io_err)).unwrap();
-                        return;
-                    }
-                }
-            });
-
-            // Spawn pinger task
-            let (mut pinger, rcv_ping_evs) = Pinger::new();
-            let mut rcv_ping_evs_fused = rcv_ping_evs.fuse();
-
-            let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
-
-            loop {
-                let mut read_buf: [u8; 1024] = [0; 1024];
-
-                select! {
-                    cmd = rcv_cmd_fused.next() => {
-                        match cmd {
-                            None => {
-                                debug!("main loop: command channel terminated from the other end");
-                                // That's OK, rcv_cmd_fused will never be ready again
-                            }
-                            Some(Cmd::Msg(irc_msg)) => {
-                                snd_msg.try_send(irc_msg).unwrap();
-                            }
-                            Some(Cmd::Reconnect(mb_port)) => {
-                                if let Some(new_port) = mb_port {
-                                    port = new_port;
-                                }
-                                continue 'connect;
-                            }
-                            Some(Cmd::Quit(reason)) => {
-                                snd_msg.send(wire::quit(reason)).await.unwrap();
-                                // This drops the sender end of the channel that the sender task
-                                // uses, which in turn causes the sender task to return. Somewhat
-                                // hacky?
-                                return;
-                            }
-                        }
-                    }
-                    bytes = read_half.read(&mut read_buf).fuse() => {
-                        match bytes {
-                            Err(io_err) => {
-                                debug!("main loop: error when reading from socket: {:?}", io_err);
-                                snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                                snd_ev.try_send(Event::Disconnected).unwrap();
-                                continue 'connect;
-                            }
-                            Ok(bytes) => {
-                                parse_buf.extend_from_slice(&read_buf[0..bytes]);
-                                while let Some(mut msg) = wire::parse_irc_msg(&mut parse_buf) {
-                                    debug!("parsed msg: {:?}", msg);
-                                    pinger.reset();
-                                    irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
-                                    snd_ev.try_send(Event::Msg(msg)).unwrap();
-                                }
-                            }
-                        }
-                    }
-                    ping_ev = rcv_ping_evs_fused.next() => {
-                        match ping_ev {
-                            None => {
-                                debug!("Ping thread terminated unexpectedly???");
-                            }
-                            Some(pinger::Event::SendPing) => {
-                                irc_state.send_ping(&mut snd_msg);
-                            }
-                            Some(pinger::Event::Disconnect) => {
-                                // TODO: indicate that this is a ping timeout
-                                snd_ev.try_send(Event::Disconnected).unwrap();
-                                // TODO: hopefully dropping the pinger rcv end is enough to stop it?
-                                continue 'connect;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    };
+    let task = main_loop(server_info, irc_state_clone, snd_ev, rcv_cmd);
 
     match runtime {
         Some(runtime) => {
-            runtime.spawn(main_loop_task);
+            runtime.spawn(task);
         }
         None => {
-            tokio::runtime::current_thread::spawn(main_loop_task);
+            tokio::runtime::current_thread::spawn(task);
         }
     }
 
@@ -478,9 +307,190 @@ fn connect(
         Client {
             msg_chan: snd_cmd,
             serv_name,
-            state: irc_state_clone,
+            state: irc_state,
             snd_ev: snd_ev_clone,
         },
         rcv_ev,
     )
+}
+
+async fn main_loop(
+    server_info: ServerInfo,
+    irc_state: State,
+    mut snd_ev: mpsc::Sender<Event>,
+    rcv_cmd: mpsc::Receiver<Cmd>,
+) {
+    let mut rcv_cmd = rcv_cmd.fuse();
+
+    // We allow changing ports when reconnecting, so `mut`
+    let mut port = server_info.port;
+
+    // Main loop just tries to (re)connect
+    'connect: loop {
+        // Channel for the sender task. Messages are complete IRC messages (including the
+        // trailing "\r\n") and the task directly sends them to the server.
+        let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
+
+        snd_ev.try_send(Event::Connecting).unwrap();
+
+        //
+        // Resolve IP address
+        //
+
+        let serv_name = server_info.addr.clone();
+
+        debug!("Resolving address");
+
+        let serv_name_clone = serv_name.clone();
+
+        let mut addr_iter = match tokio_executor::blocking::run(move || {
+            (serv_name_clone.as_str(), port).to_socket_addrs()
+        })
+        .await
+        {
+            Err(io_err) => {
+                snd_ev.try_send(Event::IoErr(io_err)).unwrap();
+                tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
+                continue;
+            }
+            Ok(addr_iter) => addr_iter,
+        };
+
+        debug!("Address resolved");
+
+        let addr = match addr_iter.next() {
+            None => {
+                snd_ev.try_send(Event::CantResolveAddr).unwrap();
+                break;
+            }
+            Some(addr) => addr,
+        };
+
+        //
+        // Establish TCP connection to the server
+        //
+
+        debug!("Establishing connection ...");
+
+        let mb_stream = if server_info.tls {
+            Stream::new_tls(addr, &serv_name).await
+        } else {
+            Stream::new_tcp(addr).await
+        };
+
+        let stream = match mb_stream {
+            Ok(stream) => stream,
+            Err(err) => {
+                snd_ev.try_send(Event::from(err)).unwrap();
+                snd_ev.try_send(Event::Disconnected).unwrap();
+                // Wait 30 seconds before looping
+                tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
+                continue;
+            }
+        };
+
+        let (mut read_half, mut write_half) = tokio::io::split(stream);
+
+        debug!("Done");
+
+        //
+        // Do the business
+        //
+
+        // Reset the connection state
+        irc_state.reset();
+        // Introduce self
+        if server_info.sasl_auth.is_some() {
+            // Will introduce self after getting a response to this LS command.
+            // This is to avoid getting stuck during nick registration. See the
+            // discussion in #91.
+            snd_msg.try_send(wire::cap_ls()).unwrap();
+        } else {
+            irc_state.introduce(&mut snd_msg);
+        }
+
+        // Spawn a task for outgoing messages.
+        let mut snd_ev_clone = snd_ev.clone();
+        tokio::runtime::current_thread::spawn(async move {
+            while let Some(msg) = rcv_msg.next().await {
+                if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
+                    debug!("IO error when writing: {:?}", io_err);
+                    snd_ev_clone.try_send(Event::IoErr(io_err)).unwrap();
+                    return;
+                }
+            }
+        });
+
+        // Spawn pinger task
+        let (mut pinger, rcv_ping_evs) = Pinger::new();
+        let mut rcv_ping_evs_fused = rcv_ping_evs.fuse();
+
+        let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
+
+        loop {
+            let mut read_buf: [u8; 1024] = [0; 1024];
+
+            select! {
+                cmd = rcv_cmd.next() => {
+                    match cmd {
+                        None => {
+                            debug!("main loop: command channel terminated from the other end");
+                            // That's OK, rcv_cmd will never be ready again
+                        }
+                        Some(Cmd::Msg(irc_msg)) => {
+                            snd_msg.try_send(irc_msg).unwrap();
+                        }
+                        Some(Cmd::Reconnect(mb_port)) => {
+                            if let Some(new_port) = mb_port {
+                                port = new_port;
+                            }
+                            continue 'connect;
+                        }
+                        Some(Cmd::Quit(reason)) => {
+                            snd_msg.send(wire::quit(reason)).await.unwrap();
+                            // This drops the sender end of the channel that the sender task
+                            // uses, which in turn causes the sender task to return. Somewhat
+                            // hacky?
+                            return;
+                        }
+                    }
+                }
+                bytes = read_half.read(&mut read_buf).fuse() => {
+                    match bytes {
+                        Err(io_err) => {
+                            debug!("main loop: error when reading from socket: {:?}", io_err);
+                            snd_ev.try_send(Event::IoErr(io_err)).unwrap();
+                            snd_ev.try_send(Event::Disconnected).unwrap();
+                            continue 'connect;
+                        }
+                        Ok(bytes) => {
+                            parse_buf.extend_from_slice(&read_buf[0..bytes]);
+                            while let Some(mut msg) = wire::parse_irc_msg(&mut parse_buf) {
+                                debug!("parsed msg: {:?}", msg);
+                                pinger.reset();
+                                irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
+                                snd_ev.try_send(Event::Msg(msg)).unwrap();
+                            }
+                        }
+                    }
+                }
+                ping_ev = rcv_ping_evs_fused.next() => {
+                    match ping_ev {
+                        None => {
+                            debug!("Ping thread terminated unexpectedly???");
+                        }
+                        Some(pinger::Event::SendPing) => {
+                            irc_state.send_ping(&mut snd_msg);
+                        }
+                        Some(pinger::Event::Disconnect) => {
+                            // TODO: indicate that this is a ping timeout
+                            snd_ev.try_send(Event::Disconnected).unwrap();
+                            // TODO: hopefully dropping the pinger rcv end is enough to stop it?
+                            continue 'connect;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
