@@ -89,13 +89,13 @@ struct ServerLogs {
 }
 
 fn print_header(fd: &mut File) -> Result<()> {
-    writeln!(fd, "")?;
+    writeln!(fd)?;
     writeln!(
         fd,
         "*** Logging started at {}",
         time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap()
     )?;
-    writeln!(fd, "")
+    writeln!(fd)
 }
 
 macro_rules! report_io_err {
