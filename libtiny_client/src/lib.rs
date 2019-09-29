@@ -15,8 +15,8 @@ use state::State;
 use stream::{Stream, StreamError};
 
 use futures::future::FutureExt;
-use futures::select;
 use futures::stream::StreamExt;
+use futures::{pin_mut, select};
 use futures_util::stream::Fuse;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
@@ -139,6 +139,7 @@ impl Client {
 
     /// Reconnect to the server, possibly using a new port.
     pub fn reconnect(&mut self, port: Option<u16>) {
+        debug!("reconnect cmd received, port: {:?}", port);
         self.msg_chan.try_send(Cmd::Reconnect(port)).unwrap()
     }
 
@@ -243,6 +244,7 @@ impl Client {
     /// sender end of the `Cmd` channel and the receiver end of the IRC message channel (for
     /// outgoing messages) will be dropped.
     pub fn quit(&mut self, reason: Option<String>) {
+        debug!("quit cmd received");
         self.msg_chan.try_send(Cmd::Quit(reason)).unwrap();
         self.snd_ev.try_send(Event::Closed).unwrap();
     }
@@ -315,6 +317,8 @@ fn connect(
     )
 }
 
+use TaskResult::*;
+
 async fn main_loop(
     server_info: ServerInfo,
     irc_state: State,
@@ -326,8 +330,32 @@ async fn main_loop(
     // We allow changing ports when reconnecting, so `mut`
     let mut port = server_info.port;
 
+    // Whether to wait before trying to (re)connect
+    let mut wait = false;
+
     // Main loop just tries to (re)connect
     'connect: loop {
+        if wait {
+            match wait_(&mut rcv_cmd).await {
+                Done(()) => {}
+                TryWithPort(new_port) => {
+                    port = new_port;
+                    wait = false;
+                    continue;
+                }
+                TryReconnect => {
+                    wait = false;
+                    continue;
+                }
+                TryAfterDelay => {
+                    panic!("wait() returned TryAfterDelay");
+                }
+                Return => {
+                    return;
+                }
+            }
+        }
+
         // Channel for the sender task. Messages are complete IRC messages (including the
         // trailing "\r\n") and the task directly sends them to the server.
         let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
@@ -344,25 +372,33 @@ async fn main_loop(
 
         let serv_name_clone = serv_name.clone();
 
-        let mut addr_iter = match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
-            ResolveAddrResult::Done(addr_iter) => {
-                debug!("resolve_addr: done");
-                addr_iter
-            },
-            ResolveAddrResult::TryWithPort(new_port) => {
-                debug!("resolve_addr: try new port");
-                port = new_port;
-                continue;
-            },
-            ResolveAddrResult::TryReconnect => {
-                debug!("resolve_addr: try again");
-                continue;
-            }
-            ResolveAddrResult::Return => {
-                debug!("resolve_addr: return");
-                return;
-            }
-        };
+        let mut addr_iter =
+            match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
+                Done(addr_iter) => {
+                    debug!("resolve_addr: done");
+                    addr_iter
+                }
+                TryWithPort(new_port) => {
+                    debug!("resolve_addr: try new port");
+                    port = new_port;
+                    wait = false;
+                    continue;
+                }
+                TryReconnect => {
+                    debug!("resolve_addr: try again");
+                    wait = false;
+                    continue;
+                }
+                TryAfterDelay => {
+                    debug!("resolve_addr: try after delay");
+                    wait = true;
+                    continue;
+                }
+                Return => {
+                    debug!("resolve_addr: return");
+                    return;
+                }
+            };
 
         debug!("Address resolved");
 
@@ -380,6 +416,7 @@ async fn main_loop(
 
         debug!("Establishing connection ...");
 
+        // TODO: This step can block too, but hopefully not too much?
         let mb_stream = if server_info.tls {
             Stream::new_tls(addr, &serv_name).await
         } else {
@@ -391,8 +428,7 @@ async fn main_loop(
             Err(err) => {
                 snd_ev.try_send(Event::from(err)).unwrap();
                 snd_ev.try_send(Event::Disconnected).unwrap();
-                // Wait 30 seconds before looping
-                tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
+                wait = true;
                 continue;
             }
         };
@@ -452,10 +488,11 @@ async fn main_loop(
                             if let Some(new_port) = mb_port {
                                 port = new_port;
                             }
+                            wait = false;
                             continue 'connect;
                         }
                         Some(Cmd::Quit(reason)) => {
-                            snd_msg.send(wire::quit(reason)).await.unwrap();
+                            snd_msg.try_send(wire::quit(reason)).unwrap();
                             // This drops the sender end of the channel that the sender task
                             // uses, which in turn causes the sender task to return. Somewhat
                             // hacky?
@@ -469,6 +506,7 @@ async fn main_loop(
                             debug!("main loop: error when reading from socket: {:?}", io_err);
                             snd_ev.try_send(Event::IoErr(io_err)).unwrap();
                             snd_ev.try_send(Event::Disconnected).unwrap();
+                            wait = true;
                             continue 'connect;
                         }
                         Ok(bytes) => {
@@ -494,6 +532,7 @@ async fn main_loop(
                             // TODO: indicate that this is a ping timeout
                             snd_ev.try_send(Event::Disconnected).unwrap();
                             // TODO: hopefully dropping the pinger rcv end is enough to stop it?
+                            wait = true;
                             continue 'connect;
                         }
                     }
@@ -503,11 +542,55 @@ async fn main_loop(
     }
 }
 
-enum ResolveAddrResult {
-    Done(std::vec::IntoIter<SocketAddr>),
+enum TaskResult<A> {
+    Done(A),
     TryWithPort(u16),
     TryReconnect,
+    TryAfterDelay,
     Return,
+}
+
+async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
+    // Weird code because of a bug in select!?
+    let delay = async {
+        tokio::timer::delay_for(Duration::from_secs(60)).await;
+    }
+        .fuse();
+    pin_mut!(delay);
+
+    loop {
+        select! {
+            () = delay => {
+                return Done(());
+            }
+            cmd = rcv_cmd.next() => {
+                // FIXME: This whole block is duplicated below, but it's hard to reuse because it
+                // usese `continue` and `return`.
+                match cmd {
+                    None => {
+                        // Channel closed, return from the main loop
+                        return Return;
+                    }
+                    Some(Cmd::Msg(_)) => {
+                        continue;
+                    }
+                    Some(Cmd::Reconnect(mb_port)) => {
+                        match mb_port {
+                            None => {
+                                return TryReconnect;
+                            }
+                            Some(port) => {
+                                return TryWithPort(port);
+                            }
+                        }
+                    }
+                    Some(Cmd::Quit(_)) => {
+                        return Return;
+                    }
+                }
+            }
+        }
+    }
 }
 
 async fn resolve_addr(
@@ -515,11 +598,9 @@ async fn resolve_addr(
     port: u16,
     rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>,
     snd_ev: &mut mpsc::Sender<Event>,
-) -> ResolveAddrResult {
+) -> TaskResult<std::vec::IntoIter<SocketAddr>> {
     let mut addr_iter_task =
         tokio_executor::blocking::run(move || (serv_name.as_str(), port).to_socket_addrs()).fuse();
-
-    use ResolveAddrResult::*;
 
     loop {
         select! {
@@ -527,9 +608,7 @@ async fn resolve_addr(
                 match addr_iter {
                     Err(io_err) => {
                         snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                        // FIXME: This blocks the task
-                        tokio::timer::delay_for(Duration::from_secs(RECONNECT_SECS)).await;
-                        continue;
+                        return TryAfterDelay;
                     }
                     Ok(addr_iter) => {
                         return Done(addr_iter);
