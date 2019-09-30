@@ -82,7 +82,8 @@ fn run(
     // Create TUI task
     let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
 
-    // init "mentions" tab
+    // Init "mentions" tab. This needs to happen before initializing the logger as otherwise we
+    // won't have a tab to show errors when something goes wrong during initialization.
     tui.new_server_tab("mentions");
     tui.add_client_msg(
         "Any mentions to you will be listed here.",
@@ -110,7 +111,12 @@ fn run(
                 );
                 None
             }
-            Ok(logger) => Some(logger),
+            Ok(logger) => {
+                // Create "mentions" log file manually -- the tab is already created in the TUI so
+                // we won't be creating a "mentions" file in the logger without this.
+                logger.new_server_tab("mentions");
+                Some(logger)
+            }
         });
 
     let tui: Box<dyn UI> = match logger {
