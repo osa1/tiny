@@ -360,7 +360,7 @@ async fn main_loop(
         // trailing "\r\n") and the task directly sends them to the server.
         let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
 
-        snd_ev.try_send(Event::Connecting).unwrap();
+        snd_ev.send(Event::Connecting).await.unwrap();
 
         //
         // Resolve IP address
@@ -404,7 +404,7 @@ async fn main_loop(
 
         let addr = match addr_iter.next() {
             None => {
-                snd_ev.try_send(Event::CantResolveAddr).unwrap();
+                snd_ev.send(Event::CantResolveAddr).await.unwrap();
                 break;
             }
             Some(addr) => addr,
@@ -426,8 +426,8 @@ async fn main_loop(
         let stream = match mb_stream {
             Ok(stream) => stream,
             Err(err) => {
-                snd_ev.try_send(Event::from(err)).unwrap();
-                snd_ev.try_send(Event::Disconnected).unwrap();
+                snd_ev.send(Event::from(err)).await.unwrap();
+                snd_ev.send(Event::Disconnected).await.unwrap();
                 wait = true;
                 continue;
             }
@@ -459,7 +459,7 @@ async fn main_loop(
             while let Some(msg) = rcv_msg.next().await {
                 if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
                     debug!("IO error when writing: {:?}", io_err);
-                    snd_ev_clone.try_send(Event::IoErr(io_err)).unwrap();
+                    snd_ev_clone.send(Event::IoErr(io_err)).await.unwrap();
                     return;
                 }
             }
@@ -504,8 +504,8 @@ async fn main_loop(
                     match bytes {
                         Err(io_err) => {
                             debug!("main loop: error when reading from socket: {:?}", io_err);
-                            snd_ev.try_send(Event::IoErr(io_err)).unwrap();
-                            snd_ev.try_send(Event::Disconnected).unwrap();
+                            snd_ev.send(Event::IoErr(io_err)).await.unwrap();
+                            snd_ev.send(Event::Disconnected).await.unwrap();
                             wait = true;
                             continue 'connect;
                         }
@@ -515,7 +515,7 @@ async fn main_loop(
                                 debug!("parsed msg: {:?}", msg);
                                 pinger.reset();
                                 irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
-                                snd_ev.try_send(Event::Msg(msg)).unwrap();
+                                snd_ev.send(Event::Msg(msg)).await.unwrap();
                             }
                         }
                     }
@@ -530,7 +530,7 @@ async fn main_loop(
                         }
                         Some(pinger::Event::Disconnect) => {
                             // TODO: indicate that this is a ping timeout
-                            snd_ev.try_send(Event::Disconnected).unwrap();
+                            snd_ev.send(Event::Disconnected).await.unwrap();
                             // TODO: hopefully dropping the pinger rcv end is enough to stop it?
                             wait = true;
                             continue 'connect;
@@ -607,7 +607,7 @@ async fn resolve_addr(
             addr_iter = addr_iter_task => {
                 match addr_iter {
                     Err(io_err) => {
-                        snd_ev.try_send(Event::IoErr(io_err)).unwrap();
+                        snd_ev.send(Event::IoErr(io_err)).await.unwrap();
                         return TryAfterDelay;
                     }
                     Ok(addr_iter) => {
