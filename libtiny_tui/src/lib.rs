@@ -22,6 +22,7 @@ pub use crate::config::Colors;
 pub use crate::tab::TabStyle;
 pub use libtiny_ui::*;
 
+use futures::select;
 use futures_util::stream::StreamExt;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
@@ -46,23 +47,34 @@ impl TUI {
 
         let (snd_ev, rcv_ev) = mpsc::channel(10);
 
-        // Spawn input handler task
-        runtime.spawn(input_handler(tui, snd_ev));
+        // For SIGWINCH handler
+        let (snd_abort, rcv_abort) = mpsc::channel::<()>(1);
 
         // Spawn SIGWINCH handler
-        runtime.spawn(sigwinch_handler(inner.clone()));
+        runtime.spawn(sigwinch_handler(inner.clone(), rcv_abort));
+
+        // Spawn input handler task
+        runtime.spawn(input_handler(tui, snd_ev, snd_abort));
 
         (TUI { inner }, rcv_ev)
     }
 }
 
-async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>) {
-    match signal(SignalKind::window_change()) {
+async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receiver<()>) {
+    let stream = match signal(SignalKind::window_change()) {
         Err(err) => {
             debug!("Can't install SIGWINCH handler: {:?}", err);
+            return;
         }
-        Ok(mut stream) => {
-            while let Some(()) = stream.next().await {
+        Ok(stream) => stream,
+    };
+
+    let mut stream_fused = stream.fuse();
+    let mut rcv_abort_fused = rcv_abort.fuse();
+
+    loop {
+        select! {
+            _ = stream_fused.next() => {
                 match tui.upgrade() {
                     None => {
                         return;
@@ -71,12 +83,19 @@ async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>) {
                         tui.borrow_mut().resize();
                     }
                 }
+            },
+            _ = rcv_abort_fused.next() => {
+                return;
             }
         }
     }
 }
 
-async fn input_handler(tui: Rc<RefCell<tui::TUI>>, mut snd_ev: mpsc::Sender<Event>) {
+async fn input_handler(
+    tui: Rc<RefCell<tui::TUI>>,
+    mut snd_ev: mpsc::Sender<Event>,
+    mut snd_abort: mpsc::Sender<()>,
+) {
     let mut input = Input::new();
     while let Some(mb_ev) = input.next().await {
         use tui::TUIRet::*;
@@ -90,6 +109,7 @@ async fn input_handler(tui: Rc<RefCell<tui::TUI>>, mut snd_ev: mpsc::Sender<Even
                 match tui_ret {
                     Abort => {
                         snd_ev.try_send(Event::Abort).unwrap();
+                        let _ = snd_abort.try_send(());
                         return;
                     }
                     KeyHandled | KeyIgnored(_) | EventIgnored(_) => {}

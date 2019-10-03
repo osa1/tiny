@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 env_logger = "0.7"
+futures-preview = { version = "0.3.0-alpha.19",  features = ["async-await"] }
 futures-util-preview = "0.3.0-alpha.19"
 libtiny_ui = { path = "../libtiny_ui" }
 log = "0.4"
