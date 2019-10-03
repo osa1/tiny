@@ -364,13 +364,6 @@ impl TUI {
 
     pub(crate) fn handle_input_event(&mut self, ev: Event) -> TUIRet {
         match ev {
-            Event::Resize => {
-                // This never happens, probably because the our select() loop,
-                // termbox can't really get resize signals.
-                self.resize();
-                TUIRet::KeyHandled
-            }
-
             Event::Key(key) => self.keypressed(key),
 
             Event::String(str) => {

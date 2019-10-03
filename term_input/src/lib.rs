@@ -1,23 +1,13 @@
 #![allow(clippy::new_without_default)]
 
-//! Interprets the terminal events we care about:
-//!
-//!   - Resize events.
-//!   - Keyboard input.
-//!
-//! Resize events are handled by registering a signal handler for SIGWINCH.
+//! Interprets the terminal events we care about (keyboard input).
 //!
 //! Keyboard events are read from stdin. We look for byte strings of key combinations that we care
 //! about. E.g. Alt-arrow keys, C-w etc.
 
-use nix::sys::signal;
-use nix::sys::signal::{sigaction, SigAction, SigHandler, SigSet, Signal};
-
 use std::char;
 use std::collections::VecDeque;
 use std::pin::Pin;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
 
 use tokio::prelude::*;
@@ -62,24 +52,11 @@ pub enum Event {
     /// Usually a paste.
     String(String),
 
-    /// SIGWINCH happened.
-    Resize,
-
     FocusGained,
     FocusLost,
 
     /// An unknown sequence of bytes (probably for a key combination that we don't care about).
     Unknown(Vec<u8>),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// SIGWINCH handler
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static GOT_SIGWINCH: AtomicBool = AtomicBool::new(false);
-
-extern "C" fn sigwinch_handler(_: libc::c_int) {
-    GOT_SIGWINCH.store(true, Ordering::Relaxed);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,19 +173,6 @@ pub struct Input {
 
 impl Input {
     pub fn new() -> Input {
-        unsafe {
-            // ignore the existing handler
-            sigaction(
-                Signal::SIGWINCH,
-                &SigAction::new(
-                    SigHandler::Handler(sigwinch_handler),
-                    signal::SA_RESTART,
-                    SigSet::empty(),
-                ),
-            )
-            .unwrap();
-        }
-
         Input {
             evs: VecDeque::new(),
             buf: Vec::with_capacity(100),
@@ -224,11 +188,6 @@ impl Stream for Input {
         mut self: Pin<&mut Input>,
         cx: &mut Context,
     ) -> Poll<Option<std::io::Result<Event>>> {
-        // Yield any resize events
-        if GOT_SIGWINCH.swap(false, Ordering::Relaxed) {
-            return Poll::Ready(Some(Ok(Event::Resize)));
-        }
-
         let self_: &mut Input = &mut *self;
 
         // Try to parse any bytes in the input buffer from the last poll

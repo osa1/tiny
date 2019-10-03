@@ -175,9 +175,9 @@ mod benchs {
 
     extern crate test;
 
-    use test::Bencher;
     use super::*;
     use std::{fs::File, io::Read};
+    use test::Bencher;
 
     #[bench]
     fn bench_trie_build(b: &mut Bencher) {

@@ -29,6 +29,7 @@ use term_input::Input;
 use time::Tm;
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::mpsc;
+use tokio_net::signal::unix::{signal, SignalKind};
 
 #[macro_use]
 extern crate log;
@@ -48,7 +49,30 @@ impl TUI {
         // Spawn input handler task
         runtime.spawn(input_handler(tui, snd_ev));
 
+        // Spawn SIGWINCH handler
+        runtime.spawn(sigwinch_handler(inner.clone()));
+
         (TUI { inner }, rcv_ev)
+    }
+}
+
+async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>) {
+    match signal(SignalKind::window_change()) {
+        Err(err) => {
+            debug!("Can't install SIGWINCH handler: {:?}", err);
+        }
+        Ok(mut stream) => {
+            while let Some(()) = stream.next().await {
+                match tui.upgrade() {
+                    None => {
+                        return;
+                    }
+                    Some(tui) => {
+                        tui.borrow_mut().resize();
+                    }
+                }
+            }
+        }
     }
 }
 
