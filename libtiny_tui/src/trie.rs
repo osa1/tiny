@@ -173,7 +173,9 @@ mod tests {
 #[cfg(test)]
 mod benchs {
 
-    use self::test::Bencher;
+    extern crate test;
+
+    use test::Bencher;
     use super::*;
     use std::{fs::File, io::Read};
 

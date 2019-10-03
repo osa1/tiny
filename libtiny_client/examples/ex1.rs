@@ -1,7 +1,7 @@
 use futures_util::stream::StreamExt;
 use std::time::Duration;
 
-use libtiny::{Client, ServerInfo};
+use libtiny_client::{Client, ServerInfo};
 
 fn main() {
     let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
