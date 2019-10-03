@@ -1,3 +1,4 @@
+#![cfg_attr(test, feature(test))]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::cognitive_complexity)]
 

@@ -297,6 +297,8 @@ fn irc_color_to_termbox(irc_color: u8) -> u8 {
 #[cfg(test)]
 mod tests {
 
+    extern crate test;
+
     use super::*;
     use std::{fs::File, io::Read};
     use test::Bencher;
