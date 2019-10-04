@@ -142,7 +142,7 @@ void tb_shutdown(void)
 
 void tb_present(void)
 {
-    int x,y,w,i;
+    int x,y,i;
     struct tb_cell *back, *front;
 
     /* invalidate cursor position */
@@ -158,7 +158,7 @@ void tb_present(void)
         for (x = 0; x < front_buffer.width; ) {
             back = &CELL(&back_buffer, x, y);
             front = &CELL(&front_buffer, x, y);
-            w = back->cw;
+            int w = back->cw;
             if (w < 1) w = 1;
             if (memcmp(back, front, sizeof(struct tb_cell)) == 0) {
                 x += w;
@@ -178,6 +178,7 @@ void tb_present(void)
                     front->ch = 0;
                     front->fg = back->fg;
                     front->bg = back->bg;
+                    front->cw = 1;
                 }
             }
             x += w;
@@ -202,7 +203,7 @@ void tb_set_cursor(int cx, int cy)
         write_cursor(cursor_x, cursor_y);
 }
 
-void tb_put_cell(int x, int y, const struct tb_cell *cell)
+static void tb_put_cell(int x, int y, const struct tb_cell *cell)
 {
     if ((unsigned)x >= (unsigned)back_buffer.width)
         return;
@@ -368,6 +369,7 @@ static void cellbuf_clear(struct cellbuf *buf)
         buf->cells[i].ch = ' ';
         buf->cells[i].fg = foreground;
         buf->cells[i].bg = background;
+        buf->cells[i].cw = 1;
     }
 }
 

@@ -92,7 +92,6 @@ SO_IMPORT void tb_set_cursor(int cx, int cy);
 /* Changes cell's parameters in the internal back buffer at the specified
  * position.
  */
-SO_IMPORT void tb_put_cell(int x, int y, const struct tb_cell *cell);
 SO_IMPORT void tb_change_cell(int x, int y, uint32_t ch, uint8_t cw, uint16_t fg, uint16_t bg);
 
 #define TB_OUTPUT_CURRENT   0

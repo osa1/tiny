@@ -12,13 +12,6 @@ pub const TB_BOLD: u16 = 0x0100;
 pub const TB_UNDERLINE: u16 = 0x0200;
 pub const TB_REVERSE: u16 = 0x0400;
 
-#[repr(C)]
-pub struct Cell {
-    pub ch: u32,
-    pub fg: u16,
-    pub bg: u16,
-}
-
 const TB_EUNSUPPORTED_TERMINAL: libc::c_int = -1;
 const TB_EFAILED_TO_OPEN_TTY: libc::c_int = -2;
 
