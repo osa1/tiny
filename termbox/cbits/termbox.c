@@ -171,6 +171,8 @@ void tb_present(void)
                 for (i = x; i < front_buffer.width; ++i) {
                     send_char(i, y, ' ');
                 }
+            } else if (back->cw == 0) {
+                send_char(x, y, ' ');
             } else {
                 send_char(x, y, back->ch);
                 for (i = 1; i < w; ++i) {
@@ -178,7 +180,7 @@ void tb_present(void)
                     front->ch = 0;
                     front->fg = back->fg;
                     front->bg = back->bg;
-                    front->cw = 1;
+                    front->cw = 0;
                 }
             }
             x += w;
