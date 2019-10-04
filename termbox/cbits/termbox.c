@@ -158,7 +158,7 @@ void tb_present(void)
         for (x = 0; x < front_buffer.width; ) {
             back = &CELL(&back_buffer, x, y);
             front = &CELL(&front_buffer, x, y);
-            w = wcwidth(back->ch);
+            w = back->cw;
             if (w < 1) w = 1;
             if (memcmp(back, front, sizeof(struct tb_cell)) == 0) {
                 x += w;
@@ -211,15 +211,10 @@ void tb_put_cell(int x, int y, const struct tb_cell *cell)
     CELL(&back_buffer, x, y) = *cell;
 }
 
-void tb_change_cell(int x, int y, uint32_t ch, uint16_t fg, uint16_t bg)
+void tb_change_cell(int x, int y, uint32_t ch, uint8_t cw, uint16_t fg, uint16_t bg)
 {
-    struct tb_cell c = {ch, fg, bg};
+    struct tb_cell c = {ch, fg, bg, cw};
     tb_put_cell(x, y, &c);
-}
-
-struct tb_cell *tb_cell_buffer(void)
-{
-    return back_buffer.cells;
 }
 
 int tb_width(void)

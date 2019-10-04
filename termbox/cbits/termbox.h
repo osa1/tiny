@@ -38,11 +38,13 @@ extern "C" {
  *  - 'ch' is a unicode character
  *  - 'fg' foreground color and attributes
  *  - 'bg' background color and attributes
+ *  - 'cw' is the visible width of the char
  */
 struct tb_cell {
     uint32_t ch;
     uint16_t fg;
     uint16_t bg;
+    uint8_t cw;
 };
 
 /* Error codes returned by tb_init(). All of them are self-explanatory, except
@@ -91,14 +93,7 @@ SO_IMPORT void tb_set_cursor(int cx, int cy);
  * position.
  */
 SO_IMPORT void tb_put_cell(int x, int y, const struct tb_cell *cell);
-SO_IMPORT void tb_change_cell(int x, int y, uint32_t ch, uint16_t fg, uint16_t bg);
-
-/* Returns a pointer to internal cell back buffer. You can get its dimensions
- * using tb_width() and tb_height() functions. The pointer stays valid as long
- * as no tb_clear() and tb_present() calls are made. The buffer is
- * one-dimensional buffer containing lines of cells starting from the top.
- */
-SO_IMPORT struct tb_cell *tb_cell_buffer(void);
+SO_IMPORT void tb_change_cell(int x, int y, uint32_t ch, uint8_t cw, uint16_t fg, uint16_t bg);
 
 #define TB_OUTPUT_CURRENT   0
 #define TB_OUTPUT_NORMAL    1

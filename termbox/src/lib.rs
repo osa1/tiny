@@ -41,9 +41,7 @@ extern "C" {
     pub fn tb_set_clear_attributes(fg: u16, bg: u16);
     pub fn tb_present();
     pub fn tb_set_cursor(cx: libc::c_int, cy: libc::c_int);
-    pub fn tb_put_cell(x: libc::c_int, y: libc::c_int, cell: Cell);
-    pub fn tb_change_cell(x: libc::c_int, y: libc::c_int, ch: u32, fg: u16, bg: u16);
-    // fn tb_cell_buffer() -> *mut tb_cell;
+    pub fn tb_change_cell(x: libc::c_int, y: libc::c_int, ch: u32, cw: u8, fg: u16, bg: u16);
     pub fn tb_select_output_mode(mode: libc::c_int) -> libc::c_int;
 }
 
@@ -113,12 +111,9 @@ impl Termbox {
         unsafe { tb_set_cursor(cx as libc::c_int, cy as libc::c_int) }
     }
 
-    pub fn put_cell(&mut self, x: i32, y: i32, cell: Cell) {
-        unsafe { tb_put_cell(x as libc::c_int, y as libc::c_int, cell) }
-    }
-
     pub fn change_cell(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
-        unsafe { tb_change_cell(x as libc::c_int, y as libc::c_int, char_to_utf8(ch), fg, bg) }
+        let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1) as u8;
+        unsafe { tb_change_cell(x as libc::c_int, y as libc::c_int, char_to_utf8(ch), cw, fg, bg) }
     }
 
     pub fn get_output_mode(&self) -> OutputMode {

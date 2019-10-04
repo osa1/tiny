@@ -11,6 +11,7 @@ edition = "2018"
 
 [dependencies]
 libc = "0.2"
+unicode-width = "0.1"
 
 [build-dependencies]
 cc = "1.0.38"
