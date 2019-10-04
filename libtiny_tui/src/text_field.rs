@@ -145,7 +145,7 @@ impl TextField {
                     }
                 }
 
-                tb.set_cursor(pos_x + self.cursor - self.scroll, pos_y);
+                tb.set_cursor(Some(((pos_x + self.cursor - self.scroll) as u16, pos_y as u16)));
             }
         }
     }
@@ -594,7 +594,7 @@ fn draw_line(
             colors.cursor.bg,
         );
     }
-    tb.set_cursor(pos_x + cursor - scroll, pos_y);
+    tb.set_cursor(Some(((pos_x + cursor - scroll) as u16, pos_y as u16)));
 }
 
 impl TextField {

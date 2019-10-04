@@ -2,20 +2,16 @@
 name = "termbox_simple"
 version = "0.2.3"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
-links = "termbox_simple"
 description = "A hacked version of termbox (see README)"
 repository = "https://github.com/osa1/tiny"
 license = "MIT"
-build = "build.rs"
 edition = "2018"
 
 [dependencies]
 libc = "0.2"
+termion = "1.5"
 unicode-width = "0.1"
-
-[build-dependencies]
-cc = "1.0.38"
 
 [dev-dependencies]
 mio = "0.6.9"
-term_input = { path = "../term_input" }
+term_input = "0.1.5"

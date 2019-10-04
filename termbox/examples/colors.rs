@@ -4,7 +4,6 @@ use termbox_simple::*;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();
-    tui.set_output_mode(OutputMode::Output256);
     tui.set_clear_attributes(0, 0);
 
     let mut fg = true;

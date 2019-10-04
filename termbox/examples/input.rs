@@ -33,7 +33,13 @@ fn main() {
                         break 'mainloop;
                     }
                     for (char_idx, char) in string.chars().enumerate() {
-                        termbox.change_cell(char_idx as libc::c_int, 0, char, TB_WHITE, TB_DEFAULT);
+                        termbox.change_cell(
+                            char_idx as libc::c_int,
+                            0,
+                            char,
+                            TB_DEFAULT,
+                            TB_DEFAULT,
+                        );
                     }
                     termbox.present();
                 }
