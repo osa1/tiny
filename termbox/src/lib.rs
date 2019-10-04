@@ -17,13 +17,6 @@ const TB_EFAILED_TO_OPEN_TTY: libc::c_int = -2;
 
 const TB_HIDE_CURSOR: libc::c_int = -1;
 
-const TB_OUTPUT_CURRENT: libc::c_int = 0;
-const TB_OUTPUT_NORMAL: libc::c_int = 1;
-// These are not used, we just std::mem::transmute the value if it's in range
-// const TB_OUTPUT_256       : libc::c_int = 2;
-// const TB_OUTPUT_216       : libc::c_int = 3;
-const TB_OUTPUT_GRAYSCALE: libc::c_int = 4;
-
 extern "C" {
     pub fn tb_init() -> libc::c_int;
     pub fn tb_resize();
@@ -35,7 +28,6 @@ extern "C" {
     pub fn tb_present();
     pub fn tb_set_cursor(cx: libc::c_int, cy: libc::c_int);
     pub fn tb_change_cell(x: libc::c_int, y: libc::c_int, ch: u32, cw: u8, fg: u16, bg: u16);
-    pub fn tb_select_output_mode(mode: libc::c_int) -> libc::c_int;
 }
 
 pub struct Termbox {}
@@ -44,14 +36,6 @@ pub struct Termbox {}
 pub enum InitError {
     UnsupportedTerminal,
     FailedToOpenTty,
-}
-
-#[repr(C)]
-pub enum OutputMode {
-    OutputNormal = 1,
-    Output256,
-    Output216,
-    OutputGrayscale,
 }
 
 impl Termbox {
@@ -107,21 +91,6 @@ impl Termbox {
     pub fn change_cell(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
         let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1) as u8;
         unsafe { tb_change_cell(x as libc::c_int, y as libc::c_int, char_to_utf8(ch), cw, fg, bg) }
-    }
-
-    pub fn get_output_mode(&self) -> OutputMode {
-        let ret = unsafe { tb_select_output_mode(TB_OUTPUT_CURRENT) };
-        if ret >= TB_OUTPUT_NORMAL && ret <= TB_OUTPUT_GRAYSCALE {
-            unsafe { std::mem::transmute(ret) }
-        } else {
-            panic!("get_output_mode(): Invalid output mode: {}", ret)
-        }
-    }
-
-    pub fn set_output_mode(&mut self, mode: OutputMode) {
-        unsafe {
-            tb_select_output_mode(std::mem::transmute(mode));
-        }
     }
 }
 

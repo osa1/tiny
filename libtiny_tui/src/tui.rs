@@ -17,7 +17,7 @@ use crate::tab::Tab;
 use crate::widget::WidgetRet;
 use crate::{MsgSource, MsgTarget};
 use term_input::{Arrow, Event, Key};
-use termbox_simple::{OutputMode, Termbox};
+use termbox_simple::Termbox;
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
@@ -66,7 +66,6 @@ pub(crate) struct TUI {
 impl TUI {
     pub(crate) fn new(colors: Colors) -> TUI {
         let mut tb = Termbox::init().unwrap(); // TODO: check errors
-        tb.set_output_mode(OutputMode::Output256);
         tb.set_clear_attributes(colors.clear.fg, colors.clear.bg);
 
         let width = tb.width() as i32;
