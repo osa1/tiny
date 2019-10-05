@@ -1,3 +1,17 @@
+# 2019/10/05: 0.5.0
+
+Starting with this release tiny is no longer distributed on crates.io. Please
+get it from the git repo at https://github.com/osa1/tiny.
+
+- With the exception of TUI most of tiny is rewritten for this release. See #138
+  for the details. The TLDR is that the code should now be easier to hack on.
+- tiny now properly logs all messaging to the `log_dir` specified in tinyrc.
+  (#100, #56, #132)
+- Address name resolving step no longer blocks the UI, and is interruptible
+  (e.g. by issuing a `/connect` command, or by closing the tab/client) (#3).
+- Fixed glitches in the TUI when rendering non-visible (0-column) or wide (shown
+  in multiple terminal columns) unicode characters (#115).
+
 # 2019/08/06: 0.4.5
 
 - IRC color codes and ASCII control chars are now removed from desktop
