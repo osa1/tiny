@@ -24,6 +24,7 @@ pub struct Termbox {
     last_bg: u16,
     // (x, y)
     cursor: Option<(u16, u16)>,
+    last_cursor: (u16, u16),
     output_buffer: Vec<u8>,
 }
 
@@ -142,6 +143,7 @@ impl Termbox {
             last_fg: 0,
             last_bg: 0,
             cursor: Some((0, 0)),
+            last_cursor: (0, 0),
             output_buffer: Vec::with_capacity(32 * 1024),
         };
 
@@ -216,6 +218,8 @@ impl Termbox {
     }
 
     pub fn present(&mut self) {
+        self.last_cursor = (0, 0);
+
         if self.buffer_size_change_request {
             self.update_size();
             self.buffer_size_change_request = false;
@@ -242,21 +246,10 @@ impl Termbox {
                 if cw > 1 && (x + (cw - 1)) >= usize::from(self.front_buffer.w) {
                     // Not enough room for wide ch, send spaces
                     for i in x..usize::from(self.front_buffer.w) {
-                        write!(
-                            self.output_buffer,
-                            "{} ",
-                            termion::cursor::Goto(i as u16 + 1, y as u16 + 1)
-                        )
-                        .unwrap();
+                        self.send_char(i as u16, y as u16, ' ');
                     }
                 } else {
-                    write!(
-                        self.output_buffer,
-                        "{}{}",
-                        termion::cursor::Goto(x as u16 + 1, y as u16 + 1),
-                        back_cell.ch
-                    )
-                    .unwrap();
+                    self.send_char((x + 1) as u16, (y + 1) as u16, back_cell.ch);
                     // We're going to skip `cw` cells so for wide chars fill the slop in the front
                     // buffer
                     for i in 1..cw {
@@ -273,12 +266,7 @@ impl Termbox {
         }
 
         if let Some((x, y)) = self.cursor {
-            write!(
-                self.output_buffer,
-                "{}",
-                termion::cursor::Goto(x + 1, y + 1),
-            )
-            .unwrap();
+            goto(x + 1, y + 1, &mut self.output_buffer);
         }
 
         self.tty.write_all(&self.output_buffer).unwrap();
@@ -306,23 +294,13 @@ impl Termbox {
             Some((x, y)) => match self.cursor {
                 None => {
                     self.cursor = Some((x, y));
-                    write!(
-                        self.output_buffer,
-                        "{}{}",
-                        termion::cursor::Goto(x + 1, y + 1),
-                        termion::cursor::Show
-                    )
-                    .unwrap();
+                    goto(x + 1, y + 1, &mut self.output_buffer);
+                    write!(self.output_buffer, "{}", termion::cursor::Show).unwrap();
                 }
                 Some((x_, y_)) => {
                     if x != x_ || y != y_ {
                         self.cursor = Some((x, y));
-                        write!(
-                            self.output_buffer,
-                            "{}",
-                            termion::cursor::Goto(x + 1, y + 1)
-                        )
-                        .unwrap();
+                        goto(x + 1, y + 1, &mut self.output_buffer);
                     }
                 }
             },
@@ -405,6 +383,57 @@ impl Termbox {
             .unwrap();
         }
     }
+
+    fn send_char(&mut self, to_x: u16, to_y: u16, ch: char) {
+        // if the target cell is next to the last cell, then don't move the cursor
+        if (self.last_cursor.0 + 1) == to_x && self.last_cursor.1 == to_y {
+            write!(self.output_buffer, "{}", ch).unwrap();
+        } else {
+            goto(to_x, to_y, &mut self.output_buffer);
+            write!(self.output_buffer, "{}", ch).unwrap();
+        }
+        self.last_cursor = (to_x, to_y);
+    }
+}
+
+const LOOKUP: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+fn num_to_buf(mut num: u16, buf: &mut Vec<u8>) {
+    let start_len = buf.len();
+    let mut chars_len = 0;
+    loop {
+        let rem = num % 10;
+        let ch = LOOKUP[rem as usize];
+        buf.push(ch);
+        num /= 10;
+        chars_len += 1;
+        if num == 0 {
+            break;
+        }
+    }
+
+    if chars_len == 1 {
+        return;
+    }
+
+    let swap_len = start_len + (chars_len / 2) as usize;
+    let mut cur_char;
+    let mut c = 0;
+    for i in start_len..swap_len {
+        let next_swap_idx = start_len + chars_len - c - 1;
+        cur_char = buf[next_swap_idx];
+        buf[next_swap_idx] = buf[i];
+        buf[i] = cur_char;
+        c += 1;
+    }
+}
+
+fn goto(x: u16, y: u16, buf: &mut Vec<u8>) {
+    write!(buf, "{}", "\x1B[").unwrap();
+    num_to_buf(y, buf);
+    write!(buf, "{}", ';').unwrap();
+    num_to_buf(x, buf);
+    write!(buf, "{}", 'H').unwrap();
 }
 
 impl Drop for Termbox {
