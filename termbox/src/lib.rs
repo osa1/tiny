@@ -385,13 +385,15 @@ impl Termbox {
     }
 
     fn send_char(&mut self, to_x: u16, to_y: u16, ch: char) {
-        // if the target cell is next to the last cell, then don't move the cursor
-        if (self.last_cursor.0 + 1) == to_x && self.last_cursor.1 == to_y {
-            self.output_buffer.push(ch as u8);
-        } else {
+        let mut ch_bytes = [0u8; 4];
+        let ch_str = ch.encode_utf8(&mut ch_bytes);
+
+        // if the target cell isn't next to the last cell, then move the cursor first
+        if self.last_cursor.0 + 1 != to_x || self.last_cursor.1 != to_y {
             goto(to_x, to_y, &mut self.output_buffer);
-            self.output_buffer.push(ch as u8);
         }
+        self.output_buffer.extend_from_slice(ch_str.as_bytes());
+
         self.last_cursor = (to_x, to_y);
     }
 }
