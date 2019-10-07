@@ -1,3 +1,8 @@
+# Unreleased
+
+- When a domain name resolves to multiple IP addresses tiny now tries connecting
+  to the rest of the addresses when one fails (#144).
+
 # 2019/10/05: 0.5.0
 
 Starting with this release tiny is no longer distributed on crates.io. Please

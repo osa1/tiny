@@ -26,9 +26,17 @@ pub(crate) async fn task(
 fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bool {
     use libtiny_client::Event::*;
     match ev {
-        Connecting => {
+        ResolvingHost => {
             ui.add_client_msg(
-                "Connecting...",
+                "Resolving host...",
+                &MsgTarget::AllServTabs {
+                    serv: client.get_serv_name(),
+                },
+            );
+        }
+        Connecting(sock_addr) => {
+            ui.add_client_msg(
+                &format!("Connecting to {}", sock_addr),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
                 },
@@ -57,11 +65,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
         }
         IoErr(err) => {
             ui.add_err_msg(
-                &format!(
-                    "Connection error: {}. Will try to reconnect in {} seconds.",
-                    err.description(),
-                    libtiny_client::RECONNECT_SECS
-                ),
+                &format!("Connection error: {}", err.description()),
                 time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
@@ -70,11 +74,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
         }
         TlsErr(err) => {
             ui.add_err_msg(
-                &format!(
-                    "TLS error: {}. Will try to reconnect in {} seconds.",
-                    err.description(),
-                    libtiny_client::RECONNECT_SECS
-                ),
+                &format!("TLS error: {}", err.description()),
                 time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
