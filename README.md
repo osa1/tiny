@@ -47,8 +47,20 @@ tiny is an IRC client written in Rust.
 
 ## Installation
 
-Install the Rust nightly toolchain, clone the repo, and run `cargo install` (or
-`cargo install --force` if you already have an older version installed).
+Install the Rust nightly toolchain, clone the repo, and run
+
+```
+cargo install --path .
+```
+
+If you don't want to clone the repo, you can use
+
+```
+cargo install --git https://github.com/osa1/tiny
+```
+
+If you have an older version installed, add `--force` to the command you're
+using.
 
 Arch Linux users can install tiny from the
 [AUR](https://aur.archlinux.org/packages/tiny-irc-client-git/).
