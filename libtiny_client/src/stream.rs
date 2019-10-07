@@ -16,6 +16,7 @@ pub(crate) enum Stream {
     TlsStream(TlsStream<TcpStream>),
 }
 
+#[derive(Debug)]
 pub(crate) enum StreamError {
     TlsError(native_tls::Error),
     IoError(std::io::Error),
@@ -34,11 +35,23 @@ impl From<std::io::Error> for StreamError {
 }
 
 impl Stream {
-    pub(crate) async fn new_tcp(addr: SocketAddr) -> Result<Stream, StreamError> {
+    pub(crate) async fn new(
+        addr: SocketAddr,
+        host_name: &str,
+        use_tls: bool,
+    ) -> Result<Stream, StreamError> {
+        if use_tls {
+            Stream::new_tls(addr, host_name).await
+        } else {
+            Stream::new_tcp(addr).await
+        }
+    }
+
+    async fn new_tcp(addr: SocketAddr) -> Result<Stream, StreamError> {
         Ok(Stream::TcpStream(TcpStream::connect(addr).await?))
     }
 
-    pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
+    async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
         let tcp_stream = TcpStream::connect(addr).await?;
         let tls_connector =
             tokio_tls::TlsConnector::from(native_tls::TlsConnector::builder().build()?);

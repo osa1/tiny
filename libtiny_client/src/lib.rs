@@ -17,6 +17,7 @@ use stream::{Stream, StreamError};
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures::{pin_mut, select};
+use futures_util::future;
 use futures_util::stream::Fuse;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
@@ -372,55 +373,87 @@ async fn main_loop(
 
         let serv_name_clone = serv_name.clone();
 
-        let mut addr_iter =
-            match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
-                Done(addr_iter) => {
-                    debug!("resolve_addr: done");
-                    addr_iter
-                }
-                TryWithPort(new_port) => {
-                    debug!("resolve_addr: try new port");
-                    port = new_port;
-                    wait = false;
-                    continue;
-                }
-                TryReconnect => {
-                    debug!("resolve_addr: try again");
-                    wait = false;
-                    continue;
-                }
-                TryAfterDelay => {
-                    debug!("resolve_addr: try after delay");
-                    wait = true;
-                    continue;
-                }
-                Return => {
-                    debug!("resolve_addr: return");
-                    return;
-                }
-            };
+        let addr_iter = match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
+            Done(addr_iter) => {
+                debug!("resolve_addr: done");
+                addr_iter
+            }
+            TryWithPort(new_port) => {
+                debug!("resolve_addr: try new port");
+                port = new_port;
+                wait = false;
+                continue;
+            }
+            TryReconnect => {
+                debug!("resolve_addr: try again");
+                wait = false;
+                continue;
+            }
+            TryAfterDelay => {
+                debug!("resolve_addr: try after delay");
+                wait = true;
+                continue;
+            }
+            Return => {
+                debug!("resolve_addr: return");
+                return;
+            }
+        };
 
         debug!("Address resolved");
 
-        let addr = match addr_iter.next() {
-            None => {
-                snd_ev.send(Event::CantResolveAddr).await.unwrap();
-                break;
+        let mut ipv4_addr = None;
+        let mut ipv6_addr = None;
+        for addr in addr_iter {
+            match addr {
+                SocketAddr::V4(_) => {
+                    if ipv4_addr.is_none() {
+                        ipv4_addr = Some(addr);
+                    }
+                    if ipv6_addr.is_some() {
+                        break;
+                    }
+                }
+                SocketAddr::V6(_) => {
+                    if ipv6_addr.is_none() {
+                        ipv6_addr = Some(addr);
+                    }
+                    if ipv4_addr.is_some() {
+                        break;
+                    }
+                }
             }
-            Some(addr) => addr,
-        };
+        }
 
         //
-        // Establish TCP connection to the server
+        // Establish connection to the server
         //
 
         debug!("Establishing connection ...");
+        debug!("IPv4: {:?}", ipv4_addr);
+        debug!("IPv6: {:?}", ipv6_addr);
 
-        // TODO: This step can block too, but hopefully not too much?
-        let mb_stream = if server_info.tls {
-            Stream::new_tls(addr, &serv_name).await
-        } else {
-            Stream::new_tcp(addr).await
+        let mb_stream = match (ipv4_addr, ipv6_addr) {
+            (None, None) => {
+                snd_ev.send(Event::CantResolveAddr).await.unwrap();
+                break;
+            }
+            (Some(addr), None) | (None, Some(addr)) => {
+                Stream::new(addr, &serv_name, server_info.tls).await
+            }
+            (Some(addr1), Some(addr2)) => {
+                let task1 = Stream::new(addr1, &serv_name, server_info.tls);
+                pin_mut!(task1);
+                let task2 = Stream::new(addr2, &serv_name, server_info.tls);
+                pin_mut!(task2);
+                match future::select(task1, task2).await.into_inner() {
+                    (Ok(r), _) => Ok(r),
+                    (Err(err), other) => {
+                        debug!("IPv4 connection failed: {:?}, trying IPv6", err);
+                        other.await
+                    }
+                }
+            }
         };
 
         let stream = match mb_stream {

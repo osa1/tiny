@@ -1,3 +1,10 @@
+# Unreleased
+
+- When an IRC server domain resolves to IPv4 and IPv6 addresses tiny now selects
+  one IPv4 and one IPv6 address and tries to connect to both. This works better
+  when a user can only connect to IPv4 or on to IPv6, but address name resolver
+  returns e.g. IPv6 address first when the user can only connect to IPv4 (#144).
+
 # 2019/10/05: 0.5.0
 
 Starting with this release tiny is no longer distributed on crates.io. Please
