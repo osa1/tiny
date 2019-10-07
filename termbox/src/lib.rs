@@ -387,23 +387,21 @@ impl Termbox {
     fn send_char(&mut self, to_x: u16, to_y: u16, ch: char) {
         // if the target cell is next to the last cell, then don't move the cursor
         if (self.last_cursor.0 + 1) == to_x && self.last_cursor.1 == to_y {
-            write!(self.output_buffer, "{}", ch).unwrap();
+            self.output_buffer.push(ch as u8);
         } else {
             goto(to_x, to_y, &mut self.output_buffer);
-            write!(self.output_buffer, "{}", ch).unwrap();
+            self.output_buffer.push(ch as u8);
         }
         self.last_cursor = (to_x, to_y);
     }
 }
-
-const LOOKUP: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 fn num_to_buf(mut num: u16, buf: &mut Vec<u8>) {
     let start_len = buf.len();
     let mut chars_len = 0;
     loop {
         let rem = num % 10;
-        let ch = LOOKUP[rem as usize];
+        let ch = b'0' + rem as u8;
         buf.push(ch);
         num /= 10;
         chars_len += 1;
@@ -429,11 +427,11 @@ fn num_to_buf(mut num: u16, buf: &mut Vec<u8>) {
 }
 
 fn goto(x: u16, y: u16, buf: &mut Vec<u8>) {
-    write!(buf, "{}", "\x1B[").unwrap();
+    buf.extend_from_slice(b"\x1B[");
     num_to_buf(y, buf);
-    write!(buf, "{}", ';').unwrap();
+    buf.push(b';');
     num_to_buf(x, buf);
-    write!(buf, "{}", 'H').unwrap();
+    buf.push(b'H');
 }
 
 impl Drop for Termbox {
