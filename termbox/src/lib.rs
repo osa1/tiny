@@ -410,16 +410,11 @@ fn num_to_buf(mut num: u16, buf: &mut Vec<u8>) {
         }
     }
 
-    if chars_len == 1 {
-        return;
-    }
-
     let swap_len = start_len + (chars_len / 2) as usize;
-    let mut cur_char;
     let mut c = 0;
     for i in start_len..swap_len {
         let next_swap_idx = start_len + chars_len - c - 1;
-        cur_char = buf[next_swap_idx];
+        let cur_char = buf[next_swap_idx];
         buf[next_swap_idx] = buf[i];
         buf[i] = cur_char;
         c += 1;
