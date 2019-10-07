@@ -74,19 +74,27 @@ pub struct SASLAuth {
 }
 
 /// IRC client events. Returned by `Client` to the users via a channel.
+///
+/// Note that Client only returns when it can't resolve the domain name. In all other cases (no
+/// matter what the error is) it continues, in case of a connection error either by trying another
+/// IP address of the same domain, or by waiting `RECONNECT_SECS` seconds and then trying again.
+/// The latter happens after sending a `Disconnected` event.
 #[derive(Debug)]
 pub enum Event {
-    /// Client trying to connect
-    Connecting,
+    /// Client resolving domain name
+    ResolvingHost,
+    /// Domain name resolved, client trying to connect to the given IP address
+    Connecting(SocketAddr),
     /// TCP connection established *and* the introduction sequence with the IRC server started.
     Connected,
-    /// Disconnected from the server. Usually sent right after an `Event::IoErr`.
+    /// Disconnected from the server. Usually sent right after an `Event::IoErr`. Client tries to
+    /// reconnect after `RECONNECT_SECS` seconds after sending this event.
     Disconnected,
     /// An IO error happened.
     IoErr(std::io::Error),
     /// A TLS error happened
     TlsErr(native_tls::Error),
-    /// Client couldn't resolve host address.
+    /// Client couldn't resolve host address. The client stops after sending this event.
     CantResolveAddr,
     /// Nick changed.
     NickChange(String),
@@ -360,11 +368,11 @@ async fn main_loop(
         // trailing "\r\n") and the task directly sends them to the server.
         let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
 
-        snd_ev.send(Event::Connecting).await.unwrap();
-
         //
         // Resolve IP address
         //
+
+        snd_ev.send(Event::ResolvingHost).await.unwrap();
 
         let serv_name = server_info.addr.clone();
 
@@ -372,65 +380,53 @@ async fn main_loop(
 
         let serv_name_clone = serv_name.clone();
 
-        let mut addr_iter =
-            match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
-                Done(addr_iter) => {
-                    debug!("resolve_addr: done");
-                    addr_iter
-                }
-                TryWithPort(new_port) => {
-                    debug!("resolve_addr: try new port");
-                    port = new_port;
-                    wait = false;
-                    continue;
-                }
-                TryReconnect => {
-                    debug!("resolve_addr: try again");
-                    wait = false;
-                    continue;
-                }
-                TryAfterDelay => {
-                    debug!("resolve_addr: try after delay");
-                    wait = true;
-                    continue;
-                }
-                Return => {
-                    debug!("resolve_addr: return");
-                    return;
-                }
-            };
-
-        debug!("Address resolved");
-
-        let addr = match addr_iter.next() {
-            None => {
-                snd_ev.send(Event::CantResolveAddr).await.unwrap();
-                break;
+        let addr_iter = match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
+            Done(addr_iter) => {
+                debug!("resolve_addr: done");
+                addr_iter
             }
-            Some(addr) => addr,
+            TryWithPort(new_port) => {
+                debug!("resolve_addr: try new port");
+                port = new_port;
+                wait = false;
+                continue;
+            }
+            TryReconnect => {
+                debug!("resolve_addr: try again");
+                wait = false;
+                continue;
+            }
+            TryAfterDelay => {
+                debug!("resolve_addr: try after delay");
+                wait = true;
+                continue;
+            }
+            Return => {
+                debug!("resolve_addr: return");
+                return;
+            }
         };
+
+        let addrs = addr_iter.collect::<Vec<_>>();
+
+        if addrs.is_empty() {
+            snd_ev.send(Event::CantResolveAddr).await.unwrap();
+            break; // returns
+        }
+
+        debug!("Address resolved: {:?}", addrs);
 
         //
         // Establish TCP connection to the server
         //
 
-        debug!("Establishing connection ...");
-
-        // TODO: This step can block too, but hopefully not too much?
-        let mb_stream = if server_info.tls {
-            Stream::new_tls(addr, &serv_name).await
-        } else {
-            Stream::new_tcp(addr).await
-        };
-
-        let stream = match mb_stream {
-            Ok(stream) => stream,
-            Err(err) => {
-                snd_ev.send(Event::from(err)).await.unwrap();
+        let stream = match try_connect(addrs, &serv_name, server_info.tls, &mut snd_ev).await {
+            None => {
                 snd_ev.send(Event::Disconnected).await.unwrap();
                 wait = true;
                 continue;
             }
+            Some(stream) => stream,
         };
 
         let (mut read_half, mut write_half) = tokio::io::split(stream);
@@ -641,4 +637,30 @@ async fn resolve_addr(
             }
         }
     }
+}
+
+async fn try_connect(
+    addrs: Vec<SocketAddr>,
+    serv_name: &str,
+    use_tls: bool,
+    snd_ev: &mut mpsc::Sender<Event>,
+) -> Option<Stream> {
+    for addr in addrs {
+        snd_ev.send(Event::Connecting(addr)).await.unwrap();
+        let mb_stream = if use_tls {
+            Stream::new_tls(addr, &serv_name).await
+        } else {
+            Stream::new_tcp(addr).await
+        };
+        match mb_stream {
+            Err(err) => {
+                snd_ev.send(Event::from(err)).await.unwrap();
+            }
+            Ok(stream) => {
+                return Some(stream);
+            }
+        }
+    }
+
+    None
 }
