@@ -468,14 +468,19 @@ impl TUI {
                     } else {
                         i as usize - 1
                     };
-                    if new_tab_idx > self.active_idx {
-                        for _ in 0..new_tab_idx - self.active_idx {
-                            self.next_tab_();
+                    use std::cmp::Ordering;
+                    match new_tab_idx.cmp(&self.active_idx) {
+                        Ordering::Greater => {
+                            for _ in 0..new_tab_idx - self.active_idx {
+                                self.next_tab_();
+                            }
                         }
-                    } else if new_tab_idx < self.active_idx {
-                        for _ in 0..self.active_idx - new_tab_idx {
-                            self.prev_tab_();
+                        Ordering::Less => {
+                            for _ in 0..self.active_idx - new_tab_idx {
+                                self.prev_tab_();
+                            }
                         }
+                        Ordering::Equal => {}
                     }
                     self.tabs[self.active_idx].set_style(TabStyle::Normal);
                     TUIRet::KeyHandled
@@ -616,7 +621,7 @@ impl TUI {
 
     // right one is exclusive
     fn rendered_tabs(&self) -> (usize, usize) {
-        if self.tabs.len() < 1 {
+        if self.tabs.is_empty() {
             return (0, 0);
         }
 
@@ -677,7 +682,7 @@ impl TUI {
                 self.width,
                 &self.colors,
                 &self.tabs[self.active_idx].visible_name(),
-                &self.tabs[self.active_idx].notifier,
+                self.tabs[self.active_idx].notifier,
                 self.tabs[self.active_idx].widget.get_ignore_state(),
             );
         }

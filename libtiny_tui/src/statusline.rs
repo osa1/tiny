@@ -13,7 +13,7 @@ pub(crate) fn draw_statusline(
     width: i32,
     colors: &Colors,
     visible_name: &str,
-    notifier: &Notifier,
+    notifier: Notifier,
     ignore_mode: bool,
 ) {
     let notify_state = match notifier {

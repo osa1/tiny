@@ -90,7 +90,16 @@ impl Termbox {
 
     pub fn change_cell(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
         let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1) as u8;
-        unsafe { tb_change_cell(x as libc::c_int, y as libc::c_int, char_to_utf8(ch), cw, fg, bg) }
+        unsafe {
+            tb_change_cell(
+                x as libc::c_int,
+                y as libc::c_int,
+                char_to_utf8(ch),
+                cw,
+                fg,
+                bg,
+            )
+        }
     }
 }
 
