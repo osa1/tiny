@@ -2,6 +2,9 @@
 
 - When a domain name resolves to multiple IP addresses tiny now tries connecting
   to the rest of the addresses when one fails (#144).
+- Fixed a bug introduced in 0.5.0 where the client did not update its internal
+  state after changing nick, causing TUI and client state disagreeing on what
+  the current nick is (#149).
 
 # 2019/10/05: 0.5.0
 

@@ -362,10 +362,18 @@ impl StateInner {
                         snd_ev
                             .try_send(Event::NickChange(new_nick.to_owned()))
                             .unwrap();
-                        if !self.nicks.contains(new_nick) {
-                            self.nicks.push(new_nick.to_owned());
-                            self.current_nick_idx = self.nicks.len() - 1;
+
+                        match utils::find_idx(&self.nicks, |nick| nick == new_nick) {
+                            None => {
+                                self.nicks.push(new_nick.to_owned());
+                                self.current_nick_idx = self.nicks.len() - 1;
+                            }
+                            Some(nick_idx) => {
+                                self.current_nick_idx = nick_idx;
+                            }
                         }
+
+                        self.current_nick = new_nick.to_owned();
                     }
 
                     // Rename the nick in channel states, also populate the chan list
