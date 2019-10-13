@@ -551,7 +551,7 @@ async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
     let delay = async {
         tokio::timer::delay_for(Duration::from_secs(60)).await;
     }
-        .fuse();
+    .fuse();
     pin_mut!(delay);
 
     loop {

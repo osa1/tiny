@@ -145,7 +145,10 @@ impl TextField {
                     }
                 }
 
-                tb.set_cursor(Some(((pos_x + self.cursor - self.scroll) as u16, pos_y as u16)));
+                tb.set_cursor(Some((
+                    (pos_x + self.cursor - self.scroll) as u16,
+                    pos_y as u16,
+                )));
             }
         }
     }

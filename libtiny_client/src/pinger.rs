@@ -34,7 +34,7 @@ async fn pinger_task(rcv_rst: mpsc::Receiver<()>, mut snd_ev: mpsc::Sender<Event
         let delay = async {
             delay_for(Duration::from_secs(60)).await;
         }
-            .fuse();
+        .fuse();
         pin_mut!(delay);
 
         select! {
