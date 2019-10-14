@@ -92,7 +92,6 @@ servers:
       tls: true
       # Optional field for server password:
       # pass: 'server_pass'
-      hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
 
@@ -112,7 +111,6 @@ servers:
 # Defaults used when connecting to a server via the /connect command
 defaults:
     nicks: [tiny_user]
-    hostname: yourhost
     realname: yourname
     join: []
 

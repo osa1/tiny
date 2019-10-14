@@ -31,9 +31,6 @@ pub(crate) struct Server {
     #[serde(default)]
     pub(crate) pass: Option<String>,
 
-    /// Hostname to be used in connection registration
-    pub(crate) hostname: String,
-
     /// Real name to be used in connection registration
     pub(crate) realname: String,
 
@@ -57,7 +54,6 @@ pub(crate) struct Server {
 #[derive(Clone, Deserialize)]
 pub(crate) struct Defaults {
     pub(crate) nicks: Vec<String>,
-    pub(crate) hostname: String,
     pub(crate) realname: String,
     #[serde(default)]
     pub(crate) join: Vec<String>,

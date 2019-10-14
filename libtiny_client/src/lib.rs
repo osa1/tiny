@@ -48,8 +48,6 @@ pub struct ServerInfo {
     /// Server password.
     pub pass: Option<String>,
 
-    pub hostname: String,
-
     pub realname: String,
 
     /// Nicks to select when logging in.

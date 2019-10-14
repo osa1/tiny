@@ -134,7 +134,6 @@ fn run(
             port: server.port,
             tls: server.tls,
             pass: server.pass,
-            hostname: server.hostname,
             realname: server.realname,
             nicks: server.nicks,
             auto_join: server.join,

@@ -5,6 +5,7 @@
 - Fixed a bug introduced in 0.5.0 where the client did not update its internal
   state after changing nick, causing TUI and client state disagreeing on what
   the current nick is (#149).
+- tiny no longer needs a 'hostname' field in servers in the config file (#150).
 
 # 2019/10/05: 0.5.0
 

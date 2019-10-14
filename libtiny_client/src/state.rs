@@ -158,10 +158,7 @@ impl StateInner {
             .try_send(wire::nick(&self.current_nick))
             .unwrap();
         snd_irc_msg
-            .try_send(wire::user(
-                &self.server_info.hostname,
-                &self.server_info.realname,
-            ))
+            .try_send(wire::user(&self.nicks[0], &self.server_info.realname))
             .unwrap();
     }
 
@@ -239,10 +236,8 @@ impl StateInner {
                 // :hobana.freenode.net 396 osa1 haskell/developer/osa1
                 // :is now your hidden host (set by services.)
                 if params.len() == 3 {
-                    let usermask = format!(
-                        "{}!~{}@{}",
-                        self.current_nick, self.server_info.hostname, params[1]
-                    );
+                    let usermask =
+                        format!("{}!~{}@{}", self.current_nick, self.nicks[0], params[1]);
                     self.usermask = Some(usermask);
                 }
             }

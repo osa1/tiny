@@ -3,7 +3,6 @@ servers:
     - addr: irc.mozilla.org
       port: 6697
       tls: true
-      hostname: yourhost
       realname: yourname
       nicks: [tiny_user]
 
@@ -31,7 +30,6 @@ servers:
 # Defaults used when connecting to servers via the /connect command
 defaults:
     nicks: [tiny_user]
-    hostname: yourhost
     realname: yourname
     join: []
     tls: false
