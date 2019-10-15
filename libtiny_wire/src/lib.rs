@@ -110,6 +110,24 @@ pub struct Msg {
     pub cmd: Cmd,
 }
 
+/// A client-to-client protocol message. See https://defs.ircdocs.horse/defs/ctcp.html
+#[derive(Debug, PartialEq, Eq)]
+pub enum CTCP {
+    Version,
+    Action,
+    Other(String),
+}
+
+impl CTCP {
+    fn parse(s: &str) -> CTCP {
+        match s {
+            "VERSION" => CTCP::Version,
+            "ACTION" => CTCP::Action,
+            _ => CTCP::Other(s.to_owned()),
+        }
+    }
+}
+
 /// An IRC command or reply
 #[derive(Debug, PartialEq, Eq)]
 pub enum Cmd {
@@ -120,7 +138,7 @@ pub enum Cmd {
         target: MsgTarget,
         msg: String,
         is_notice: bool,
-        is_action: bool,
+        ctcp: Option<CTCP>,
     },
 
     JOIN {
@@ -248,27 +266,41 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
                     false
                 };
                 let target = params[0];
-                let msg = params[1];
+                let mut msg = params[1];
                 let target = if target.chars().nth(0) == Some('#') {
                     MsgTarget::Chan(target.to_owned())
                 } else {
                     MsgTarget::User(target.to_owned())
                 };
-                let is_action = msg.len() >= 8 && &msg.as_bytes()[..8] == ACTION_PREFIX.as_bytes();
-                let msg = if is_action {
-                    if msg.as_bytes()[msg.len() - 1] == 0x01 {
-                        &msg[8..msg.len() - 1]
-                    } else {
-                        &msg[8..]
+
+                let mut ctcp: Option<CTCP> = None;
+                if !msg.is_empty() && msg.as_bytes()[0] == 0x01 {
+                    // Drop 0x01
+                    msg = &msg[1..];
+                    // Parse message type
+                    for (byte_idx, byte) in msg.as_bytes().iter().enumerate() {
+                        if *byte == 0x01 {
+                            let ctcp_type = &msg[0..byte_idx];
+                            ctcp = Some(CTCP::parse(ctcp_type));
+                            msg = &msg[byte_idx + 1..];
+                            break;
+                        } else if *byte == b' ' {
+                            let ctcp_type = &msg[0..byte_idx];
+                            ctcp = Some(CTCP::parse(ctcp_type));
+                            msg = &msg[byte_idx + 1..];
+                            if !msg.is_empty() && msg.as_bytes()[msg.len() - 1] == 0x01 {
+                                msg = &msg[..msg.len() - 1];
+                            }
+                            break;
+                        }
                     }
-                } else {
-                    msg
-                };
+                }
+
                 Cmd::PRIVMSG {
                     target,
                     msg: msg.to_owned(),
                     is_notice,
-                    is_action,
+                    ctcp,
                 }
             }
             MsgType::Cmd("JOIN") if params.len() == 1 => {
@@ -416,8 +448,6 @@ pub fn drop_nick_prefix(nick: &str) -> &str {
     }
 }
 
-static ACTION_PREFIX: &str = "\x01ACTION ";
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,7 +481,7 @@ mod tests {
                     target: MsgTarget::User("tiny".to_owned()),
                     msg: "a b c".to_owned(),
                     is_notice: false,
-                    is_action: false,
+                    ctcp: None,
                 },
             })
         );
@@ -474,7 +504,7 @@ mod tests {
                     target: MsgTarget::User("*".to_owned()),
                     msg: "*** Looking up your hostname...".to_owned(),
                     is_notice: true,
-                    is_action: false,
+                    ctcp: None,
                 },
             })
         );
@@ -574,7 +604,7 @@ mod tests {
                     target: MsgTarget::Chan("#ircv3".to_owned()),
                     msg: "writes some specs!".to_owned(),
                     is_notice: false,
-                    is_action: true,
+                    ctcp: Some(CTCP::Action),
                 },
             })
         );
@@ -600,7 +630,7 @@ mod tests {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "msg contents".to_owned(),
                 is_notice: false,
-                is_action: true,
+                ctcp: Some(CTCP::Action),
             }
         );
         assert_eq!(buf.len(), 0);
@@ -613,7 +643,7 @@ mod tests {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "".to_owned(),
                 is_notice: false,
-                is_action: true,
+                ctcp: Some(CTCP::Action),
             }
         );
         assert_eq!(buf.len(), 0);
@@ -628,10 +658,64 @@ mod tests {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "’’’’’’’".to_owned(),
                 is_notice: false,
-                is_action: false,
+                ctcp: None,
             }
         );
         assert_eq!(buf.len(), 0);
+    }
+
+    #[test]
+    fn test_ctcp_version_parsing() {
+        let mut buf = vec![];
+        write!(&mut buf, ":a!b@c PRIVMSG target :\x01VERSION\x01\r\n").unwrap();
+        assert_eq!(
+            parse_irc_msg(&mut buf).unwrap().cmd,
+            Cmd::PRIVMSG {
+                target: MsgTarget::User("target".to_owned()),
+                msg: "".to_owned(),
+                is_notice: false,
+                ctcp: Some(CTCP::Version),
+            }
+        );
+
+        let mut buf = vec![];
+        write!(&mut buf, ":a!b@c PRIVMSG target :\x01VERSION \x01\r\n").unwrap();
+        assert_eq!(
+            parse_irc_msg(&mut buf).unwrap().cmd,
+            Cmd::PRIVMSG {
+                target: MsgTarget::User("target".to_owned()),
+                msg: "".to_owned(),
+                is_notice: false,
+                ctcp: Some(CTCP::Version),
+            }
+        );
+    }
+
+    #[test]
+    fn other_ctcp_parsing() {
+        let mut buf = vec![];
+        write!(&mut buf, ":a!b@c PRIVMSG target :\x01blah blah \x01\r\n").unwrap();
+        assert_eq!(
+            parse_irc_msg(&mut buf).unwrap().cmd,
+            Cmd::PRIVMSG {
+                target: MsgTarget::User("target".to_owned()),
+                msg: "blah ".to_owned(),
+                is_notice: false,
+                ctcp: Some(CTCP::Other("blah".to_owned())),
+            }
+        );
+
+        let mut buf = vec![];
+        write!(&mut buf, ":a!b@c PRIVMSG target :\x01blah blah \r\n").unwrap();
+        assert_eq!(
+            parse_irc_msg(&mut buf).unwrap().cmd,
+            Cmd::PRIVMSG {
+                target: MsgTarget::User("target".to_owned()),
+                msg: "blah ".to_owned(),
+                is_notice: false,
+                ctcp: Some(CTCP::Other("blah".to_owned())),
+            }
+        );
     }
 
     #[test]

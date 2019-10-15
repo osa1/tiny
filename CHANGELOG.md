@@ -6,6 +6,8 @@
   state after changing nick, causing TUI and client state disagreeing on what
   the current nick is (#149).
 - tiny no longer needs a 'hostname' field in servers in the config file (#150).
+- Version requests are not shown in the server tab if a tab for the requester
+  does not exist (#145).
 
 # 2019/10/05: 0.5.0
 
