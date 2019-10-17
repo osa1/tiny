@@ -72,6 +72,15 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
                 },
             );
         }
+        ConnectionClosed => {
+            ui.add_err_msg(
+                &format!("Connection closed on the remote end"),
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv: client.get_serv_name(),
+                },
+            );
+        }
         TlsErr(err) => {
             ui.add_err_msg(
                 &format!("TLS error: {}", err.description()),

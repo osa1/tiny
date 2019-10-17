@@ -92,6 +92,8 @@ pub enum Event {
     IoErr(std::io::Error),
     /// A TLS error happened
     TlsErr(native_tls::Error),
+    /// Remote end closed the connection
+    ConnectionClosed,
     /// Client couldn't resolve host address. The client stops after sending this event.
     CantResolveAddr,
     /// Nick changed.
@@ -494,11 +496,21 @@ async fn main_loop(
                         }
                     }
                 }
+                // It's fine to fuse() the read_half here because we restart main loop with a new
+                // stream when this stream ends (either with an error, or when it's closed on the
+                // remote end), so we never poll it again after it terminates.
                 bytes = read_half.read(&mut read_buf).fuse() => {
                     match bytes {
                         Err(io_err) => {
                             debug!("main loop: error when reading from socket: {:?}", io_err);
                             snd_ev.send(Event::IoErr(io_err)).await.unwrap();
+                            snd_ev.send(Event::Disconnected).await.unwrap();
+                            wait = true;
+                            continue 'connect;
+                        }
+                        Ok(0) => {
+                            debug!("main loop: read 0 bytes");
+                            snd_ev.send(Event::ConnectionClosed).await.unwrap();
                             snd_ev.send(Event::Disconnected).await.unwrap();
                             wait = true;
                             continue 'connect;

@@ -4,13 +4,14 @@
   to the rest of the addresses when one fails (#144).
 - Fixed a bug introduced in 0.5.0 where the client did not update its internal
   state after changing nick, causing TUI and client state disagreeing on what
-  the current nick is (#149).
+  the current nick is (#149, introduced with #138).
 - tiny no longer needs a 'hostname' field in servers in the config file (#150).
 - Version requests are now shown in the server tab if a tab for the requester
   does not exist (#145).
 - Fixed a bug where we forgot to reset "nick accepted" state on disconnect,
-  causing incorrect nick selection when reconnecting (yet another bug introduced
-  with #138).
+  causing incorrect nick selection when reconnecting (introduced with #138).
+- Fixed a bug that caused the client to loop when the connection is closed on
+  the remote end (#153, another bug introduced with #138).
 
 # 2019/10/05: 0.5.0
 
