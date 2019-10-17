@@ -461,7 +461,7 @@ async fn main_loop(
 
         // Spawn pinger task
         let (mut pinger, rcv_ping_evs) = Pinger::new();
-        let mut rcv_ping_evs_fused = rcv_ping_evs.fuse();
+        let mut rcv_ping_evs = rcv_ping_evs.fuse();
 
         let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
 
@@ -514,7 +514,7 @@ async fn main_loop(
                         }
                     }
                 }
-                ping_ev = rcv_ping_evs_fused.next() => {
+                ping_ev = rcv_ping_evs.next() => {
                     match ping_ev {
                         None => {
                             debug!("Ping thread terminated unexpectedly???");
