@@ -8,6 +8,9 @@
 - tiny no longer needs a 'hostname' field in servers in the config file (#150).
 - Version requests are now shown in the server tab if a tab for the requester
   does not exist (#145).
+- Fixed a bug where we forgot to reset "nick accepted" state on disconnect,
+  causing incorrect nick selection when reconnecting (yet another bug introduced
+  with #138).
 
 # 2019/10/05: 0.5.0
 

@@ -133,6 +133,7 @@ impl StateInner {
     }
 
     fn reset(&mut self) {
+        self.nick_accepted = false;
         self.nicks = self.server_info.nicks.clone();
         self.current_nick_idx = 0;
         self.current_nick = self.nicks[0].clone();
