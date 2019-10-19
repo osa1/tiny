@@ -24,11 +24,44 @@ pub struct GUI {
     snd_cmd: glib::Sender<GUICmd>,
 }
 
+#[derive(Debug)]
+enum MsgTargetOwned {
+    Server { serv: String },
+    Chan { serv: String, chan: String },
+    User { serv: String, nick: String },
+    AllServTabs { serv: String },
+    CurrentTab,
+}
+
+impl MsgTargetOwned {
+    fn from(t: &MsgTarget) -> MsgTargetOwned {
+        use MsgTargetOwned::*;
+        match t {
+            MsgTarget::Server { serv } => Server {
+                serv: serv.to_string(),
+            },
+            MsgTarget::Chan { serv, chan } => Chan {
+                serv: serv.to_string(),
+                chan: chan.to_string(),
+            },
+            MsgTarget::User { serv, nick } => User {
+                serv: serv.to_string(),
+                nick: nick.to_string(),
+            },
+            MsgTarget::AllServTabs { serv } => AllServTabs {
+                serv: serv.to_string(),
+            },
+            MsgTarget::CurrentTab => CurrentTab,
+        }
+    }
+}
+
 enum GUICmd {
     NewServerTab { serv: String },
     CloseServerTab { serv: String },
     NewChanTab { serv: String, chan: String },
     CloseChanTab { serv: String, chan: String },
+    AddClientMsg { msg: String, target: MsgTargetOwned },
 }
 
 impl GUI {
@@ -90,6 +123,9 @@ fn build_ui(
                 CloseChanTab { ref serv, ref chan } => {
                     tabs.close_chan_tab(serv, chan);
                 }
+                AddClientMsg { msg, target } => {
+                    tabs.add_client_msg(msg, target);
+                }
             }
             glib::Continue(true)
         });
@@ -137,8 +173,16 @@ impl UI for GUI {
             })
             .unwrap()
     }
+
     fn close_user_tab(&self, serv: &str, nick: &str) {}
-    fn add_client_msg(&self, msg: &str, target: &MsgTarget) {}
+
+    fn add_client_msg(&self, msg: &str, target: &MsgTarget) {
+        self.snd_cmd.send(AddClientMsg {
+            msg: msg.to_owned(),
+            target: MsgTargetOwned::from(target),
+        });
+    }
+
     fn add_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {}
     fn add_err_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {}
     fn add_client_err_msg(&self, msg: &str, target: &MsgTarget) {}
