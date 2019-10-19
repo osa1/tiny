@@ -11,6 +11,7 @@ gio = "0.7"
 glib = "0.8"
 gtk = { version = "0.7", features = ["v3_22_30"] }
 libtiny_ui = { path = "../libtiny_ui" }
+time = "0.1"
 tokio = { git = "https://github.com/tokio-rs/tokio.git" }
 
 [dev-dependencies]

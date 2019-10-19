@@ -31,5 +31,6 @@ impl Tabs {
         let tab = MessagingUI::new();
         let label = gtk::Label::new(Some(serv));
         self.notebook.append_page(tab.get_widget(), Some(&label));
+        self.notebook.show_all();
     }
 }
