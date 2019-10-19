@@ -9,12 +9,17 @@ fn main() {
 
     executor.spawn(async move {
         loop {
-            tokio::timer::delay_for(std::time::Duration::from_secs(1)).await;
-            gui.new_server_tab("Just testing");
+            gui.new_server_tab("Server");
+            gui.new_chan_tab("Server", "Chan");
+            tokio::timer::delay_for(std::time::Duration::from_secs(3)).await;
         }
     });
 
-    executor.block_on(async move { for ev in rcv_ev.next().await {} });
+    executor.block_on(async move {
+        while let Some(ev) = rcv_ev.next().await {
+            println!("GUI event received: {:?}", ev);
+        }
+    });
 
     executor.run().unwrap(); // unwraps RunError
 }

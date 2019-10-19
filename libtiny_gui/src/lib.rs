@@ -15,6 +15,9 @@ use tokio::sync::mpsc;
 use messaging::MessagingUI;
 use tabs::Tabs;
 
+#[macro_use]
+extern crate log;
+
 #[derive(Clone)]
 pub struct GUI {
     /// Channel to send commands to the GUI, which is running in another thread.
@@ -23,6 +26,9 @@ pub struct GUI {
 
 enum GUICmd {
     NewServerTab { serv: String },
+    CloseServerTab { serv: String },
+    NewChanTab { serv: String, chan: String },
+    CloseChanTab { serv: String, chan: String },
 }
 
 impl GUI {
@@ -40,17 +46,22 @@ fn run_gui(rcv_cmd: glib::Receiver<GUICmd>, snd_ev: mpsc::Sender<Event>) {
         .expect("Initialization failed...");
 
     // Hack to be able to move the channel to build_ui
+    // Easy to move snd_ev as it's Clone
     let rcv_cmd = Rc::new(RefCell::new(Some(rcv_cmd)));
     application.connect_activate(move |app| {
-        build_ui(app, rcv_cmd.clone());
+        build_ui(app, rcv_cmd.clone(), snd_ev.clone());
     });
 
     application.run(&std::env::args().collect::<Vec<_>>());
 }
 
-fn build_ui(application: &gtk::Application, rcv_cmd: Rc<RefCell<Option<glib::Receiver<GUICmd>>>>) {
-    let tabs = Tabs::new();
-    tabs.new_server_tab("mentions");
+fn build_ui(
+    application: &gtk::Application,
+    rcv_cmd: Rc<RefCell<Option<glib::Receiver<GUICmd>>>>,
+    snd_ev: mpsc::Sender<Event>,
+) {
+    let mut tabs = Tabs::new(snd_ev);
+    tabs.new_server_tab("mentions".to_string());
 
     let window = gtk::ApplicationWindow::new(application);
 
@@ -60,14 +71,24 @@ fn build_ui(application: &gtk::Application, rcv_cmd: Rc<RefCell<Option<glib::Rec
     window.add(tabs.get_widget());
     window.show_all();
 
+    use GUICmd::*;
     rcv_cmd
         .borrow_mut()
         .take()
         .unwrap()
         .attach(None, move |cmd| {
             match cmd {
-                GUICmd::NewServerTab { ref serv } => {
+                NewServerTab { serv } => {
                     tabs.new_server_tab(serv);
+                }
+                CloseServerTab { ref serv } => {
+                    tabs.close_server_tab(serv);
+                }
+                NewChanTab { serv, chan } => {
+                    tabs.new_chan_tab(serv, chan);
+                }
+                CloseChanTab { ref serv, ref chan } => {
+                    tabs.close_chan_tab(serv, chan);
                 }
             }
             glib::Continue(true)
@@ -78,20 +99,44 @@ fn build_ui(application: &gtk::Application, rcv_cmd: Rc<RefCell<Option<glib::Rec
 // Implement UI API
 //
 
+use GUICmd::*;
+
 impl UI for GUI {
     fn draw(&self) {}
 
     fn new_server_tab(&self, serv: &str) {
         self.snd_cmd
-            .send(GUICmd::NewServerTab {
+            .send(NewServerTab {
                 serv: serv.to_owned(),
             })
             .unwrap();
     }
 
-    fn close_server_tab(&self, serv: &str) {}
-    fn new_chan_tab(&self, serv: &str, chan: &str) {}
-    fn close_chan_tab(&self, serv: &str, chan: &str) {}
+    fn close_server_tab(&self, serv: &str) {
+        self.snd_cmd
+            .send(CloseServerTab {
+                serv: serv.to_owned(),
+            })
+            .unwrap();
+    }
+
+    fn new_chan_tab(&self, serv: &str, chan: &str) {
+        self.snd_cmd
+            .send(NewChanTab {
+                serv: serv.to_owned(),
+                chan: chan.to_owned(),
+            })
+            .unwrap()
+    }
+
+    fn close_chan_tab(&self, serv: &str, chan: &str) {
+        self.snd_cmd
+            .send(CloseChanTab {
+                serv: serv.to_owned(),
+                chan: chan.to_owned(),
+            })
+            .unwrap()
+    }
     fn close_user_tab(&self, serv: &str, nick: &str) {}
     fn add_client_msg(&self, msg: &str, target: &MsgTarget) {}
     fn add_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {}
