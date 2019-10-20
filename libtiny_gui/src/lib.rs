@@ -12,7 +12,6 @@ use std::thread;
 use time::Tm;
 use tokio::sync::mpsc;
 
-use messaging::MessagingUI;
 use tabs::Tabs;
 
 #[macro_use]
@@ -57,11 +56,82 @@ impl MsgTargetOwned {
 }
 
 enum GUICmd {
-    NewServerTab { serv: String },
-    CloseServerTab { serv: String },
-    NewChanTab { serv: String, chan: String },
-    CloseChanTab { serv: String, chan: String },
-    AddClientMsg { msg: String, target: MsgTargetOwned },
+    NewServerTab {
+        serv: String,
+    },
+    CloseServerTab {
+        serv: String,
+    },
+    NewChanTab {
+        serv: String,
+        chan: String,
+    },
+    CloseChanTab {
+        serv: String,
+        chan: String,
+    },
+    CloseUserTab {
+        serv: String,
+        nick: String,
+    },
+    AddClientMsg {
+        msg: String,
+        target: MsgTargetOwned,
+    },
+    AddMsg {
+        msg: String,
+        target: MsgTargetOwned,
+    },
+    AddErrMsg {
+        msg: String,
+        ts: Tm,
+        target: MsgTargetOwned,
+    },
+    AddClientErrMsg {
+        msg: String,
+        target: MsgTargetOwned,
+    },
+    ClearNicks {
+        serv: String,
+    },
+    SetNick {
+        serv: String,
+        nick: String,
+    },
+    AddPrivmsg {
+        sender: String,
+        msg: String,
+        ts: Tm,
+        target: MsgTargetOwned,
+        highlight: bool,
+        is_action: bool,
+    },
+    AddNick {
+        nick: String,
+        ts: Option<Tm>,
+        target: MsgTargetOwned,
+    },
+    RemoveNick {
+        nick: String,
+        ts: Option<Tm>,
+        target: MsgTargetOwned,
+    },
+    RenameNick {
+        old_nick: String,
+        new_nick: String,
+        ts: Tm,
+        target: MsgTargetOwned,
+    },
+    SetTopic {
+        topic: String,
+        ts: Tm,
+        serv: String,
+        chan: String,
+    },
+    SetTabStyle {
+        style: TabStyle,
+        target: MsgTargetOwned,
+    },
 }
 
 impl GUI {
@@ -123,8 +193,61 @@ fn build_ui(
                 CloseChanTab { ref serv, ref chan } => {
                     tabs.close_chan_tab(serv, chan);
                 }
+                CloseUserTab { ref serv, ref nick } => {
+                    tabs.close_user_tab(serv, nick);
+                }
                 AddClientMsg { msg, target } => {
                     tabs.add_client_msg(msg, target);
+                }
+                AddMsg { msg, target } => {
+                    tabs.add_msg(msg, target);
+                }
+                AddErrMsg { msg, ts, target } => {
+                    tabs.add_err_msg(msg, ts, target);
+                }
+                AddClientErrMsg { msg, target } => {
+                    tabs.add_client_err_msg(msg, target);
+                }
+                ClearNicks { serv } => {
+                    tabs.clear_nicks(serv);
+                }
+                SetNick { serv, nick } => {
+                    tabs.set_nick(serv, nick);
+                }
+                AddPrivmsg {
+                    sender,
+                    msg,
+                    ts,
+                    target,
+                    highlight,
+                    is_action,
+                } => {
+                    tabs.add_privmsg(sender, msg, ts, target, highlight, is_action);
+                }
+                AddNick { nick, ts, target } => {
+                    tabs.add_nick(nick, ts, target);
+                }
+                RemoveNick { nick, ts, target } => {
+                    tabs.remove_nick(nick, ts, target);
+                }
+                RenameNick {
+                    old_nick,
+                    new_nick,
+                    ts,
+                    target,
+                } => {
+                    tabs.rename_nick(old_nick, new_nick, ts, target);
+                }
+                SetTopic {
+                    topic,
+                    ts,
+                    serv,
+                    chan,
+                } => {
+                    tabs.set_topic(topic, ts, serv, chan);
+                }
+                SetTabStyle { style, target } => {
+                    tabs.set_tab_style(style, target);
                 }
             }
             glib::Continue(true)
@@ -174,20 +297,67 @@ impl UI for GUI {
             .unwrap()
     }
 
-    fn close_user_tab(&self, serv: &str, nick: &str) {}
+    fn close_user_tab(&self, serv: &str, nick: &str) {
+        self.snd_cmd
+            .send(CloseUserTab {
+                serv: serv.to_owned(),
+                nick: nick.to_owned(),
+            })
+            .unwrap()
+    }
 
     fn add_client_msg(&self, msg: &str, target: &MsgTarget) {
         self.snd_cmd.send(AddClientMsg {
             msg: msg.to_owned(),
             target: MsgTargetOwned::from(target),
-        });
+        }).unwrap();
     }
 
-    fn add_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {}
-    fn add_err_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {}
-    fn add_client_err_msg(&self, msg: &str, target: &MsgTarget) {}
-    fn clear_nicks(&self, serv: &str) {}
-    fn set_nick(&self, serv: &str, nick: &str) {}
+    fn add_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {
+        self.snd_cmd
+            .send(AddMsg {
+                msg: msg.to_owned(),
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
+    }
+
+    fn add_err_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {
+        self.snd_cmd
+            .send(AddErrMsg {
+                msg: msg.to_owned(),
+                ts,
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
+    }
+
+    fn add_client_err_msg(&self, msg: &str, target: &MsgTarget) {
+        self.snd_cmd
+            .send(AddClientErrMsg {
+                msg: msg.to_owned(),
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
+    }
+
+    fn clear_nicks(&self, serv: &str) {
+        self.snd_cmd
+            .send(ClearNicks {
+                serv: serv.to_owned(),
+            })
+            .unwrap();
+    }
+
+    fn set_nick(&self, serv: &str, nick: &str) {
+        self.snd_cmd
+            .send(SetNick {
+                serv: serv.to_owned(),
+                nick: nick.to_owned(),
+            })
+            .unwrap();
+    }
+
     fn add_privmsg(
         &self,
         sender: &str,
@@ -197,13 +367,70 @@ impl UI for GUI {
         highlight: bool,
         is_action: bool,
     ) {
+        self.snd_cmd
+            .send(AddPrivmsg {
+                sender: sender.to_owned(),
+                msg: msg.to_owned(),
+                ts,
+                target: MsgTargetOwned::from(target),
+                highlight,
+                is_action,
+            })
+            .unwrap();
     }
-    fn add_nick(&self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {}
-    fn remove_nick(&self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {}
-    fn rename_nick(&self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget) {}
-    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &str) {}
-    fn set_tab_style(&self, style: TabStyle, target: &MsgTarget) {}
-    fn user_tab_exists(&self, serv: &str, nick: &str) -> bool {
+
+    fn add_nick(&self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
+        self.snd_cmd
+            .send(AddNick {
+                nick: nick.to_owned(),
+                ts,
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
+    }
+
+    fn remove_nick(&self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
+        self.snd_cmd
+            .send(RemoveNick {
+                nick: nick.to_owned(),
+                ts,
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
+    }
+
+    fn rename_nick(&self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget) {
+        self.snd_cmd
+            .send(RenameNick {
+                old_nick: old_nick.to_owned(),
+                new_nick: new_nick.to_owned(),
+                ts,
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
+    }
+
+    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &str) {
+        self.snd_cmd
+            .send(SetTopic {
+                topic: topic.to_owned(),
+                ts,
+                serv: serv.to_owned(),
+                chan: chan.to_owned(),
+            })
+            .unwrap();
+    }
+
+    fn set_tab_style(&self, style: TabStyle, target: &MsgTarget) {
+        self.snd_cmd
+            .send(SetTabStyle {
+                style,
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
+    }
+
+    fn user_tab_exists(&self, _serv: &str, _nick: &str) -> bool {
         // FIXME: This part of the API will need to change
         false
     }

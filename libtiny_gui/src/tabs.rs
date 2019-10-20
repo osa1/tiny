@@ -2,6 +2,7 @@
 
 use gtk::prelude::*;
 use libtiny_ui::*;
+use time::Tm;
 use tokio::sync::mpsc;
 
 use crate::messaging::MessagingUI;
@@ -11,6 +12,7 @@ pub(crate) struct Tabs {
     notebook: gtk::Notebook,
     snd_ev: mpsc::Sender<Event>,
     tabs: Vec<Tab>,
+    active_idx: usize,
 }
 
 struct Tab {
@@ -27,6 +29,7 @@ impl Tabs {
             notebook,
             snd_ev,
             tabs: vec![],
+            active_idx: 0, // TODO: Incorrect
         }
     }
 
@@ -40,71 +43,184 @@ impl Tabs {
 //
 
 impl Tabs {
-    pub(crate) fn new_server_tab(&mut self, serv: String) {
-        let label = gtk::Label::new(Some(&serv));
-        let src = MsgSource::Serv { serv };
-        let widget = MessagingUI::new(src.clone(), self.snd_ev.clone());
-        self.notebook.append_page(widget.get_widget(), Some(&label));
-        let tab = Tab { widget, src };
-        self.tabs.push(tab);
-        self.notebook.show_all();
+    pub(crate) fn new_server_tab(&mut self, serv: String) -> Option<usize> {
+        unimplemented!()
     }
 
     pub(crate) fn close_server_tab(&mut self, serv: &str) {
-        // TODO: Close all tabs of this server
-        while let Some(idx) = find_idx(&self.tabs, |tab| tab.src.serv_name() == serv) {
-            self.tabs.remove(idx);
-            self.notebook.remove_page(Some(idx as u32));
-        }
+        unimplemented!()
     }
 
-    pub(crate) fn new_chan_tab(&mut self, serv: String, chan: String) {
-        match find_idx(&self.tabs, |tab| tab.src.serv_name() == serv) {
-            None => {
-                debug!("Can't find server tab for server {}", serv);
-                // debug!("Tabs: {:?}", self.tabs);
-            }
-            Some(serv_tab_idx) => {
-                // Insert after the last channel tab for this server
-                let insert_idx =
-                    match find_idx(&self.tabs[serv_tab_idx + 1..], |tab| match tab.src {
-                        MsgSource::Serv { .. } | MsgSource::User { .. } => true,
-                        MsgSource::Chan { .. } => false,
-                    }) {
-                        None => self.tabs.len(),
-                        Some(idx) => idx + serv_tab_idx + 1,
-                    };
-                let label = gtk::Label::new(Some(&chan));
-                let msg_src = MsgSource::Chan { serv, chan };
-                let tab = MessagingUI::new(msg_src, self.snd_ev.clone());
-                println!("insert idx: {}", insert_idx);
-                self.notebook
-                    .insert_page(tab.get_widget(), Some(&label), Some(insert_idx as u32));
-                self.notebook.show_all();
-            }
-        }
+    pub(crate) fn new_chan_tab(&mut self, serv: String, chan: String) -> Option<usize> {
+        unimplemented!()
     }
 
     pub(crate) fn close_chan_tab(&mut self, serv: &str, chan: &str) {
-        match find_idx(&self.tabs, |tab| match tab.src {
-            MsgSource::Chan {
-                serv: ref serv_,
-                chan: ref chan_,
-            } => serv_ == serv && chan_ == chan,
-            _ => false,
-        }) {
-            None => {
-                debug!("Can't find {} tab for server {}", chan, serv);
-                // debug!("Tabs: {:?}", self.tab_srcs);
+        unimplemented!()
+    }
+
+    pub(crate) fn new_user_tab(&mut self, serv: String, nick: String) -> Option<usize> {
+        unimplemented!()
+    }
+
+    pub(crate) fn close_user_tab(&mut self, serv: &str, nick: &str) {
+        unimplemented!()
+    }
+
+    pub(crate) fn add_client_msg(&self, msg: String, target: MsgTargetOwned) {
+        unimplemented!()
+    }
+
+    pub(crate) fn add_msg(&self, msg: String, target: MsgTargetOwned) {
+        unimplemented!()
+    }
+
+    pub(crate) fn add_err_msg(&self, msg: String, ts: Tm, target: MsgTargetOwned) {
+        unimplemented!()
+    }
+
+    pub(crate) fn add_client_err_msg(&self, msg: String, target: MsgTargetOwned) {
+        unimplemented!()
+    }
+
+    pub(crate) fn clear_nicks(&self, serv: String) {
+        unimplemented!()
+    }
+
+    pub(crate) fn set_nick(&self, serv: String, nick: String) {
+        unimplemented!()
+    }
+
+    pub(crate) fn add_privmsg(
+        &self,
+        sender: String,
+        msg: String,
+        ts: Tm,
+        target: MsgTargetOwned,
+        highlight: bool,
+        is_action: bool,
+    ) {
+        unimplemented!()
+    }
+
+    pub(crate) fn add_nick(&self, nick: String, ts: Option<Tm>, target: MsgTargetOwned) {
+        unimplemented!()
+    }
+
+    pub(crate) fn remove_nick(&self, nick: String, ts: Option<Tm>, target: MsgTargetOwned) {
+        unimplemented!()
+    }
+
+    pub(crate) fn rename_nick(
+        &self,
+        old_nick: String,
+        new_nick: String,
+        ts: Tm,
+        target: MsgTargetOwned,
+    ) {
+        unimplemented!()
+    }
+
+    pub(crate) fn set_topic(&self, topic: String, ts: Tm, serv: String, chan: String) {
+        unimplemented!()
+    }
+
+    pub(crate) fn set_tab_style(&self, style: TabStyle, target: MsgTargetOwned) {
+        unimplemented!()
+    }
+}
+
+//
+// Helpers
+//
+
+impl Tabs {
+    fn apply_to_target<F>(&mut self, target: &MsgTarget, f: &F)
+    where
+        F: Fn(&mut Tab, bool),
+    {
+        // Creating a vector just to make borrow checker happy (I can't have a Vec<&mut Tab>)
+        // I need to collect tabs here because of the "create if not exists" logic.
+        // (see `target_idxs.is_empty()` below)
+        let mut target_idxs: Vec<usize> = Vec::with_capacity(1);
+
+        match *target {
+            MsgTarget::Server { serv } => {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
+                    if let MsgSource::Serv { serv: ref serv_ } = tab.src {
+                        if serv == serv_ {
+                            target_idxs.push(tab_idx);
+                            break;
+                        }
+                    }
+                }
             }
-            Some(idx) => {
-                self.tabs.remove(idx);
-                self.notebook.remove_page(Some(idx as u32));
+
+            MsgTarget::Chan { serv, chan } => {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
+                    if let MsgSource::Chan {
+                        serv: ref serv_,
+                        chan: ref chan_,
+                    } = tab.src
+                    {
+                        if serv == serv_ && chan == chan_ {
+                            target_idxs.push(tab_idx);
+                            break;
+                        }
+                    }
+                }
             }
+
+            MsgTarget::User { serv, nick } => {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
+                    if let MsgSource::User {
+                        serv: ref serv_,
+                        nick: ref nick_,
+                    } = tab.src
+                    {
+                        if serv == serv_ && nick == nick_ {
+                            target_idxs.push(tab_idx);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            MsgTarget::AllServTabs { serv } => {
+                for (tab_idx, tab) in self.tabs.iter().enumerate() {
+                    if tab.src.serv_name() == serv {
+                        target_idxs.push(tab_idx);
+                    }
+                }
+            }
+
+            MsgTarget::CurrentTab => {
+                target_idxs.push(self.active_idx);
+            }
+        }
+
+        // Create server/chan/user tab when necessary
+        if target_idxs.is_empty() {
+            if let Some(idx) = self.maybe_create_tab(target) {
+                target_idxs.push(idx);
+            }
+        }
+
+        for tab_idx in target_idxs {
+            f(&mut self.tabs[tab_idx], self.active_idx == tab_idx);
         }
     }
 
-    pub(crate) fn add_client_msg(&self, msg: String, target: MsgTargetOwned) {}
+    fn maybe_create_tab(&mut self, target: &MsgTarget) -> Option<usize> {
+        match *target {
+            MsgTarget::Server { serv } | MsgTarget::AllServTabs { serv } => {
+                self.new_server_tab(serv.to_owned())
+            }
+            MsgTarget::Chan { serv, chan } => self.new_chan_tab(serv.to_owned(), chan.to_owned()),
+            MsgTarget::User { serv, nick } => self.new_user_tab(serv.to_owned(), nick.to_owned()),
+            _ => None,
+        }
+    }
 }
 
 // TODO: Duplicate from libtiny_client::utils
