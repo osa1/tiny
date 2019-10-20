@@ -12,6 +12,7 @@ fn main() {
             gui.new_server_tab("Server");
             gui.new_chan_tab("Server", "Chan");
             tokio::timer::delay_for(std::time::Duration::from_secs(3)).await;
+            gui.add_client_msg("just tesing", &MsgTarget::Server { serv: "Server" });
         }
     });
 

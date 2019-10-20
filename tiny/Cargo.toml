@@ -13,6 +13,7 @@ dirs = "1.0.2"
 env_logger = "0.7"
 futures-util-preview = "0.3.0-alpha.19"
 libtiny_client = { path = "../libtiny_client" }
+libtiny_gui = { path = "../libtiny_gui" }
 libtiny_logger = { path = "../libtiny_logger" }
 libtiny_tui = { path = "../libtiny_tui" }
 libtiny_ui = { path = "../libtiny_ui" }

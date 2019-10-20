@@ -5,7 +5,6 @@ mod tabs;
 
 use gio::prelude::*;
 use gtk::prelude::*;
-use libtiny_ui::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::thread;
@@ -13,6 +12,7 @@ use time::Tm;
 use tokio::sync::mpsc;
 
 use tabs::Tabs;
+pub use libtiny_ui::*;
 
 #[macro_use]
 extern crate log;
@@ -57,25 +57,16 @@ impl MsgTargetOwned {
     fn borrow(&self) -> MsgTarget {
         use MsgTargetOwned::*;
         match self {
-            Server { ref serv } => MsgTarget::Server {
-                serv
-            },
-            Chan { ref serv, ref chan } => MsgTarget::Chan {
-                serv,
-                chan,
-            },
-            User { ref serv, ref nick } => MsgTarget::User {
-                serv,
-                nick,
-            },
-            AllServTabs { ref serv } => MsgTarget::AllServTabs {
-                serv,
-            },
+            Server { ref serv } => MsgTarget::Server { serv },
+            Chan { ref serv, ref chan } => MsgTarget::Chan { serv, chan },
+            User { ref serv, ref nick } => MsgTarget::User { serv, nick },
+            AllServTabs { ref serv } => MsgTarget::AllServTabs { serv },
             CurrentTab => MsgTarget::CurrentTab,
         }
     }
 }
 
+#[derive(Debug)]
 enum GUICmd {
     NewServerTab {
         serv: String,
@@ -160,7 +151,7 @@ impl GUI {
     /// Runs a GUI in a new thread.
     pub fn run() -> (GUI, mpsc::Receiver<Event>) {
         let (snd_cmd, rcv_cmd) = glib::MainContext::channel::<GUICmd>(glib::PRIORITY_DEFAULT);
-        let (snd_ev, rcv_ev) = mpsc::channel::<Event>(10);
+        let (snd_ev, rcv_ev) = mpsc::channel::<Event>(1000);
         thread::spawn(move || run_gui(rcv_cmd, snd_ev));
         (GUI { snd_cmd }, rcv_ev)
     }
@@ -202,6 +193,7 @@ fn build_ui(
         .take()
         .unwrap()
         .attach(None, move |cmd| {
+            println!("GUI thread got cmd: {:?}", cmd);
             match cmd {
                 NewServerTab { serv } => {
                     tabs.new_server_tab(serv);

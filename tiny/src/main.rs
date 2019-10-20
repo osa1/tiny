@@ -13,7 +13,9 @@ mod utils;
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny_client::{Client, ServerInfo};
 use libtiny_logger::Logger;
-use libtiny_tui::{Colors, MsgTarget, TUI};
+// use libtiny_tui::{Colors, MsgTarget, TUI};
+use libtiny_tui::Colors;
+use libtiny_gui::{GUI, MsgTarget};
 use libtiny_ui::UI;
 use std::path::PathBuf;
 
@@ -80,7 +82,8 @@ fn run(
     let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
 
     // Create TUI task
-    let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
+    // let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
+    let (tui, rcv_tui_ev) = GUI::run();
 
     // Init "mentions" tab. This needs to happen before initializing the logger as otherwise we
     // won't have a tab to show errors when something goes wrong during initialization.

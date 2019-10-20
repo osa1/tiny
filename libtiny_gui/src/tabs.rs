@@ -23,7 +23,7 @@ impl Tabs {
     pub(crate) fn new(snd_ev: mpsc::Sender<Event>) -> Tabs {
         let notebook = gtk::Notebook::new();
         notebook.set_tab_pos(gtk::PositionType::Bottom);
-
+        notebook.set_scrollable(true);
         Tabs {
             notebook,
             snd_ev,
@@ -182,9 +182,7 @@ impl Tabs {
 
     pub(crate) fn set_nick(&mut self, serv: String, new_nick: String) {
         let target = MsgTarget::AllServTabs { serv: &serv };
-        self.apply_to_target(&target, &|tab, _| {
-            tab.widget.set_nick(&new_nick)
-        });
+        self.apply_to_target(&target, &|tab, _| tab.widget.set_nick(&new_nick));
     }
 
     pub(crate) fn add_privmsg(
@@ -198,7 +196,8 @@ impl Tabs {
     ) {
         let target = target.borrow();
         self.apply_to_target(&target, &|tab, _| {
-            tab.widget.add_privmsg(&sender, &msg, ts, highlight, is_action);
+            tab.widget
+                .add_privmsg(&sender, &msg, ts, highlight, is_action);
             // TODO
             // let nick = tab.widget.get_nick();
             // if let Some(nick_) = nick {
@@ -233,7 +232,10 @@ impl Tabs {
     }
 
     pub(crate) fn set_topic(&mut self, topic: String, ts: Tm, serv: String, chan: String) {
-        let target = MsgTarget::Chan { serv: &serv, chan: &chan };
+        let target = MsgTarget::Chan {
+            serv: &serv,
+            chan: &chan,
+        };
         self.apply_to_target(&target, &|tab, _| {
             tab.widget.show_topic(&topic, ts);
         });
@@ -252,13 +254,23 @@ impl Tabs {
 impl Tabs {
     fn new_tab(&mut self, idx: usize, src: MsgSource) {
         let src_ = src.clone();
+        let msg_ui = MessagingUI::new(src_, self.snd_ev.clone());
+        let label_str = match src {
+            MsgSource::Serv { ref serv } => serv,
+            MsgSource::Chan { ref chan, .. } => chan,
+            MsgSource::User { ref nick, .. } => nick,
+        };
+        let label = gtk::Label::new(Some(label_str));
+        self.notebook
+            .insert_page(msg_ui.get_widget(), Some(&label), Some(idx as u32));
         self.tabs.insert(
             idx,
             Tab {
-                widget: MessagingUI::new(src_, self.snd_ev.clone()),
+                widget: msg_ui,
                 src,
             },
         );
+        self.notebook.show_all();
     }
 
     fn select_tab(&mut self, tab_idx: usize) {

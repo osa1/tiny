@@ -62,7 +62,7 @@ impl MsgSource {
 // style with higher significance for a less significant style (e.g. updating
 // from `Highlight` to `NewMsg` in `set_tab_style`).
 // TODO: This shouldn't be a part of the API
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TabStyle {
     Normal,
     NewMsg,

@@ -4,10 +4,11 @@ use gio::prelude::*;
 use gtk::prelude::*;
 use libtiny_ui::*;
 use std::cell::RefCell;
-use tokio::sync::mpsc;
 use time::Tm;
+use tokio::sync::mpsc;
 
 pub(crate) struct MessagingUI {
+    scrolled: gtk::ScrolledWindow,
     text_view: gtk::TextView,
     entry: gtk::Entry,
     box_: gtk::Box,
@@ -16,8 +17,9 @@ pub(crate) struct MessagingUI {
 
 impl MessagingUI {
     pub(crate) fn new(msg_src: MsgSource, snd_ev: mpsc::Sender<Event>) -> MessagingUI {
-        // vbox -> [ text_view, entry ]
+        // vbox -> [ scrolled -> text_view, entry ]
         let box_ = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let scrolled = gtk::ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
 
         let text_view = gtk::TextViewBuilder::new()
             .cursor_visible(false)
@@ -42,10 +44,12 @@ impl MessagingUI {
             }
         });
 
-        box_.pack_start(&text_view, true, true, 0);
+        box_.pack_start(&scrolled, true, true, 0);
+        scrolled.add(&text_view);
         box_.pack_start(&entry, false, true, 0);
 
         MessagingUI {
+            scrolled,
             text_view,
             entry,
             box_,
@@ -58,42 +62,71 @@ impl MessagingUI {
     }
 
     pub(crate) fn add_client_msg(&self, msg: &str) {
-        unimplemented!()
+        let text_buffer = self.text_view.get_buffer().unwrap();
+        let mut end_iter = text_buffer.get_end_iter();
+        text_buffer.insert_markup(&mut end_iter, &format!("[client] {}\n", msg));
     }
 
     pub(crate) fn add_msg(&self, msg: &str, ts: Tm) {
-        unimplemented!()
+        let text_buffer = self.text_view.get_buffer().unwrap();
+        let mut end_iter = text_buffer.get_end_iter();
+        text_buffer.insert_markup(&mut end_iter, &format!("{}\n", msg));
     }
 
     pub(crate) fn add_err_msg(&self, msg: &str, ts: Tm) {
-        unimplemented!()
+        let text_buffer = self.text_view.get_buffer().unwrap();
+        let mut end_iter = text_buffer.get_end_iter();
+        text_buffer.insert_markup(
+            &mut end_iter,
+            &format!(
+                "[error] [{}] {}\n",
+                time::strftime("%H:%M:%S", &ts).unwrap(),
+                msg
+            ),
+        );
     }
 
     pub(crate) fn add_client_err_msg(&self, msg: &str) {
-        unimplemented!()
+        let text_buffer = self.text_view.get_buffer().unwrap();
+        let mut end_iter = text_buffer.get_end_iter();
+        text_buffer.insert_markup(&mut end_iter, &format!("[client error] {}\n", msg));
     }
 
     pub(crate) fn clear_nicks(&self) {
-        unimplemented!()
+        // TODO
+        // unimplemented!()
     }
 
     pub(crate) fn set_nick(&self, new_nick: &str) {
-        unimplemented!()
+        // TODO
+        // unimplemented!()
     }
 
-    pub(crate) fn add_privmsg(&self, sender: &str, msg: &str, ts: Tm, highlight: bool, is_action: bool) {
-        unimplemented!()
+    pub(crate) fn add_privmsg(
+        &self,
+        sender: &str,
+        msg: &str,
+        ts: Tm,
+        highlight: bool,
+        is_action: bool,
+    ) {
+        let text_buffer = self.text_view.get_buffer().unwrap();
+        let mut end_iter = text_buffer.get_end_iter();
+        text_buffer.insert_markup(&mut end_iter, &format!("<{}> {}\n", sender, msg));
     }
 
     pub(crate) fn join(&self, nick: &str, ts: Option<Tm>) {
-        unimplemented!()
+        // TODO
+        // unimplemented!()
     }
 
     pub(crate) fn part(&self, nick: &str, ts: Option<Tm>) {
-        unimplemented!()
+        // TODO
+        // unimplemented!()
     }
 
     pub(crate) fn show_topic(&self, topic: &str, ts: Tm) {
-        unimplemented!()
+        // TODO
+        // unimplemented!()
     }
 }
