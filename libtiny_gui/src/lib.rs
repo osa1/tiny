@@ -53,6 +53,27 @@ impl MsgTargetOwned {
             MsgTarget::CurrentTab => CurrentTab,
         }
     }
+
+    fn borrow(&self) -> MsgTarget {
+        use MsgTargetOwned::*;
+        match self {
+            Server { ref serv } => MsgTarget::Server {
+                serv
+            },
+            Chan { ref serv, ref chan } => MsgTarget::Chan {
+                serv,
+                chan,
+            },
+            User { ref serv, ref nick } => MsgTarget::User {
+                serv,
+                nick,
+            },
+            AllServTabs { ref serv } => MsgTarget::AllServTabs {
+                serv,
+            },
+            CurrentTab => MsgTarget::CurrentTab,
+        }
+    }
 }
 
 enum GUICmd {
@@ -80,6 +101,7 @@ enum GUICmd {
     },
     AddMsg {
         msg: String,
+        ts: Tm,
         target: MsgTargetOwned,
     },
     AddErrMsg {
@@ -199,8 +221,8 @@ fn build_ui(
                 AddClientMsg { msg, target } => {
                     tabs.add_client_msg(msg, target);
                 }
-                AddMsg { msg, target } => {
-                    tabs.add_msg(msg, target);
+                AddMsg { msg, ts, target } => {
+                    tabs.add_msg(msg, ts, target);
                 }
                 AddErrMsg { msg, ts, target } => {
                     tabs.add_err_msg(msg, ts, target);
@@ -307,16 +329,19 @@ impl UI for GUI {
     }
 
     fn add_client_msg(&self, msg: &str, target: &MsgTarget) {
-        self.snd_cmd.send(AddClientMsg {
-            msg: msg.to_owned(),
-            target: MsgTargetOwned::from(target),
-        }).unwrap();
+        self.snd_cmd
+            .send(AddClientMsg {
+                msg: msg.to_owned(),
+                target: MsgTargetOwned::from(target),
+            })
+            .unwrap();
     }
 
     fn add_msg(&self, msg: &str, ts: Tm, target: &MsgTarget) {
         self.snd_cmd
             .send(AddMsg {
                 msg: msg.to_owned(),
+                ts,
                 target: MsgTargetOwned::from(target),
             })
             .unwrap();
