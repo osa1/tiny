@@ -278,30 +278,6 @@ impl<UI1: UI + Clone, UI2: UI + Clone> UI for CombinedUIs<UI1, UI2> {
     }
 }
 
-impl UI for () {
-    fn draw(&self) {}
-    fn new_server_tab(&self, _: &str) {}
-    fn close_server_tab(&self, _: &str) {}
-    fn new_chan_tab(&self, _: &str, _: &str) {}
-    fn close_chan_tab(&self, _: &str, _: &str) {}
-    fn close_user_tab(&self, _: &str, _: &str) {}
-    fn add_client_msg(&self, _: &str, _: &MsgTarget) {}
-    fn add_msg(&self, _: &str, _: Tm, _: &MsgTarget) {}
-    fn add_err_msg(&self, _: &str, _: Tm, _: &MsgTarget) {}
-    fn add_client_err_msg(&self, _: &str, _: &MsgTarget) {}
-    fn clear_nicks(&self, _: &str) {}
-    fn set_nick(&self, _: &str, _: &str) {}
-    fn add_privmsg(&self, _: &str, _: &str, _: Tm, _: &MsgTarget, _: bool, _: bool) {}
-    fn add_nick(&self, _: &str, _: Option<Tm>, _: &MsgTarget) {}
-    fn remove_nick(&self, _: &str, _: Option<Tm>, _: &MsgTarget) {}
-    fn rename_nick(&self, _: &str, _: &str, _: Tm, _: &MsgTarget) {}
-    fn set_topic(&self, _: &str, _: Tm, _: &str, _: &str) {}
-    fn set_tab_style(&self, _: TabStyle, _: &MsgTarget) {}
-    fn user_tab_exists(&self, _: &str, _: &str) -> bool {
-        false
-    }
-}
-
 pub fn combine<UI1: UI, UI2: UI>(ui1: UI1, ui2: UI2) -> CombinedUIs<UI1, UI2> {
     CombinedUIs { ui1, ui2 }
 }
