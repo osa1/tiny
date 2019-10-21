@@ -6,7 +6,6 @@ use std::convert::From;
 use time::{self, Tm};
 
 use crate::{
-    config,
     config::{Colors, Style},
     exit_dialogue::ExitDialogue,
     msg_area::{
@@ -41,7 +40,7 @@ pub(crate) struct MessagingUI {
     nicks: Trie,
 
     current_nick: Option<String>,
-    draw_current_nick: bool,
+    show_current_nick: bool,
 
     last_activity_line: Option<ActivityLine>,
     last_activity_ts: Option<Timestamp>,
@@ -89,7 +88,7 @@ impl MessagingUI {
             show_status: status,
             nicks: Trie::new(),
             current_nick: None,
-            draw_current_nick: true,
+            show_current_nick: true,
             last_activity_line: None,
             last_activity_ts: None,
         }
@@ -118,7 +117,7 @@ impl MessagingUI {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
 
         if let Some(ref nick) = self.current_nick {
-            if self.draw_current_nick {
+            if self.show_current_nick {
                 let nick_color = colors.nick[self.get_nick_color(nick) % colors.nick.len()];
                 let style = Style {
                     fg: u16::from(nick_color),
@@ -129,7 +128,7 @@ impl MessagingUI {
                     pos_x + nick.len() as i32,
                     pos_y + self.height - 1,
                     ':',
-                    colors.user_msg.fg | config::TB_BOLD,
+                    colors.user_msg.fg,
                     colors.user_msg.bg,
                 );
                 self.draw_input_field(
@@ -223,9 +222,9 @@ impl MessagingUI {
             }
         };
 
-        self.draw_current_nick = (nick_width as f32) <= (width as f32) * (30f32 / 100f32);
+        self.show_current_nick = (nick_width as f32) <= (width as f32) * (30f32 / 100f32);
 
-        let widget_width = if self.draw_current_nick {
+        let widget_width = if self.show_current_nick {
             width - nick_width
         } else {
             width
