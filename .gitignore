@@ -3,4 +3,3 @@ target
 logs
 stderr
 stdout
-Cargo.lock
