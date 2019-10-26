@@ -12,4 +12,3 @@ futures-preview = "0.3.0-alpha.18"
 libc = "0.2"
 mio = "0.6"
 tokio = { git = "https://github.com/tokio-rs/tokio.git" }
-tokio-net = { git = "https://github.com/tokio-rs/tokio.git" }

@@ -29,8 +29,8 @@ use std::rc::{Rc, Weak};
 use term_input::Input;
 use time::Tm;
 use tokio::runtime::current_thread::Runtime;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
-use tokio_net::signal::unix::{signal, SignalKind};
 
 #[macro_use]
 extern crate log;

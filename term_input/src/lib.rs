@@ -168,7 +168,7 @@ pub struct Input {
     /// Used when reading from stdin.
     buf: Vec<u8>,
 
-    stdin: tokio_net::util::PollEvented<mio::unix::EventedFd<'static>>,
+    stdin: tokio::net::util::PollEvented<mio::unix::EventedFd<'static>>,
 }
 
 impl Input {
@@ -176,7 +176,8 @@ impl Input {
         Input {
             evs: VecDeque::new(),
             buf: Vec::with_capacity(100),
-            stdin: tokio_net::util::PollEvented::new(mio::unix::EventedFd(&libc::STDIN_FILENO)),
+            stdin: tokio::net::util::PollEvented::new(mio::unix::EventedFd(&libc::STDIN_FILENO))
+                .unwrap(),
         }
     }
 }

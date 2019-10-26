@@ -16,8 +16,7 @@ tempfile = "3.0.3"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
-tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"] }
-tokio-net = { git = "https://github.com/tokio-rs/tokio.git", features = ["signal"] }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer", "signal"] }
 
 [dev-dependencies]
 mio = "0.6.9"
