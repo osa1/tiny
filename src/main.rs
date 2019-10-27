@@ -22,7 +22,7 @@ fn main() {
         servers: server_args,
         config_path,
     } = parse_cmd_line_args(std::env::args());
-    let config_path = config_path.unwrap_or_else(config::get_default_config_path);
+    let config_path = config_path.unwrap_or_else(config::get_config_path);
     if config_path.is_dir() {
         println!("The config path is a directory.");
         ::std::process::exit(1);

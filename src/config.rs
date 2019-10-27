@@ -1,13 +1,11 @@
 //! To see how color numbers map to actual colors in your terminal run
 //! `cargo run --example colors`. Use tab to swap fg/bg colors.
-use dirs::home_dir;
 use serde::Deserialize;
 use serde_yaml;
-use std::{
-    fs::File,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-};
+use std::fs;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) struct SASLAuth {
@@ -70,10 +68,40 @@ pub(crate) struct Config {
     pub(crate) log_dir: Option<PathBuf>,
 }
 
-pub(crate) fn get_default_config_path() -> PathBuf {
-    let mut config_path = home_dir().unwrap();
-    config_path.push(".tinyrc.yml");
-    config_path
+/// Returns tiny config file path. File may or may not exist.
+///
+/// Places to look: (in priority order)
+///
+/// - $XDG_CONFIG_HOME/tiny/config.yml
+/// - $HOME/.config/tiny/config.yml
+/// - $HOME/.tinyrc.yml (old, for backward compat)
+///
+/// Panics when none of $XDG_CONFIG_HOME or $HOME can be found (using the `dirs` crate).
+pub(crate) fn get_config_path() -> PathBuf {
+    let xdg_config_path = dirs::config_dir().map(|mut xdg_config_home| {
+        xdg_config_home.push("tiny");
+        let _ = fs::create_dir_all(&xdg_config_home);
+        xdg_config_home.push("config.yml");
+        xdg_config_home
+    });
+
+    let home_config_path = dirs::home_dir().map(|mut home_dir| {
+        home_dir.push(".tinyrc.yml");
+        home_dir
+    });
+
+    match (xdg_config_path, home_config_path) {
+        (Some(xdg_config_path), _) if xdg_config_path.exists() => xdg_config_path,
+        (_, Some(home_config_path)) if home_config_path.exists() => home_config_path,
+        (Some(xdg_config_path), _) => xdg_config_path,
+        (_, Some(home_config_path)) => home_config_path,
+        (None, None) => {
+            panic!(
+                "Can't read $HOME or $XDG_CONFIG_HOME environment variables,
+                please consider setting at least one of these variables"
+            );
+        }
+    }
 }
 
 pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
@@ -107,7 +135,7 @@ You may want to edit {0:?} before re-running tiny.",
 }
 
 fn get_default_config_yaml() -> String {
-    let mut log_dir = home_dir().unwrap();
+    let mut log_dir = dirs::home_dir().unwrap();
     log_dir.push("tiny_logs");
     format!(
         include_str!("../tinyrc.yml"),
