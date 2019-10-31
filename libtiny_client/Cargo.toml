@@ -14,6 +14,6 @@ libtiny_logger = { path = "../libtiny_logger" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = "0.2"
-tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"] }
-tokio-executor = { git = "https://github.com/tokio-rs/tokio.git" }
-tokio-tls = { git = "https://github.com/tokio-rs/tokio.git" }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"], rev = "227533d" }
+tokio-executor = { git = "https://github.com/tokio-rs/tokio.git", rev = "227533d" }
+tokio-tls = { git = "https://github.com/tokio-rs/tokio.git", rev = "227533d" }

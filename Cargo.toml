@@ -32,7 +32,7 @@ log = "0.4"
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 time = "0.1"
-tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"] }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"], rev = "227533d" }
 
 [profile.release]
 lto = true
