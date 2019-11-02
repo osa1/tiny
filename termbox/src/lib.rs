@@ -110,7 +110,7 @@ impl Termbox {
         }
 
         // See also Drop impl where we reverse all this
-        let mut new_term: libc::termios = old_term.clone();
+        let mut new_term: libc::termios = old_term;
         new_term.c_iflag &= !(libc::IGNBRK
             | libc::BRKINT
             | libc::PARMRK
@@ -433,13 +433,9 @@ fn num_to_buf(buf: &mut Vec<u8>, mut num: u16) {
 
     let swap_len = start_len + (chars_len / 2) as usize;
 
-    let mut c = 0;
-    for i in start_len..swap_len {
+    for (c, i) in (start_len..swap_len).enumerate() {
         let next_swap_idx = start_len + chars_len - c - 1;
-        let cur_char = buf[next_swap_idx];
-        buf[next_swap_idx] = buf[i];
-        buf[i] = cur_char;
-        c += 1;
+        buf.swap(next_swap_idx, i);
     }
 }
 
