@@ -82,17 +82,14 @@ mod tests {
     #[test]
     fn test_split_iterator_1() {
         let iter = split_iterator("yada yada yada", 5);
-        assert_eq!(
-            iter.into_iter().collect::<Vec<&str>>(),
-            vec!["yada ", "yada ", "yada"]
-        );
+        assert_eq!(iter.collect::<Vec<&str>>(), vec!["yada ", "yada ", "yada"]);
     }
 
     #[test]
     fn test_split_iterator_2() {
         let iter = split_iterator("yada yada yada", 4);
         assert_eq!(
-            iter.into_iter().collect::<Vec<&str>>(),
+            iter.collect::<Vec<&str>>(),
             // weird but OK
             vec!["yada", " ", "yada", " ", "yada"]
         );
@@ -102,7 +99,7 @@ mod tests {
     fn test_split_iterator_3() {
         let iter = split_iterator("yada yada yada", 3);
         assert_eq!(
-            iter.into_iter().collect::<Vec<&str>>(),
+            iter.collect::<Vec<&str>>(),
             vec!["yad", "a ", "yad", "a ", "yad", "a"]
         );
     }
@@ -111,7 +108,7 @@ mod tests {
     fn test_split_iterator_4() {
         let iter = split_iterator("longwordislong", 3);
         assert_eq!(
-            iter.into_iter().collect::<Vec<&str>>(),
+            iter.collect::<Vec<&str>>(),
             vec!["lon", "gwo", "rdi", "slo", "ng"]
         );
     }
@@ -119,13 +116,13 @@ mod tests {
     #[test]
     fn test_split_iterator_5() {
         let iter = split_iterator("", 3);
-        assert_eq!(iter.into_iter().collect::<Vec<&str>>(), vec![""]);
+        assert_eq!(iter.collect::<Vec<&str>>(), vec![""]);
     }
 
     #[test]
     fn test_split_iterator_6() {
         let iter = split_iterator("", 0);
         let ret: Vec<&str> = vec![];
-        assert_eq!(iter.into_iter().collect::<Vec<&str>>(), ret);
+        assert_eq!(iter.collect::<Vec<&str>>(), ret);
     }
 }

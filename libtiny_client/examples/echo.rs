@@ -61,7 +61,7 @@ async fn echo_bot_task(server_info: ServerInfo) {
     while let Some(ev) = rcv_ev.next().await {
         println!("Client event: {:?}", ev);
         if let Event::Msg(Msg {
-            pfx: Some(Pfx::User { nick, user: _ }),
+            pfx: Some(Pfx::User { nick, .. }),
             cmd: Cmd::PRIVMSG { target, msg, .. },
         }) = ev
         {
