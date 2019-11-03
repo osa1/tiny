@@ -78,47 +78,15 @@ tiny is tested on Linux and OSX.
 
 ## Configuration
 
-When tiny couldn't find a config file at `~/.tinyrc.yml` it creates one with
-some defaults and exits. Edit that file before re-running tiny to change the
-defaults. If you want to create the file yourself, the default file looks like
-this:
+tiny looks for these places for a config file:
 
-```yaml
-# Servers to auto-connect
-servers:
-    - addr: irc.mozilla.org
-      port: 6697
-      # Optional field, defaults to false:
-      tls: true
-      # Optional field for server password:
-      # pass: 'server_pass'
-      realname: yourname
-      nicks: [tiny_user]
+- `$XDG_CONFIG_HOME/tiny/config.yml`
+- (when `$XDG_CONFIG_HOME` is not defined) `$HOME/.config/tiny/config.yml`
+- (deprecated) `$HOME/.tinyrc.yml`
 
-      # Optional SASL authentication
-      # sasl:
-      #   username: 'tiny_user'
-      #   password: 'hunter2'
-
-      # Channels to automatically join
-      join:
-          - '#tiny'
-          - '#rust'
-
-      # Optional password to identify via NickServ
-      # nickserv_ident: 'hunter2'
-
-# Defaults used when connecting to a server via the /connect command
-defaults:
-    nicks: [tiny_user]
-    realname: yourname
-    join: []
-
-# Where to put log files
-log_dir: '/home/$USER/tiny_logs'
-
-# <Color scheme configuration>
-```
+when a config file is not found in one of these locations tiny creates one with
+defaults and exists, printing path to the config file. Edit that file before
+re-running tiny to change the defaults.
 
 **A note on nick identification:** Some IRC servers such as ircd-seven (used by
 Freenode) and InspIRCd (used by Mozilla) support identification via the `PASS`
