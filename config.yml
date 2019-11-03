@@ -37,8 +37,8 @@ defaults:
 # Where to put log files
 log_dir: '{}'
 
-# Color theme based on 256 colors (if supported). Colors can be defined as color
-# indices (0-255) or with their names.
+# Color theme based on 256 colors. Colors can be defined as color indices
+# (0-255) or with their names.
 #
 # Accepted color names are:
 # default (0), black (0), maroon (1), green (2), olive (3), navy (4),

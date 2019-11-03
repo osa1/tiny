@@ -138,7 +138,7 @@ fn get_default_config_yaml() -> String {
     let mut log_dir = dirs::home_dir().unwrap();
     log_dir.push("tiny_logs");
     format!(
-        include_str!("../tinyrc.yml"),
+        include_str!("../config.yml"),
         log_dir.as_path().to_str().unwrap()
     )
 }
