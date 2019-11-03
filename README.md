@@ -49,7 +49,7 @@ tiny is an IRC client written in Rust.
 Install the Rust nightly toolchain, clone the repo, and run
 
 ```
-cargo install --path .
+cargo install --path tiny
 ```
 
 If you don't want to clone the repo, you can use

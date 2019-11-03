@@ -1,13 +1,3 @@
-[package]
-name = "tiny"
-version = "0.5.0"
-authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
-repository = "https://github.com/osa1/tiny"
-readme = "README.md"
-license = "MIT"
-description = "An IRC client"
-edition = "2018"
-
 [workspace]
 members = [
     "libtiny_client",
@@ -17,22 +7,8 @@ members = [
     "libtiny_wire",
     "term_input",
     "termbox",
+    "tiny",
 ]
-
-[dependencies]
-dirs = "1.0.2"
-env_logger = "0.7"
-futures-util-preview = "0.3.0-alpha.19"
-libtiny_client = { path = "libtiny_client" }
-libtiny_logger = { path = "libtiny_logger" }
-libtiny_tui = { path = "libtiny_tui" }
-libtiny_ui = { path = "libtiny_ui" }
-libtiny_wire = { path = "libtiny_wire" }
-log = "0.4"
-serde = { version = "1.0.8", features = ["derive"] }
-serde_yaml = "0.7.1"
-time = "0.1"
-tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"], rev = "227533d" }
 
 [profile.release]
 lto = true
