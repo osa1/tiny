@@ -284,13 +284,22 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
+    fn _add_client_msg(&mut self, msg: &str) {
+        // Replace tabs with 4 spaces
+        let msg = msg.replace("\t", "    ");
+        let lines = msg.split('\n');
+        for line in lines {
+            self.msg_area.add_text(line);
+            self.msg_area.flush_line();
+        }
+    }
+
     pub(crate) fn add_client_err_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
-        self.msg_area.add_text(msg);
-        self.msg_area.flush_line();
+        self._add_client_msg(msg);
     }
 
     pub(crate) fn add_client_notify_msg(&mut self, msg: &str) {
@@ -298,8 +307,7 @@ impl MessagingUI {
 
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-        self.msg_area.add_text(msg);
-        self.msg_area.flush_line();
+        self._add_client_msg(msg);
         self.reset_activity_line();
     }
 
@@ -308,8 +316,7 @@ impl MessagingUI {
 
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
-        self.msg_area.add_text(msg);
-        self.msg_area.flush_line();
+        self._add_client_msg(msg);
         self.reset_activity_line();
     }
 
