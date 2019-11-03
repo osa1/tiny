@@ -13,7 +13,7 @@ gtk = { version = "0.7", features = ["v3_22_30"] }
 libtiny_ui = { path = "../libtiny_ui" }
 log = "0.4"
 time = "0.1"
-tokio = { git = "https://github.com/tokio-rs/tokio.git" }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", rev = "227533d" }
 
 [dev-dependencies]
 futures-util-preview = "0.3.0-alpha.19"

@@ -672,7 +672,7 @@ dependencies = [
  "libtiny_ui 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.2.0-alpha.6 (git+https://github.com/tokio-rs/tokio.git)",
+ "tokio 0.2.0-alpha.6 (git+https://github.com/tokio-rs/tokio.git?rev=227533d)",
 ]
 
 [[package]]
