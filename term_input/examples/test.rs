@@ -13,7 +13,7 @@ fn main() {
         libc::tcgetattr(libc::STDIN_FILENO, &mut old_term);
     }
 
-    let mut new_term: libc::termios = old_term.clone();
+    let mut new_term: libc::termios = old_term;
     new_term.c_iflag &= !(libc::IGNBRK
         | libc::BRKINT
         | libc::PARMRK
