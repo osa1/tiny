@@ -56,7 +56,7 @@ fn show_usage() {
 static NICK_SEP: [&str; 4] = [": ", ", ", ":", ","];
 
 async fn echo_bot_task(server_info: ServerInfo) {
-    let (mut client, mut rcv_ev) = Client::new(server_info, None);
+    let (mut client, mut rcv_ev) = Client::new(server_info);
 
     while let Some(ev) = rcv_ev.next().await {
         println!("Client event: {:?}", ev);
