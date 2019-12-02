@@ -21,7 +21,6 @@ use futures_util::stream::Fuse;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::runtime::current_thread::Runtime;
 use tokio::sync::mpsc;
 
 #[macro_use]
@@ -138,11 +137,8 @@ pub struct Client {
 impl Client {
     /// Create a new client. Spawns two `tokio` tasks on the given `runtime`. If not given, tasks
     /// are created on the default executor using `tokio::spawn`.
-    pub fn new(
-        server_info: ServerInfo,
-        runtime: Option<&mut Runtime>,
-    ) -> (Client, mpsc::Receiver<Event>) {
-        connect(server_info, runtime)
+    pub fn new(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
+        connect(server_info)
     }
 
     /// Reconnect to the server, possibly using a new port.
@@ -279,10 +275,7 @@ enum Cmd {
     Quit(Option<String>),
 }
 
-fn connect(
-    server_info: ServerInfo,
-    runtime: Option<&mut Runtime>,
-) -> (Client, mpsc::Receiver<Event>) {
+fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //
@@ -304,15 +297,7 @@ fn connect(
     let irc_state_clone = irc_state.clone();
 
     let task = main_loop(server_info, irc_state_clone, snd_ev, rcv_cmd);
-
-    match runtime {
-        Some(runtime) => {
-            runtime.spawn(task);
-        }
-        None => {
-            tokio::runtime::current_thread::spawn(task);
-        }
-    }
+    tokio::runtime::current_thread::spawn(task);
 
     (
         Client {

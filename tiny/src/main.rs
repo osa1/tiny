@@ -124,40 +124,48 @@ fn run(
         Some(logger) => Box::new(libtiny_ui::combine(tui, logger)) as Box<dyn UI>,
     };
 
-    let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
+    executor.spawn(async move {
+        let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
-    for server in servers.iter().cloned() {
-        tui.new_server_tab(&server.addr);
+        for server in servers.iter().cloned() {
+            tui.new_server_tab(&server.addr);
 
-        let server_info = ServerInfo {
-            addr: server.addr,
-            port: server.port,
-            tls: server.tls,
-            pass: server.pass,
-            realname: server.realname,
-            nicks: server.nicks,
-            auto_join: server.join,
-            nickserv_ident: server.nickserv_ident,
-            sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {
-                username: auth.username,
-                password: auth.password,
-            }),
-        };
+            let server_info = ServerInfo {
+                addr: server.addr,
+                port: server.port,
+                tls: server.tls,
+                pass: server.pass,
+                realname: server.realname,
+                nicks: server.nicks,
+                auto_join: server.join,
+                nickserv_ident: server.nickserv_ident,
+                sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {
+                    username: auth.username,
+                    password: auth.password,
+                }),
+            };
 
-        let (client, rcv_conn_ev) = Client::new(server_info, Some(&mut executor));
-        // TODO: Somehow it's quite hard to expose this objekt call with a different name and less
-        // polymorphic type in libtiny_ui ...
-        let tui_clone = libtiny_ui::clone_box(&*tui);
-        let client_clone = client.clone();
+            let (client, rcv_conn_ev) = Client::new(server_info);
+            // TODO: Somehow it's quite hard to expose this objekt call with a different name and less
+            // polymorphic type in libtiny_ui ...
+            let tui_clone = libtiny_ui::clone_box(&*tui);
+            let client_clone = client.clone();
 
-        // Spawn a task to handle connection events
-        executor.spawn(conn::task(rcv_conn_ev, tui_clone, client_clone));
+            // Spawn a task to handle connection events
+            tokio::runtime::current_thread::spawn(conn::task(rcv_conn_ev, tui_clone, client_clone));
 
-        clients.push(client);
-    }
+            clients.push(client);
+        }
 
-    // Spawn a task to handle TUI events
-    executor.spawn(ui::task(config_path, defaults, tui, clients, rcv_tui_ev));
+        // Spawn a task to handle TUI events
+        tokio::runtime::current_thread::spawn(ui::task(
+            config_path,
+            defaults,
+            tui,
+            clients,
+            rcv_tui_ev,
+        ));
+    });
 
     executor.run().unwrap(); // unwraps RunError
 }

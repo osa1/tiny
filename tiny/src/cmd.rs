@@ -249,20 +249,17 @@ fn connect_(
     let msg_target = MsgTarget::Server { serv: serv_name };
     ui.add_client_msg("Connecting...", &msg_target);
 
-    let (client, rcv_ev) = Client::new(
-        ServerInfo {
-            addr: serv_name.to_owned(),
-            port: serv_port,
-            tls: defaults.tls,
-            realname: defaults.realname.clone(),
-            pass: pass.map(str::to_owned),
-            nicks: defaults.nicks.clone(),
-            auto_join: defaults.join.clone(),
-            nickserv_ident: None,
-            sasl_auth: None,
-        },
-        None, // tokio executor
-    );
+    let (client, rcv_ev) = Client::new(ServerInfo {
+        addr: serv_name.to_owned(),
+        port: serv_port,
+        tls: defaults.tls,
+        realname: defaults.realname.clone(),
+        pass: pass.map(str::to_owned),
+        nicks: defaults.nicks.clone(),
+        auto_join: defaults.join.clone(),
+        nickserv_ident: None,
+        sasl_auth: None,
+    });
 
     // Spawn UI task
     let ui_clone = libtiny_ui::clone_box(&**ui);
