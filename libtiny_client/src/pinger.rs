@@ -5,7 +5,7 @@ use futures::FutureExt;
 use futures::{pin_mut, select, stream::StreamExt};
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio::timer::delay_for;
+use tokio::time::delay_for;
 
 pub(crate) struct Pinger {
     snd_rst: mpsc::Sender<()>,
@@ -69,7 +69,7 @@ impl Pinger {
         let (snd_ev, rcv_ev) = mpsc::channel(1);
         // No need for sending another "reset" when there's already one waiting to be processed
         let (snd_rst, rcv_rst) = mpsc::channel(1);
-        tokio::runtime::current_thread::spawn(pinger_task(rcv_rst, snd_ev));
+        tokio::task::spawn_local(pinger_task(rcv_rst, snd_ev));
         (Pinger { snd_rst }, rcv_ev)
     }
 

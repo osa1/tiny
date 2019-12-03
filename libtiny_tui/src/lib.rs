@@ -22,15 +22,15 @@ pub use crate::tab::TabStyle;
 pub use libtiny_ui::*;
 
 use futures::select;
-use futures_util::stream::StreamExt;
+use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 use term_input::Input;
 use time::Tm;
-use tokio::runtime::current_thread::Runtime;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
+use tokio::task::spawn_local;
 
 #[macro_use]
 extern crate log;
@@ -41,7 +41,7 @@ pub struct TUI {
 }
 
 impl TUI {
-    pub fn run(config_path: PathBuf, runtime: &mut Runtime) -> (TUI, mpsc::Receiver<Event>) {
+    pub fn run(config_path: PathBuf) -> (TUI, mpsc::Receiver<Event>) {
         let tui = Rc::new(RefCell::new(tui::TUI::new(config_path)));
         let inner = Rc::downgrade(&tui);
 
@@ -51,10 +51,10 @@ impl TUI {
         let (snd_abort, rcv_abort) = mpsc::channel::<()>(1);
 
         // Spawn SIGWINCH handler
-        runtime.spawn(sigwinch_handler(inner.clone(), rcv_abort));
+        spawn_local(sigwinch_handler(inner.clone(), rcv_abort));
 
         // Spawn input handler task
-        runtime.spawn(input_handler(tui, snd_ev, snd_abort));
+        spawn_local(input_handler(tui, snd_ev, snd_abort));
 
         (TUI { inner }, rcv_ev)
     }

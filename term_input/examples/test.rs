@@ -33,8 +33,13 @@ fn main() {
     }
 
     /* DO THE BUSINESS HERE */
-    let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
-    executor.spawn(async move {
+    let mut runtime = tokio::runtime::Builder::new()
+        .basic_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
+    let local = tokio::task::LocalSet::new();
+    local.block_on(&mut runtime, async move {
         let mut input = Input::new();
         while let Some(mb_ev) = input.next().await {
             match mb_ev {
@@ -51,7 +56,6 @@ fn main() {
             }
         }
     });
-    executor.run().unwrap();
 
     // restore the old settings
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &old_term) };

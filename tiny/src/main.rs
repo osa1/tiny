@@ -75,46 +75,51 @@ fn run(
 
     // One task for each client to handle IRC events
     // One task for TUI events
-    let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
+    let mut runtime = tokio::runtime::Builder::new()
+        .basic_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
+    let local = tokio::task::LocalSet::new();
 
-    // Create TUI task
-    let (tui, rcv_tui_ev) = TUI::run(config_path.clone(), &mut executor);
-    tui.draw();
+    local.block_on(&mut runtime, async move {
+        // Create TUI task
+        let (tui, rcv_tui_ev) = TUI::run(config_path.clone());
+        tui.draw();
 
-    // Create logger
-    let report_logger_error = {
-        let tui_clone = tui.clone();
-        Box::new(move |err: String| {
-            // Somehwat hacky -- only tab we have is "mentions" so we show the error there
-            tui_clone.add_client_err_msg(
-                &format!("Logger error: {}", err),
-                &MsgTarget::Server { serv: "mentions" },
-            )
-        })
-    };
-    let logger: Option<Logger> =
-        log_dir.and_then(|log_dir| match Logger::new(log_dir, report_logger_error) {
-            Err(err) => {
-                tui.add_client_err_msg(
-                    &format!("Can't create logger: {}", err),
-                    &MsgTarget::CurrentTab,
-                );
-                None
-            }
-            Ok(logger) => {
-                // Create "mentions" log file manually -- the tab is already created in the TUI so
-                // we won't be creating a "mentions" file in the logger without this.
-                logger.new_server_tab("mentions");
-                Some(logger)
-            }
-        });
+        // Create logger
+        let report_logger_error = {
+            let tui_clone = tui.clone();
+            Box::new(move |err: String| {
+                // Somehwat hacky -- only tab we have is "mentions" so we show the error there
+                tui_clone.add_client_err_msg(
+                    &format!("Logger error: {}", err),
+                    &MsgTarget::Server { serv: "mentions" },
+                )
+            })
+        };
+        let logger: Option<Logger> =
+            log_dir.and_then(|log_dir| match Logger::new(log_dir, report_logger_error) {
+                Err(err) => {
+                    tui.add_client_err_msg(
+                        &format!("Can't create logger: {}", err),
+                        &MsgTarget::CurrentTab,
+                    );
+                    None
+                }
+                Ok(logger) => {
+                    // Create "mentions" log file manually -- the tab is already created in the TUI so
+                    // we won't be creating a "mentions" file in the logger without this.
+                    logger.new_server_tab("mentions");
+                    Some(logger)
+                }
+            });
 
-    let tui: Box<dyn UI> = match logger {
-        None => Box::new(tui) as Box<dyn UI>,
-        Some(logger) => Box::new(libtiny_ui::combine(tui, logger)) as Box<dyn UI>,
-    };
+        let tui: Box<dyn UI> = match logger {
+            None => Box::new(tui) as Box<dyn UI>,
+            Some(logger) => Box::new(libtiny_ui::combine(tui, logger)) as Box<dyn UI>,
+        };
 
-    executor.spawn(async move {
         let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
         for server in servers.iter().cloned() {
@@ -142,20 +147,14 @@ fn run(
             let client_clone = client.clone();
 
             // Spawn a task to handle connection events
-            tokio::runtime::current_thread::spawn(conn::task(rcv_conn_ev, tui_clone, client_clone));
+            tokio::task::spawn_local(conn::task(rcv_conn_ev, tui_clone, client_clone));
 
             clients.push(client);
         }
 
-        // Spawn a task to handle TUI events
-        tokio::runtime::current_thread::spawn(ui::task(
-            config_path,
-            defaults,
-            tui,
-            clients,
-            rcv_tui_ev,
-        ));
+        // Block on TUI task
+        ui::task(config_path, defaults, tui, clients, rcv_tui_ev).await;
     });
 
-    executor.run().unwrap(); // unwraps RunError
+    runtime.block_on(local);
 }

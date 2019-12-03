@@ -15,9 +15,8 @@ use state::State;
 use stream::{Stream, StreamError};
 
 use futures::future::FutureExt;
-use futures::stream::StreamExt;
+use futures::stream::{Fuse, StreamExt};
 use futures::{pin_mut, select};
-use futures_util::stream::Fuse;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -297,7 +296,7 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
     let irc_state_clone = irc_state.clone();
 
     let task = main_loop(server_info, irc_state_clone, snd_ev, rcv_cmd);
-    tokio::runtime::current_thread::spawn(task);
+    tokio::task::spawn_local(task);
 
     (
         Client {
@@ -436,7 +435,7 @@ async fn main_loop(
 
         // Spawn a task for outgoing messages.
         let mut snd_ev_clone = snd_ev.clone();
-        tokio::runtime::current_thread::spawn(async move {
+        tokio::task::spawn_local(async move {
             while let Some(msg) = rcv_msg.next().await {
                 if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
                     debug!("IO error when writing: {:?}", io_err);
@@ -544,7 +543,7 @@ enum TaskResult<A> {
 async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
     // Weird code because of a bug in select!?
     let delay = async {
-        tokio::timer::delay_for(Duration::from_secs(60)).await;
+        tokio::time::delay_for(Duration::from_secs(60)).await;
     }
     .fuse();
     pin_mut!(delay);
@@ -591,17 +590,21 @@ async fn resolve_addr(
     snd_ev: &mut mpsc::Sender<Event>,
 ) -> TaskResult<std::vec::IntoIter<SocketAddr>> {
     let mut addr_iter_task =
-        tokio_executor::blocking::run(move || (serv_name.as_str(), port).to_socket_addrs()).fuse();
+        tokio::task::spawn_blocking(move || (serv_name.as_str(), port).to_socket_addrs()).fuse();
 
     loop {
         select! {
             addr_iter = addr_iter_task => {
                 match addr_iter {
-                    Err(io_err) => {
+                    Err(join_err) => {
+                        // TODO (osa): Not sure about this
+                        panic!("DNS thread failed: {:?}", join_err);
+                    }
+                    Ok(Err(io_err)) => {
                         snd_ev.send(Event::IoErr(io_err)).await.unwrap();
                         return TryAfterDelay;
                     }
-                    Ok(addr_iter) => {
+                    Ok(Ok(addr_iter)) => {
                         return Done(addr_iter);
                     }
                 }

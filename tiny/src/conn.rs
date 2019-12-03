@@ -3,7 +3,7 @@
 
 //! IRC event handling
 
-use futures_util::stream::StreamExt;
+use futures::stream::StreamExt;
 use libtiny_client::Client;
 use libtiny_ui::{MsgTarget, TabStyle, UI};
 use libtiny_wire as wire;
