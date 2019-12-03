@@ -8,12 +8,10 @@ edition = "2018"
 [dependencies]
 base64 = "0.6.0"
 env_logger = "0.7"
-futures-preview = { version = "0.3.0-alpha.19",  features = ["async-await"] }
-futures-util-preview = "0.3.0-alpha.19"
+futures = "0.3.1"
 libtiny_logger = { path = "../libtiny_logger" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = "0.2"
-tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["timer"], rev = "227533d" }
-tokio-executor = { git = "https://github.com/tokio-rs/tokio.git", rev = "227533d" }
-tokio-tls = { git = "https://github.com/tokio-rs/tokio.git", rev = "227533d" }
+tokio = { version = "0.2.7", features = ["full"] }
+tokio-tls = "0.3.0"

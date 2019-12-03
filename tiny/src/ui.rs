@@ -5,7 +5,7 @@
 
 use crate::cmd::{parse_cmd, CmdArgs, ParseCmdResult};
 use crate::config;
-use futures_util::stream::StreamExt;
+use futures::stream::StreamExt;
 use libtiny_client::Client;
 use libtiny_ui::{MsgSource, MsgTarget, UI};
 use std::path::{Path, PathBuf};
