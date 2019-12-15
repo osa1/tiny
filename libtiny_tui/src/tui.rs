@@ -61,10 +61,13 @@ pub(crate) struct TUI {
     show_statusline: bool,
     /// Is there room for statusline?
     statusline_visible: bool,
+
+	// Do you want to show timestamp in every msg ?
+    every_msg_ts: bool,
 }
 
 impl TUI {
-    pub(crate) fn new(colors: Colors) -> TUI {
+    pub(crate) fn new(colors: Colors, tsmsg: bool) -> TUI {
         let mut tb = Termbox::init().unwrap(); // TODO: check errors
         tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
 
@@ -81,6 +84,7 @@ impl TUI {
             h_scroll: 0,
             show_statusline: false,
             statusline_visible: statusline_visible(width, height),
+            every_msg_ts: tsmsg,
         }
     }
 
@@ -191,7 +195,7 @@ impl TUI {
         self.colors = colors;
     }
 
-    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool, notifier: Notifier) {
+    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool, tsmsg: bool, notifier: Notifier) {
         use std::collections::HashMap;
 
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
@@ -232,7 +236,7 @@ impl TUI {
         self.tabs.insert(
             idx,
             Tab {
-                widget: MessagingUI::new(self.width, self.height - 1 - statusline_height, status),
+                widget: MessagingUI::new(self.width, self.height - 1 - statusline_height, status, tsmsg),
                 src,
                 style: TabStyle::Normal,
                 switch,
@@ -252,6 +256,7 @@ impl TUI {
                         serv: serv.to_owned(),
                     },
                     true,
+                    self.every_msg_ts,
                     Notifier::Mentions,
                 );
                 Some(tab_idx)
@@ -298,6 +303,7 @@ impl TUI {
                             chan: chan.to_owned(),
                         },
                         status_val,
+                        self.every_msg_ts,
                         notifier,
                     );
                     if self.active_idx >= tab_idx {
@@ -339,6 +345,7 @@ impl TUI {
                             nick: nick.to_owned(),
                         },
                         true,
+                        self.every_msg_ts,
                         Notifier::Messages,
                     );
                     if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {

@@ -44,6 +44,9 @@ pub(crate) struct MessagingUI {
 
     last_activity_line: Option<ActivityLine>,
     last_activity_ts: Option<Timestamp>,
+    
+    // Show timestamp in every msg
+    every_msg_ts: bool,
 }
 
 /// Like `time::Tm`, but we only care about hour and minute parts.
@@ -78,7 +81,7 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub(crate) fn new(width: i32, height: i32, status: bool) -> MessagingUI {
+    pub(crate) fn new(width: i32, height: i32, status: bool, tsmsg: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
             input_field: TextField::new(width),
@@ -91,6 +94,7 @@ impl MessagingUI {
             show_current_nick: true,
             last_activity_line: None,
             last_activity_ts: None,
+            every_msg_ts: tsmsg,
         }
     }
 
@@ -265,7 +269,7 @@ impl MessagingUI {
 impl MessagingUI {
     fn add_timestamp(&mut self, ts: Timestamp) {
         if let Some(ts_) = self.last_activity_ts {
-            if ts_ != ts {
+            if ts_ != ts || self.every_msg_ts {
                 ts.stamp(&mut self.msg_area);
             }
         } else {

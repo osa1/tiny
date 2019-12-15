@@ -40,6 +40,7 @@ fn main() {
                 defaults,
                 colors,
                 log_dir,
+                tsmsg,
             }) => {
                 let servers = if !server_args.is_empty() {
                     // connect only to servers that match at least one of
@@ -58,7 +59,7 @@ fn main() {
                 } else {
                     servers
                 };
-                run(servers, defaults, colors, config_path, log_dir)
+                run(servers, defaults, colors, config_path, log_dir, tsmsg)
             }
         }
     }
@@ -70,6 +71,7 @@ fn run(
     colors: Colors,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
+    tsmsg: bool,
 ) {
     env_logger::builder()
         .target(env_logger::Target::Stderr)
@@ -80,7 +82,7 @@ fn run(
     let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
 
     // Create TUI task
-    let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
+    let (tui, rcv_tui_ev) = TUI::run(colors, tsmsg, &mut executor);
 
     // Init "mentions" tab. This needs to happen before initializing the logger as otherwise we
     // won't have a tab to show errors when something goes wrong during initialization.

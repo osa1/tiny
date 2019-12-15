@@ -41,8 +41,8 @@ pub struct TUI {
 }
 
 impl TUI {
-    pub fn run(colors: Colors, runtime: &mut Runtime) -> (TUI, mpsc::Receiver<Event>) {
-        let tui = Rc::new(RefCell::new(tui::TUI::new(colors)));
+    pub fn run(colors: Colors, tsmsg: bool, runtime: &mut Runtime) -> (TUI, mpsc::Receiver<Event>) {
+        let tui = Rc::new(RefCell::new(tui::TUI::new(colors, tsmsg)));
         let inner = Rc::downgrade(&tui);
 
         let (snd_ev, rcv_ev) = mpsc::channel(10);

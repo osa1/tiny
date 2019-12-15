@@ -66,6 +66,7 @@ pub(crate) struct Config {
     #[serde(default)]
     pub(crate) colors: libtiny_tui::Colors,
     pub(crate) log_dir: Option<PathBuf>,
+    pub(crate) tsmsg: bool,
 }
 
 /// Returns tiny config file path. File may or may not exist.

@@ -125,3 +125,5 @@ colors:
         fg: red
         bg: default
         attrs: [bold]
+
+tsmsg: false
