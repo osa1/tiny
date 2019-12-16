@@ -126,4 +126,5 @@ colors:
         bg: default
         attrs: [bold]
 
+# Show timestampe in the most left on every massage
 tsmsg: false
