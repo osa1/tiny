@@ -16,6 +16,10 @@
   location. The old location `$HOME/.tinyrc.yml` is still used when there isn't
   a config file in the new location, to avoid breakage. `$HOME/.config` is used
   for `$XDG_CONFIG_HOME` when the env variable is not available (#152).
+- Timestamps can now be configured using the new (optional) `timestamp_format`
+  field in the config. Value should be a valid `strftime()` format string (see
+  `man strftime` for details). Default value is the same as before (`%H:%M`).
+  (#161)
 
 # 2019/10/05: 0.5.0
 

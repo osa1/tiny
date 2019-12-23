@@ -9,7 +9,6 @@ use libtiny_tui::TUI;
 use libtiny_ui::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
 use tokio::runtime::current_thread::Runtime;
 
 fn main() {
@@ -20,13 +19,11 @@ fn main() {
     let lines = file_buffered.lines().map(Result::unwrap).collect();
 
     let mut executor = Runtime::new().unwrap();
-    let (tui, _) = TUI::run(PathBuf::from("../tiny/config.yml"), &mut executor);
+    let (tui, _) = TUI::run(None, &mut executor);
 
     tui.draw();
 
     executor.block_on(bench_task(tui, lines));
-
-    // executor.run();
 }
 
 async fn bench_task(tui: TUI, lines: Vec<String>) {

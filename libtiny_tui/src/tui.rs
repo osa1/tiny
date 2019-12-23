@@ -3,12 +3,13 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::str;
 use std::str::SplitWhitespace;
 use time::Tm;
 
-use crate::config::{parse_config, Colors, Config, Style};
-use crate::messaging::{MessagingUI, Timestamp};
+use crate::config::{def_ts_fmt, parse_config, Colors, Config, Style};
+use crate::messaging::MessagingUI;
 use crate::notifier::Notifier;
 use crate::statusline::{draw_statusline, statusline_visible};
 use crate::tab::{Tab, TabStyle};
@@ -60,23 +61,54 @@ pub(crate) struct TUI {
     show_statusline: bool,
     /// Is there room for statusline?
     statusline_visible: bool,
-    /// Config file path
-    config_path: PathBuf,
+
+    /// A valid `time::strftime` format string for rendering timestamps.
+    ts_fmt: Rc<String>,
+
+    /// Config file path, used in `/reload` command to reload TUI colors.
+    config_path: Option<PathBuf>,
 }
 
 impl TUI {
-    pub(crate) fn new(config_path: PathBuf) -> TUI {
-        let tb = Termbox::init().unwrap(); // TODO: check errors
-
-        // This is now done in reload_config() below
-        // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
+    pub(crate) fn new(config_path: Option<PathBuf>) -> TUI {
+        let mut tb = Termbox::init().unwrap(); // TODO: check errors
 
         let width = tb.width() as i32;
         let height = tb.height() as i32;
 
+        let config_or_error = match config_path {
+            None => Ok(Config::default()),
+            Some(ref config_path) => parse_config(config_path),
+        };
+
+        let (colors, ts_fmt, opt_err) = match config_or_error {
+            Err(err) => (
+                Colors::default(),
+                def_ts_fmt(),
+                Some(format!("Can't parse TUI config: {:?}", err)),
+            ),
+            Ok(Config {
+                colors,
+                timestamp_format,
+            }) => {
+                // Validate timestamp format
+                let (timestamp_format, err) = match time::strftime(&timestamp_format, &time::now())
+                {
+                    Err(err) => (
+                        def_ts_fmt(),
+                        Some(format!("Invalid timestamp_format field: {}", err)),
+                    ),
+                    Ok(_) => (timestamp_format, None),
+                };
+                (colors, timestamp_format, err)
+            }
+        };
+
+        tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
+
         let mut tui = TUI {
             tb,
-            colors: Colors::default(),
+            colors,
             tabs: Vec::new(),
             active_idx: 0,
             width,
@@ -84,6 +116,7 @@ impl TUI {
             h_scroll: 0,
             show_statusline: false,
             statusline_visible: statusline_visible(width, height),
+            ts_fmt: Rc::new(ts_fmt),
             config_path,
         };
 
@@ -95,7 +128,10 @@ impl TUI {
             &MsgTarget::Server { serv: "mentions" },
         );
 
-        tui.reload_config();
+        if let Some(err) = opt_err {
+            tui.add_client_err_msg(&err, &MsgTarget::CurrentTab);
+        }
+
         tui
     }
 
@@ -197,23 +233,28 @@ impl TUI {
                 true
             }
             Some("reload") => {
-                self.reload_config();
+                self.reload_colors();
                 true
             }
             _ => false,
         }
     }
 
-    pub(crate) fn reload_config(&mut self) {
-        match parse_config(&self.config_path) {
-            Err(err) => {
-                self.add_client_err_msg(
-                    &format!("Can't parse TUI config: {:?}", err),
-                    &MsgTarget::CurrentTab,
-                );
-            }
-            Ok(Config { colors }) => {
-                self.set_colors(colors);
+    fn reload_colors(&mut self) {
+        if let Some(ref config_path) = self.config_path {
+            match parse_config(config_path) {
+                Err(err) => {
+                    self.add_client_err_msg(
+                        &format!("Can't parse TUI config: {:?}", err),
+                        &MsgTarget::CurrentTab,
+                    );
+                }
+                Ok(Config {
+                    colors,
+                    timestamp_format: _,
+                }) => {
+                    self.set_colors(colors);
+                }
             }
         }
     }
@@ -265,7 +306,12 @@ impl TUI {
         self.tabs.insert(
             idx,
             Tab {
-                widget: MessagingUI::new(self.width, self.height - 1 - statusline_height, status),
+                widget: MessagingUI::new(
+                    self.width,
+                    self.height - 1 - statusline_height,
+                    status,
+                    self.ts_fmt.clone(),
+                ),
                 src,
                 style: TabStyle::Normal,
                 switch,
@@ -1049,7 +1095,7 @@ impl TUI {
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget
-                .add_privmsg(sender, msg, Timestamp::from(ts), highlight, is_action);
+                .add_privmsg(sender, msg, ts, highlight, is_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
                 tab.notifier
@@ -1062,7 +1108,7 @@ impl TUI {
     /// and debug log tabs. Timestamped and logged.
     pub(crate) fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_msg(msg, Timestamp::from(ts));
+            tab.widget.add_msg(msg, ts);
         });
     }
 
@@ -1070,14 +1116,14 @@ impl TUI {
     /// nickname is in use etc. Timestamped and logged.
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.add_err_msg(msg, Timestamp::from(ts));
+            tab.widget.add_err_msg(msg, ts);
         });
     }
 
     pub(crate) fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &str) {
         let target = MsgTarget::Chan { serv, chan };
         self.apply_to_target(&target, &|tab: &mut Tab, _| {
-            tab.widget.show_topic(title, Timestamp::from(ts));
+            tab.widget.show_topic(title, ts);
         });
     }
 
@@ -1090,13 +1136,13 @@ impl TUI {
 
     pub(crate) fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.join(nick, ts.map(Timestamp::from));
+            tab.widget.join(nick, ts);
         });
     }
 
     pub(crate) fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.part(nick, ts.map(Timestamp::from));
+            tab.widget.part(nick, ts);
         });
     }
 
@@ -1108,7 +1154,7 @@ impl TUI {
         target: &MsgTarget,
     ) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
-            tab.widget.nick(old_nick, new_nick, Timestamp::from(ts));
+            tab.widget.nick(old_nick, new_nick, ts);
             // TODO: Does this actually rename the tab?
             tab.update_source(&|src: &mut MsgSource| {
                 if let MsgSource::User { ref mut nick, .. } = *src {
