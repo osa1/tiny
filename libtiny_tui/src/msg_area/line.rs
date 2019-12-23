@@ -60,7 +60,7 @@ pub(crate) enum SchemeStyle {
 }
 
 impl Seg {
-    pub(crate) fn style(&self, colors: &Colors) -> config::Style {
+    fn style(&self, colors: &Colors) -> config::Style {
         match self.style {
             SegStyle::Fixed(style) => style,
             SegStyle::Index(idx) => config::Style {
@@ -106,15 +106,15 @@ impl Line {
         if self.current_seg.text.is_empty() {
             self.current_seg.style = style;
         } else if self.current_seg.style != style {
-            let seg = mem::replace(
-                &mut self.current_seg,
-                Seg {
-                    text: String::new(),
-                    style,
-                },
-            );
-            self.segs.push(seg);
+            self.flush_current_seg(style);
         }
+    }
+
+    pub(crate) fn add_timestamp(&mut self, ts_str: &str) {
+        debug_assert!(self.segs.is_empty());
+        self.set_style(SegStyle::SchemeStyle(SchemeStyle::Timestamp));
+        self.add_text(ts_str);
+        self.add_char(' ');
     }
 
     pub(crate) fn add_text(&mut self, str: &str) {
@@ -262,6 +262,17 @@ impl Line {
                 char_idx += 1;
             }
         }
+    }
+
+    fn flush_current_seg(&mut self, style: SegStyle) {
+        let seg = mem::replace(
+            &mut self.current_seg,
+            Seg {
+                text: String::new(),
+                style,
+            },
+        );
+        self.segs.push(seg);
     }
 }
 

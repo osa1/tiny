@@ -37,6 +37,10 @@ defaults:
 # Where to put log files
 log_dir: '{}'
 
+# How to show timestamps. Should be a valid strftime() format string. Run `man
+# strftime` in your shell for strftime format specification.
+timestamp_format: '%H:%M'
+
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
 #

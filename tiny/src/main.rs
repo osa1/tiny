@@ -78,7 +78,7 @@ fn run(
     let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
 
     // Create TUI task
-    let (tui, rcv_tui_ev) = TUI::run(config_path.clone(), &mut executor);
+    let (tui, rcv_tui_ev) = TUI::run(Some(config_path.clone()), &mut executor);
     tui.draw();
 
     // Create logger
