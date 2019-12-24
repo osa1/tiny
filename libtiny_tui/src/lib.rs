@@ -18,13 +18,13 @@ mod tui;
 mod utils;
 mod widget;
 
-pub use crate::config::Colors;
 pub use crate::tab::TabStyle;
 pub use libtiny_ui::*;
 
 use futures::select;
 use futures_util::stream::StreamExt;
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 use term_input::Input;
 use time::Tm;
@@ -41,8 +41,8 @@ pub struct TUI {
 }
 
 impl TUI {
-    pub fn run(colors: Colors, runtime: &mut Runtime) -> (TUI, mpsc::Receiver<Event>) {
-        let tui = Rc::new(RefCell::new(tui::TUI::new(colors)));
+    pub fn run(config_path: PathBuf, runtime: &mut Runtime) -> (TUI, mpsc::Receiver<Event>) {
+        let tui = Rc::new(RefCell::new(tui::TUI::new(config_path)));
         let inner = Rc::downgrade(&tui);
 
         let (snd_ev, rcv_ev) = mpsc::channel(10);
@@ -155,16 +155,6 @@ macro_rules! delegate {
     }
 }
 
-macro_rules! delegate_pub {
-    ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
-        pub fn $name(&self, $($x: $t,)*) {
-            if let Some(inner) = self.inner.upgrade() {
-                inner.borrow_mut().$name( $( $x, )* );
-            }
-        }
-    }
-}
-
 impl UI for TUI {
     delegate!(draw());
     delegate!(new_server_tab(serv_name: &str,));
@@ -208,8 +198,4 @@ impl UI for TUI {
             None => false,
         }
     }
-}
-
-impl TUI {
-    delegate_pub!(set_colors(colors: Colors,));
 }

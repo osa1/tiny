@@ -13,7 +13,7 @@ mod utils;
 use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny_client::{Client, ServerInfo};
 use libtiny_logger::Logger;
-use libtiny_tui::{Colors, MsgTarget, TUI};
+use libtiny_tui::{MsgTarget, TUI};
 use libtiny_ui::UI;
 use std::path::PathBuf;
 
@@ -38,7 +38,6 @@ fn main() {
             Ok(config::Config {
                 servers,
                 defaults,
-                colors,
                 log_dir,
             }) => {
                 let servers = if !server_args.is_empty() {
@@ -58,7 +57,7 @@ fn main() {
                 } else {
                     servers
                 };
-                run(servers, defaults, colors, config_path, log_dir)
+                run(servers, defaults, config_path, log_dir)
             }
         }
     }
@@ -67,7 +66,6 @@ fn main() {
 fn run(
     servers: Vec<config::Server>,
     defaults: config::Defaults,
-    colors: Colors,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
 ) {
@@ -80,15 +78,7 @@ fn run(
     let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
 
     // Create TUI task
-    let (tui, rcv_tui_ev) = TUI::run(colors, &mut executor);
-
-    // Init "mentions" tab. This needs to happen before initializing the logger as otherwise we
-    // won't have a tab to show errors when something goes wrong during initialization.
-    tui.new_server_tab("mentions");
-    tui.add_client_msg(
-        "Any mentions to you will be listed here.",
-        &MsgTarget::Server { serv: "mentions" },
-    );
+    let (tui, rcv_tui_ev) = TUI::run(config_path.clone(), &mut executor);
     tui.draw();
 
     // Create logger

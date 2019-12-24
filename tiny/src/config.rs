@@ -1,5 +1,3 @@
-//! To see how color numbers map to actual colors in your terminal run
-//! `cargo run --example colors`. Use tab to swap fg/bg colors.
 use serde::Deserialize;
 use serde_yaml;
 use std::fs;
@@ -63,8 +61,6 @@ pub(crate) struct Defaults {
 pub(crate) struct Config {
     pub(crate) servers: Vec<Server>,
     pub(crate) defaults: Defaults,
-    #[serde(default)]
-    pub(crate) colors: libtiny_tui::Colors,
     pub(crate) log_dir: Option<PathBuf>,
 }
 
@@ -112,10 +108,6 @@ pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Err
         str
     };
 
-    parse_config_str(&contents)
-}
-
-fn parse_config_str(contents: &str) -> Result<Config, serde_yaml::Error> {
     serde_yaml::from_str(&contents)
 }
 

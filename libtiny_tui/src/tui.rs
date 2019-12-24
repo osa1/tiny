@@ -2,20 +2,19 @@
 #![allow(clippy::new_without_default)]
 #![allow(clippy::too_many_arguments)]
 
+use std::path::PathBuf;
 use std::str;
 use std::str::SplitWhitespace;
 use time::Tm;
 
-use crate::config::Colors;
-use crate::notifier::Notifier;
-use crate::tab::TabStyle;
-
-use crate::config::Style;
+use crate::config::{parse_config, Colors, Config, Style};
 use crate::messaging::{MessagingUI, Timestamp};
+use crate::notifier::Notifier;
 use crate::statusline::{draw_statusline, statusline_visible};
-use crate::tab::Tab;
+use crate::tab::{Tab, TabStyle};
 use crate::widget::WidgetRet;
 use crate::{MsgSource, MsgTarget};
+
 use term_input::{Arrow, Event, Key};
 use termbox_simple::Termbox;
 
@@ -61,19 +60,23 @@ pub(crate) struct TUI {
     show_statusline: bool,
     /// Is there room for statusline?
     statusline_visible: bool,
+    /// Config file path
+    config_path: PathBuf,
 }
 
 impl TUI {
-    pub(crate) fn new(colors: Colors) -> TUI {
-        let mut tb = Termbox::init().unwrap(); // TODO: check errors
-        tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
+    pub(crate) fn new(config_path: PathBuf) -> TUI {
+        let tb = Termbox::init().unwrap(); // TODO: check errors
+
+        // This is now done in reload_config() below
+        // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
 
         let width = tb.width() as i32;
         let height = tb.height() as i32;
 
-        TUI {
+        let mut tui = TUI {
             tb,
-            colors,
+            colors: Colors::default(),
             tabs: Vec::new(),
             active_idx: 0,
             width,
@@ -81,7 +84,19 @@ impl TUI {
             h_scroll: 0,
             show_statusline: false,
             statusline_visible: statusline_visible(width, height),
-        }
+            config_path,
+        };
+
+        // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
+        // show any errors in TUI.
+        tui.new_server_tab("mentions");
+        tui.add_client_msg(
+            "Any mentions to you will be listed here.",
+            &MsgTarget::Server { serv: "mentions" },
+        );
+
+        tui.reload_config();
+        tui
     }
 
     fn ignore(&mut self, src: &MsgSource) {
@@ -181,11 +196,29 @@ impl TUI {
                 self.toggle_statusline();
                 true
             }
+            Some("reload") => {
+                self.reload_config();
+                true
+            }
             _ => false,
         }
     }
 
-    pub(crate) fn set_colors(&mut self, colors: Colors) {
+    pub(crate) fn reload_config(&mut self) {
+        match parse_config(&self.config_path) {
+            Err(err) => {
+                self.add_client_err_msg(
+                    &format!("Can't parse TUI config: {:?}", err),
+                    &MsgTarget::CurrentTab,
+                );
+            }
+            Ok(Config { colors }) => {
+                self.set_colors(colors);
+            }
+        }
+    }
+
+    fn set_colors(&mut self, colors: Colors) {
         self.tb
             .set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
         self.colors = colors;

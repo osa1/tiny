@@ -105,7 +105,6 @@ static CMDS: [&Cmd; 8] = [
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
-    // &RELOAD_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -458,30 +457,6 @@ fn nick(args: CmdArgs) {
         ui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/*
-static RELOAD_CMD: Cmd = Cmd {
-    name: "reload",
-    cmd_fn: reload,
-};
-
-fn reload(args: CmdArgs) {
-    let CmdArgs {
-        config_path, ui, ..
-    } = args;
-    match config::parse_config(config_path) {
-        Ok(config::Config { colors, .. }) => ui.set_colors(colors),
-        Err(err) => {
-            ui.add_client_err_msg("Can't parse config file:", &MsgTarget::CurrentTab);
-            for line in err.description().lines() {
-                ui.add_client_err_msg(line, &MsgTarget::CurrentTab);
-            }
-        }
-    }
-}
-*/
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

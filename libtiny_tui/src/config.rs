@@ -1,8 +1,20 @@
-use serde::{
-    de::{self, Deserializer, MapAccess, Visitor},
-    Deserialize,
-};
+// To see how color numbers map to actual colors in your terminal run
+// `cargo run --example colors`. Use tab to swap fg/bg colors.
+
+use serde::de::{self, Deserializer, MapAccess, Visitor};
+use serde::Deserialize;
+use serde_yaml;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+
 pub use termbox_simple::*;
+
+#[derive(Deserialize)]
+pub(crate) struct Config {
+    #[serde(default)]
+    pub(crate) colors: Colors,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
@@ -239,4 +251,15 @@ impl<'de> Deserialize<'de> for Style {
 
         d.deserialize_map(StyleVisitor)
     }
+}
+
+pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
+    let contents = {
+        let mut str = String::new();
+        let mut file = File::open(config_path).unwrap();
+        file.read_to_string(&mut str).unwrap();
+        str
+    };
+
+    serde_yaml::from_str(&contents)
 }
