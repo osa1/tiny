@@ -22,7 +22,6 @@ fn main() {
     let mut executor = Runtime::new().unwrap();
     let (tui, _) = TUI::run(PathBuf::from("../tiny/config.yml"), &mut executor);
 
-    tui.new_server_tab("test");
     tui.draw();
 
     executor.block_on(bench_task(tui, lines));
@@ -31,7 +30,7 @@ fn main() {
 }
 
 async fn bench_task(tui: TUI, lines: Vec<String>) {
-    let msg_target = MsgTarget::Server { serv: "test" };
+    let msg_target = MsgTarget::Server { serv: "mentions" };
     let time = time::now();
 
     for line in &lines {
