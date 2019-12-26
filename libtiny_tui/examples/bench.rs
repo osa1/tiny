@@ -5,11 +5,12 @@
 //
 // Useful for benchmarking TUI::draw().
 
-use libtiny_tui::{Colors, TUI};
+use libtiny_tui::TUI;
 use libtiny_ui::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use tokio::runtime::current_thread::Runtime;
+use std::path::PathBuf;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
@@ -19,7 +20,7 @@ fn main() {
     let lines = file_buffered.lines().map(Result::unwrap).collect();
 
     let mut executor = Runtime::new().unwrap();
-    let (tui, _) = TUI::run(Colors::default(), &mut executor);
+    let (tui, _) = TUI::run(PathBuf::from("../tiny/config.yml"), &mut executor);
 
     tui.new_server_tab("test");
     tui.draw();
