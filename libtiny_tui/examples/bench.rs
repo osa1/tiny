@@ -9,8 +9,8 @@ use libtiny_tui::TUI;
 use libtiny_ui::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use tokio::runtime::current_thread::Runtime;
 use std::path::PathBuf;
+use tokio::runtime::current_thread::Runtime;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
