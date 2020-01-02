@@ -33,9 +33,9 @@ fn main() {
     }
 
     /* DO THE BUSINESS HERE */
-    let mut input = Input::new();
     let mut executor = tokio::runtime::current_thread::Runtime::new().unwrap();
     executor.spawn(async move {
+        let mut input = Input::new();
         while let Some(mb_ev) = input.next().await {
             match mb_ev {
                 Ok(ev) => {
