@@ -143,10 +143,6 @@ impl MsgArea {
         self.line_buf.set_style(style);
     }
 
-    pub(crate) fn add_timestamp(&mut self, ts_str: &str) {
-        self.line_buf.add_timestamp(ts_str);
-    }
-
     pub(crate) fn add_text(&mut self, str: &str) {
         self.line_buf.add_text(str);
     }

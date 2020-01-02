@@ -2,7 +2,6 @@ use term_input::Key;
 use termbox_simple::Termbox;
 
 use std::convert::From;
-use std::rc::Rc;
 
 use time::{self, Tm};
 
@@ -44,22 +43,42 @@ pub(crate) struct MessagingUI {
     show_current_nick: bool,
 
     last_activity_line: Option<ActivityLine>,
-    last_activity_ts: Option<String>,
+    last_activity_ts: Option<Timestamp>,
+}
 
-    /// A valid `time::strftime` format string for rendering timestamps.
-    ts_fmt: Rc<String>,
+/// Like `time::Tm`, but we only care about hour and minute parts.
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub(crate) struct Timestamp {
+    hour: i32,
+    min: i32,
+}
+
+impl Timestamp {
+    fn stamp(self, msg_area: &mut MsgArea) {
+        msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::Timestamp));
+        msg_area.add_text(&format!("{:02}:{:02} ", self.hour, self.min));
+    }
+}
+
+impl From<Tm> for Timestamp {
+    fn from(tm: Tm) -> Timestamp {
+        Timestamp {
+            hour: tm.tm_hour,
+            min: tm.tm_min,
+        }
+    }
 }
 
 /// An activity line is just a line that we update on joins / leaves /
 /// disconnects. We group activities that happen in the same minute to avoid
 /// redundantly showing lines.
 struct ActivityLine {
-    ts: Tm,
+    ts: Timestamp,
     line_idx: usize,
 }
 
 impl MessagingUI {
-    pub(crate) fn new(width: i32, height: i32, status: bool, ts_fmt: Rc<String>) -> MessagingUI {
+    pub(crate) fn new(width: i32, height: i32, status: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
             input_field: TextField::new(width),
@@ -72,7 +91,6 @@ impl MessagingUI {
             show_current_nick: true,
             last_activity_line: None,
             last_activity_ts: None,
-            ts_fmt,
         }
     }
 
@@ -245,23 +263,18 @@ impl MessagingUI {
 // Adding new messages
 
 impl MessagingUI {
-    fn add_timestamp(&mut self, ts: Tm) {
-        let ts_str = time::strftime(&*self.ts_fmt, &ts).unwrap();
-        match self.last_activity_ts {
-            None => {
-                self.msg_area.add_timestamp(&ts_str);
-                self.last_activity_ts = Some(ts_str);
+    fn add_timestamp(&mut self, ts: Timestamp) {
+        if let Some(ts_) = self.last_activity_ts {
+            if ts_ != ts {
+                ts.stamp(&mut self.msg_area);
             }
-            Some(ref last_activity_ts) => {
-                if last_activity_ts != &ts_str {
-                    self.msg_area.add_timestamp(&ts_str);
-                    self.last_activity_ts = Some(ts_str);
-                }
-            }
+        } else {
+            ts.stamp(&mut self.msg_area);
         }
+        self.last_activity_ts = Some(ts);
     }
 
-    pub(crate) fn show_topic(&mut self, topic: &str, ts: Tm) {
+    pub(crate) fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
         self.msg_area
@@ -304,7 +317,7 @@ impl MessagingUI {
         &mut self,
         sender: &str,
         msg: &str,
-        ts: Tm,
+        ts: Timestamp,
         highlight: bool,
         is_action: bool,
     ) {
@@ -341,7 +354,7 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub(crate) fn add_msg(&mut self, msg: &str, ts: Tm) {
+    pub(crate) fn add_msg(&mut self, msg: &str, ts: Timestamp) {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
@@ -351,7 +364,7 @@ impl MessagingUI {
         self.msg_area.flush_line();
     }
 
-    pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Tm) {
+    pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
@@ -383,7 +396,7 @@ impl MessagingUI {
         self.nicks.clear();
     }
 
-    pub(crate) fn join(&mut self, nick: &str, ts: Option<Tm>) {
+    pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
         if self.show_status && !self.nicks.contains(nick) {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
@@ -400,7 +413,7 @@ impl MessagingUI {
         self.nicks.insert(nick);
     }
 
-    pub(crate) fn part(&mut self, nick: &str, ts: Option<Tm>) {
+    pub(crate) fn part(&mut self, nick: &str, ts: Option<Timestamp>) {
         self.nicks.remove(nick);
 
         if self.show_status {
@@ -432,7 +445,7 @@ impl MessagingUI {
         self.show_status
     }
 
-    pub(crate) fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Tm) {
+    pub(crate) fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {
         self.nicks.remove(old_nick);
         self.nicks.insert(new_nick);
 
@@ -452,7 +465,7 @@ impl MessagingUI {
         self.last_activity_line = None;
     }
 
-    fn get_activity_line_idx(&mut self, ts: Tm) -> usize {
+    fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
         match self.last_activity_line {
             Some(ref l) if l.ts == ts => l.line_idx,
             _ => {

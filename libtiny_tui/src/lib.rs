@@ -41,10 +41,7 @@ pub struct TUI {
 }
 
 impl TUI {
-    pub fn run(
-        config_path: Option<PathBuf>,
-        runtime: &mut Runtime,
-    ) -> (TUI, mpsc::Receiver<Event>) {
+    pub fn run(config_path: PathBuf, runtime: &mut Runtime) -> (TUI, mpsc::Receiver<Event>) {
         let tui = Rc::new(RefCell::new(tui::TUI::new(config_path)));
         let inner = Rc::downgrade(&tui);
 

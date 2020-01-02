@@ -4,7 +4,6 @@
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
 use serde_yaml;
-use std::default::Default;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -15,23 +14,6 @@ pub use termbox_simple::*;
 pub(crate) struct Config {
     #[serde(default)]
     pub(crate) colors: Colors,
-
-    /// A valid `strftime()` format string used when showing timestamps. Validated in `TUI::new`.
-    #[serde(default = "def_ts_fmt")]
-    pub(crate) timestamp_format: String,
-}
-
-pub(crate) fn def_ts_fmt() -> String {
-    "%H:%M".to_string()
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            colors: Colors::default(),
-            timestamp_format: def_ts_fmt(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

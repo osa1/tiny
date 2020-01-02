@@ -38,8 +38,6 @@ tiny is an IRC client written in Rust.
 
 - Configurable colors
 
-- Configurable timestamps
-
 - SASL authentication
 
 - Configurable desktop notifications on new messages
@@ -171,7 +169,7 @@ Commands start with `/` character.
 - `/names`: List all nicks in the current channel. You can use `/names <nick>` to
   check if a specific nick is in the channel.
 
-- `/reload`: Reload TUI colors from the config file
+- `/reload`: Reload configuration
 
 - `/clear`: Clears tab contents
 
