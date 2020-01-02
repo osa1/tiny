@@ -8,7 +8,10 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
-futures-preview = "0.3.0-alpha.18"
+futures-preview = "0.3.0-alpha.19"
 libc = "0.2"
 mio = "0.6"
 tokio = { git = "https://github.com/tokio-rs/tokio.git", rev = "227533d" }
+
+[dev-dependencies]
+futures-preview = "0.3.0-alpha.19"
