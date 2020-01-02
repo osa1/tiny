@@ -453,16 +453,14 @@ impl MessagingUI {
     }
 
     fn get_activity_line_idx(&mut self, ts: Tm) -> usize {
-        // borrow checker strikes again
-        if let Some(ref mut l) = self.last_activity_line {
-            if l.ts == ts {
-                return l.line_idx;
+        match self.last_activity_line {
+            Some(ref l) if l.ts == ts => l.line_idx,
+            _ => {
+                self.add_timestamp(ts);
+                let line_idx = self.msg_area.flush_line();
+                self.last_activity_line = Some(ActivityLine { ts, line_idx });
+                line_idx
             }
         }
-
-        self.add_timestamp(ts);
-        let line_idx = self.msg_area.flush_line();
-        self.last_activity_line = Some(ActivityLine { ts, line_idx });
-        line_idx
     }
 }
