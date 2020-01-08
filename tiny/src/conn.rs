@@ -7,7 +7,6 @@ use futures::stream::StreamExt;
 use libtiny_client::Client;
 use libtiny_ui::{MsgTarget, TabStyle, UI};
 use libtiny_wire as wire;
-use std::error::Error;
 use tokio::sync::mpsc;
 
 pub(crate) async fn task(
@@ -65,7 +64,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
         }
         IoErr(err) => {
             ui.add_err_msg(
-                &format!("Connection error: {}", err.description()),
+                &format!("Connection error: {}", err),
                 time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
@@ -83,7 +82,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
         }
         TlsErr(err) => {
             ui.add_err_msg(
-                &format!("TLS error: {}", err.description()),
+                &format!("TLS error: {}", err),
                 time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
