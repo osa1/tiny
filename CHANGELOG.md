@@ -16,6 +16,7 @@
   location. The old location `$HOME/.tinyrc.yml` is still used when there isn't
   a config file in the new location, to avoid breakage. `$HOME/.config` is used
   for `$XDG_CONFIG_HOME` when the env variable is not available (#152).
+- Fixed a panic when some clients return later than TUI when exiting tiny.
 
 # 2019/10/05: 0.5.0
 
