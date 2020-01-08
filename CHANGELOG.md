@@ -1,4 +1,4 @@
-# Unreleased
+# 2020/01/08: 0.5.1
 
 - When a domain name resolves to multiple IP addresses tiny now tries connecting
   to the rest of the addresses when one fails (#144).
