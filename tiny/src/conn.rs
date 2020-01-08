@@ -15,14 +15,12 @@ pub(crate) async fn task(
     client: Client,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        if handle_conn_ev(&*ui, &client, ev) {
-            return;
-        }
+        handle_conn_ev(&*ui, &client, ev);
         ui.draw();
     }
 }
 
-fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bool {
+fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) {
     use libtiny_client::Event::*;
     match ev {
         ResolvingHost => {
@@ -104,11 +102,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) -> bo
         Msg(msg) => {
             handle_irc_msg(ui, client, msg);
         }
-        Closed => {
-            return true;
-        }
     }
-    false
 }
 
 fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {

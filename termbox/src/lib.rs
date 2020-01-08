@@ -184,8 +184,7 @@ impl Termbox {
         self.output_buffer
             .extend_from_slice(termion::clear::All.as_ref());
         // T_EXIT_CA for xterm
-        self.output_buffer
-            .extend_from_slice(b"\x1b[?1049l");
+        self.output_buffer.extend_from_slice(b"\x1b[?1049l");
 
         self.flush_output_buffer();
     }
@@ -458,8 +457,7 @@ impl Drop for Termbox {
         self.output_buffer
             .extend_from_slice(termion::clear::All.as_ref());
         // T_EXIT_CA for xterm
-        self.output_buffer
-            .extend_from_slice(b"\x1b[?1049l");
+        self.output_buffer.extend_from_slice(b"\x1b[?1049l");
         self.flush_output_buffer();
 
         unsafe {

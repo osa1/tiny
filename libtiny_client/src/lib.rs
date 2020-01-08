@@ -98,10 +98,6 @@ pub enum Event {
     NickChange(String),
     /// A message from the server
     Msg(wire::Msg),
-
-    /// This is to signal the task that listens for events to stop.
-    // TODO: Maybe try something like making Client non-Clone and sharing Weaks with tasks
-    Closed,
 }
 
 impl From<StreamError> for Event {
@@ -127,10 +123,6 @@ pub struct Client {
     /// Reference to the state, to be able to provide methods like `get_nick` and
     /// `is_nick_accepted`.
     state: State,
-    // We can't have a channel to the sender task directly here, because when the sender task
-    // returns we lose the receiving end of the channel and there's no way to avoid this except
-    // with annoying hacks like wrapping it with an `Arc<Mutex<..>>` or something.
-    snd_ev: mpsc::Sender<Event>,
 }
 
 impl Client {
@@ -249,7 +241,6 @@ impl Client {
     pub fn quit(&mut self, reason: Option<String>) {
         debug!("quit cmd received");
         self.msg_chan.try_send(Cmd::Quit(reason)).unwrap();
-        self.snd_ev.try_send(Event::Closed).unwrap();
     }
 
     /// Get all nicks in a channel.
@@ -283,7 +274,6 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
 
     // Channel for returning IRC events to user.
     let (snd_ev, rcv_ev) = mpsc::channel::<Event>(100);
-    let snd_ev_clone = snd_ev.clone(); // for Client
 
     // Channel for commands from user.
     let (snd_cmd, rcv_cmd) = mpsc::channel::<Cmd>(100);
@@ -303,7 +293,6 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
             msg_chan: snd_cmd,
             serv_name,
             state: irc_state,
-            snd_ev: snd_ev_clone,
         },
         rcv_ev,
     )
@@ -395,7 +384,7 @@ async fn main_loop(
 
         if addrs.is_empty() {
             snd_ev.send(Event::CantResolveAddr).await.unwrap();
-            break; // returns
+            return;
         }
 
         debug!("Address resolved: {:?}", addrs);
