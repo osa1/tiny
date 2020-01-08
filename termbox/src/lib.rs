@@ -128,7 +128,7 @@ impl Termbox {
 
         unsafe { libc::tcsetattr(libc::STDOUT_FILENO, libc::TCSAFLUSH, &new_term) };
         // T_ENTER_CA for xterm
-        tty.write_all("\x1b[?1049h".as_bytes()).unwrap();
+        tty.write_all(b"\x1b[?1049h").unwrap();
 
         // Done with setting terminal attributes
 
@@ -185,7 +185,7 @@ impl Termbox {
             .extend_from_slice(termion::clear::All.as_ref());
         // T_EXIT_CA for xterm
         self.output_buffer
-            .extend_from_slice("\x1b[?1049l".as_bytes());
+            .extend_from_slice(b"\x1b[?1049l");
 
         self.flush_output_buffer();
     }
@@ -195,7 +195,7 @@ impl Termbox {
         self.flip_terms();
 
         // T_ENTER_CA for xterm
-        self.tty.write_all("\x1b[?1049h".as_bytes()).unwrap();
+        self.tty.write_all(b"\x1b[?1049h").unwrap();
 
         self.buffer_size_change_request = true;
         self.present();
@@ -459,7 +459,7 @@ impl Drop for Termbox {
             .extend_from_slice(termion::clear::All.as_ref());
         // T_EXIT_CA for xterm
         self.output_buffer
-            .extend_from_slice("\x1b[?1049l".as_bytes());
+            .extend_from_slice(b"\x1b[?1049l");
         self.flush_output_buffer();
 
         unsafe {
