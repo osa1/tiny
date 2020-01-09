@@ -1,3 +1,9 @@
+# Unreleased
+
+- TUI: Tab bar scrolls to left after closing tabs to fit more tabs into the
+  visible part of the tab bar (#164). See #164 for an example of previous
+  behavior.
+
 # 2020/01/08: 0.5.1
 
 - When a domain name resolves to multiple IP addresses tiny now tries connecting
