@@ -301,6 +301,7 @@ impl TUI {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
+        self.fix_scroll_after_close();
     }
 
     /// Returns index of the new tab if a new tab is created.
@@ -354,6 +355,7 @@ impl TUI {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
+        self.fix_scroll_after_close();
     }
 
     /// Returns index of the new tab if a new tab is created.
@@ -392,6 +394,7 @@ impl TUI {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
+        self.fix_scroll_after_close();
     }
 
     pub(crate) fn handle_input_event(&mut self, ev: Event) -> TUIRet {
@@ -787,6 +790,48 @@ impl TUI {
     fn prev_tab(&mut self) {
         self.prev_tab_();
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
+    }
+
+    /// After closing a tab scroll left if there is space on the right and we can fit more tabs
+    /// from the left into the visible part of the tab bar.
+    fn fix_scroll_after_close(&mut self) {
+        let (tab_left, tab_right) = self.rendered_tabs();
+
+        if tab_left == 0 {
+            return;
+        }
+
+        // Size of shown part of the tab bar. DOES NOT include LEFT_ARROW.
+        let mut shown_width = 0;
+        for (tab_idx, tab) in self.tabs[tab_left..tab_right].iter().enumerate() {
+            shown_width += tab.width();
+            if tab_idx != tab_right - 1 {
+                shown_width += 1; // space between tabs
+            }
+        }
+
+        // How much space left in tab bar. Not accounting for LEFT_ARROW here!
+        let mut space_left = self.width - shown_width;
+
+        // How much to scroll left
+        let mut scroll_left = 0;
+
+        // Start iterating tabs on the left, add the tab size to `scroll_left` as long as scrolling
+        // doesn't make the right-most tab go out of bounds
+        for left_tab_idx in (0..=tab_left - 1).rev() {
+            let tab_width = self.tabs[left_tab_idx].width() + 1; // 1 for space
+            let draw_arrow = left_tab_idx != 0;
+            let tab_with_arrow_w = tab_width + if draw_arrow { 2 } else { 0 };
+
+            if tab_with_arrow_w <= space_left {
+                scroll_left += tab_width;
+                space_left -= tab_width;
+            } else {
+                break;
+            }
+        }
+
+        self.h_scroll -= scroll_left;
     }
 
     pub(crate) fn switch(&mut self, string: &str) {
