@@ -1,4 +1,5 @@
-use serde::Deserialize;
+use serde::{de::Error, Deserialize, Deserializer};
+use serde_yaml;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -27,7 +28,7 @@ pub(crate) struct Server {
     pub(crate) tls: bool,
 
     /// Server password (optional)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "with_expand_envs")]
     pub(crate) pass: Option<String>,
 
     /// Real name to be used in connection registration
@@ -88,6 +89,18 @@ pub(crate) fn validate_config(config: &Config) -> Vec<String> {
     }
 
     errors
+}
+
+/// Expand env variables in the config (used primarily for pass)
+fn with_expand_envs<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    match shellexpand::env(&s) {
+        Ok(value) => Ok(Some(value.to_string())),
+        Err(err) => Err(Error::custom(err)),
+    }
 }
 
 /// Returns tiny config file path. File may or may not exist.
