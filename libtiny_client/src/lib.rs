@@ -89,7 +89,7 @@ pub enum Event {
     /// An IO error happened.
     IoErr(std::io::Error),
     /// A TLS error happened
-    TlsErr(native_tls::Error),
+    TlsErr(stream::TlsError),
     /// Remote end closed the connection
     ConnectionClosed,
     /// Client couldn't resolve host address. The client stops after sending this event.

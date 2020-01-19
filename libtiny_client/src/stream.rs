@@ -1,4 +1,3 @@
-use native_tls;
 use std::{
     net::SocketAddr,
     pin::Pin,
@@ -8,7 +7,11 @@ use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::TcpStream,
 };
+
+#[cfg(feature = "tls-native")]
 use tokio_tls::TlsStream;
+#[cfg(feature = "tls-rustls")]
+use tokio_rustls::client::TlsStream;
 
 #[derive(Debug)]
 pub(crate) enum Stream {
@@ -16,13 +19,18 @@ pub(crate) enum Stream {
     TlsStream(TlsStream<TcpStream>),
 }
 
+#[cfg(feature = "tls-native")]
+pub(crate) type TlsError = native_tls::Error;
+#[cfg(feature = "tls-rustls")]
+pub(crate) type TlsError = rustls::TLSError;
+
 pub(crate) enum StreamError {
-    TlsError(native_tls::Error),
+    TlsError(TlsError),
     IoError(std::io::Error),
 }
 
-impl From<native_tls::Error> for StreamError {
-    fn from(err: native_tls::Error) -> Self {
+impl From<TlsError> for StreamError {
+    fn from(err: TlsError) -> Self {
         StreamError::TlsError(err)
     }
 }
@@ -38,11 +46,23 @@ impl Stream {
         Ok(Stream::TcpStream(TcpStream::connect(addr).await?))
     }
 
+    #[cfg(feature = "tls-native")]
     pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
         let tcp_stream = TcpStream::connect(addr).await?;
         let tls_connector =
             tokio_tls::TlsConnector::from(native_tls::TlsConnector::builder().build()?);
         let tls_stream = tls_connector.connect(host_name, tcp_stream).await?;
+        Ok(Stream::TlsStream(tls_stream))
+    }
+
+    #[cfg(feature = "tls-rustls")]
+    pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
+        let tcp_stream = TcpStream::connect(addr).await?;
+        let config = std::sync::Arc::new(rustls::ClientConfig::default());
+        let tls_connector = tokio_rustls::TlsConnector::from(config);
+        let name = webpki::DNSNameRef::try_from_ascii_str(host_name)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let tls_stream = tls_connector.connect(name, tcp_stream).await?;
         Ok(Stream::TlsStream(tls_stream))
     }
 }

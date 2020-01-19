@@ -10,6 +10,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7825f6833612eb2414095684fcf6c635becf3ce97fe48cf6421321e93bfbd53c"
+
+[[package]]
 name = "arc-swap"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -112,6 +118,12 @@ name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
+
+[[package]]
+name = "bumpalo"
+version = "3.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fb8038c1ddc0a5f73787b130f4cc75151e96ed33e417fde765eb5a81e3532f4"
 
 [[package]]
 name = "byteorder"
@@ -406,6 +418,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "heck"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -430,6 +451,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2b3ea6ff95e175473f8ffe6a7eb7c00d054240321b84c57051175fe3c1e075e"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "js-sys"
+version = "0.3.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7889c7c36282151f6bf465be4700359318aef36baa951462382eae49e9577cf9"
+dependencies = [
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -474,8 +504,11 @@ dependencies = [
  "libtiny_wire",
  "log",
  "native-tls",
+ "rustls",
  "tokio",
+ "tokio-rustls",
  "tokio-tls",
+ "webpki",
 ]
 
 [[package]]
@@ -667,6 +700,16 @@ dependencies = [
  "rustc_version",
  "semver",
  "void",
+]
+
+[[package]]
+name = "nom"
+version = "4.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
+dependencies = [
+ "memchr",
+ "version_check",
 ]
 
 [[package]]
@@ -981,6 +1024,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ring"
+version = "0.16.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6747f8da1f2b1fabbee1aaa4eb8a11abf9adef0bf58a41cee45db5d59cecdfac"
+dependencies = [
+ "cc",
+ "lazy_static",
+ "libc",
+ "spin",
+ "untrusted",
+ "web-sys",
+ "winapi 0.3.8",
+]
+
+[[package]]
 name = "rust-argon2"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1007,6 +1065,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b25a18b1bf7387f0145e7f8324e700805aade3842dd3db2e74e4cdeb4677c09e"
+dependencies = [
+ "base64 0.10.1",
+ "log",
+ "ring",
+ "sct",
+ "webpki",
+]
+
+[[package]]
 name = "safemem"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1020,6 +1091,16 @@ checksum = "87f550b06b6cba9c8b8be3ee73f391990116bf527450d2556e9b9ce263b9a021"
 dependencies = [
  "lazy_static",
  "winapi 0.3.8",
+]
+
+[[package]]
+name = "sct"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3042af939fca8c3453b7af0f1c66e533a15a86169e39de2657310ade8f98d3c"
+dependencies = [
+ "ring",
+ "untrusted",
 ]
 
 [[package]]
@@ -1108,6 +1189,18 @@ dependencies = [
  "redox_syscall",
  "winapi 0.3.8",
 ]
+
+[[package]]
+name = "sourcefile"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bf77cb82ba8453b42b6ae1d692e4cdc92f9a47beaf89a847c8be83f4e328ad3"
+
+[[package]]
+name = "spin"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "syn"
@@ -1272,6 +1365,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-rustls"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "141afec0978abae6573065a48882c6bae44c5cc61db9b511ac4abf6a09bfd9cc"
+dependencies = [
+ "futures-core",
+ "rustls",
+ "tokio",
+ "webpki",
+]
+
+[[package]]
 name = "tokio-tls"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1280,6 +1385,12 @@ dependencies = [
  "native-tls",
  "tokio",
 ]
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e83e153d1053cbb5a118eeff7fd5be06ed99153f00dbcd8ae310c5fb2b22edc0"
 
 [[package]]
 name = "unicode-width"
@@ -1294,10 +1405,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 
 [[package]]
+name = "untrusted"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60369ef7a31de49bcb3f6ca728d4ba7300d9a1658f94c727d4cab8c8d9f4aece"
+
+[[package]]
 name = "vcpkg"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fc439f2794e98976c88a2a2dafce96b930fe8010b0a256b3c2199a773933168"
+
+[[package]]
+name = "version_check"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
 
 [[package]]
 name = "void"
@@ -1310,6 +1433,108 @@ name = "wasi"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b89c3ce4ce14bdc6fb6beaf9ec7928ca331de5df7e5ea278375642a2f478570d"
+
+[[package]]
+name = "wasm-bindgen"
+version = "0.2.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5205e9afdf42282b192e2310a5b463a6d1c1d774e30dc3c791ac37ab42d2616c"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-backend"
+version = "0.2.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11cdb95816290b525b32587d76419facd99662a07e59d3cdb560488a819d9a45"
+dependencies = [
+ "bumpalo",
+ "lazy_static",
+ "log",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-macro"
+version = "0.2.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "574094772ce6921576fb6f2e3f7497b8a76273b6db092be18fc48a082de09dc3"
+dependencies = [
+ "quote",
+ "wasm-bindgen-macro-support",
+]
+
+[[package]]
+name = "wasm-bindgen-macro-support"
+version = "0.2.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e85031354f25eaebe78bb7db1c3d86140312a911a106b2e29f9cc440ce3e7668"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "wasm-bindgen-backend",
+ "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-shared"
+version = "0.2.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5e7e61fc929f4c0dddb748b102ebf9f632e2b8d739f2016542b4de2965a9601"
+
+[[package]]
+name = "wasm-bindgen-webidl"
+version = "0.2.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef012a0d93fc0432df126a8eaf547b2dce25a8ce9212e1d3cbeef5c11157975d"
+dependencies = [
+ "anyhow",
+ "heck",
+ "log",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "wasm-bindgen-backend",
+ "weedle",
+]
+
+[[package]]
+name = "web-sys"
+version = "0.3.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf97caf6aa8c2b1dac90faf0db529d9d63c93846cca4911856f78a83cebf53b"
+dependencies = [
+ "anyhow",
+ "js-sys",
+ "sourcefile",
+ "wasm-bindgen",
+ "wasm-bindgen-webidl",
+]
+
+[[package]]
+name = "webpki"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7e664e770ac0110e2384769bcc59ed19e329d81f555916a6e072714957b81b4"
+dependencies = [
+ "ring",
+ "untrusted",
+]
+
+[[package]]
+name = "weedle"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bb43f70885151e629e2a19ce9e50bd730fd436cfd4b666894c9ce4de9141164"
+dependencies = [
+ "nom",
+]
 
 [[package]]
 name = "winapi"

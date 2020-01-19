@@ -5,6 +5,11 @@ authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "An IRC client library, mainly to be used in tiny"
 edition = "2018"
 
+[features]
+default = ["tls-native"]
+tls-native = ["native-tls", "tokio-tls"]
+tls-rustls = ["rustls", "tokio-rustls", "webpki"]
+
 [dependencies]
 base64 = "0.6.0"
 env_logger = "0.7"
@@ -12,6 +17,9 @@ futures = "0.3.1"
 libtiny_logger = { path = "../libtiny_logger" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
-native-tls = "0.2"
+native-tls = { version = "0.2", optional = true }
+rustls = { version = "0.16.0", optional = true }
 tokio = { version = "0.2.9", features = ["full"] }
-tokio-tls = "0.3.0"
+tokio-rustls = { version = "0.12.2", optional = true }
+tokio-tls = { version = "0.3.0", optional = true }
+webpki = { version = "0.21.0", optional = true }

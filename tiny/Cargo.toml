@@ -8,11 +8,16 @@ license = "MIT"
 description = "An IRC client"
 edition = "2018"
 
+[features]
+default = ["tls-native"]
+tls-native = ["libtiny_client/tls-native"]
+tls-rustls = ["libtiny_client/tls-rustls"]
+
 [dependencies]
 dirs = "1.0.2"
 env_logger = "0.7"
 futures = "0.3.1"
-libtiny_client = { path = "../libtiny_client" }
+libtiny_client = { path = "../libtiny_client", default-features = false }
 libtiny_logger = { path = "../libtiny_logger" }
 libtiny_tui = { path = "../libtiny_tui" }
 libtiny_ui = { path = "../libtiny_ui" }
