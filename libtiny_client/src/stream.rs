@@ -3,6 +3,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use lazy_static::lazy_static;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::TcpStream,
@@ -13,6 +14,21 @@ use tokio_tls::TlsStream;
 #[cfg(feature = "tls-rustls")]
 use tokio_rustls::client::TlsStream;
 
+#[cfg(feature = "tls-native")]
+lazy_static! {
+    static ref TLS_CONNECTOR: tokio_tls::TlsConnector =
+        tokio_tls::TlsConnector::from(native_tls::TlsConnector::builder().build().unwrap());
+}
+
+#[cfg(feature = "tls-rustls")]
+lazy_static! {
+    static ref TLS_CONNECTOR: tokio_rustls::TlsConnector = {
+        let mut config = tokio_rustls::rustls::ClientConfig::default();
+        config.root_store = rustls_native_certs::load_native_certs().unwrap();
+        tokio_rustls::TlsConnector::from(std::sync::Arc::new(config))
+    };
+}
+
 #[derive(Debug)]
 pub(crate) enum Stream {
     TcpStream(TcpStream),
@@ -22,7 +38,7 @@ pub(crate) enum Stream {
 #[cfg(feature = "tls-native")]
 pub(crate) type TlsError = native_tls::Error;
 #[cfg(feature = "tls-rustls")]
-pub(crate) type TlsError = rustls::TLSError;
+pub(crate) type TlsError = tokio_rustls::rustls::TLSError;
 
 pub(crate) enum StreamError {
     TlsError(TlsError),
@@ -49,20 +65,16 @@ impl Stream {
     #[cfg(feature = "tls-native")]
     pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
         let tcp_stream = TcpStream::connect(addr).await?;
-        let tls_connector =
-            tokio_tls::TlsConnector::from(native_tls::TlsConnector::builder().build()?);
-        let tls_stream = tls_connector.connect(host_name, tcp_stream).await?;
+        let tls_stream = TLS_CONNECTOR.connect(host_name, tcp_stream).await?;
         Ok(Stream::TlsStream(tls_stream))
     }
 
     #[cfg(feature = "tls-rustls")]
     pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
         let tcp_stream = TcpStream::connect(addr).await?;
-        let config = std::sync::Arc::new(rustls::ClientConfig::default());
-        let tls_connector = tokio_rustls::TlsConnector::from(config);
-        let name = webpki::DNSNameRef::try_from_ascii_str(host_name)
+        let name = tokio_rustls::webpki::DNSNameRef::try_from_ascii_str(host_name)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        let tls_stream = tls_connector.connect(name, tcp_stream).await?;
+        let tls_stream = TLS_CONNECTOR.connect(name, tcp_stream).await?;
         Ok(Stream::TlsStream(tls_stream))
     }
 }
