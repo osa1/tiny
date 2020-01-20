@@ -1,18 +1,18 @@
+use lazy_static::lazy_static;
 use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
 };
-use lazy_static::lazy_static;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::TcpStream,
 };
 
-#[cfg(feature = "tls-native")]
-use tokio_tls::TlsStream;
 #[cfg(feature = "tls-rustls")]
 use tokio_rustls::client::TlsStream;
+#[cfg(feature = "tls-native")]
+use tokio_tls::TlsStream;
 
 #[cfg(feature = "tls-native")]
 lazy_static! {
