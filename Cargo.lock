@@ -1291,6 +1291,7 @@ dependencies = [
  "libtiny_ui",
  "libtiny_wire",
  "log",
+ "regex",
  "rustc_tools_util",
  "serde",
  "serde_yaml",

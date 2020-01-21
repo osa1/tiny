@@ -1,5 +1,7 @@
-use serde::{de::Error, Deserialize, Deserializer};
+use regex::Regex;
+use serde::{Deserialize, Deserializer};
 use serde_yaml;
+use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -11,7 +13,7 @@ pub(crate) struct SASLAuth {
     pub(crate) password: String,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 pub(crate) struct Server {
     /// Address of the server
     pub(crate) addr: String,
@@ -51,7 +53,7 @@ pub(crate) struct Server {
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 pub(crate) struct Defaults {
     pub(crate) nicks: Vec<String>,
     pub(crate) realname: String,
@@ -61,7 +63,7 @@ pub(crate) struct Defaults {
     pub(crate) tls: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub(crate) struct Config {
     pub(crate) servers: Vec<Server>,
     pub(crate) defaults: Defaults,
@@ -91,15 +93,30 @@ pub(crate) fn validate_config(config: &Config) -> Vec<String> {
     errors
 }
 
+fn is_shell_var(val: &str) -> bool {
+    let re = Regex::new(r"^\$[A-z][A-z0-9_]+$").unwrap();
+    return re.is_match(val);
+}
+
 /// Expand env variables in the config (used primarily for pass)
 fn with_expand_envs<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    match shellexpand::env(&s) {
-        Ok(value) => Ok(Some(value.to_string())),
-        Err(err) => Err(Error::custom(err)),
+    if is_shell_var(&s) {
+        return match env::var(&s[1..]) {
+            Ok(value) => Ok(Some(value.to_string())),
+            Err(_) => {
+                eprintln!("Tried expanding env variable {} but unable to find it. If this is your password and not and env variable, add the password as ${}", &s, &s);
+                std::process::exit(1);
+            }
+        };
+    } else {
+        if &s[0..2] == "$$" {
+            return Ok(Some(s[1..].to_string()));
+        }
+        Ok(Some(s))
     }
 }
 

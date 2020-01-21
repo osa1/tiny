@@ -27,7 +27,7 @@ libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
-shellexpand = "1.1.0"
+regex = "1"
 time = "0.1"
 tokio = { version = "0.2.11", features = ["full"] }
 
