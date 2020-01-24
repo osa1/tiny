@@ -18,4 +18,5 @@ os:
 script:
   - cargo build --verbose --all
   - cargo test --verbose --all
+  - (cd tiny && cargo build --no-default-features --features tls-rustls)
   - cargo fmt --all -- --check
