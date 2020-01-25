@@ -44,6 +44,8 @@ tiny is an IRC client written in Rust.
 
 - znc compatible
 
+- TLS support
+
 ## Installation
 
 Install the Rust nightly toolchain, clone the repo, and run
@@ -61,18 +63,29 @@ cargo install --git https://github.com/osa1/tiny
 If you have an older version installed, add `--force` to the command you're
 using.
 
-Arch Linux users can install tiny from the
-[AUR](https://aur.archlinux.org/packages/tiny-irc-client-git/).
+Arch Linux users can install tiny from the [AUR].
+
+[AUR]: https://aur.archlinux.org/packages/tiny-irc-client-git/
 
 Since version 0.3.0 tiny needs OpenSSL or LibreSSL headers and runtime
-libraries. See [rust-openssl's
-README](https://github.com/sfackler/rust-openssl#linux) for instructions on
-installing them.
+libraries. See [rust-openssl documentation] for installation instructions.
 
-##### Dependencies
+[rust-openssl documentation]: https://docs.rs/openssl/0.10.26/openssl/#automatic
 
-* OpenSSL or LibreSSL
-* libdbus [Linux only]
+### Using rustls instead of native TLS library
+
+To use [rustls], add `--no-default-features --features tls-rustls` to the
+install command you're using.
+
+When building with rustls tiny doesn't require a native SSL library (OpenSSL or
+LibreSSL).
+
+[rustls]: https://github.com/ctz/rustls
+
+### Dependencies
+
+* OpenSSL or LibreSSL (default, not when rustls is used)
+* libdbus (Linux only)
 
 tiny is tested on Linux and OSX.
 
