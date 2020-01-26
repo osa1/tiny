@@ -39,8 +39,6 @@ pub struct Termbox {
 
 struct CellBuf {
     cells: Box<[Cell]>,
-    w: u16,
-    h: u16,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -60,8 +58,6 @@ impl CellBuf {
     fn new(w: u16, h: u16) -> CellBuf {
         CellBuf {
             cells: vec![EMPTY_CELL; usize::from(w) * usize::from(h)].into_boxed_slice(),
-            w,
-            h,
         }
     }
 
@@ -73,18 +69,18 @@ impl CellBuf {
         }
     }
 
-    fn resize(&mut self, w: u16, h: u16) {
-        if self.w == w && self.h == h {
+    fn resize(&mut self, old_w: u16, old_h: u16, w: u16, h: u16) {
+        if old_w == w && old_h == h {
             return;
         }
 
         // Old cells should be visible at the top-left corner
         let mut new_cells = vec![EMPTY_CELL; usize::from(w) * usize::from(h)].into_boxed_slice();
-        let minw = usize::from(min(self.w, w));
-        let minh = usize::from(min(self.h, h));
+        let minw = usize::from(min(old_w, w));
+        let minh = usize::from(min(old_h, h));
         {
             let w = usize::from(w);
-            let self_w = usize::from(self.w);
+            let self_w = usize::from(old_w);
             for i in 0..minh {
                 for j in 0..minw {
                     new_cells[i * w + j] = self.cells[i * self_w + j];
@@ -92,8 +88,6 @@ impl CellBuf {
             }
         }
 
-        self.w = w;
-        self.h = h;
         self.cells = new_cells;
     }
 }
@@ -234,13 +228,12 @@ impl Termbox {
             self.buffer_size_change_request = false;
         }
 
-        let front_buffer_w = usize::from(self.front_buffer.w);
-        let back_buffer_w = usize::from(self.back_buffer.w);
-        for y in 0..usize::from(self.front_buffer.h) {
+        for y in 0..usize::from(self.term_height) {
             let mut x = 0;
-            while x < usize::from(self.front_buffer.w) {
-                let front_cell = &mut self.front_buffer.cells[(y * front_buffer_w) + x];
-                let back_cell = self.back_buffer.cells[(y * back_buffer_w) + x];
+            while x < usize::from(self.term_width) {
+                let front_cell =
+                    &mut self.front_buffer.cells[(y * usize::from(self.term_width)) + x];
+                let back_cell = self.back_buffer.cells[(y * usize::from(self.term_width)) + x];
                 // TODO: For 0-width chars maybe only move to the next cell in the back buffer?
                 let cw0 = UnicodeWidthChar::width(back_cell.ch).unwrap_or(1);
                 let cw = std::cmp::max(cw0, 1);
@@ -253,9 +246,9 @@ impl Termbox {
 
                 self.send_attr(back_cell.fg, back_cell.bg);
 
-                if cw > 1 && (x + (cw - 1)) >= usize::from(self.front_buffer.w) {
+                if cw > 1 && (x + (cw - 1)) >= usize::from(self.term_width) {
                     // Not enough room for wide ch, send spaces
-                    for i in x..usize::from(self.front_buffer.w) {
+                    for i in x..usize::from(self.term_width) {
                         self.send_char(i as u16, y as u16, ' ', 1);
                     }
                 } else if cw0 == 0 {
@@ -266,8 +259,8 @@ impl Termbox {
                     // buffer so that if we put a non-wide character lto this cell later next
                     // columns won't be bogus.
                     for i in 1..cw {
-                        let mut front_cell =
-                            &mut self.front_buffer.cells[(y * front_buffer_w) + x + i];
+                        let mut front_cell = &mut self.front_buffer.cells
+                            [(y * usize::from(self.term_width)) + x + i];
                         front_cell.ch = ' ';
                         front_cell.fg = back_cell.fg;
                         front_cell.bg = back_cell.bg;
@@ -338,11 +331,13 @@ impl Termbox {
     }
 
     fn update_size(&mut self) {
+        let old_w = self.term_width;
+        let old_h = self.term_height;
         let (w, h) = termion::terminal_size().unwrap();
         self.term_width = w;
         self.term_height = h;
-        self.back_buffer.resize(w, h);
-        self.front_buffer.resize(w, h);
+        self.back_buffer.resize(old_w, old_h, w, h);
+        self.front_buffer.resize(old_w, old_h, w, h);
         self.front_buffer.clear(self.clear_fg, self.clear_bg);
         self.send_clear();
     }
