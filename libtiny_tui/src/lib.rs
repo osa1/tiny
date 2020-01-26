@@ -18,6 +18,9 @@ mod tui;
 mod utils;
 mod widget;
 
+#[cfg(test)]
+mod tests;
+
 pub use crate::tab::TabStyle;
 pub use libtiny_ui::*;
 
