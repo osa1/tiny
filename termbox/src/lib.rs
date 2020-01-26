@@ -16,7 +16,8 @@ pub const TB_BOLD: u16 = 0x0100;
 pub const TB_UNDERLINE: u16 = 0x0200;
 
 pub struct Termbox {
-    tty: File,
+    // Not available in test instances
+    tty: Option<File>,
     old_term: libc::termios,
     term_width: u16,
     term_height: u16,
@@ -37,15 +38,16 @@ pub struct Termbox {
     // total_flushed: u64,
 }
 
-struct CellBuf {
-    cells: Box<[Cell]>,
+#[derive(Clone)]
+pub struct CellBuf {
+    pub cells: Box<[Cell]>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct Cell {
-    ch: char,
-    fg: u16,
-    bg: u16,
+pub struct Cell {
+    pub ch: char,
+    pub fg: u16,
+    pub bg: u16,
 }
 
 const EMPTY_CELL: Cell = Cell {
@@ -134,7 +136,7 @@ impl Termbox {
         let mut front_buffer = CellBuf::new(term_width, term_height);
         front_buffer.clear(clear_fg, clear_bg);
         let mut termbox = Termbox {
-            tty,
+            tty: Some(tty),
             old_term,
             term_width,
             term_height,
@@ -155,6 +157,25 @@ impl Termbox {
         termbox.send_clear();
 
         Ok(termbox)
+    }
+
+    pub fn init_test(w: u16, h: u16) -> Termbox {
+        Termbox {
+            tty: None,
+            old_term: unsafe { std::mem::zeroed() },
+            term_width: w,
+            term_height: h,
+            buffer_size_change_request: false,
+            back_buffer: CellBuf::new(w, h),
+            front_buffer: CellBuf::new(w, h),
+            clear_fg: 0,
+            clear_bg: 0,
+            last_fg: 0,
+            last_bg: 0,
+            cursor: Some((0, 0)),
+            terminal_cursor: (0, 0),
+            output_buffer: Vec::with_capacity(32 * 1024),
+        }
     }
 
     // Swap current term with old_term
@@ -188,7 +209,9 @@ impl Termbox {
         self.flip_terms();
 
         // T_ENTER_CA for xterm
-        self.tty.write_all(b"\x1b[?1049h").unwrap();
+        if let Some(ref mut tty) = self.tty {
+            tty.write_all(b"\x1b[?1049h").unwrap();
+        }
 
         self.buffer_size_change_request = true;
         self.present();
@@ -326,7 +349,9 @@ impl Termbox {
 
     fn flush_output_buffer(&mut self) {
         // self.total_flushed += self.output_buffer.len() as u64;
-        self.tty.write_all(&self.output_buffer).unwrap();
+        if let Some(ref mut tty) = self.tty {
+            tty.write_all(&self.output_buffer).unwrap();
+        }
         self.output_buffer.clear();
     }
 
@@ -455,10 +480,23 @@ impl Drop for Termbox {
         self.output_buffer.extend_from_slice(b"\x1b[?1049l");
         self.flush_output_buffer();
 
-        unsafe {
-            libc::tcsetattr(libc::STDOUT_FILENO, libc::TCSAFLUSH, &self.old_term);
+        if self.tty.is_some() {
+            unsafe {
+                libc::tcsetattr(libc::STDOUT_FILENO, libc::TCSAFLUSH, &self.old_term);
+            }
         }
 
         //  eprintln!("Total bytes flushed: {}", self.total_flushed);
+    }
+}
+
+//
+// Testing API
+//
+
+impl Termbox {
+    /// Returns a copy of the front buffer. Useful when testing.
+    pub fn get_front_buffer(&self) -> CellBuf {
+        self.front_buffer.clone()
     }
 }

@@ -61,13 +61,27 @@ pub(crate) struct TUI {
     /// Is there room for statusline?
     statusline_visible: bool,
     /// Config file path
-    config_path: PathBuf,
+    config_path: Option<PathBuf>,
 }
 
 impl TUI {
     pub(crate) fn new(config_path: PathBuf) -> TUI {
         let tb = Termbox::init().unwrap(); // TODO: check errors
+        TUI::new_tb(Some(config_path), tb)
+    }
 
+    #[cfg(test)]
+    pub(crate) fn new_test(w: u16, h: u16) -> TUI {
+        let tb = Termbox::init_test(w, h);
+        TUI::new_tb(None, tb)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_tb(&self) -> &Termbox {
+        &self.tb
+    }
+
+    fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
         // This is now done in reload_config() below
         // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
 
@@ -205,15 +219,17 @@ impl TUI {
     }
 
     pub(crate) fn reload_config(&mut self) {
-        match parse_config(&self.config_path) {
-            Err(err) => {
-                self.add_client_err_msg(
-                    &format!("Can't parse TUI config: {:?}", err),
-                    &MsgTarget::CurrentTab,
-                );
-            }
-            Ok(Config { colors }) => {
-                self.set_colors(colors);
+        if let Some(ref config_path) = self.config_path {
+            match parse_config(config_path) {
+                Err(err) => {
+                    self.add_client_err_msg(
+                        &format!("Can't parse TUI config: {:?}", err),
+                        &MsgTarget::CurrentTab,
+                    );
+                }
+                Ok(Config { colors }) => {
+                    self.set_colors(colors);
+                }
             }
         }
     }
@@ -782,12 +798,12 @@ impl TUI {
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
 
-    fn next_tab(&mut self) {
+    pub(crate) fn next_tab(&mut self) {
         self.next_tab_();
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
 
-    fn prev_tab(&mut self) {
+    pub(crate) fn prev_tab(&mut self) {
         self.prev_tab_();
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
@@ -798,6 +814,7 @@ impl TUI {
         let (tab_left, tab_right) = self.rendered_tabs();
 
         if tab_left == 0 {
+            self.h_scroll = 0;
             return;
         }
 
