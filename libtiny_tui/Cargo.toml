@@ -16,7 +16,7 @@ tempfile = "3.0.3"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
-tokio = { version = "0.2.9", features = ["full"] }
+tokio = { version = "0.2.11", features = ["full"] }
 
 [dev-dependencies]
 mio = "0.6.9"
