@@ -6,7 +6,7 @@ description = "An IRC client library, mainly to be used in tiny"
 edition = "2018"
 
 [features]
-default = ["tls-native"]
+default = ["tls-rustls"]
 tls-native = ["native-tls", "tokio-tls"]
 tls-rustls = ["rustls-native-certs", "tokio-rustls"]
 
