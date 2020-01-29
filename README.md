@@ -39,7 +39,8 @@ tiny is an IRC client written in Rust.
 
 - SASL authentication
 
-- Configurable desktop notifications on new messages
+- Configurable desktop notifications on new messages (opt-in feature behind a
+  feature flag, see below)
 
 - znc compatible
 
@@ -47,7 +48,21 @@ tiny is an IRC client written in Rust.
 
 ## Installation
 
-Install the Rust nightly toolchain, clone the repo, and run
+For pre-build binaries see [releases]. To build from source install Rust nightly
+toolchain. By default tiny uses [rustls] for TLS support, and desktop
+notifications are disabled.
+
+[releases]: https://github.com/osa1/tiny/releases
+[rustls]: https://github.com/ctz/rustls
+
+- To use system TLS library (OpenSSL or LibreSSL), add `--no-default-features
+  --features=tls-native` to the command you're using. Note that this requires
+  OpenSSL or LibreSSL headers and runtime libraries on Linux.
+
+- To enable desktop notifications add `--features=desktop-notifications`. This
+  requires libdbus on Linux.
+
+To install in a clone:
 
 ```
 cargo install --path tiny
@@ -62,29 +77,9 @@ cargo install --git https://github.com/osa1/tiny
 If you have an older version installed, add `--force` to the command you're
 using.
 
-Arch Linux users can install tiny from the [AUR].
+Arch Linux users can install tiny from [AUR].
 
 [AUR]: https://aur.archlinux.org/packages/tiny-irc-client-git/
-
-Since version 0.3.0 tiny needs OpenSSL or LibreSSL headers and runtime
-libraries. See [rust-openssl documentation] for installation instructions.
-
-[rust-openssl documentation]: https://docs.rs/openssl/0.10.26/openssl/#automatic
-
-### Using rustls instead of native TLS library
-
-To use [rustls], add `--no-default-features --features tls-rustls` to the
-install command you're using.
-
-When building with rustls tiny doesn't require a native SSL library (OpenSSL or
-LibreSSL).
-
-[rustls]: https://github.com/ctz/rustls
-
-### Dependencies
-
-* OpenSSL or LibreSSL (default, not when rustls is used)
-* libdbus (Linux only)
 
 tiny is tested on Linux and OSX.
 

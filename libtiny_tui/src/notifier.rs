@@ -1,4 +1,6 @@
 use crate::{utils::remove_irc_control_chars, MsgTarget};
+
+#[cfg(feature = "desktop-notifications")]
 use notify_rust::Notification;
 
 /// Destktop notification handler
@@ -12,10 +14,14 @@ pub(crate) enum Notifier {
     Messages,
 }
 
+#[cfg(feature = "desktop-notifications")]
 fn notify(summary: &str, body: &str) {
     // TODO: Report errors somehow
     let _ = Notification::new().summary(summary).body(body).show();
 }
+
+#[cfg(not(feature = "desktop-notifications"))]
+fn notify(_summary: &str, _body: &str) {}
 
 impl Notifier {
     pub(crate) fn notify_privmsg(

@@ -4,12 +4,16 @@ version = "0.1.0"
 description = "A terminal UI for tiny"
 edition = "2018"
 
+[features]
+default = []
+desktop-notifications = ["notify-rust"]
+
 [dependencies]
 env_logger = "0.7"
 futures = "0.3.1"
 libtiny_ui = { path = "../libtiny_ui" }
 log = "0.4"
-notify-rust = "3"
+notify-rust = { version = "3", optional = true }
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 tempfile = "3.0.3"

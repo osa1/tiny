@@ -34,19 +34,58 @@ jobs:
             components: rustfmt
             override: true
 
-      - name: Make release tarball (libssl + libdbus)
+      - name: Make release tarball (default)
         run: |
           (cd tiny && cargo build --release --verbose)
+          tar -C target/release -czvf tiny-ubuntu-18.04.tar.gz tiny
+
+      - name: Make release tarball (default, statically linked)
+        run: |
+          (cd tiny && cargo build --release --verbose --target=x86_64-unknown-linux-musl)
+          tar -C target/x86_64-unknown-linux-musl/release \
+            -czvf tiny-ubuntu-18.04-static.tar.gz tiny
+
+      - name: Make release tarball (libssl)
+        run: |
+          (cd tiny && cargo build --release --verbose \
+            --no-default-features --features="tls-native")
           tar -C target/release -czvf tiny-ubuntu-18.04-libssl.tar.gz tiny
 
-      - name: Make release tarball (rustls + libdbus)
+      - name: Make release tarball (libdbus)
         run: |
-          (cd tiny && cargo build --release --verbose --no-default-features --features tls-rustls)
-          tar -C target/release -czvf tiny-ubuntu-18.04-rustls.tar.gz tiny
+          (cd tiny && cargo build --release --verbose \
+            --no-default-features --features="desktop-notifications")
+          tar -C target/release -czvf tiny-ubuntu-18.04-dbus.tar.gz tiny
+
+      - name: Make release tarball (libssl + libdbus)
+        run: |
+          (cd tiny && cargo build --release --verbose \
+            --no-default-features --features="tls-native desktop-notifications")
+          tar -C target/release -czvf tiny-ubuntu-18.04-libssl-dbus.tar.gz tiny
 
       # TODO: Can I not do this in one step?
 
-      - name: Upload executable (1/2)
+      - name: Upload executable (1/5)
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tiny-ubuntu-18.04.tar.gz
+          asset_name: tiny-ubuntu-18.04.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload executable (2/5)
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tiny-ubuntu-18.04-static.tar.gz
+          asset_name: tiny-ubuntu-18.04-static.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload executable (3/5)
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,12 +95,22 @@ jobs:
           asset_name: tiny-ubuntu-18.04-libssl.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload executable (2/2)
+      - name: Upload executable (4/5)
         uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tiny-ubuntu-18.04-rustls.tar.gz
-          asset_name: tiny-ubuntu-18.04-rustls.tar.gz
+          asset_path: tiny-ubuntu-18.04-dbus.tar.gz
+          asset_name: tiny-ubuntu-18.04-dbus.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload executable (4/5)
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tiny-ubuntu-18.04-libssl-dbus.tar.gz
+          asset_name: tiny-ubuntu-18.04-libssl-dbus.tar.gz
           asset_content_type: application/gzip
