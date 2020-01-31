@@ -1,0 +1,66 @@
+# This makes a (draft) release and uploads build artifacts.
+
+name: Make a release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install native dependencies
+        run: sudo apt-get install libdbus-1-dev pkg-config libssl-dev
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: true
+
+      - name: Get nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: rustfmt
+            override: true
+
+      - name: Make release tarball (libssl + libdbus)
+        run: |
+          (cd tiny && cargo build --release --verbose)
+          tar -C target/release -czvf tiny-ubuntu-18.04-libssl.tar.gz tiny
+
+      - name: Make release tarball (rustls + libdbus)
+        run: |
+          (cd tiny && cargo build --release --verbose --no-default-features --features tls-rustls)
+          tar -C target/release -czvf tiny-ubuntu-18.04-rustls.tar.gz tiny
+
+      # TODO: Can I not do this in one step?
+
+      - name: Upload executable (1/2)
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tiny-ubuntu-18.04-libssl.tar.gz
+          asset_name: tiny-ubuntu-18.04-libssl.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload executable (2/2)
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tiny-ubuntu-18.04-rustls.tar.gz
+          asset_name: tiny-ubuntu-18.04-rustls.tar.gz
+          asset_content_type: application/gzip
