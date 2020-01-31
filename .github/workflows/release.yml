@@ -7,7 +7,8 @@ on:
     tags: ['v*']
 
 jobs:
-  build:
+  make_release:
+    name: Make release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
