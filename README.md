@@ -1,13 +1,11 @@
 # tiny - Yet another console IRC client
 
-[![Travis Build Status](https://travis-ci.org/osa1/tiny.svg?branch=master)](https://travis-ci.org/osa1/tiny)
-[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-
 tiny is an IRC client written in Rust.
 
-![tiny in action](tiny.png)
-
-![tiny in action](tiny_mac.png)
+<p float="left" align="middle">
+  <img src="tiny.png" width="400" />
+  <img src="tiny_mac.png" width="400" /> 
+</p>
 
 ## Features
 
