@@ -3,9 +3,9 @@
 tiny is an IRC client written in Rust.
 
 <p float="left" align="middle">
-  <img src="tiny.png" width="285" />
-  <img src="tiny_mac.png" width="285" />
-  <img src="https://user-images.githubusercontent.com/448274/73597059-47e71380-4539-11ea-844d-0ec260691911.png" width="285" />
+  <img src="tiny.png" width="430" />
+  <img src="tiny_mac.png" width="430" />
+  <img src="https://user-images.githubusercontent.com/448274/73597059-47e71380-4539-11ea-844d-0ec260691911.png" width="430" />
 </p>
 
 ## Features
