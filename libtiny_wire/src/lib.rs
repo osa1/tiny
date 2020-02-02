@@ -267,7 +267,7 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
                 };
                 let target = params[0];
                 let mut msg = params[1];
-                let target = if target.chars().nth(0) == Some('#') {
+                let target = if target.starts_with('#') {
                     MsgTarget::Chan(target.to_owned())
                 } else {
                     MsgTarget::User(target.to_owned())
@@ -402,7 +402,7 @@ fn parse_reply_num(bs: &[u8]) -> Option<u16> {
 }
 
 fn parse_params(chrs: &str) -> Vec<&str> {
-    debug_assert_ne!(chrs.chars().nth(0), Some(' '));
+    debug_assert!(!chrs.starts_with(' '));
 
     let mut ret: Vec<&str> = Vec::new();
 
@@ -441,7 +441,7 @@ pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
 pub fn drop_nick_prefix(nick: &str) -> &str {
     static PREFIXES: [char; 5] = ['~', '&', '@', '%', '+'];
 
-    if PREFIXES.contains(&nick.chars().nth(0).unwrap()) {
+    if PREFIXES.contains(&nick.chars().next().unwrap()) {
         &nick[1..]
     } else {
         nick

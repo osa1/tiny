@@ -835,7 +835,7 @@ impl TUI {
 
         // Start iterating tabs on the left, add the tab size to `scroll_left` as long as scrolling
         // doesn't make the right-most tab go out of bounds
-        for left_tab_idx in (0..=tab_left - 1).rev() {
+        for left_tab_idx in (0..tab_left).rev() {
             let tab_width = self.tabs[left_tab_idx].width() + 1; // 1 for space
             let draw_arrow = left_tab_idx != 0;
             let tab_with_arrow_w = tab_width + if draw_arrow { 2 } else { 0 };

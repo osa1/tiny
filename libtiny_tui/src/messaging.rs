@@ -103,7 +103,7 @@ impl MessagingUI {
     }
 
     pub(crate) fn get_nick(&self) -> Option<&str> {
-        self.current_nick.as_ref().map(String::as_str)
+        self.current_nick.as_deref()
     }
 
     fn draw_input_field(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
