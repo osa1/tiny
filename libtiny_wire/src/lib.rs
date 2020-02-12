@@ -40,6 +40,10 @@ pub fn part(channel: &str) -> String {
     format!("PART {}\r\n", channel)
 }
 
+pub fn list(arg: &str) -> String {
+    format!("LIST {}\r\n", arg)
+}
+
 pub fn privmsg(msgtarget: &str, msg: &str) -> String {
     // IRC messages need to be shorter than 512 bytes (see RFC 1459 or 2812). This should be dealt
     // with at call sites as we can't show how we split messages into multiple messages in the UI

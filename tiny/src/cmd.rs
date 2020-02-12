@@ -96,7 +96,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 8] = [
+static CMDS: [&Cmd; 9] = [
     &AWAY_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
@@ -104,6 +104,7 @@ static CMDS: [&Cmd; 8] = [
     &ME_CMD,
     &MSG_CMD,
     &NAMES_CMD,
+    &LIST_CMD,
     &NICK_CMD,
 ];
 
@@ -429,6 +430,31 @@ fn names(args: CmdArgs) {
         }
     } else {
         ui.add_client_err_msg("/names only supported in chan tabs", &MsgTarget::CurrentTab);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static LIST_CMD: Cmd = Cmd {
+    name: "list",
+    cmd_fn: list,
+};
+
+fn list(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        ui,
+        clients,
+        src,
+        ..
+    } = args;
+
+    match find_client(clients, src.serv_name()) {
+        Some(client) => client.list(args),
+        None => ui.add_client_err_msg(
+            &format!("Can't LIST: Not connected to server {}", src.serv_name()),
+            &MsgTarget::CurrentTab,
+        ),
     }
 }
 

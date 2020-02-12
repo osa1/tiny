@@ -221,6 +221,13 @@ impl Client {
         self.msg_chan.try_send(Cmd::Msg(wire::part(chan))).unwrap();
     }
 
+    /// List channels on server
+    pub fn list(&mut self, channels: &str) {
+        self.msg_chan
+            .try_send(Cmd::Msg(wire::list(channels)))
+            .unwrap();
+    }
+
     /// Set away status. `None` means not away.
     pub fn away(&mut self, msg: Option<&str>) {
         self.state.set_away(msg);
