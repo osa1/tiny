@@ -178,8 +178,6 @@ Commands start with `/` character.
 
 - `/nick <nick>`: Change nick
 
-- `/list`: List all channels in current server
-
 - `/names`: List all nicks in the current channel. You can use `/names <nick>` to
   check if a specific nick is in the channel.
 
@@ -199,6 +197,16 @@ Commands start with `/` character.
 - `/notify [off|mentions|messages]`: Enable and disable desktop notifications.
   Running this command in a server tab applies it to all channels of that
   server. You can check your notify state in the status line.
+
+## Server Commands
+
+For commands not supported by tiny as a slash command, sending the command in the server tab will send the message directly to the server.
+
+### Examples:
+- `LIST` will list all channels on the server
+- `MOTD` will display the server Message of the Day
+- `RULES` will display server rules
+- etc...
 
 ## Contributing
 
