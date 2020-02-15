@@ -58,7 +58,7 @@ jobs:
       - name: Make release tarball (libdbus)
         run: |
           (cd tiny && cargo build --release --verbose \
-            --no-default-features --features="desktop-notifications")
+            --no-default-features --features="tls-rustls desktop-notifications")
           tar -C target/release -czvf tiny-ubuntu-18.04-dbus.tar.gz tiny
 
       - name: Make release tarball (libssl + libdbus)
