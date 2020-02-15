@@ -4,9 +4,9 @@
   visible part of the tab bar (#164). See #164 for an example of previous
   behavior.
 - tiny now reads the system cert store (for TLS connections) only once, instead
-  of on every new connection. (!172)
+  of on every new connection. (#172)
 - It's now possible to build tiny with [rustls] instead of [native-tls]. See
-  README for instructions. (!172)
+  README for instructions. (#172)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
