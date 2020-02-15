@@ -14,7 +14,9 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Install native dependencies
-        run: sudo apt-get install libdbus-1-dev pkg-config libssl-dev
+        run: |
+            sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
+                musl musl-dev musl-tools
 
       - name: Create release
         id: create_release
