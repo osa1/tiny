@@ -405,7 +405,6 @@ impl MessagingUI {
                     line.add_char('+');
                     line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
                     line.add_text(nick);
-                    line.add_char(' ');
                 });
             }
         }
@@ -424,7 +423,6 @@ impl MessagingUI {
                     line.add_char('-');
                     line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
                     line.add_text(nick);
-                    line.add_char(' ');
                 });
             }
         }
@@ -457,7 +455,6 @@ impl MessagingUI {
             line.add_char('>');
             line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
             line.add_text(new_nick);
-            line.add_char(' ');
         });
     }
 
@@ -467,7 +464,17 @@ impl MessagingUI {
 
     fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
         match self.last_activity_line {
-            Some(ref l) if l.ts == ts => l.line_idx,
+            Some(ref l) if l.ts == ts => {
+                let line_idx = l.line_idx;
+                // FIXME: It's a bit hacky to add a space in this function which from the name
+                // looks like a getter.
+                // The idea is that we want to add a space *before* adding new stuff, not *after*,
+                // to avoid adding redundant spaces. The test `small_screen_1` breaks if we don't
+                // get this right.
+                self.msg_area
+                    .modify_line(line_idx, |line| line.add_char(' '));
+                line_idx
+            }
             _ => {
                 self.add_timestamp(ts);
                 let line_idx = self.msg_area.flush_line();

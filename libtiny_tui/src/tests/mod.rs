@@ -1,6 +1,8 @@
 use crate::tui::TUI;
 
+use libtiny_ui::*;
 use termbox_simple::CellBuf;
+use time::Tm;
 
 fn buffer_str(buf: &CellBuf, w: u16, h: u16) -> String {
     let w = usize::from(w);
@@ -104,4 +106,67 @@ fn close_rightmost_tab() {
          |                    |
          |mentions            |";
     expect_screen(screen, &tui, 20, 4);
+}
+
+#[test]
+fn small_screen_1() {
+    let mut tui = TUI::new_test(21, 3);
+    let serv = "irc.server_1.org";
+    let chan = "#chan";
+    tui.new_server_tab(serv);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = unsafe { ::std::mem::zeroed() };
+    tui.add_nick("123456", Some(ts), &target);
+    tui.add_nick("abcdef", Some(ts), &target);
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|00:00 +123456 +abcdef|
+         |osa1:                |
+         |< #chan              |";
+    expect_screen(screen, &tui, 21, 3);
+}
+
+#[test]
+fn small_screen_2() {
+    let mut tui = TUI::new_test(21, 4);
+    let serv = "irc.server_1.org";
+    let chan = "#chan";
+    tui.new_server_tab(serv);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts: Tm = unsafe { ::std::mem::zeroed() };
+    tui.set_topic("Blah blah blah-", ts.clone(), serv, chan);
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|                     |
+         |00:00 Blah blah blah-|
+         |osa1:                |
+         |< #chan              |";
+    expect_screen(screen, &tui, 21, 4);
+
+    tui.add_nick("123456", Some(ts), &target);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|00:00 Blah blah blah-|
+         |+123456              |
+         |osa1:                |
+         |< #chan              |";
+    expect_screen(screen, &tui, 21, 4);
 }

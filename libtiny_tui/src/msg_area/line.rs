@@ -239,7 +239,7 @@ impl Line {
                         }
                         col += 1;
                     } else {
-                        // need to split here. ignore whitespace char.
+                        // Need to split here. Ignore whitespace char.
                         line += 1;
                         if line >= height {
                             break;
