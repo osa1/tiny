@@ -164,7 +164,6 @@ impl MsgArea {
         self.lines.len() - 1
     }
 
-    #[inline]
     pub(crate) fn modify_line<F>(&mut self, idx: usize, f: F)
     where
         F: Fn(&mut Line),
