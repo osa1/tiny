@@ -150,7 +150,7 @@ mod tests {
             Ok(Config { servers, .. }) => {
                 assert_eq!(
                     servers[0].join,
-                    vec!["#tiny".to_owned(), "#rust".to_owned()]
+                    vec!["##rust".to_owned()]
                 );
                 assert_eq!(servers[0].tls, true);
                 assert_eq!(servers[0].pass, Some("hunter2".to_owned()));
