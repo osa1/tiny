@@ -112,14 +112,14 @@ this config:
 
 ```yaml
 servers:
-    - addr: irc.mozilla.org
+    - addr: chat.freenode.net
       ...
 
-    - addr: chat.freenode.net
+    - addr: irc.gnome.org
       ...
 ```
 
-By default tiny connects to both servers. You can connect to only the second
+By default tiny connects to both servers. You can connect to only the first
 server by passing `freenode` as a command line argument.
 
 You can use `--config <path>` to specify your config file location.

@@ -1,6 +1,6 @@
 # Servers to auto-connect
 servers:
-    - addr: irc.mozilla.org
+    - addr: chat.freenode.net
       port: 6697
       tls: true
       realname: yourname
@@ -8,8 +8,7 @@ servers:
 
       # Channels to automatically join
       join:
-          - '#tiny'
-          - '#rust'
+          - '##rust'
 
       # Three authentication methods: pass, sasl, and nickserv_ident
       # These are optional and you probably only need one of these, delete
