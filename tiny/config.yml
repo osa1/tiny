@@ -39,6 +39,9 @@ defaults:
 # Where to put log files
 log_dir: '{}'
 
+# Enable text field wrapping instead of scrolling
+text_field_wrap: false
+
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
 #
