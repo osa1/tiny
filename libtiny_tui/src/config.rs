@@ -14,6 +14,8 @@ pub use termbox_simple::*;
 pub(crate) struct Config {
     #[serde(default)]
     pub(crate) colors: Colors,
+    #[serde(default)]
+    pub(crate) text_field_wrap: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

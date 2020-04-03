@@ -9,7 +9,12 @@ use termbox_simple::Termbox;
 use crate::{config::Colors, termbox, trie::Trie, utils, widget::WidgetRet};
 
 // TODO: Make these settings
-const SCROLLOFF: i32 = 5;
+const SCROLL_OFF: i32 = 5;
+
+/// Minimum width of TextField for wrapping
+const SCROLL_FALLBACK_WIDTH: i32 = 36;
+
+/// Input history size
 const HIST_SIZE: usize = 30;
 
 pub(crate) struct TextField {
@@ -19,11 +24,17 @@ pub(crate) struct TextField {
     /// Cursor in currently shown line
     cursor: i32,
 
-    /// Horizontal scroll
-    scroll: i32,
-
     /// Width of the widget
     width: i32,
+
+    /// Max lines before turning into scroll mode
+    max_lines: i32,
+
+    /// Config value for text field wrapping
+    text_field_wrap: bool,
+
+    /// Amount of scroll in the input field
+    scroll: Option<i32>,
 
     /// A history of sent messages/commands. Once added messages are never
     /// modified. A modification attempt should result in a new buffer with a
@@ -51,19 +62,23 @@ enum Mode {
 }
 
 impl TextField {
-    pub(crate) fn new(width: i32) -> TextField {
+    pub(crate) fn new(width: i32, max_lines: i32, text_field_wrap: bool) -> TextField {
         TextField {
             buffer: Vec::with_capacity(512),
             cursor: 0,
-            scroll: 0,
             width,
+            max_lines,
+            text_field_wrap,
+            scroll: if text_field_wrap { None } else { Some(0) },
             history: Vec::with_capacity(HIST_SIZE),
             mode: Mode::Edit,
         }
     }
 
-    pub(crate) fn resize(&mut self, width: i32) {
+    pub(crate) fn resize(&mut self, width: i32, max_lines: i32) {
         self.width = width;
+        self.max_lines = max_lines;
+        self.scroll = self.get_scroll_for_resize();
         let cursor = self.cursor;
         self.move_cursor(cursor);
     }
@@ -77,9 +92,10 @@ impl TextField {
                     &self.buffer,
                     pos_x,
                     pos_y,
-                    self.scroll,
                     self.width,
                     self.cursor,
+                    self.should_scroll(),
+                    self.scroll,
                 );
             }
             Mode::History(hist_curs) => {
@@ -89,9 +105,10 @@ impl TextField {
                     &self.history[hist_curs as usize],
                     pos_x,
                     pos_y,
-                    self.scroll,
                     self.width,
                     self.cursor,
+                    self.should_scroll(),
+                    self.scroll,
                 );
             }
             Mode::Autocomplete {
@@ -101,10 +118,20 @@ impl TextField {
                 ref completions,
                 current_completion,
             } => {
+                let cursor_x_off;
+                let cursor_y_off;
+                if self.should_scroll() {
+                    cursor_x_off = self.cursor - self.scroll.unwrap();
+                    cursor_y_off = 0;
+                } else {
+                    cursor_x_off = self.cursor % self.width;
+                    cursor_y_off = self.cursor / self.width;
+                }
+
                 // draw a placeholder for the cursor
                 tb.change_cell(
-                    pos_x + self.cursor - self.scroll,
-                    pos_y,
+                    pos_x + cursor_x_off,
+                    pos_y + cursor_y_off,
                     ' ',
                     colors.user_msg.fg,
                     colors.user_msg.bg,
@@ -119,24 +146,37 @@ impl TextField {
                     utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
 
                 for (char_idx, char) in iter.enumerate() {
-                    if char_idx >= ((self.scroll + self.width) as usize) {
-                        break;
+                    let x_off;
+                    let y_off;
+                    let mut can_scroll = true;
+                    if self.should_scroll() {
+                        let scroll = self.scroll.unwrap_or(0);
+                        x_off = (char_idx as i32) - scroll;
+                        y_off = 0;
+                        if char_idx >= ((scroll + self.width) as usize) {
+                            break;
+                        }
+                        if char_idx < scroll as usize {
+                            can_scroll = false
+                        }
+                    } else {
+                        x_off = char_idx as i32 % self.width;
+                        y_off = char_idx as i32 / self.width;
                     }
-
-                    if char_idx >= self.scroll as usize {
+                    if can_scroll {
                         if char_idx >= word_starts && char_idx < insertion_point + completion.len()
                         {
                             tb.change_cell(
-                                pos_x + (char_idx as i32) - self.scroll,
-                                pos_y,
+                                pos_x + x_off,
+                                pos_y + y_off,
                                 char,
                                 colors.completion.fg,
                                 colors.completion.bg,
                             );
                         } else {
                             tb.change_cell(
-                                pos_x + (char_idx as i32) - self.scroll,
-                                pos_y,
+                                pos_x + x_off,
+                                pos_y + y_off,
                                 char,
                                 colors.user_msg.fg,
                                 colors.user_msg.bg,
@@ -146,8 +186,8 @@ impl TextField {
                 }
 
                 tb.set_cursor(Some((
-                    (pos_x + self.cursor - self.scroll) as u16,
-                    pos_y as u16,
+                    (pos_x + cursor_x_off) as u16,
+                    (pos_y + cursor_y_off) as u16,
                 )));
             }
         }
@@ -156,7 +196,7 @@ impl TextField {
     pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
             Key::Char('\r') => {
-                if self.line_len() > 0 {
+                if self.current_buffer_len() > 0 {
                     self.modify();
 
                     let ret = mem::replace(&mut self.buffer, Vec::new());
@@ -194,7 +234,7 @@ impl TextField {
             }
 
             Key::Del => {
-                if self.cursor < self.line_len() {
+                if self.cursor < self.current_buffer_len() {
                     self.modify();
                     self.buffer.remove(self.cursor as usize);
                 }
@@ -209,7 +249,7 @@ impl TextField {
                     self.move_cursor_to_end();
                     WidgetRet::KeyHandled
                 } else if ch == 'k' {
-                    if self.cursor != self.line_len() {
+                    if self.cursor != self.current_buffer_len() {
                         self.modify();
                         self.buffer.drain(self.cursor as usize..);
                     }
@@ -253,7 +293,7 @@ impl TextField {
             }
 
             Key::CtrlArrow(Arrow::Right) => {
-                let len = self.line_len() as usize;
+                let len = self.current_buffer_len() as usize;
                 if (self.cursor as usize) < len {
                     let mut cur = self.cursor as usize;
                     let mut skipped = false;
@@ -440,7 +480,7 @@ impl TextField {
         }
     }
 
-    fn line_len(&self) -> i32 {
+    fn current_buffer_len(&self) -> i32 {
         match self.mode {
             Mode::Edit => self.buffer.len() as i32,
             Mode::History(hist_curs) => self.history[hist_curs as usize].len() as i32,
@@ -450,6 +490,21 @@ impl TextField {
                 current_completion,
                 ..
             } => (original_buffer.len() + completions[current_completion].len()) as i32,
+        }
+    }
+
+    /// Calculate how many lines of text will be in the textfield
+    /// based on the width of the widget
+    pub(crate) fn calculate_lines(&self) -> i32 {
+        if !self.scroll.is_some() {
+            let len = self.current_buffer_len();
+            if len >= self.width {
+                len / self.width + 1
+            } else {
+                1
+            }
+        } else {
+            1
         }
     }
 
@@ -525,7 +580,7 @@ impl TextField {
     // Manipulating cursor
 
     fn inc_cursor(&mut self) {
-        let cur = min(self.line_len(), self.cursor + 1);
+        let cur = min(self.current_buffer_len(), self.cursor + 1);
         self.move_cursor(cur);
     }
 
@@ -535,57 +590,59 @@ impl TextField {
     }
 
     fn move_cursor_to_end(&mut self) {
-        let cursor = self.line_len();
+        let cursor = self.current_buffer_len();
         self.move_cursor(cursor);
     }
 
     fn move_cursor(&mut self, cursor: i32) {
-        assert!(cursor >= 0 && cursor <= self.line_len());
+        assert!(cursor >= 0 && cursor <= self.current_buffer_len());
         self.cursor = cursor;
 
-        if self.line_len() + 1 < self.width {
-            self.scroll = 0;
-        } else {
-            let scrolloff = {
-                if self.width < 2 * SCROLLOFF + 1 {
-                    0
-                } else {
-                    SCROLLOFF
+        if self.scroll.is_some() {
+            if self.current_buffer_len() + 1 >= self.width {
+                let scrolloff = {
+                    if self.width < 2 * SCROLL_OFF + 1 {
+                        0
+                    } else {
+                        SCROLL_OFF
+                    }
+                };
+
+                let left_end = self.scroll.unwrap();
+                let right_end = self.scroll.unwrap() + self.width;
+
+                if cursor - scrolloff < left_end {
+                    self.scroll = Some(max(0, cursor - scrolloff));
+                } else if cursor + scrolloff >= right_end {
+                    let scroll = min(
+                        // +1 because cursor should be visible, i.e.
+                        // right_end > cursor should hold after this
+                        max(0, cursor + 1 + scrolloff - self.width),
+                        // +1 because cursor goes one more character
+                        // after the buffer, to be able to add chars
+                        max(0, self.current_buffer_len() + 1 - self.width),
+                    );
+                    self.scroll = Some(scroll);
                 }
-            };
-
-            let left_end = self.scroll;
-            let right_end = self.scroll + self.width;
-
-            if cursor - scrolloff < left_end {
-                self.scroll = max(0, cursor - scrolloff);
-            } else if cursor + scrolloff >= right_end {
-                self.scroll = min(
-                    // +1 because cursor should be visible, i.e.
-                    // right_end > cursor should hold after this
-                    max(0, cursor + 1 + scrolloff - self.width),
-                    // +1 because cursor goes one more character
-                    // after the buffer, to be able to add chars
-                    max(0, self.line_len() + 1 - self.width),
-                );
+            } else {
+                self.scroll = Some(0);
             }
         }
     }
 }
 
-fn draw_line(
+fn draw_line_scroll(
     tb: &mut Termbox,
     colors: &Colors,
     line: &[char],
     pos_x: i32,
     pos_y: i32,
-    scroll: i32,
     width: i32,
     cursor: i32,
+    scroll: i32,
 ) {
     let slice: &[char] = &line[scroll as usize..min(line.len(), (scroll + width) as usize)];
     termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().cloned());
-
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
@@ -597,7 +654,62 @@ fn draw_line(
             colors.cursor.bg,
         );
     }
+
     tb.set_cursor(Some(((pos_x + cursor - scroll) as u16, pos_y as u16)));
+}
+
+fn draw_line(
+    tb: &mut Termbox,
+    colors: &Colors,
+    line: &[char],
+    pos_x: i32,
+    pos_y: i32,
+    width: i32,
+    cursor: i32,
+    should_scroll: bool,
+    scroll: Option<i32>,
+) {
+    if should_scroll {
+        draw_line_scroll(
+            tb,
+            colors,
+            line,
+            pos_x,
+            pos_y,
+            width,
+            cursor,
+            scroll.unwrap_or(0),
+        );
+    } else {
+        // --- vert overflow ---
+        let mut y = pos_y;
+        let mut cursor_line = 0;
+        let cursor_col = cursor % width;
+        // handle vertical expansion for text overflow
+        if line.len() >= width as usize {
+            cursor_line = cursor / width;
+            let chunked = line.chunks(width as usize);
+            for l in chunked.into_iter() {
+                termbox::print_chars(tb, pos_x, y, colors.user_msg, l.iter().cloned());
+                y += 1;
+            }
+        } else {
+            termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, line.iter().cloned());
+        }
+
+        tb.change_cell(
+            pos_x + cursor_col,
+            pos_y + cursor_line,
+            ' ',
+            colors.cursor.fg,
+            colors.cursor.bg,
+        );
+
+        tb.set_cursor(Some((
+            (pos_x + cursor_col) as u16,
+            (pos_y + cursor_line) as u16,
+        )));
+    }
 }
 
 impl TextField {
@@ -648,6 +760,18 @@ impl TextField {
             self.move_cursor(cursor + completion_len as i32);
         }
     }
+
+    fn should_scroll(&self) -> bool {
+        self.scroll.is_some()
+    }
+
+    fn get_scroll_for_resize(&self) -> Option<i32> {
+        if !self.text_field_wrap || self.max_lines == 1 || self.width <= SCROLL_FALLBACK_WIDTH {
+            self.scroll.or(Some(0))
+        } else {
+            None
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -660,7 +784,7 @@ mod tests {
 
     #[test]
     fn text_field_bug() {
-        let mut text_field = TextField::new(10);
+        let mut text_field = TextField::new(10, 10, false);
         text_field.keypressed(Key::Char('a'));
         text_field.keypressed(Key::Char(' '));
         text_field.keypressed(Key::Char('b'));

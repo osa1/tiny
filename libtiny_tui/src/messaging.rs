@@ -78,10 +78,10 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub(crate) fn new(width: i32, height: i32, status: bool) -> MessagingUI {
+    pub(crate) fn new(width: i32, height: i32, status: bool, text_field_wrap: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
-            input_field: TextField::new(width),
+            input_field: TextField::new(width, height - 1, text_field_wrap),
             exit_dialogue: None,
             width,
             height,
@@ -106,10 +106,18 @@ impl MessagingUI {
         self.current_nick.as_deref()
     }
 
-    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(&mut self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+        let lines = self.input_field.calculate_lines();
+        // make space for textfield expansion
+        if self.height - lines >= 5 {
+            self.msg_area.resize(self.width, self.height - lines);
+        } else {
+            let widget_width = self.calculate_input_field_width(self.width);
+            self.input_field.resize(widget_width, 1);
+        }
         self.msg_area.draw(tb, colors, pos_x, pos_y);
 
-        let input_field_y = pos_y + self.height - 1;
+        let input_field_y = pos_y + self.height - lines;
         match &self.exit_dialogue {
             Some(exit_dialogue) => {
                 exit_dialogue.draw(tb, colors, pos_x, input_field_y);
@@ -209,11 +217,7 @@ impl MessagingUI {
         }
     }
 
-    pub(crate) fn resize(&mut self, width: i32, height: i32) {
-        self.width = width;
-        self.height = height;
-        self.msg_area.resize(width, height - 1);
-
+    fn calculate_input_field_width(&mut self, width: i32) -> i32 {
         let nick_width = match self.current_nick {
             None => 0,
             Some(ref rc) =>
@@ -223,15 +227,22 @@ impl MessagingUI {
             }
         };
 
-        self.show_current_nick = (nick_width as f32) <= (width as f32) * (30f32 / 100f32);
-
-        let widget_width = if self.show_current_nick {
+        self.show_current_nick = nick_width as f32 <= width as f32 * (30f32 / 100f32);
+        if self.show_current_nick {
             width - nick_width
         } else {
             width
-        };
+        }
+    }
 
-        self.input_field.resize(widget_width);
+    pub(crate) fn resize(&mut self, width: i32, height: i32) {
+        self.width = width;
+        self.height = height;
+        self.msg_area.resize(width, height - 1);
+
+        let widget_width = self.calculate_input_field_width(width);
+
+        self.input_field.resize(widget_width, height - 1);
 
         // We don't show the nick in exit dialogue, so it has the full width
         for exit_dialogue in &mut self.exit_dialogue {

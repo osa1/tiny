@@ -50,6 +50,8 @@ pub(crate) struct TUI {
     /// Color scheme
     colors: Colors,
 
+    text_field_wrap: bool,
+
     tabs: Vec<Tab>,
     active_idx: usize,
     width: i32,
@@ -77,6 +79,11 @@ impl TUI {
     }
 
     #[cfg(test)]
+    pub(crate) fn set_text_field_wrap_test(&mut self, text_field_wrap: bool) {
+        self.text_field_wrap = text_field_wrap
+    }
+
+    #[cfg(test)]
     pub(crate) fn get_tb(&self) -> &Termbox {
         &self.tb
     }
@@ -91,6 +98,7 @@ impl TUI {
         let mut tui = TUI {
             tb,
             colors: Colors::default(),
+            text_field_wrap: false,
             tabs: Vec::new(),
             active_idx: 0,
             width,
@@ -227,8 +235,12 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                Ok(Config { colors }) => {
+                Ok(Config {
+                    colors,
+                    text_field_wrap,
+                }) => {
                     self.set_colors(colors);
+                    self.set_text_field_wrap(text_field_wrap);
                 }
             }
         }
@@ -238,6 +250,10 @@ impl TUI {
         self.tb
             .set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
         self.colors = colors;
+    }
+
+    fn set_text_field_wrap(&mut self, text_field_wrap: bool) {
+        self.text_field_wrap = text_field_wrap;
     }
 
     fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool, notifier: Notifier) {
@@ -281,7 +297,12 @@ impl TUI {
         self.tabs.insert(
             idx,
             Tab {
-                widget: MessagingUI::new(self.width, self.height - 1 - statusline_height, status),
+                widget: MessagingUI::new(
+                    self.width,
+                    self.height - 1 - statusline_height,
+                    status,
+                    self.text_field_wrap,
+                ),
                 src,
                 style: TabStyle::Normal,
                 switch,
