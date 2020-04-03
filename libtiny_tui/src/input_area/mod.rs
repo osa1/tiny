@@ -6,32 +6,51 @@ use std::{
 use term_input::{Arrow, Key};
 use termbox_simple::Termbox;
 
-use crate::{config::Colors, termbox, trie::Trie, utils, widget::WidgetRet};
+use crate::{
+    config::{Colors, Style},
+    termbox,
+    trie::Trie,
+    utils,
+    widget::WidgetRet,
+};
+
+pub(crate) mod input_line;
+use self::input_line::{draw_line, draw_line_autocomplete, InputLine};
 
 /// Inspired by vim's 'scrolloff': minimal number of characters to keep above and below the cursor.
-const SCROLLOFF: i32 = 5;
+const SCROLL_OFF: i32 = 5;
 
+/// Minimum width of TextField for wrapping
+const SCROLL_FALLBACK_WIDTH: i32 = 36;
+
+/// Input history size
 const HIST_SIZE: usize = 30;
 
 pub(crate) struct TextField {
     /// The message that's currently being edited (not yet sent)
-    buffer: Vec<char>,
+    buffer: InputLine,
 
-    /// Cursor in currently shown line
     cursor: i32,
-
-    /// Horizontal scroll
-    scroll: i32,
 
     /// Width of the widget
     width: i32,
+    /// Height of the widget, invalidated on input and resize
+    height: Option<i32>,
+
+    /// Maximum lines the widget can grow to
+    max_lines: i32,
+
+    /// Amount of scroll in the input field
+    scroll: Option<i32>,
 
     /// A history of sent messages/commands. Once added messages are never
     /// modified. A modification attempt should result in a new buffer with a
     /// copy of the vector in history. (old contents of the buffer will be lost)
-    history: Vec<Vec<char>>,
+    history: Vec<InputLine>,
 
     mode: Mode,
+
+    nick: Option<Nickname>,
 }
 
 enum Mode {
@@ -43,7 +62,7 @@ enum Mode {
 
     /// Auto-completing a nick in channel
     Autocomplete {
-        original_buffer: Vec<char>,
+        original_buffer: InputLine,
         insertion_point: usize,
         word_starts: usize,
         completions: Vec<String>,
@@ -51,36 +70,101 @@ enum Mode {
     },
 }
 
-impl TextField {
-    pub(crate) fn new(width: i32) -> TextField {
-        TextField {
-            buffer: Vec::with_capacity(512),
-            cursor: 0,
-            scroll: 0,
-            width,
-            history: Vec::with_capacity(HIST_SIZE),
-            mode: Mode::Edit,
+pub(crate) struct Nickname {
+    value: String,
+    color: usize,
+}
+
+static NICKNAME_SUFFIX: &str = ": ";
+impl Nickname {
+    fn new(value: String, color: usize) -> Nickname {
+        Nickname { value, color }
+    }
+
+    /// Calculates the length of the nickname based on given width, including the NICKNAME_SUFFIX
+    /// width should be the width of TextField
+    /// When the length of the Nickname area is 30% or less of the width, then show
+    fn len(&self, width: i32) -> usize {
+        let len = self.value.len() + NICKNAME_SUFFIX.len();
+        if len as f32 <= width as f32 * (30f32 / 100f32) {
+            len
+        } else {
+            0
         }
     }
 
-    pub(crate) fn resize(&mut self, width: i32) {
+    fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32, width: i32) {
+        if self.len(width) > 0 {
+            let nick_color = colors.nick[self.color % colors.nick.len()];
+            let style = Style {
+                fg: u16::from(nick_color),
+                bg: colors.user_msg.bg,
+            };
+            termbox::print_chars(
+                tb,
+                pos_x,
+                pos_y,
+                style,
+                self.value.chars().chain(NICKNAME_SUFFIX.chars()),
+            );
+        }
+    }
+}
+
+impl TextField {
+    pub(crate) fn new(width: i32, max_lines: i32) -> TextField {
+        TextField {
+            buffer: InputLine::new(),
+            cursor: 0,
+            width,
+            height: Some(1),
+            max_lines,
+            scroll: None,
+            history: Vec::with_capacity(HIST_SIZE),
+            mode: Mode::Edit,
+            nick: None,
+        }
+    }
+
+    pub(crate) fn set_nick(&mut self, value: String, color: usize) {
+        self.nick = Some(Nickname::new(value, color))
+    }
+
+    pub(crate) fn get_nick(&self) -> Option<String> {
+        if let Some(nick) = &self.nick {
+            let nick_string = nick.value.clone();
+            Some(nick_string)
+        } else {
+            None
+        }
+    }
+
+    /// Resizes TextArea
+    pub(crate) fn resize(&mut self, width: i32, max_lines: i32) {
         self.width = width;
-        let cursor = self.cursor;
-        self.move_cursor(cursor);
+        self.height = None;
+        self.max_lines = max_lines;
     }
 
     pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+        let mut nick_length = 0;
+        if let Some(nick) = &self.nick {
+            nick.draw(tb, colors, pos_x, pos_y, self.width);
+            nick_length = nick.len(self.width) as i32;
+        }
         match self.mode {
             Mode::Edit => {
                 draw_line(
                     tb,
                     colors,
                     &self.buffer,
-                    pos_x,
+                    pos_x + nick_length,
                     pos_y,
-                    self.scroll,
                     self.width,
                     self.cursor,
+                    self.should_scroll(),
+                    self.scroll,
+                    None,
                 );
             }
             Mode::History(hist_curs) => {
@@ -88,11 +172,13 @@ impl TextField {
                     tb,
                     colors,
                     &self.history[hist_curs as usize],
-                    pos_x,
+                    pos_x + nick_length,
                     pos_y,
-                    self.scroll,
                     self.width,
                     self.cursor,
+                    self.should_scroll(),
+                    self.scroll,
+                    None,
                 );
             }
             Mode::Autocomplete {
@@ -101,78 +187,41 @@ impl TextField {
                 word_starts,
                 ref completions,
                 current_completion,
-            } => {
-                // draw a placeholder for the cursor
-                tb.change_cell(
-                    pos_x + self.cursor - self.scroll,
-                    pos_y,
-                    ' ',
-                    colors.user_msg.fg,
-                    colors.user_msg.bg,
-                );
-
-                let completion: &str = &completions[current_completion];
-
-                let mut orig_buf_iter = original_buffer.iter().cloned();
-                let mut completion_iter = completion.chars();
-
-                let iter: utils::InsertIterator<char> =
-                    utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
-
-                for (char_idx, char) in iter.enumerate() {
-                    if char_idx >= ((self.scroll + self.width) as usize) {
-                        break;
-                    }
-
-                    if char_idx >= self.scroll as usize {
-                        if char_idx >= word_starts && char_idx < insertion_point + completion.len()
-                        {
-                            tb.change_cell(
-                                pos_x + (char_idx as i32) - self.scroll,
-                                pos_y,
-                                char,
-                                colors.completion.fg,
-                                colors.completion.bg,
-                            );
-                        } else {
-                            tb.change_cell(
-                                pos_x + (char_idx as i32) - self.scroll,
-                                pos_y,
-                                char,
-                                colors.user_msg.fg,
-                                colors.user_msg.bg,
-                            );
-                        }
-                    }
-                }
-
-                tb.set_cursor(Some((
-                    (pos_x + self.cursor - self.scroll) as u16,
-                    pos_y as u16,
-                )));
-            }
+            } => draw_line_autocomplete(
+                original_buffer,
+                insertion_point,
+                word_starts,
+                completions,
+                current_completion,
+                tb,
+                colors,
+                pos_x + nick_length,
+                pos_y,
+                self.width,
+                self.cursor,
+                self.should_scroll(),
+                self.scroll,
+            ),
         }
     }
 
     pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
         match key {
             Key::Char('\r') => {
-                if self.line_len() > 0 {
+                if self.current_buffer_len() > 0 {
                     self.modify();
 
-                    let ret = mem::replace(&mut self.buffer, Vec::new());
+                    let ret = mem::replace(&mut self.buffer, InputLine::new());
                     if self.history.len() == HIST_SIZE {
-                        let mut reuse = self.history.remove(0);
-                        reuse.clear();
-                        reuse.extend_from_slice(&ret);
-                        self.history.push(reuse);
+                        self.history.remove(0);
+                        self.history.push(ret.clone());
                     } else {
                         self.history.push(ret.clone());
                     }
 
                     self.move_cursor(0);
 
-                    WidgetRet::Input(ret)
+                    WidgetRet::Input(ret.get_buffer().to_vec())
                 } else {
                     WidgetRet::KeyHandled
                 }
@@ -195,7 +244,7 @@ impl TextField {
             }
 
             Key::Del => {
-                if self.cursor < self.line_len() {
+                if self.cursor < self.current_buffer_len() {
                     self.modify();
                     self.buffer.remove(self.cursor as usize);
                     // TODO: We should probably call move_cursor here to update scroll?
@@ -211,7 +260,7 @@ impl TextField {
                     self.move_cursor_to_end();
                     WidgetRet::KeyHandled
                 } else if ch == 'k' {
-                    if self.cursor != self.line_len() {
+                    if self.cursor != self.current_buffer_len() {
                         self.modify();
                         self.buffer.drain(self.cursor as usize..);
                     }
@@ -255,7 +304,7 @@ impl TextField {
             }
 
             Key::CtrlArrow(Arrow::Right) => {
-                let len = self.line_len() as usize;
+                let len = self.current_buffer_len() as usize;
                 if (self.cursor as usize) < len {
                     let mut cur = self.cursor as usize;
                     let mut skipped = false;
@@ -278,6 +327,8 @@ impl TextField {
             ////////////////////////////////////////////////////////////////////
             // Scrolling in history or autocompletion list
             Key::Arrow(Arrow::Up) => {
+                // invalidate height calculation
+                self.height = None;
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
@@ -328,6 +379,8 @@ impl TextField {
             }
 
             Key::Arrow(Arrow::Down) => {
+                // invalidate height calculation
+                self.height = None;
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
@@ -385,12 +438,13 @@ impl TextField {
 
     /// Add a line to the text field history.
     pub(crate) fn add_history(&mut self, str: &str) {
-        self.history.push(str.chars().collect());
+        self.history
+            .push(InputLine::from_buffer(str.chars().collect()));
     }
 
     pub(crate) fn set(&mut self, str: &str) {
         self.mode = Mode::Edit;
-        self.buffer = str.chars().collect();
+        self.buffer = InputLine::from_buffer(str.chars().collect());
         self.move_cursor_to_end();
     }
 
@@ -402,14 +456,14 @@ impl TextField {
 
         self.modify();
 
-        let char = self.buffer[(self.cursor - 1) as usize];
+        let char = self.buffer.get((self.cursor - 1) as usize);
 
         // Try to imitate vim's behaviour here.
         if char.is_whitespace() {
             self.consume_before(char::is_whitespace);
             self.consume_before(char::is_alphanumeric);
         } else {
-            let char = self.buffer[(self.cursor - 1) as usize];
+            let char = self.buffer.get((self.cursor - 1) as usize);
             if char.is_alphanumeric() {
                 self.consume_before(char::is_alphanumeric);
             } else if self.cursor != 0 {
@@ -427,7 +481,7 @@ impl TextField {
     {
         let end_range = self.cursor as usize;
         let mut begin_range = self.cursor - 1;
-        while begin_range >= 0 && f(self.buffer[begin_range as usize]) {
+        while begin_range >= 0 && f(self.buffer.get(begin_range as usize)) {
             begin_range -= 1;
         }
         self.buffer.drain(((begin_range + 1) as usize)..end_range);
@@ -435,14 +489,81 @@ impl TextField {
     }
 
     // Ignoring auto-completions
-    fn shown_line(&self) -> &Vec<char> {
-        match self.mode {
-            Mode::Edit | Mode::Autocomplete { .. } => &self.buffer,
-            Mode::History(hist_curs) => &self.history[hist_curs as usize],
+    pub(crate) fn shown_line(&mut self) -> &mut InputLine {
+        match &mut self.mode {
+            Mode::Edit | Mode::Autocomplete { .. } => &mut self.buffer,
+            Mode::History(hist_curs) => &mut self.history[*hist_curs as usize],
         }
     }
 
-    fn line_len(&self) -> i32 {
+    fn calculate_height_autocomplete(&self, width: i32, nick_length: usize) -> usize {
+        if let Mode::Autocomplete {
+            original_buffer,
+            completions,
+            current_completion,
+            word_starts,
+            ..
+        } = &self.mode
+        {
+            let mut temp_buffer = original_buffer.clone();
+            let completion = &completions[*current_completion];
+            for (idx, c) in completion.char_indices() {
+                temp_buffer.insert(word_starts + idx, c);
+            }
+            temp_buffer.calculate_height(width, nick_length)
+        } else {
+            1
+        }
+    }
+
+    /// Gets the height of the widget
+    /// If the height is larger than the allowed max lines turn on scroll
+    /// else turn off scroll
+    pub(crate) fn get_height(&mut self, width: i32) -> i32 {
+        let height = match self.height {
+            Some(height) => height,
+            None => self.calculate_height(width),
+        };
+
+        // Check for scroll fallback
+        if height >= self.max_lines || width <= SCROLL_FALLBACK_WIDTH {
+            self.scroll_on();
+            1
+        } else {
+            self.scroll_off();
+            height
+        }
+    }
+
+    fn scroll_on(&mut self) {
+        // If scroll is already on, we don't need to calculate scroll
+        if let None = self.scroll {
+            self.scroll = Some(0);
+            self.move_cursor(self.cursor);
+        }
+    }
+
+    fn scroll_off(&mut self) {
+        self.scroll = None;
+    }
+
+    fn calculate_height(&mut self, width: i32) -> i32 {
+        let mut line_count: i32 = 1;
+        let mut nick_length = 0;
+        if let Some(nick) = &self.nick {
+            nick_length = nick.len(self.width);
+        }
+        if self.current_buffer_len() >= width - nick_length as i32 {
+            if self.in_autocomplete() {
+                line_count = self.calculate_height_autocomplete(width, nick_length) as i32;
+            } else {
+                line_count = self.shown_line().calculate_height(width, nick_length) as i32;
+            }
+        }
+        line_count
+    }
+
+    fn current_buffer_len(&self) -> i32 {
         match self.mode {
             Mode::Edit => self.buffer.len() as i32,
             Mode::History(hist_curs) => self.history[hist_curs as usize].len() as i32,
@@ -457,8 +578,8 @@ impl TextField {
 
     fn char_at(&self, idx: usize) -> char {
         match self.mode {
-            Mode::Edit => self.buffer[idx],
-            Mode::History(hist_curs) => self.history[hist_curs as usize][idx],
+            Mode::Edit => self.buffer.get(idx),
+            Mode::History(hist_curs) => self.history[hist_curs as usize].get(idx),
             Mode::Autocomplete {
                 ref original_buffer,
                 insertion_point,
@@ -467,7 +588,7 @@ impl TextField {
                 ..
             } => {
                 if idx < insertion_point {
-                    original_buffer[idx]
+                    original_buffer.get(idx)
                 } else if idx >= insertion_point
                     && idx < insertion_point + completions[current_completion].len()
                 {
@@ -476,7 +597,7 @@ impl TextField {
                         .nth(idx - insertion_point)
                         .unwrap()
                 } else {
-                    original_buffer[idx - completions[current_completion].len()]
+                    original_buffer.get(idx - completions[current_completion].len())
                 }
             }
         }
@@ -492,12 +613,12 @@ impl TextField {
     }
 
     fn modify(&mut self) {
+        // invalidate height calculation
+        self.height = None;
         match self.mode {
             Mode::Edit => {}
             Mode::History(hist_idx) => {
-                self.buffer.clear();
-                self.buffer
-                    .extend_from_slice(&self.history[hist_idx as usize]);
+                self.buffer = self.history[hist_idx as usize].clone();
             }
             Mode::Autocomplete {
                 ref mut original_buffer,
@@ -506,7 +627,7 @@ impl TextField {
                 current_completion,
                 ..
             } => {
-                let mut buffer: Vec<char> = mem::replace(original_buffer, vec![]);
+                let mut buffer = mem::replace(original_buffer, InputLine::new());
                 let completions: Vec<String> = mem::replace(completions, vec![]);
                 let word = &completions[current_completion];
 
@@ -516,10 +637,9 @@ impl TextField {
                     insertion_point += 1;
                 }
 
-                self.buffer = buffer;
+                self.buffer = buffer
             }
         }
-
         self.mode = Mode::Edit;
     }
 
@@ -527,7 +647,7 @@ impl TextField {
     // Manipulating cursor
 
     fn inc_cursor(&mut self) {
-        let cur = min(self.line_len(), self.cursor + 1);
+        let cur = min(self.current_buffer_len(), self.cursor + 1);
         self.move_cursor(cur);
     }
 
@@ -537,78 +657,57 @@ impl TextField {
     }
 
     fn move_cursor_to_end(&mut self) {
-        let cursor = self.line_len();
+        let cursor = self.current_buffer_len();
         self.move_cursor(cursor);
     }
 
     /// Update cursor location, possibly after an update. Update scroll value to fit as much of the
     /// input field as possible to the screen.
     fn move_cursor(&mut self, cursor: i32) {
-        let line_len = self.line_len();
+        let line_len = self.current_buffer_len();
 
-        // Cursor should be in range
         assert!(cursor >= 0 && cursor <= line_len);
         self.cursor = cursor;
 
-        // Disable SCROLLOFF if there isn't enough space on the screen to have SCROLLOFF space on
-        // both ends
-        let scrolloff = {
-            if self.width < 2 * SCROLLOFF + 1 {
-                0
+        if self.scroll.is_some() {
+            let mut nick_length = 0;
+            if let Some(nick) = &self.nick {
+                nick_length = nick.len(self.width);
+            }
+            let fixed_width = self.width - nick_length as i32;
+            if self.current_buffer_len() + 1 >= fixed_width {
+                // Disable SCROLLOFF if there isn't enough space on the screen to have SCROLLOFF space on
+                // both ends
+                let scrolloff = {
+                    if self.width < 2 * SCROLL_OFF + 1 {
+                        0
+                    } else {
+                        SCROLL_OFF
+                    }
+                };
+
+                // Shown range of the text field before updating scroll
+                let left_end = min(self.scroll.unwrap(), line_len);
+                let right_end = min(self.scroll.unwrap() + fixed_width, line_len);
+
+                if cursor - scrolloff < left_end {
+                    self.scroll = Some(max(0, cursor - scrolloff));
+                } else if cursor + scrolloff >= right_end {
+                    let scroll = min(
+                        // +1 because cursor should be visible, i.e.
+                        // right_end > cursor should hold after this
+                        max(0, cursor + 1 + scrolloff - fixed_width),
+                        // +1 because cursor goes one more character
+                        // after the buffer, to be able to add chars
+                        max(0, self.current_buffer_len() + 1 - fixed_width),
+                    );
+                    self.scroll = Some(scroll);
+                }
             } else {
-                SCROLLOFF
+                self.scroll = Some(0);
             }
         };
-
-        // Shown range of the text field before updating scroll
-        let left_end = min(self.scroll, line_len);
-        let right_end = min(self.scroll + self.width, line_len);
-
-        // println!(
-        //     "scrolloff={}, left_end={}, right_end={}",
-        //     scrolloff, left_end, right_end
-        // );
-
-        if cursor - scrolloff < left_end {
-            self.scroll = max(0, cursor - scrolloff);
-        } else if cursor + scrolloff >= right_end {
-            self.scroll = min(
-                // +1 because cursor should be visible, i.e.
-                // right_end > cursor should hold after this
-                max(0, cursor + 1 + scrolloff - self.width),
-                // +1 because cursor goes one more character
-                // after the buffer, to be able to add chars
-                max(0, self.line_len() + 1 - self.width),
-            );
-        }
     }
-}
-
-fn draw_line(
-    tb: &mut Termbox,
-    colors: &Colors,
-    line: &[char],
-    pos_x: i32,
-    pos_y: i32,
-    scroll: i32,
-    width: i32,
-    cursor: i32,
-) {
-    let slice: &[char] = &line[scroll as usize..min(line.len(), (scroll + width) as usize)];
-    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().cloned());
-
-    // On my terminal the cursor is only shown when there's a character
-    // under it.
-    if cursor as usize >= line.len() {
-        tb.change_cell(
-            pos_x + cursor - scroll,
-            pos_y,
-            ' ',
-            colors.cursor.fg,
-            colors.cursor.bg,
-        );
-    }
-    tb.set_cursor(Some(((pos_x + cursor - scroll) as u16, pos_y as u16)));
 }
 
 impl TextField {
@@ -619,11 +718,14 @@ impl TextField {
             return;
         }
 
+        // invalidate height calculation
+        self.height = None;
+
         let cursor_right = self.cursor;
         let mut cursor_left = max(0, cursor_right - 1);
 
         let completions = {
-            let line = self.shown_line();
+            let line = &self.shown_line().get_buffer();
 
             while cursor_left >= 0
                 && line
@@ -659,6 +761,10 @@ impl TextField {
             self.move_cursor(cursor + completion_len as i32);
         }
     }
+
+    fn should_scroll(&self) -> bool {
+        self.scroll.is_some()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -671,7 +777,7 @@ mod tests {
 
     #[test]
     fn text_field_bug() {
-        let mut text_field = TextField::new(10);
+        let mut text_field = TextField::new(10, 50);
         text_field.keypressed(Key::Char('a'));
         text_field.keypressed(Key::Char(' '));
         text_field.keypressed(Key::Char('b'));

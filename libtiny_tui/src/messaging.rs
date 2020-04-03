@@ -6,14 +6,13 @@ use std::convert::From;
 use time::{self, Tm};
 
 use crate::{
-    config::{Colors, Style},
+    config::Colors,
     exit_dialogue::ExitDialogue,
+    input_area::TextField,
     msg_area::{
         line::{SchemeStyle, SegStyle},
         MsgArea,
     },
-    termbox,
-    text_field::TextField,
     trie::Trie,
     widget::WidgetRet,
 };
@@ -38,9 +37,6 @@ pub(crate) struct MessagingUI {
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
     nicks: Trie,
-
-    current_nick: Option<String>,
-    show_current_nick: bool,
 
     last_activity_line: Option<ActivityLine>,
     last_activity_ts: Option<Timestamp>,
@@ -81,67 +77,47 @@ impl MessagingUI {
     pub(crate) fn new(width: i32, height: i32, status: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
-            input_field: TextField::new(width),
+            input_field: TextField::new(width, get_input_field_max_height(height)),
             exit_dialogue: None,
             width,
             height,
             show_status: status,
             nicks: Trie::new(),
-            current_nick: None,
-            show_current_nick: true,
             last_activity_line: None,
             last_activity_ts: None,
         }
     }
 
     pub(crate) fn set_nick(&mut self, nick: String) {
-        self.current_nick = Some(nick);
+        let nick_color = self.get_nick_color(&nick);
+        self.input_field.set_nick(nick, nick_color);
         // update text field size
         let w = self.width;
         let h = self.height;
         self.resize(w, h);
     }
 
-    pub(crate) fn get_nick(&self) -> Option<&str> {
-        self.current_nick.as_deref()
+    pub(crate) fn get_nick(&self) -> Option<String> {
+        self.input_field.get_nick()
     }
 
-    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(&mut self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+        let input_field_height = self.input_field.get_height(self.width);
+
+        // if the height of msg_area needs to change...
+        if self.height - input_field_height != self.msg_area.get_height() {
+            self.msg_area
+                .resize(self.width, self.height - input_field_height);
+        }
         self.msg_area.draw(tb, colors, pos_x, pos_y);
 
-        let input_field_y = pos_y + self.height - 1;
+        let input_field_y = pos_y + self.height - input_field_height;
         match &self.exit_dialogue {
             Some(exit_dialogue) => {
                 exit_dialogue.draw(tb, colors, pos_x, input_field_y);
             }
             None => {
-                if let Some(ref nick) = self.current_nick {
-                    if self.show_current_nick {
-                        let nick_color = colors.nick[self.get_nick_color(nick) % colors.nick.len()];
-                        let style = Style {
-                            fg: u16::from(nick_color),
-                            bg: colors.user_msg.bg,
-                        };
-                        termbox::print_chars(tb, pos_x, input_field_y, style, nick.chars());
-                        tb.change_cell(
-                            pos_x + nick.len() as i32,
-                            input_field_y,
-                            ':',
-                            colors.user_msg.fg,
-                            colors.user_msg.bg,
-                        );
-                        self.input_field.draw(
-                            tb,
-                            colors,
-                            pos_x + nick.len() as i32 + 2,
-                            input_field_y,
-                        );
-                    } else {
-                        self.input_field.draw(tb, colors, pos_x, input_field_y);
-                    }
-                } else {
-                    self.input_field.draw(tb, colors, pos_x, input_field_y);
-                }
+                self.input_field.draw(tb, colors, pos_x, input_field_y);
             }
         }
     }
@@ -212,26 +188,12 @@ impl MessagingUI {
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
         self.width = width;
         self.height = height;
-        self.msg_area.resize(width, height - 1);
 
-        let nick_width = match self.current_nick {
-            None => 0,
-            Some(ref rc) =>
-            // +2 for ": "
-            {
-                rc.len() as i32 + 2
-            }
-        };
-
-        self.show_current_nick = (nick_width as f32) <= (width as f32) * (30f32 / 100f32);
-
-        let widget_width = if self.show_current_nick {
-            width - nick_width
-        } else {
-            width
-        };
-
-        self.input_field.resize(widget_width);
+        self.input_field
+            .resize(width, get_input_field_max_height(height));
+        // msg_area should resize based on input_field's rendered height
+        let msg_area_height = height - self.input_field.get_height(width);
+        self.msg_area.resize(width, msg_area_height);
 
         // We don't show the nick in exit dialogue, so it has the full width
         for exit_dialogue in &mut self.exit_dialogue {
@@ -261,6 +223,11 @@ impl MessagingUI {
             self.exit_dialogue = Some(ExitDialogue::new(self.width));
         }
     }
+}
+
+/// Calculation for input field's maximum height
+fn get_input_field_max_height(window_height: i32) -> i32 {
+    window_height / 2
 }
 
 ////////////////////////////////////////////////////////////////////////////////

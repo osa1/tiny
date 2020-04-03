@@ -227,9 +227,7 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                Ok(Config { colors }) => {
-                    self.set_colors(colors);
-                }
+                Ok(Config { colors }) => self.set_colors(colors),
             }
         }
     }
@@ -367,8 +365,7 @@ impl TUI {
                     if self.active_idx >= tab_idx {
                         self.next_tab();
                     }
-                    if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick().map(str::to_owned)
-                    {
+                    if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick() {
                         self.tabs[tab_idx].widget.set_nick(nick);
                     }
                     Some(tab_idx)
@@ -407,7 +404,7 @@ impl TUI {
                         Notifier::Messages,
                         None,
                     );
-                    if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
+                    if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
                         self.tabs[tab_idx + 1].widget.set_nick(nick);
                     }
                     self.tabs[tab_idx + 1].widget.join(nick, None);
@@ -1146,7 +1143,7 @@ impl TUI {
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
                 tab.notifier
-                    .notify_privmsg(sender, msg, target, nick_, highlight);
+                    .notify_privmsg(sender, msg, target, &nick_, highlight);
             }
         });
     }

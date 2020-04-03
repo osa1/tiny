@@ -5,15 +5,15 @@
 
 mod config;
 mod exit_dialogue;
+mod input_area;
 mod messaging;
-// FIXME: This is "pub" to be able to use in an example
 #[doc(hidden)]
+// FIXME: This is "pub" to be able to use in an example
 pub mod msg_area;
 mod notifier;
 mod statusline;
 mod tab;
 mod termbox;
-mod text_field;
 mod trie;
 mod tui;
 mod utils;
