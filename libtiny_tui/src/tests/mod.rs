@@ -43,10 +43,24 @@ fn expect_screen(screen: &str, tui: &TUI, w: u16, h: u16) {
     let _ = screen_filtered.pop(); // pop the last '\n'
 
     let found = buffer_str(&tui.get_tb().get_front_buffer(), w, h);
+
+    let mut line = String::new();
+    for _ in 0..w {
+        line.push('-');
+    }
+
     if screen_filtered != found {
         panic!(
-            "Unexpected screen\nExpected:\n{:?}\nFound:\n{:?}",
-            screen_filtered, found
+            "Unexpected screen\n\
+            Expected:\n\
+            {}\n\
+            {}\n\
+            {}\n\
+            Found:\n\
+            {}\n\
+            {}\n\
+            {}\n",
+            line, screen_filtered, line, line, found, line
         );
     }
 }
@@ -192,166 +206,76 @@ fn small_screen_2() {
     expect_screen(screen, &tui, 21, 4);
 }
 
-///
-/// Tests text wrap on
-///
+// Tests text field wrapping (text_field_wrap setting)
 #[test]
 fn test_text_field_wrap() {
-    let mut tui = TUI::new_test(60, 8);
+    // Screen should be wide enough to enable wrapping. See SCROLL_FALLBACK_WIDTH in text_field.rs
+    // and MessagingUI::draw where we use the magic number '5' for min. number of lines that should
+    // be visible in the text field to be able to enable wrapping. (TODO: get rid of the magic
+    // number)
+    let mut tui = TUI::new_test(40, 8);
     tui.set_text_field_wrap_test(true);
 
     let server = "chat.freenode.net";
     tui.new_server_tab(server);
-    tui.set_nick(server, "osa1");
+    tui.set_nick(server, "x");
 
-    // switch to server tab
+    // Switch to server tab
     tui.next_tab();
 
-    // write some stuff
+    // Write some stuff
     let target = MsgTarget::CurrentTab;
     let ts: Tm = unsafe { ::std::mem::zeroed() };
     tui.add_msg("test test test", ts, &target);
 
-    for _ in 0..65 {
+    for _ in 0..37 {
         let event = term_input::Event::Key(Key::Char('a'));
+        tui.handle_input_event(event);
+    }
+    for _ in 0..10 {
+        let event = term_input::Event::Key(Key::Char('b'));
         tui.handle_input_event(event);
     }
 
     tui.draw();
 
     #[rustfmt::skip]
-    let screen = 
-    "|                                                            |
-     |                                                            |
-     |                                                            |
-     |                                                            |
-     |00:00 test test test                                        |
-     |osa1: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|
-     |      aaaaaaaaaaa                                           |
-     |mentions chat.freenode.net                                  |";
+    let screen =
+    "|                                        |
+     |                                        |
+     |                                        |
+     |                                        |
+     |00:00 test test test                    |
+     |x: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|
+     |   bbbbbbbbbb                           |
+     |mentions chat.freenode.net              |";
 
-    expect_screen(screen, &tui, 60, 8);
-}
+    expect_screen(screen, &tui, 40, 8);
 
-///
-/// Tests text wrap on
-/// Writes some text that will wrap
-/// Deletes the text to check if the input field went back to 1 line
-///
-#[test]
-fn test_text_field_wrap_add_delete() {
-    let mut tui = TUI::new_test(60, 8);
-    tui.set_text_field_wrap_test(true);
-
-    let server = "chat.freenode.net";
-    tui.new_server_tab(server);
-    tui.set_nick(server, "osa1");
-
-    // switch to server tab
-    tui.next_tab();
-
-    // write some stuff
-    let target = MsgTarget::CurrentTab;
-    let ts: Tm = unsafe { ::std::mem::zeroed() };
-    tui.add_msg("test test test", ts, &target);
-
-    for _ in 0..65 {
-        let event = term_input::Event::Key(Key::Char('a'));
-        tui.handle_input_event(event);
-    }
-
-    tui.draw();
-
-    // Hit ctrl-a to go to the beginning of line
-    let ctrl_a_event = term_input::Event::Key(Key::Ctrl('a'));
-    tui.handle_input_event(ctrl_a_event);
-    // Hit ctrl-k to clear the line
-    let ctrl_k_event = term_input::Event::Key(Key::Ctrl('k'));
-    tui.handle_input_event(ctrl_k_event);
-
-    tui.draw();
-
-    #[rustfmt::skip]
-    let screen = 
-    "|                                                            |
-     |                                                            |
-     |                                                            |
-     |                                                            |
-     |                                                            |
-     |00:00 test test test                                        |
-     |osa1:                                                       |
-     |mentions chat.freenode.net                                  |";
-
-    expect_screen(screen, &tui, 60, 8);
-}
-
-///
-/// Tests scroll mode on (text wrap off)
-///
-#[test]
-fn test_text_field_wrap_false() {
-    let mut tui = TUI::new_test(60, 8);
-    tui.set_text_field_wrap_test(false);
-
-    let server = "chat.freenode.net";
-    tui.new_server_tab(server);
-    tui.set_nick(server, "osa1");
-    // switch to server tab
-    tui.next_tab();
-
-    for _ in 0..65 {
-        let event = term_input::Event::Key(Key::Char('a'));
+    // If we remove a few characters now the line above the text field should still be right above
+    // the text field
+    for _ in 0..11 {
+        let event = term_input::Event::Key(Key::Backspace);
         tui.handle_input_event(event);
     }
 
     tui.draw();
 
     #[rustfmt::skip]
-    let screen = 
-    "|                                                            |
-     |                                                            |
-     |                                                            |
-     |                                                            |
-     |                                                            |
-     |                                                            |
-     |osa1: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
-     |mentions chat.freenode.net                                  |";
-    //                                               cursor space^
-    expect_screen(screen, &tui, 60, 8);
-}
+    let screen =
+    "|                                        |
+     |                                        |
+     |                                        |
+     |                                        |
+     |                                        |
+     |00:00 test test test                    |
+     |x: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+     |mentions chat.freenode.net              |";
 
-///
-/// Tests scroll (text wrap on) small screen
-///
-#[test]
-fn test_scroll_text_field_wrap_true() {
-    let mut tui = TUI::new_test(30, 10);
-    tui.set_text_field_wrap_test(true);
+    expect_screen(screen, &tui, 40, 8);
 
-    let server = "chat.freenode.net";
-    tui.new_server_tab(server);
-    tui.set_nick(server, "osa1");
-    // switch to server tab
-    tui.next_tab();
+    // On making screen smaller we should fall back to scrolling
+    // TODO
 
-    for _ in 0..65 {
-        let event = term_input::Event::Key(Key::Char('a'));
-        tui.handle_input_event(event);
-    }
-
-    tui.draw();
-    #[rustfmt::skip]
-    let screen = 
-    "|                              |
-     |                              |
-     |                              |
-     |                              |
-     |                              |
-     |                              |
-     |                              |
-     |                              |
-     |osa1: aaaaaaaaaaaaaaaaaaaaaaa |
-     |mentions chat.freenode.net    |";
-    //                 cursor space^
-    expect_screen(screen, &tui, 30, 10);
+    // TODO: Test changing nicks
 }
