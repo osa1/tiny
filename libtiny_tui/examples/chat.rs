@@ -1,8 +1,8 @@
 // In a chat window add dozens of nicks, each printing some random lines.
 
 use futures::future::FutureExt;
-use futures::stream::StreamExt;
 use futures::select;
+use futures::stream::StreamExt;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;

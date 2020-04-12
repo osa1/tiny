@@ -106,42 +106,43 @@ impl MessagingUI {
         self.current_nick.as_deref()
     }
 
-    fn draw_input_field(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
-        match self.exit_dialogue {
-            Some(ref exit_dialogue) => exit_dialogue.draw(tb, colors, pos_x, pos_y),
-            None => self.input_field.draw(tb, colors, pos_x, pos_y),
-        }
-    }
-
     pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
 
-        if let Some(ref nick) = self.current_nick {
-            if self.show_current_nick {
-                let nick_color = colors.nick[self.get_nick_color(nick) % colors.nick.len()];
-                let style = Style {
-                    fg: u16::from(nick_color),
-                    bg: colors.user_msg.bg,
-                };
-                termbox::print_chars(tb, pos_x, pos_y + self.height - 1, style, nick.chars());
-                tb.change_cell(
-                    pos_x + nick.len() as i32,
-                    pos_y + self.height - 1,
-                    ':',
-                    colors.user_msg.fg,
-                    colors.user_msg.bg,
-                );
-                self.draw_input_field(
-                    tb,
-                    colors,
-                    pos_x + nick.len() as i32 + 2,
-                    pos_y + self.height - 1,
-                );
-            } else {
-                self.draw_input_field(tb, colors, pos_x, pos_y + self.height - 1);
+        let input_field_y = pos_y + self.height - 1;
+        match &self.exit_dialogue {
+            Some(exit_dialogue) => {
+                exit_dialogue.draw(tb, colors, pos_x, input_field_y);
             }
-        } else {
-            self.draw_input_field(tb, colors, pos_x, pos_y + self.height - 1);
+            None => {
+                if let Some(ref nick) = self.current_nick {
+                    if self.show_current_nick {
+                        let nick_color = colors.nick[self.get_nick_color(nick) % colors.nick.len()];
+                        let style = Style {
+                            fg: u16::from(nick_color),
+                            bg: colors.user_msg.bg,
+                        };
+                        termbox::print_chars(tb, pos_x, input_field_y, style, nick.chars());
+                        tb.change_cell(
+                            pos_x + nick.len() as i32,
+                            input_field_y,
+                            ':',
+                            colors.user_msg.fg,
+                            colors.user_msg.bg,
+                        );
+                        self.input_field.draw(
+                            tb,
+                            colors,
+                            pos_x + nick.len() as i32 + 2,
+                            input_field_y,
+                        );
+                    } else {
+                        self.input_field.draw(tb, colors, pos_x, input_field_y);
+                    }
+                } else {
+                    self.input_field.draw(tb, colors, pos_x, input_field_y);
+                }
+            }
         }
     }
 
@@ -231,8 +232,10 @@ impl MessagingUI {
         };
 
         self.input_field.resize(widget_width);
+
+        // We don't show the nick in exit dialogue, so it has the full width
         for exit_dialogue in &mut self.exit_dialogue {
-            exit_dialogue.resize(widget_width);
+            exit_dialogue.resize(width);
         }
     }
 
@@ -254,6 +257,7 @@ impl MessagingUI {
     fn toggle_exit_dialogue(&mut self) {
         let exit_dialogue = ::std::mem::replace(&mut self.exit_dialogue, None);
         if exit_dialogue.is_none() {
+            // We don't show the nick in exit dialogue, so it has the full width
             self.exit_dialogue = Some(ExitDialogue::new(self.width));
         }
     }

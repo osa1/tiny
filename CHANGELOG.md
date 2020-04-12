@@ -7,6 +7,7 @@
   of on every new connection. (#172)
 - It's now possible to build tiny with [rustls] instead of [native-tls]. See
   README for instructions. (#172)
+- A bug when rendering exit dialogue (shown on C-c) fixed.
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
