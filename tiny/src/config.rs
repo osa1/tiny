@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use serde_yaml;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
