@@ -232,7 +232,7 @@ fn test_text_field_wrap() {
         let event = term_input::Event::Key(Key::Char('a'));
         tui.handle_input_event(event);
     }
-    for _ in 0..10 {
+    for _ in 0..5 {
         let event = term_input::Event::Key(Key::Char('b'));
         tui.handle_input_event(event);
     }
@@ -247,14 +247,34 @@ fn test_text_field_wrap() {
      |                                        |
      |00:00 test test test                    |
      |x: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|
-     |   bbbbbbbbbb                           |
+     |   bbbbb                                |
      |mentions chat.freenode.net              |";
 
     expect_screen(screen, &tui, 40, 8);
 
+    // Test resizing
+    tui.set_size(46, 8);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+    "|                                              |
+     |                                              |
+     |                                              |
+     |                                              |
+     |                                              |
+     |00:00 test test test                          |
+     |x: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbb |
+     |mentions chat.freenode.net                    |";
+
+    expect_screen(screen, &tui, 46, 8);
+
+    // Reset size
+    tui.set_size(40, 8);
+
     // If we remove a few characters now the line above the text field should still be right above
     // the text field
-    for _ in 0..11 {
+    for _ in 0..6 {
         let event = term_input::Event::Key(Key::Backspace);
         tui.handle_input_event(event);
     }
@@ -275,7 +295,42 @@ fn test_text_field_wrap() {
     expect_screen(screen, &tui, 40, 8);
 
     // On making screen smaller we should fall back to scrolling
-    // TODO
+    tui.set_size(30, 8);
+    for _ in 0..5 {
+        let event = term_input::Event::Key(Key::Char('b'));
+        tui.handle_input_event(event);
+    }
+    tui.draw();
 
-    // TODO: Test changing nicks
+    #[rustfmt::skip]
+    let screen =
+    "|                              |
+     |                              |
+     |                              |
+     |                              |
+     |                              |
+     |00:00 test test test          |
+     |x: aaaaaaaaaaaaaaaaaaaaabbbbb |
+     |mentions chat.freenode.net    |";
+
+    expect_screen(screen, &tui, 30, 8);
+
+    tui.set_size(40, 8);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+    "|                                        |
+     |                                        |
+     |                                        |
+     |                                        |
+     |00:00 test test test                    |
+     |x: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab|
+     |   bbbb                                 |
+     |mentions chat.freenode.net              |";
+
+    expect_screen(screen, &tui, 40, 8);
+
+    // TODO: Test changing nick (osa: I don't understand how nick length is taken into account when
+    // falling back to scrolling)
 }
