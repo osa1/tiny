@@ -132,6 +132,26 @@ fn small_screen_1() {
          |osa1:                |
          |< #chan              |";
     expect_screen(screen, &tui, 21, 3);
+
+    tui.set_size(24, 3);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|00:00 +123456 +abcdef   |
+         |osa1:                   |
+         |< irc.server_1.org #chan|";
+    expect_screen(screen, &tui, 24, 3);
+
+    tui.set_size(31, 3);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|00:00 +123456 +abcdef          |
+         |osa1:                          |
+         |mentions irc.server_1.org #chan|";
+    expect_screen(screen, &tui, 31, 3);
 }
 
 #[test]
