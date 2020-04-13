@@ -7,7 +7,6 @@ use std::io::Result;
 use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
-use time;
 use time::Tm;
 
 use libtiny_ui::*;

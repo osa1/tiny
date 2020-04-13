@@ -3,7 +3,6 @@
 
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
-use serde_yaml;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
