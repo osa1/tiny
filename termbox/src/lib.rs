@@ -499,4 +499,15 @@ impl Termbox {
     pub fn get_front_buffer(&self) -> CellBuf {
         self.front_buffer.clone()
     }
+
+    /// Sets size of the buffers. Useful when testing.
+    pub fn set_buffer_size(&mut self, w: u16, h: u16) {
+        let old_w = self.term_width;
+        let old_h = self.term_height;
+        self.term_width = w;
+        self.term_height = h;
+        self.back_buffer.resize(old_w, old_h, w, h);
+        self.front_buffer.resize(old_w, old_h, w, h);
+        self.front_buffer.clear(self.clear_fg, self.clear_bg);
+    }
 }
