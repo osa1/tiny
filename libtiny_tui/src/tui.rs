@@ -565,6 +565,7 @@ impl TUI {
         }
     }
 
+    /// Handles resize events. Call on SIGWINCH.
     pub(crate) fn resize(&mut self) {
         self.tb.resize();
         self.tb.clear();
@@ -572,6 +573,21 @@ impl TUI {
         self.width = self.tb.width();
         self.height = self.tb.height();
 
+        self.resize_();
+    }
+
+    #[cfg(test)]
+    /// Set terminal size. Useful when testing resizing.
+    pub(crate) fn set_size(&mut self, w: u16, h: u16) {
+        self.tb.set_buffer_size(w, h);
+
+        self.width = i32::from(w);
+        self.height = i32::from(h);
+
+        self.resize_();
+    }
+
+    fn resize_(&mut self) {
         // self.statusline_visible = statusline_visible(self.width, self.height);
         let statusline_height =
             if statusline_visible(self.width, self.height) && self.show_statusline {
