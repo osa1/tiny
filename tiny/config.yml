@@ -6,6 +6,9 @@ servers:
       realname: yourname
       nicks: [tiny_user]
 
+      # (optional) Server alias for display in tab line
+      # alias: Freenode
+
       # Channels to automatically join
       join:
           - '##rust'

@@ -16,7 +16,7 @@ fn main() {
 
     local.block_on(&mut runtime, async move {
         let (tui, _) = TUI::run(PathBuf::from("../tiny/config.yml"));
-        tui.new_server_tab("debug");
+        tui.new_server_tab("debug", None);
         let debug_tab = MsgTarget::Server { serv: "debug" };
 
         tui.add_msg(

@@ -20,7 +20,7 @@ fn main() {
 
         for serv_idx in 0..10 {
             let server = format!("server_{}", serv_idx);
-            tui.new_server_tab(&server);
+            tui.new_server_tab(&server, None);
 
             tui.new_chan_tab(&server, "chan_0");
             tui.set_tab_style(

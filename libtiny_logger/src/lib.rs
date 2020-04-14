@@ -37,7 +37,7 @@ macro_rules! delegate {
 
 impl UI for Logger {
     fn draw(&self) {}
-    delegate!(new_server_tab(serv: &str,));
+    delegate!(new_server_tab(serv: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &str,));
     delegate!(close_chan_tab(serv: &str, chan: &str,));
@@ -127,7 +127,7 @@ impl LoggerInner {
         })
     }
 
-    fn new_server_tab(&mut self, serv: &str) {
+    fn new_server_tab(&mut self, serv: &str, _alias: Option<String>) {
         if self.servers.contains_key(serv) {
             return;
         }
