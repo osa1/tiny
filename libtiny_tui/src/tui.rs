@@ -256,7 +256,14 @@ impl TUI {
         self.text_field_wrap = text_field_wrap;
     }
 
-    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool, notifier: Notifier, alias: Option<String>, ) {
+    fn new_tab(
+        &mut self,
+        idx: usize,
+        src: MsgSource,
+        status: bool,
+        notifier: Notifier,
+        alias: Option<String>,
+    ) {
         use std::collections::HashMap;
 
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
