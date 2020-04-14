@@ -8,6 +8,10 @@
 - It's now possible to build tiny with [rustls] instead of [native-tls]. See
   README for instructions. (#172)
 - A bug when rendering exit dialogue (shown on C-c) fixed.
+- A new optional server field 'alias' added to the configuration file for
+  specifying aliases for servers, to be shown in the tab line. This is useful
+  when a server address is long, or just an IP address, or you want to show
+  something different than the server address in the tab bar (#186).
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
