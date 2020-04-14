@@ -244,7 +244,7 @@ fn connect_(
     // can't move the rest to an else branch because of borrowchk
 
     // otherwise create a new Conn, tab etc.
-    ui.new_server_tab(serv_name);
+    ui.new_server_tab(serv_name, None);
     let msg_target = MsgTarget::Server { serv: serv_name };
     ui.add_client_msg("Connecting...", &msg_target);
 

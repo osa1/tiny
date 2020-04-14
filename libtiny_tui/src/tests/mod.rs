@@ -83,8 +83,8 @@ fn init_screen() {
 fn close_rightmost_tab() {
     // After closing right-most tab the tab bar should scroll left.
     let mut tui = TUI::new_test(20, 4);
-    tui.new_server_tab("irc.server_1.org");
-    tui.new_server_tab("irc.server_2.org");
+    tui.new_server_tab("irc.server_1.org", None);
+    tui.new_server_tab("irc.server_2.org", None);
     tui.next_tab();
     tui.next_tab();
     tui.draw();
@@ -128,7 +128,7 @@ fn small_screen_1() {
     let mut tui = TUI::new_test(21, 3);
     let serv = "irc.server_1.org";
     let chan = "#chan";
-    tui.new_server_tab(serv);
+    tui.new_server_tab(serv, None);
     tui.set_nick(serv, "osa1");
     tui.new_chan_tab(serv, chan);
     tui.next_tab();
@@ -174,7 +174,7 @@ fn small_screen_2() {
     let mut tui = TUI::new_test(21, 4);
     let serv = "irc.server_1.org";
     let chan = "#chan";
-    tui.new_server_tab(serv);
+    tui.new_server_tab(serv, None);
     tui.set_nick(serv, "osa1");
     tui.new_chan_tab(serv, chan);
     tui.next_tab();
@@ -217,7 +217,7 @@ fn test_text_field_wrap() {
     tui.set_text_field_wrap_test(true);
 
     let server = "chat.freenode.net";
-    tui.new_server_tab(server);
+    tui.new_server_tab(server, Some(server.to_string()));
     tui.set_nick(server, "x");
 
     // Switch to server tab

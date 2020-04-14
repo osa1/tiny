@@ -160,7 +160,7 @@ macro_rules! delegate {
 
 impl UI for TUI {
     delegate!(draw());
-    delegate!(new_server_tab(serv_name: &str,));
+    delegate!(new_server_tab(serv_name: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv_name: &str,));
     delegate!(new_chan_tab(serv_name: &str, chan: &str,));
     delegate!(close_chan_tab(serv_name: &str, chan: &str,));

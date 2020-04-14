@@ -111,7 +111,7 @@ impl TUI {
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
         // show any errors in TUI.
-        tui.new_server_tab("mentions");
+        tui.new_server_tab("mentions", None);
         tui.add_client_msg(
             "Any mentions to you will be listed here.",
             &MsgTarget::Server { serv: "mentions" },
@@ -256,7 +256,14 @@ impl TUI {
         self.text_field_wrap = text_field_wrap;
     }
 
-    fn new_tab(&mut self, idx: usize, src: MsgSource, status: bool, notifier: Notifier) {
+    fn new_tab(
+        &mut self,
+        idx: usize,
+        src: MsgSource,
+        status: bool,
+        notifier: Notifier,
+        alias: Option<String>,
+    ) {
         use std::collections::HashMap;
 
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
@@ -269,7 +276,11 @@ impl TUI {
         let switch = {
             let mut ret = None;
             let mut n = 0;
-            for ch in src.visible_name().chars() {
+            let visible_name = match alias.as_ref() {
+                None => src.visible_name(),
+                Some(ref alias) => alias,
+            };
+            for ch in visible_name.chars() {
                 if !ch.is_alphabetic() {
                     continue;
                 }
@@ -297,6 +308,7 @@ impl TUI {
         self.tabs.insert(
             idx,
             Tab {
+                alias,
                 widget: MessagingUI::new(
                     self.width,
                     self.height - 1 - statusline_height,
@@ -312,7 +324,7 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub(crate) fn new_server_tab(&mut self, serv: &str) -> Option<usize> {
+    pub(crate) fn new_server_tab(&mut self, serv: &str, alias: Option<String>) -> Option<usize> {
         match self.find_serv_tab_idx(serv) {
             None => {
                 let tab_idx = self.tabs.len();
@@ -323,6 +335,7 @@ impl TUI {
                     },
                     true,
                     Notifier::Mentions,
+                    alias,
                 );
                 Some(tab_idx)
             }
@@ -346,7 +359,7 @@ impl TUI {
         match self.find_chan_tab_idx(serv, chan) {
             None => match self.find_last_serv_tab_idx(serv) {
                 None => {
-                    self.new_server_tab(serv);
+                    self.new_server_tab(serv, None);
                     self.new_chan_tab(serv, chan)
                 }
                 Some(serv_tab_idx) => {
@@ -370,6 +383,7 @@ impl TUI {
                         },
                         status_val,
                         notifier,
+                        None,
                     );
                     if self.active_idx >= tab_idx {
                         self.next_tab();
@@ -400,7 +414,7 @@ impl TUI {
         match self.find_user_tab_idx(serv, nick) {
             None => match self.find_last_serv_tab_idx(serv) {
                 None => {
-                    self.new_server_tab(serv);
+                    self.new_server_tab(serv, None);
                     self.new_user_tab(serv, nick)
                 }
                 Some(tab_idx) => {
@@ -412,6 +426,7 @@ impl TUI {
                         },
                         true,
                         Notifier::Messages,
+                        None,
                     );
                     if let Some(nick) = self.tabs[tab_idx].widget.get_nick().map(str::to_owned) {
                         self.tabs[tab_idx + 1].widget.set_nick(nick);
@@ -1092,7 +1107,7 @@ impl TUI {
     fn maybe_create_tab(&mut self, target: &MsgTarget) -> Option<usize> {
         match *target {
             MsgTarget::Server { serv } | MsgTarget::AllServTabs { serv } => {
-                self.new_server_tab(serv)
+                self.new_server_tab(serv, None)
             }
 
             MsgTarget::Chan { serv, chan } => self.new_chan_tab(serv, chan),
