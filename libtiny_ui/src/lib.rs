@@ -91,7 +91,7 @@ pub trait UI: objekt::Clone {
     fn draw(&self);
 
     /// Create a new server tab.
-    fn new_server_tab(&self, serv: &str);
+    fn new_server_tab(&self, serv: &str, alias: Option<String>);
 
     /// Close a server tab and all channel and user tabs for that server.
     fn close_server_tab(&self, serv: &str);
@@ -177,9 +177,9 @@ impl<UI1: UI + Clone, UI2: UI + Clone> UI for CombinedUIs<UI1, UI2> {
         self.ui2.draw();
     }
 
-    fn new_server_tab(&self, serv: &str) {
-        self.ui1.new_server_tab(serv);
-        self.ui2.new_server_tab(serv);
+    fn new_server_tab(&self, serv: &str, alias: Option<String>) {
+        self.ui1.new_server_tab(serv, alias.clone());
+        self.ui2.new_server_tab(serv, alias);
     }
 
     fn close_server_tab(&self, serv: &str) {

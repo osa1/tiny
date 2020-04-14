@@ -15,6 +15,10 @@ pub(crate) struct Server {
     /// Address of the server
     pub(crate) addr: String,
 
+    /// Optional server alias to be shown in the tab line.
+    #[serde(default)]
+    pub(crate) alias: Option<String>,
+
     /// Port of the server
     pub(crate) port: u16,
 
