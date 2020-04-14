@@ -217,7 +217,7 @@ fn test_text_field_wrap() {
     tui.set_text_field_wrap_test(true);
 
     let server = "chat.freenode.net";
-    tui.new_server_tab(server);
+    tui.new_server_tab(server, None);
     tui.set_nick(server, "x");
 
     // Switch to server tab
