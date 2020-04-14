@@ -206,12 +206,3 @@ For commands not supported by tiny as a slash command, sending the command in th
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-## Contributors
-
-- [Ömer Sinan Ağacan](https://github.com/osa1)
-- [Abin Simon](https://github.com/meain)
-- [Umur Gedik](https://github.com/umurgdk)
-- [Chiu Yue Chun](https://github.com/BrianOn99)
-- [@wammies](https://github.com/wammies)
-- [Nick Econopouly](https://github.com/wrycode)
