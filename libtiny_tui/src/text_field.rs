@@ -33,6 +33,8 @@ pub(crate) struct TextField {
     /// Config value for text field wrapping
     text_field_wrap: bool,
 
+    wrapped_lines: Option<Vec<Vec<char>>>,
+
     /// Amount of scroll in the input field
     scroll: Option<i32>,
 
@@ -69,6 +71,7 @@ impl TextField {
             width,
             max_lines,
             text_field_wrap,
+            wrapped_lines: None,
             scroll: if text_field_wrap { None } else { Some(0) },
             history: Vec::with_capacity(HIST_SIZE),
             mode: Mode::Edit,
@@ -96,6 +99,8 @@ impl TextField {
                     self.cursor,
                     self.should_scroll(),
                     self.scroll,
+                    &self.wrapped_lines,
+                    None,
                 );
             }
             Mode::History(hist_curs) => {
@@ -109,6 +114,8 @@ impl TextField {
                     self.cursor,
                     self.should_scroll(),
                     self.scroll,
+                    &self.wrapped_lines,
+                    None,
                 );
             }
             Mode::Autocomplete {
@@ -118,77 +125,97 @@ impl TextField {
                 ref completions,
                 current_completion,
             } => {
-                let cursor_x_off;
-                let cursor_y_off;
-                if self.should_scroll() {
-                    cursor_x_off = self.cursor - self.scroll.unwrap();
-                    cursor_y_off = 0;
-                } else {
-                    cursor_x_off = self.cursor % self.width;
-                    cursor_y_off = self.cursor / self.width;
-                }
-
-                // draw a placeholder for the cursor
-                tb.change_cell(
-                    pos_x + cursor_x_off,
-                    pos_y + cursor_y_off,
-                    ' ',
-                    colors.user_msg.fg,
-                    colors.user_msg.bg,
-                );
-
                 let completion: &str = &completions[current_completion];
 
                 let mut orig_buf_iter = original_buffer.iter().cloned();
                 let mut completion_iter = completion.chars();
 
-                let iter: utils::InsertIterator<char> =
-                    utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
+                if self.should_scroll() {
+                    let cursor_x_off = self.cursor - self.scroll.unwrap();
+                    let cursor_y_off = 0;
 
-                for (char_idx, char) in iter.enumerate() {
-                    let x_off;
-                    let y_off;
-                    let mut can_scroll = true;
-                    if self.should_scroll() {
-                        let scroll = self.scroll.unwrap_or(0);
-                        x_off = (char_idx as i32) - scroll;
-                        y_off = 0;
-                        if char_idx >= ((scroll + self.width) as usize) {
-                            break;
-                        }
-                        if char_idx < scroll as usize {
-                            can_scroll = false
-                        }
-                    } else {
-                        x_off = char_idx as i32 % self.width;
-                        y_off = char_idx as i32 / self.width;
-                    }
-                    if can_scroll {
-                        if char_idx >= word_starts && char_idx < insertion_point + completion.len()
-                        {
-                            tb.change_cell(
-                                pos_x + x_off,
-                                pos_y + y_off,
-                                char,
-                                colors.completion.fg,
-                                colors.completion.bg,
-                            );
+                    // draw a placeholder for the cursor
+                    tb.change_cell(
+                        pos_x + cursor_x_off,
+                        pos_y + cursor_y_off,
+                        ' ',
+                        colors.user_msg.fg,
+                        colors.user_msg.bg,
+                    );
+
+                    let iter: utils::InsertIterator<char> = utils::insert_iter(
+                        &mut orig_buf_iter,
+                        &mut completion_iter,
+                        insertion_point,
+                    );
+
+                    for (char_idx, char) in iter.enumerate() {
+                        let x_off;
+                        let y_off;
+                        let mut can_scroll = true;
+                        if self.should_scroll() {
+                            let scroll = self.scroll.unwrap_or(0);
+                            x_off = (char_idx as i32) - scroll;
+                            y_off = 0;
+                            if char_idx >= ((scroll + self.width) as usize) {
+                                break;
+                            }
+                            if char_idx < scroll as usize {
+                                can_scroll = false
+                            }
                         } else {
-                            tb.change_cell(
-                                pos_x + x_off,
-                                pos_y + y_off,
-                                char,
-                                colors.user_msg.fg,
-                                colors.user_msg.bg,
-                            );
+                            x_off = char_idx as i32 % self.width;
+                            y_off = char_idx as i32 / self.width;
+                        }
+                        if can_scroll {
+                            if char_idx >= word_starts
+                                && char_idx < insertion_point + completion.len()
+                            {
+                                tb.change_cell(
+                                    pos_x + x_off,
+                                    pos_y + y_off,
+                                    char,
+                                    colors.completion.fg,
+                                    colors.completion.bg,
+                                );
+                            } else {
+                                tb.change_cell(
+                                    pos_x + x_off,
+                                    pos_y + y_off,
+                                    char,
+                                    colors.user_msg.fg,
+                                    colors.user_msg.bg,
+                                );
+                            }
                         }
                     }
+                    tb.set_cursor(Some((
+                        (pos_x + cursor_x_off) as u16,
+                        (pos_y + cursor_y_off) as u16,
+                    )));
+                } else {
+                    let iter: utils::InsertIterator<char> = utils::insert_iter(
+                        &mut orig_buf_iter,
+                        &mut completion_iter,
+                        insertion_point,
+                    );
+                    let lines: Vec<Vec<char>> =
+                        wrap_lines(&iter.into_iter().collect(), self.width as usize);
+                    let completion_range = CompletionRange {
+                        start_idx: word_starts,
+                        end_idx: insertion_point + completion.len(),
+                    };
+                    draw_line_wrapped(
+                        tb,
+                        colors,
+                        pos_x,
+                        pos_y,
+                        self.width,
+                        self.cursor,
+                        &lines,
+                        &Some(completion_range),
+                    );
                 }
-
-                tb.set_cursor(Some((
-                    (pos_x + cursor_x_off) as u16,
-                    (pos_y + cursor_y_off) as u16,
-                )));
             }
         }
     }
@@ -495,11 +522,29 @@ impl TextField {
 
     /// Calculate how many lines of text will be in the textfield
     /// based on the width of the widget
-    pub(crate) fn calculate_lines(&self) -> i32 {
+    pub(crate) fn calculate_lines(&mut self) -> i32 {
         if !self.scroll.is_some() {
             let len = self.current_buffer_len();
             if len >= self.width {
-                len / self.width + 1
+                let wrapped_lines = wrap_lines(self.shown_line(), self.width as usize);
+                let mut line_count = wrapped_lines.len() as i32;
+                let last_line_len = wrapped_lines.last().unwrap().len();
+                if last_line_len == self.width as usize {
+                    line_count += 1;
+                }
+                if let Mode::Autocomplete {
+                    ref completions,
+                    current_completion,
+                    ..
+                } = self.mode
+                {
+                    if last_line_len + completions[current_completion].len() >= self.width as usize
+                    {
+                        line_count += 1;
+                    }
+                }
+                self.wrapped_lines = Some(wrapped_lines);
+                line_count
             } else {
                 1
             }
@@ -658,18 +703,86 @@ fn draw_line_scroll(
     tb.set_cursor(Some(((pos_x + cursor - scroll) as u16, pos_y as u16)));
 }
 
+struct CompletionRange {
+    start_idx: usize,
+    end_idx: usize,
+}
+
+fn draw_line_wrapped(
+    tb: &mut Termbox,
+    colors: &Colors,
+    pos_x: i32,
+    pos_y: i32,
+    width: i32,
+    cursor: i32,
+    lines: &Vec<Vec<char>>,
+    completion_range: &Option<CompletionRange>,
+) {
+    // handle text field wrapping
+    let mut y = pos_y;
+    let mut cursor_xy: (i32, i32) = (0, 0);
+    let mut cursor_char = ' ';
+
+    let mut cursor_counter = 0;
+    let mut completion_counter = 0;
+    // eprintln!("{:?}", lines);
+    for l in lines {
+        for (idx, c) in l.iter().enumerate() {
+            let x_off = pos_x + idx as i32;
+
+            let mut style = colors.user_msg;
+            // for autocompletion highlighting
+            if let Some(completion_range) = completion_range {
+                if completion_counter >= completion_range.start_idx
+                    && completion_counter < completion_range.end_idx
+                {
+                    style = colors.completion;
+                }
+            }
+
+            tb.change_cell(x_off, y, *c, style.fg, style.bg);
+
+            if cursor_counter + 1 == cursor {
+                if idx as i32 == width - 1 {
+                    cursor_xy = (pos_x, y + 1);
+                } else {
+                    cursor_xy = (x_off + 1, y);
+                }
+            } else if cursor_counter == cursor {
+                cursor_xy = (x_off, y);
+                cursor_char = *c;
+            }
+            cursor_counter += 1;
+            completion_counter += 1;
+        }
+        y += 1;
+    }
+
+    tb.change_cell(
+        cursor_xy.0,
+        cursor_xy.1,
+        cursor_char,
+        colors.cursor.fg,
+        colors.cursor.bg,
+    );
+
+    tb.set_cursor(Some(((cursor_xy.0) as u16, (cursor_xy.1) as u16)));
+}
+
 fn draw_line(
     tb: &mut Termbox,
     colors: &Colors,
-    line: &[char],
+    line: &Vec<char>,
     pos_x: i32,
     pos_y: i32,
     width: i32,
     cursor: i32,
     should_scroll: bool,
     scroll: Option<i32>,
+    wrapped_lines: &Option<Vec<Vec<char>>>,
+    completion_range: Option<CompletionRange>,
 ) {
-    if should_scroll {
+    if should_scroll || line.len() < width as usize {
         draw_line_scroll(
             tb,
             colors,
@@ -681,35 +794,62 @@ fn draw_line(
             scroll.unwrap_or(0),
         );
     } else {
-        // --- vert overflow ---
-        let mut y = pos_y;
-        let mut cursor_line = 0;
-        let cursor_col = cursor % width;
-        // handle vertical expansion for text overflow
-        if line.len() >= width as usize {
-            cursor_line = cursor / width;
-            let chunked = line.chunks(width as usize);
-            for l in chunked.into_iter() {
-                termbox::print_chars(tb, pos_x, y, colors.user_msg, l.iter().cloned());
-                y += 1;
+        let lines: Vec<Vec<char>> = match wrapped_lines {
+            Some(wrapped_lines) => wrapped_lines.clone(),
+            None => wrap_lines(line, width as usize),
+        };
+
+        draw_line_wrapped(
+            tb,
+            colors,
+            pos_x,
+            pos_y,
+            width,
+            cursor,
+            &lines,
+            &completion_range,
+        );
+    }
+}
+
+fn wrap_lines(buffer: &Vec<char>, width: usize) -> Vec<Vec<char>> {
+    let mut lines: Vec<Vec<char>> = Vec::new();
+    let mut current_line_len = 1;
+    let mut last_whitespace_idx: Option<usize> = None;
+    let mut current_line_start_idx: usize = 0;
+
+    for (idx, c) in buffer.iter().enumerate() {
+        // store whitespace if we need to go back to it and split
+        if c.is_whitespace() {
+            last_whitespace_idx = Some(idx);
+        }
+        // eprintln!("current_line_len {} width {}", current_line_len, width);
+        let mut line_end_idx = idx;
+
+        // need to break the line
+        if current_line_len == width {
+            if !c.is_whitespace() {
+                // go back to last whitespace and cut it off
+                if let Some(last_whitespace_idx) = last_whitespace_idx {
+                    line_end_idx = last_whitespace_idx;
+                }
             }
+            // last character of line is whitespace, so wrap on it
+            lines.push(buffer[current_line_start_idx..=line_end_idx].into());
+            current_line_start_idx = line_end_idx + 1;
+            // set the length of the next line based on how many characters back we went
+            current_line_len = max(1, idx - line_end_idx);
         } else {
-            termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, line.iter().cloned());
+            current_line_len += 1;
         }
 
-        tb.change_cell(
-            pos_x + cursor_col,
-            pos_y + cursor_line,
-            ' ',
-            colors.cursor.fg,
-            colors.cursor.bg,
-        );
-
-        tb.set_cursor(Some((
-            (pos_x + cursor_col) as u16,
-            (pos_y + cursor_line) as u16,
-        )));
+        // if the rest of the characters fit on one line then just push and break
+        if buffer.len() - current_line_start_idx <= width {
+            lines.push(buffer[current_line_start_idx..].into());
+            break;
+        }
     }
+    lines
 }
 
 impl TextField {
