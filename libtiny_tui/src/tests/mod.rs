@@ -331,6 +331,35 @@ fn test_text_field_wrap() {
 
     expect_screen(screen, &tui, 40, 8);
 
+    // Wrapping on words - splits lines on whitespace
+    for _ in 0..6 {
+        let event = term_input::Event::Key(Key::Backspace);
+        tui.handle_input_event(event);
+    }
+
+    let event = term_input::Event::Key(Key::Char(' '));
+    tui.handle_input_event(event);
+
+    for _ in 0..5 {
+        let event = term_input::Event::Key(Key::Char('b'));
+        tui.handle_input_event(event);
+    }
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+    "|                                        |
+     |                                        |
+     |                                        |
+     |                                        |
+     |00:00 test test test                    |
+     |x: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  |
+     |   bbbbb                                |
+     |mentions chat.freenode.net              |";
+
+    expect_screen(screen, &tui, 40, 8);
+
     // TODO: Test changing nick (osa: I don't understand how nick length is taken into account when
     // falling back to scrolling)
 }
