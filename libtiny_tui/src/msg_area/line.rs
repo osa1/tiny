@@ -209,8 +209,22 @@ impl Line {
 
         let mut char_idx: i32 = 0;
 
+        let mut line_offset = 0;
         let last_seg: [&Seg; 1] = [&self.current_seg];
         for seg in self.segs.iter().chain(last_seg.iter().copied()) {
+            // timestamp padding
+            if let SegStyle::SchemeStyle(scheme) = seg.style {
+                if let SchemeStyle::Timestamp = scheme {
+                    line_offset += seg.text.len();
+                }
+            }
+
+            // nickname padding
+            if let SegStyle::Index(_) = seg.style {
+                // +2 = ': ' after nick
+                line_offset += seg.text.len() + 2;
+            }
+
             let sty = seg.style(colors);
 
             for char in seg.text.chars() {
@@ -244,7 +258,7 @@ impl Line {
                         if line >= height {
                             break;
                         }
-                        col = pos_x;
+                        col = pos_x + line_offset as i32;
                     }
                 } else {
                     debug_assert!(!char.is_ascii_control());
