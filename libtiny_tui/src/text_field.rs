@@ -202,8 +202,8 @@ impl TextField {
                     let lines: Vec<Vec<char>> =
                         wrap_lines(&iter.into_iter().collect(), self.width as usize);
                     let completion_range = CompletionRange {
-                        start_idx: word_starts,
-                        end_idx: insertion_point + completion.len(),
+                        start_idx: word_starts as i32,
+                        end_idx: (insertion_point + completion.len()) as i32,
                     };
                     draw_line_wrapped(
                         tb,
@@ -529,20 +529,27 @@ impl TextField {
                 let wrapped_lines = wrap_lines(self.shown_line(), self.width as usize);
                 let mut line_count = wrapped_lines.len() as i32;
                 let last_line_len = wrapped_lines.last().unwrap().len();
-                if last_line_len == self.width as usize {
-                    line_count += 1;
-                }
-                if let Mode::Autocomplete {
-                    ref completions,
-                    current_completion,
-                    ..
-                } = self.mode
-                {
-                    if last_line_len + completions[current_completion].len() >= self.width as usize
-                    {
-                        line_count += 1;
+
+                // might need space to move cursor to next line
+                match self.mode {
+                    Mode::Autocomplete {
+                        ref completions,
+                        current_completion,
+                        ..
+                    } => {
+                        if last_line_len + completions[current_completion].len()
+                            >= self.width as usize
+                        {
+                            line_count += 1;
+                        }
+                    }
+                    _ => {
+                        if last_line_len == self.width as usize {
+                            line_count += 1;
+                        }
                     }
                 }
+
                 self.wrapped_lines = Some(wrapped_lines);
                 line_count
             } else {
@@ -704,8 +711,8 @@ fn draw_line_scroll(
 }
 
 struct CompletionRange {
-    start_idx: usize,
-    end_idx: usize,
+    start_idx: i32,
+    end_idx: i32,
 }
 
 fn draw_line_wrapped(
@@ -723,8 +730,7 @@ fn draw_line_wrapped(
     let mut cursor_xy: (i32, i32) = (0, 0);
     let mut cursor_char = ' ';
 
-    let mut cursor_counter = 0;
-    let mut completion_counter = 0;
+    let mut cursor_counter: i32 = 0;
     // eprintln!("{:?}", lines);
     for l in lines {
         for (idx, c) in l.iter().enumerate() {
@@ -733,8 +739,8 @@ fn draw_line_wrapped(
             let mut style = colors.user_msg;
             // for autocompletion highlighting
             if let Some(completion_range) = completion_range {
-                if completion_counter >= completion_range.start_idx
-                    && completion_counter < completion_range.end_idx
+                if cursor_counter >= completion_range.start_idx
+                    && cursor_counter < completion_range.end_idx
                 {
                     style = colors.completion;
                 }
@@ -753,7 +759,6 @@ fn draw_line_wrapped(
                 cursor_char = *c;
             }
             cursor_counter += 1;
-            completion_counter += 1;
         }
         y += 1;
     }
