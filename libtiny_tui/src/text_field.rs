@@ -8,8 +8,9 @@ use termbox_simple::Termbox;
 
 use crate::{config::Colors, termbox, trie::Trie, utils, widget::WidgetRet};
 
-// TODO: Make these settings
+/// Inspired by vim's 'scrolloff': minimal number of characters to keep above and below the cursor.
 const SCROLLOFF: i32 = 5;
+
 const HIST_SIZE: usize = 30;
 
 pub(crate) struct TextField {
@@ -197,6 +198,7 @@ impl TextField {
                 if self.cursor < self.line_len() {
                     self.modify();
                     self.buffer.remove(self.cursor as usize);
+                    // TODO: We should probably call move_cursor here to update scroll?
                 }
                 WidgetRet::KeyHandled
             }
@@ -539,36 +541,45 @@ impl TextField {
         self.move_cursor(cursor);
     }
 
+    /// Update cursor location, possibly after an update. Update scroll value to fit as much of the
+    /// input field as possible to the screen.
     fn move_cursor(&mut self, cursor: i32) {
-        assert!(cursor >= 0 && cursor <= self.line_len());
+        let line_len = self.line_len();
+
+        // Cursor should be in range
+        assert!(cursor >= 0 && cursor <= line_len);
         self.cursor = cursor;
 
-        if self.line_len() + 1 < self.width {
-            self.scroll = 0;
-        } else {
-            let scrolloff = {
-                if self.width < 2 * SCROLLOFF + 1 {
-                    0
-                } else {
-                    SCROLLOFF
-                }
-            };
-
-            let left_end = self.scroll;
-            let right_end = self.scroll + self.width;
-
-            if cursor - scrolloff < left_end {
-                self.scroll = max(0, cursor - scrolloff);
-            } else if cursor + scrolloff >= right_end {
-                self.scroll = min(
-                    // +1 because cursor should be visible, i.e.
-                    // right_end > cursor should hold after this
-                    max(0, cursor + 1 + scrolloff - self.width),
-                    // +1 because cursor goes one more character
-                    // after the buffer, to be able to add chars
-                    max(0, self.line_len() + 1 - self.width),
-                );
+        // Disable SCROLLOFF if there isn't enough space on the screen to have SCROLLOFF space on
+        // both ends
+        let scrolloff = {
+            if self.width < 2 * SCROLLOFF + 1 {
+                0
+            } else {
+                SCROLLOFF
             }
+        };
+
+        // Shown range of the text field before updating scroll
+        let left_end = min(self.scroll, line_len);
+        let right_end = min(self.scroll + self.width, line_len);
+
+        // println!(
+        //     "scrolloff={}, left_end={}, right_end={}",
+        //     scrolloff, left_end, right_end
+        // );
+
+        if cursor - scrolloff < left_end {
+            self.scroll = max(0, cursor - scrolloff);
+        } else if cursor + scrolloff >= right_end {
+            self.scroll = min(
+                // +1 because cursor should be visible, i.e.
+                // right_end > cursor should hold after this
+                max(0, cursor + 1 + scrolloff - self.width),
+                // +1 because cursor goes one more character
+                // after the buffer, to be able to add chars
+                max(0, self.line_len() + 1 - self.width),
+            );
         }
     }
 }
