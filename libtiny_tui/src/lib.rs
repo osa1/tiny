@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test))]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::cognitive_complexity)]
+#![feature(track_caller)]
 
 mod config;
 mod exit_dialogue;

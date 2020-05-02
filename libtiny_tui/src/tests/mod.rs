@@ -1,8 +1,11 @@
 use crate::tui::TUI;
 
 use libtiny_ui::*;
+use term_input::{Event, Key};
 use termbox_simple::CellBuf;
 use time::Tm;
+
+use std::panic::Location;
 
 fn buffer_str(buf: &CellBuf, w: u16, h: u16) -> String {
     let w = usize::from(w);
@@ -23,7 +26,7 @@ fn buffer_str(buf: &CellBuf, w: u16, h: u16) -> String {
     ret
 }
 
-fn expect_screen(screen: &str, tui: &TUI, w: u16, h: u16) {
+fn expect_screen(screen: &str, tui: &TUI, w: u16, h: u16, caller: &'static Location<'static>) {
     let mut screen_filtered = String::with_capacity(screen.len());
 
     let mut in_screen = false;
@@ -42,11 +45,32 @@ fn expect_screen(screen: &str, tui: &TUI, w: u16, h: u16) {
     let _ = screen_filtered.pop(); // pop the last '\n'
 
     let found = buffer_str(&tui.get_tb().get_front_buffer(), w, h);
+
+    let mut line = String::new();
+    for _ in 0..w {
+        line.push('-');
+    }
+
     if screen_filtered != found {
         panic!(
-            "Unexpected screen\nExpected:\n{:?}\nFound:\n{:?}",
-            screen_filtered, found
+            "Unexpected screen\n\
+            Expected:\n\
+            {}\n\
+            {}\n\
+            {}\n\
+            Found:\n\
+            {}\n\
+            {}\n\
+            {}\n\
+            Called by: {}\n",
+            line, screen_filtered, line, line, found, line, caller
         );
+    }
+}
+
+fn enter_string(tui: &mut TUI, s: &str) {
+    for c in s.chars() {
+        tui.handle_input_event(Event::Key(Key::Char(c)));
     }
 }
 
@@ -61,7 +85,7 @@ fn init_screen() {
          |will be listed here.|
          |                    |
          |mentions            |";
-    expect_screen(screen, &tui, 20, 4);
+    expect_screen(screen, &tui, 20, 4, Location::caller());
 }
 
 #[test]
@@ -80,7 +104,7 @@ fn close_rightmost_tab() {
          |                    |
          |                    |
          |< irc.server_2.org  |";
-    expect_screen(screen, &tui, 20, 4);
+    expect_screen(screen, &tui, 20, 4, Location::caller());
 
     // Should scroll left when the server tab is closed. Left arrow should still be visible as
     // there are still tabs to the left.
@@ -93,7 +117,7 @@ fn close_rightmost_tab() {
          |                    |
          |                    |
          |< irc.server_1.org  |";
-    expect_screen(screen, &tui, 20, 4);
+    expect_screen(screen, &tui, 20, 4, Location::caller());
 
     // Scroll left again, left arrow should disappear this time.
     tui.close_server_tab("irc.server_1.org");
@@ -105,7 +129,7 @@ fn close_rightmost_tab() {
          |will be listed here.|
          |                    |
          |mentions            |";
-    expect_screen(screen, &tui, 20, 4);
+    expect_screen(screen, &tui, 20, 4, Location::caller());
 }
 
 #[test]
@@ -131,7 +155,7 @@ fn small_screen_1() {
         "|00:00 +123456 +abcdef|
          |osa1:                |
          |< #chan              |";
-    expect_screen(screen, &tui, 21, 3);
+    expect_screen(screen, &tui, 21, 3, Location::caller());
 
     tui.set_size(24, 3);
     tui.draw();
@@ -141,7 +165,7 @@ fn small_screen_1() {
         "|00:00 +123456 +abcdef   |
          |osa1:                   |
          |< irc.server_1.org #chan|";
-    expect_screen(screen, &tui, 24, 3);
+    expect_screen(screen, &tui, 24, 3, Location::caller());
 
     tui.set_size(31, 3);
     tui.draw();
@@ -151,7 +175,7 @@ fn small_screen_1() {
         "|00:00 +123456 +abcdef          |
          |osa1:                          |
          |mentions irc.server_1.org #chan|";
-    expect_screen(screen, &tui, 31, 3);
+    expect_screen(screen, &tui, 31, 3, Location::caller());
 }
 
 #[test]
@@ -177,7 +201,7 @@ fn small_screen_2() {
          |00:00 Blah blah blah-|
          |osa1:                |
          |< #chan              |";
-    expect_screen(screen, &tui, 21, 4);
+    expect_screen(screen, &tui, 21, 4, Location::caller());
 
     tui.add_nick("123456", Some(ts), &target);
     tui.draw();
@@ -188,5 +212,72 @@ fn small_screen_2() {
          |+123456              |
          |osa1:                |
          |< #chan              |";
-    expect_screen(screen, &tui, 21, 4);
+    expect_screen(screen, &tui, 21, 4, Location::caller());
+}
+
+#[test]
+fn ctrl_w() {
+    let mut tui = TUI::new_test(30, 3);
+    let serv = "irc.server_1.org";
+    let chan = "#chan";
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    enter_string(&mut tui, "alskdfj asldkf asldkf aslkdfj aslkdfj asf");
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|                              |
+         |osa1: dkf aslkdfj aslkdfj asf |
+         |< irc.server_1.org #chan      |";
+    expect_screen(screen, &tui, 30, 3, Location::caller());
+
+    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|                              |
+         |osa1: asldkf aslkdfj aslkdfj  |
+         |< irc.server_1.org #chan      |";
+
+    expect_screen(screen, &tui, 30, 3, Location::caller());
+
+    println!("~~~~~~~~~~~~~~~~~~~~~~");
+    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    println!("~~~~~~~~~~~~~~~~~~~~~~");
+    tui.draw();
+
+    /*
+    The buggy behavior was as below:
+
+    let screen =
+        "|                              |
+         |osa1:  asldkf aslkdfj         |
+         |< irc.server_1.org #chan      |";
+    */
+
+    #[rustfmt::skip]
+    let screen =
+        "|                              |
+         |osa1:  asldkf asldkf aslkdfj  |
+         |< irc.server_1.org #chan      |";
+
+    expect_screen(screen, &tui, 30, 3, Location::caller());
+
+    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|                              |
+         |osa1: alskdfj asldkf asldkf   |
+         |< irc.server_1.org #chan      |";
+
+    expect_screen(screen, &tui, 30, 3, Location::caller());
 }
