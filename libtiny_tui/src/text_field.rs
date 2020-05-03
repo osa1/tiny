@@ -8,7 +8,7 @@ use termbox_simple::Termbox;
 
 use crate::{config::Colors, termbox, trie::Trie, utils, widget::WidgetRet};
 
-// TODO: Make these settings
+/// Inspired by vim's 'scrolloff': minimal number of characters to keep above and below the cursor.
 const SCROLL_OFF: i32 = 5;
 
 /// Minimum width of TextField for wrapping
@@ -264,6 +264,7 @@ impl TextField {
                 if self.cursor < self.current_buffer_len() {
                     self.modify();
                     self.buffer.remove(self.cursor as usize);
+                    // TODO: We should probably call move_cursor here to update scroll?
                 }
                 WidgetRet::KeyHandled
             }
@@ -646,12 +647,18 @@ impl TextField {
         self.move_cursor(cursor);
     }
 
+    /// Update cursor location, possibly after an update. Update scroll value to fit as much of the
+    /// input field as possible to the screen.
     fn move_cursor(&mut self, cursor: i32) {
+        let line_len = self.current_buffer_len();
+
         assert!(cursor >= 0 && cursor <= self.current_buffer_len());
         self.cursor = cursor;
 
         if self.scroll.is_some() {
             if self.current_buffer_len() + 1 >= self.width {
+                // Disable SCROLLOFF if there isn't enough space on the screen to have SCROLLOFF space on
+                // both ends
                 let scrolloff = {
                     if self.width < 2 * SCROLL_OFF + 1 {
                         0
@@ -660,8 +667,9 @@ impl TextField {
                     }
                 };
 
-                let left_end = self.scroll.unwrap();
-                let right_end = self.scroll.unwrap() + self.width;
+                // Shown range of the text field before updating scroll
+                let left_end = min(self.scroll.unwrap(), line_len);
+                let right_end = min(self.scroll.unwrap() + self.width, line_len);
 
                 if cursor - scrolloff < left_end {
                     self.scroll = Some(max(0, cursor - scrolloff));
@@ -679,7 +687,7 @@ impl TextField {
             } else {
                 self.scroll = Some(0);
             }
-        }
+        };
     }
 }
 
