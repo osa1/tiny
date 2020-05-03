@@ -83,6 +83,23 @@ impl Seg {
             }
         }
     }
+
+    pub(crate) fn get_timestamp_or_nick_offset(&self) -> usize {
+        let mut line_offset = 0;
+        // timestamp padding
+        if let SegStyle::SchemeStyle(scheme) = self.style {
+            if let SchemeStyle::Timestamp = scheme {
+                line_offset += self.text.len();
+            }
+        }
+
+        // nickname padding
+        if let SegStyle::Index(_) = self.style {
+            // +2 = ': ' after nick
+            line_offset += self.text.len() + 2;
+        }
+        line_offset
+    }
 }
 
 // TODO get rid of this
@@ -165,6 +182,11 @@ impl Line {
     pub(crate) fn rendered_height(&self, width: i32) -> i32 {
         let mut lines: i32 = 1;
         let mut line_start: i32 = 0;
+        let mut line_width = width;
+        let mut line_offset = 0;
+        for seg in &self.segs {
+            line_offset += seg.get_timestamp_or_nick_offset();
+        }
 
         for split_idx in 0..self.splits.len() {
             let char_idx = self.splits[split_idx];
@@ -172,7 +194,7 @@ impl Line {
             let col = char_idx - line_start;
 
             // How many more chars can we render in this line?
-            let slots_in_line: i32 = width - (col + 1);
+            let slots_in_line: i32 = line_width - (col + 1);
 
             // How many chars do we need to render until the next split point?
             let chars_until_next_split: i32 =
@@ -186,6 +208,7 @@ impl Line {
                 // debug!("splitting at {}", char_idx);
                 lines += 1;
                 line_start = char_idx + 1;
+                line_width = width - line_offset as i32;
             }
         }
 
@@ -212,18 +235,7 @@ impl Line {
         let mut line_offset = 0;
         let last_seg: [&Seg; 1] = [&self.current_seg];
         for seg in self.segs.iter().chain(last_seg.iter().copied()) {
-            // timestamp padding
-            if let SegStyle::SchemeStyle(scheme) = seg.style {
-                if let SchemeStyle::Timestamp = scheme {
-                    line_offset += seg.text.len();
-                }
-            }
-
-            // nickname padding
-            if let SegStyle::Index(_) = seg.style {
-                // +2 = ': ' after nick
-                line_offset += seg.text.len() + 2;
-            }
+            line_offset += seg.get_timestamp_or_nick_offset();
 
             let sty = seg.style(colors);
 
