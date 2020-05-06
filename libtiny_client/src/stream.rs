@@ -31,7 +31,8 @@ lazy_static! {
 
 #[derive(Debug)]
 // We box the fields to reduce type size. Without boxing the type size is 64 with native-tls and
-// 1288 with native-tls. With boxing it's 16 in both.
+// 1288 with native-tls. With boxing it's 16 in both. More importantly, there's a large size
+// difference between the variants when using rustls, see #189.
 pub(crate) enum Stream {
     TcpStream(Box<TcpStream>),
     TlsStream(Box<TlsStream<TcpStream>>),
