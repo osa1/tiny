@@ -30,9 +30,11 @@ lazy_static! {
 }
 
 #[derive(Debug)]
+// We box the fields to reduce type size. Without boxing the type size is 64 with native-tls and
+// 1288 with native-tls. With boxing it's 16 in both.
 pub(crate) enum Stream {
-    TcpStream(TcpStream),
-    TlsStream(TlsStream<TcpStream>),
+    TcpStream(Box<TcpStream>),
+    TlsStream(Box<TlsStream<TcpStream>>),
 }
 
 #[cfg(feature = "tls-native")]
@@ -59,14 +61,14 @@ impl From<std::io::Error> for StreamError {
 
 impl Stream {
     pub(crate) async fn new_tcp(addr: SocketAddr) -> Result<Stream, StreamError> {
-        Ok(Stream::TcpStream(TcpStream::connect(addr).await?))
+        Ok(Stream::TcpStream(TcpStream::connect(addr).await?.into()))
     }
 
     #[cfg(feature = "tls-native")]
     pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
         let tcp_stream = TcpStream::connect(addr).await?;
         let tls_stream = TLS_CONNECTOR.connect(host_name, tcp_stream).await?;
-        Ok(Stream::TlsStream(tls_stream))
+        Ok(Stream::TlsStream(tls_stream.into()))
     }
 
     #[cfg(feature = "tls-rustls")]
@@ -75,7 +77,7 @@ impl Stream {
         let name = tokio_rustls::webpki::DNSNameRef::try_from_ascii_str(host_name)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         let tls_stream = TLS_CONNECTOR.connect(name, tcp_stream).await?;
-        Ok(Stream::TlsStream(tls_stream))
+        Ok(Stream::TlsStream(tls_stream.into()))
     }
 }
 
