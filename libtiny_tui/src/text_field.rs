@@ -379,9 +379,10 @@ impl TextField {
     }
 
     /// Get contents of the text field and clear it.
-    pub(crate) fn flush(&mut self) -> String {
+    pub(crate) fn flush(&mut self) -> (String, i32) {
+        let old_cursor = self.cursor;
         self.cursor = 0;
-        self.buffer.drain(..).collect()
+        (self.buffer.drain(..).collect(), old_cursor)
     }
 
     /// Add a line to the text field history.

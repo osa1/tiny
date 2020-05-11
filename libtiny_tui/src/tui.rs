@@ -8,6 +8,7 @@ use std::str::SplitWhitespace;
 use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style};
+use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
 use crate::statusline::{draw_statusline, statusline_visible};
@@ -435,11 +436,28 @@ impl TUI {
         }
     }
 
-    /// Edit current input + `str` before sending.
-    fn edit_input(&mut self, str: &str) -> TUIRet {
+    fn edit_input(&mut self) -> TUIRet {
         let tab = &mut self.tabs[self.active_idx].widget;
-        let tf = tab.flush_input_field();
-        match paste_lines(&mut self.tb, tf, &str) {
+        let (text_field_contents, _) = tab.flush_input_field();
+        let editor_ret = editor::edit(&mut self.tb, &text_field_contents);
+        self.handle_editor_ret(editor_ret)
+    }
+
+    fn paste_lines(&mut self, pasted_string: &str) -> TUIRet {
+        let tab = &mut self.tabs[self.active_idx].widget;
+        let (text_field_contents, text_field_cursor) = tab.flush_input_field();
+        let editor_ret = editor::paste_lines(
+            &mut self.tb,
+            text_field_contents,
+            text_field_cursor,
+            pasted_string,
+        );
+        self.handle_editor_ret(editor_ret)
+    }
+
+    fn handle_editor_ret(&mut self, ret: Result<Vec<String>, editor::EditorError>) -> TUIRet {
+        let tab = &mut self.tabs[self.active_idx].widget;
+        match ret {
             Ok(lines) => {
                 // If there's only one line just add it to the input field, do not send it
                 if lines.len() == 1 {
@@ -459,20 +477,20 @@ impl TUI {
             Err(err) => {
                 use std::env::VarError;
                 match err {
-                    PasteError::Io(err) => {
+                    editor::EditorError::Io(err) => {
                         self.add_client_err_msg(
                             &format!("Error while running $EDITOR: {:?}", err),
                             &MsgTarget::CurrentTab,
                         );
                     }
-                    PasteError::Var(VarError::NotPresent) => {
+                    editor::EditorError::Var(VarError::NotPresent) => {
                         self.add_client_err_msg(
                             "Can't paste multi-line string: \
                              make sure your $EDITOR is set",
                             &MsgTarget::CurrentTab,
                         );
                     }
-                    PasteError::Var(VarError::NotUnicode(_)) => {
+                    editor::EditorError::Var(VarError::NotUnicode(_)) => {
                         self.add_client_err_msg(
                             "Can't paste multi-line string: \
                              can't parse $EDITOR (not unicode)",
@@ -511,7 +529,7 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => self.edit_input(""),
+            KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => self.edit_input(),
 
             KeyCode::Char(c) if modifiers.contains(KeyModifiers::ALT) => match c.to_digit(10) {
                 Some(i) => {
@@ -1329,85 +1347,4 @@ impl TUI {
         }
         (left, right)
     }
-}
-
-#[derive(Debug)]
-enum PasteError {
-    Io(::std::io::Error),
-    Var(::std::env::VarError),
-}
-
-impl From<::std::io::Error> for PasteError {
-    fn from(err: ::std::io::Error) -> PasteError {
-        PasteError::Io(err)
-    }
-}
-
-impl From<::std::env::VarError> for PasteError {
-    fn from(err: ::std::env::VarError) -> PasteError {
-        PasteError::Var(err)
-    }
-}
-
-/// The user tried to paste the multi-line string passed as the argument. Run $EDITOR to edit a
-/// temporary file with the string as the contents. On exit, parse the final contents of the file
-/// (ignore comment lines), and send each line in the file as a message. Abort if any of the lines
-/// look like a command (e.g. `/msg ...`). I don't know what's the best way to handle commands in
-/// this context.
-///
-/// Ok(str) => final string to send
-/// Err(str) => err message to show
-///
-/// FIXME: Ideally this function should get a `Termbox` argument and return a new `Termbox` because
-/// we shutdown the current termbox instance and initialize it again after running $EDITOR.
-fn paste_lines(tb: &mut Termbox, tf: String, str: &str) -> Result<Vec<String>, PasteError> {
-    use std::{
-        io::{Read, Seek, SeekFrom, Write},
-        process::Command,
-    };
-
-    let editor = ::std::env::var("EDITOR")?;
-    let mut tmp_file = ::tempfile::NamedTempFile::new()?;
-
-    writeln!(
-        tmp_file,
-        "\
-         # You pasted a multi-line message. When you close the editor final version of\n\
-         # this file will be sent (ignoring these lines). Delete contents to abort the\n\
-         # paste."
-    )?;
-    write!(tmp_file, "{}", tf)?;
-    write!(tmp_file, "{}", str.replace('\r', "\n"))?;
-
-    tb.suspend();
-    let ret = Command::new(editor).arg(tmp_file.path()).status();
-    tb.activate();
-
-    let ret = ret?;
-    if !ret.success() {
-        return Ok(vec![]); // assume aborted
-    }
-
-    let mut tmp_file = tmp_file.into_file();
-    tmp_file.seek(SeekFrom::Start(0))?;
-
-    let mut file_contents = String::new();
-    tmp_file.read_to_string(&mut file_contents)?;
-
-    let mut filtered_lines = vec![];
-    for s in file_contents.lines() {
-        // Ignore if the char is '#'. To actually send a `#` add space.
-        // For empty lines, send " ".
-        let first_char = s.chars().next();
-        if first_char == Some('#') {
-            // skip this line
-            continue;
-        } else if s.is_empty() {
-            filtered_lines.push(" ".to_owned());
-        } else {
-            filtered_lines.push(s.to_owned());
-        }
-    }
-
-    Ok(filtered_lines)
 }

@@ -4,6 +4,7 @@
 #![feature(track_caller)]
 
 mod config;
+mod editor;
 mod exit_dialogue;
 mod messaging;
 // FIXME: This is "pub" to be able to use in an example
