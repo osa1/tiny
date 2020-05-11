@@ -429,21 +429,21 @@ impl TUI {
         self.fix_scroll_after_close();
     }
 
-    pub(crate) fn handle_input_event(&mut self, ev: Event) -> TUIRet {
+    pub(crate) async fn handle_input_event(&mut self, ev: Event) -> TUIRet {
         match ev {
             Event::Key(key) => self.keypressed(key),
             ev => TUIRet::EventIgnored(ev),
         }
     }
 
-    fn edit_input(&mut self) -> TUIRet {
+    async fn edit_input(&mut self) -> TUIRet {
         let tab = &mut self.tabs[self.active_idx].widget;
         let (text_field_contents, _) = tab.flush_input_field();
-        let editor_ret = editor::edit(&mut self.tb, &text_field_contents);
+        let editor_ret = editor::edit(&mut self.tb, &text_field_contents).await;
         self.handle_editor_ret(editor_ret)
     }
 
-    fn paste_lines(&mut self, pasted_string: &str) -> TUIRet {
+    async fn paste_lines(&mut self, pasted_string: &str) -> TUIRet {
         let tab = &mut self.tabs[self.active_idx].widget;
         let (text_field_contents, text_field_cursor) = tab.flush_input_field();
         let editor_ret = editor::paste_lines(
@@ -451,7 +451,8 @@ impl TUI {
             text_field_contents,
             text_field_cursor,
             pasted_string,
-        );
+        )
+        .await;
         self.handle_editor_ret(editor_ret)
     }
 
@@ -503,10 +504,10 @@ impl TUI {
         }
     }
 
-    fn keypressed(&mut self, key: KeyEvent) -> TUIRet {
+    async fn keypressed(&mut self, key: KeyEvent) -> TUIRet {
         match self.tabs[self.active_idx].widget.keypressed(key) {
             WidgetRet::KeyHandled => TUIRet::KeyHandled,
-            WidgetRet::KeyIgnored => self.handle_keypress(key),
+            WidgetRet::KeyIgnored => self.handle_keypress(key).await,
             WidgetRet::Input(input) => TUIRet::Input {
                 msg: input,
                 from: self.tabs[self.active_idx].src.clone(),
@@ -529,7 +530,7 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => self.edit_input(),
+            KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => self.edit_input().await,
 
             KeyCode::Char(c) if modifiers.contains(KeyModifiers::ALT) => match c.to_digit(10) {
                 Some(i) => {
