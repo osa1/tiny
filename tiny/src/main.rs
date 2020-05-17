@@ -3,14 +3,13 @@
 #![feature(ptr_offset_from)]
 #![allow(clippy::zero_prefixed_literal)]
 
+mod cli;
 mod cmd;
-mod cmd_line_args;
 mod config;
 mod conn;
 mod ui;
 mod utils;
 
-use cmd_line_args::{parse_cmd_line_args, CmdLineArgs};
 use libtiny_client::{Client, ServerInfo};
 use libtiny_logger::Logger;
 use libtiny_tui::{MsgTarget, TUI};
@@ -18,10 +17,10 @@ use libtiny_ui::UI;
 use std::path::PathBuf;
 
 fn main() {
-    let CmdLineArgs {
+    let cli::Args {
         servers: server_args,
         config_path,
-    } = parse_cmd_line_args(std::env::args());
+    } = cli::parse();
     let config_path = config_path.unwrap_or_else(config::get_config_path);
     if config_path.is_dir() {
         println!("The config path is a directory.");
@@ -46,8 +45,8 @@ fn main() {
                     servers
                         .into_iter()
                         .filter(|s| {
-                            for server in &server_args {
-                                if s.addr.contains(server) {
+                            for server_arg in &server_args {
+                                if s.addr.contains(server_arg) {
                                     return true;
                                 }
                             }

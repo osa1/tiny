@@ -15,6 +15,7 @@ tls-rustls = ["libtiny_client/tls-rustls"]
 desktop-notifications = ["libtiny_tui/desktop-notifications"]
 
 [dependencies]
+clap = "2.33"
 dirs = "1.0.2"
 env_logger = "0.7"
 futures = "0.3.1"
@@ -28,3 +29,6 @@ serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 time = "0.1"
 tokio = { version = "0.2.11", features = ["full"] }
+
+[build-dependencies]
+rustc_tools_util = "0.2.0"
