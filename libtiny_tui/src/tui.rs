@@ -15,14 +15,14 @@ use crate::tab::{Tab, TabStyle};
 use crate::widget::WidgetRet;
 use crate::{MsgSource, MsgTarget};
 
-use term_input::{Arrow, Event, Key};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use termbox_simple::Termbox;
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
     Abort,
     KeyHandled,
-    KeyIgnored(Key),
+    KeyIgnored(KeyEvent),
     EventIgnored(Event),
 
     /// INVARIANT: The vec will have at least one char.
@@ -431,22 +431,6 @@ impl TUI {
     pub(crate) fn handle_input_event(&mut self, ev: Event) -> TUIRet {
         match ev {
             Event::Key(key) => self.keypressed(key),
-
-            Event::String(str) => {
-                // For some reason on my terminal newlines in text are
-                // translated to carriage returns when pasting so we check for
-                // both just to make sure
-                if str.contains('\n') || str.contains('\r') {
-                    return self.edit_input(&str);
-                } else {
-                    // TODO this may be too slow for pasting long single lines
-                    for ch in str.chars() {
-                        self.handle_input_event(Event::Key(Key::Char(ch)));
-                    }
-                }
-                TUIRet::KeyHandled
-            }
-
             ev => TUIRet::EventIgnored(ev),
         }
     }
@@ -501,7 +485,7 @@ impl TUI {
         }
     }
 
-    fn keypressed(&mut self, key: Key) -> TUIRet {
+    fn keypressed(&mut self, key: KeyEvent) -> TUIRet {
         match self.tabs[self.active_idx].widget.keypressed(key) {
             WidgetRet::KeyHandled => TUIRet::KeyHandled,
             WidgetRet::KeyIgnored => self.handle_keypress(key),
@@ -514,21 +498,22 @@ impl TUI {
         }
     }
 
-    fn handle_keypress(&mut self, key: Key) -> TUIRet {
-        match key {
-            Key::Ctrl('n') => {
+    fn handle_keypress(&mut self, key: KeyEvent) -> TUIRet {
+        let KeyEvent { code, modifiers } = key;
+        match code {
+            KeyCode::Char('n') if modifiers.contains(KeyModifiers::CONTROL) => {
                 self.next_tab();
                 TUIRet::KeyHandled
             }
 
-            Key::Ctrl('p') => {
+            KeyCode::Char('p') if modifiers.contains(KeyModifiers::CONTROL) => {
                 self.prev_tab();
                 TUIRet::KeyHandled
             }
 
-            Key::Ctrl('x') => self.edit_input(""),
+            KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => self.edit_input(""),
 
-            Key::AltChar(c) => match c.to_digit(10) {
+            KeyCode::Char(c) if modifiers.contains(KeyModifiers::ALT) => match c.to_digit(10) {
                 Some(i) => {
                     let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
                         self.tabs.len() - 1
@@ -566,17 +551,17 @@ impl TUI {
                 }
             },
 
-            Key::AltArrow(Arrow::Left) => {
+            KeyCode::Left if modifiers.contains(KeyModifiers::ALT) => {
                 self.move_tab_left();
                 TUIRet::KeyHandled
             }
 
-            Key::AltArrow(Arrow::Right) => {
+            KeyCode::Right if modifiers.contains(KeyModifiers::ALT) => {
                 self.move_tab_right();
                 TUIRet::KeyHandled
             }
 
-            key => TUIRet::KeyIgnored(key),
+            _ => TUIRet::KeyIgnored(key),
         }
     }
 

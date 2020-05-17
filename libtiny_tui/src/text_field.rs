@@ -3,7 +3,7 @@ use std::{
     mem,
 };
 
-use term_input::{Arrow, Key};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use termbox_simple::Termbox;
 
 use crate::{config::Colors, termbox, trie::Trie, utils, widget::WidgetRet};
@@ -154,9 +154,10 @@ impl TextField {
         }
     }
 
-    pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
-        match key {
-            Key::Char('\r') => {
+    pub(crate) fn keypressed(&mut self, key: KeyEvent) -> WidgetRet {
+        let KeyEvent { code, modifiers } = key;
+        match code {
+            KeyCode::Enter => {
                 if self.line_len() > 0 {
                     self.modify();
 
@@ -178,14 +179,14 @@ impl TextField {
                 }
             }
 
-            Key::Char(ch) => {
+            KeyCode::Char(ch) if modifiers.is_empty() => {
                 self.modify();
                 self.buffer.insert(self.cursor as usize, ch);
                 self.inc_cursor();
                 WidgetRet::KeyHandled
             }
 
-            Key::Backspace => {
+            KeyCode::Backspace => {
                 if self.cursor > 0 {
                     self.modify();
                     self.buffer.remove(self.cursor as usize - 1);
@@ -194,7 +195,7 @@ impl TextField {
                 WidgetRet::KeyHandled
             }
 
-            Key::Del => {
+            KeyCode::Delete => {
                 if self.cursor < self.line_len() {
                     self.modify();
                     self.buffer.remove(self.cursor as usize);
@@ -203,7 +204,7 @@ impl TextField {
                 WidgetRet::KeyHandled
             }
 
-            Key::Ctrl(ch) => {
+            KeyCode::Char(ch) if modifiers.contains(KeyModifiers::CONTROL) => {
                 if ch == 'a' {
                     self.move_cursor(0);
                     WidgetRet::KeyHandled
@@ -224,17 +225,17 @@ impl TextField {
                 }
             }
 
-            Key::Arrow(Arrow::Left) => {
+            KeyCode::Left if modifiers.is_empty() => {
                 self.dec_cursor();
                 WidgetRet::KeyHandled
             }
 
-            Key::Arrow(Arrow::Right) => {
+            KeyCode::Right if modifiers.is_empty() => {
                 self.inc_cursor();
                 WidgetRet::KeyHandled
             }
 
-            Key::CtrlArrow(Arrow::Left) => {
+            KeyCode::Left if modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.cursor > 0 {
                     let mut cur = self.cursor as usize;
                     let mut skipped = false;
@@ -254,7 +255,7 @@ impl TextField {
                 WidgetRet::KeyHandled
             }
 
-            Key::CtrlArrow(Arrow::Right) => {
+            KeyCode::Right if modifiers.contains(KeyModifiers::CONTROL) => {
                 let len = self.line_len() as usize;
                 if (self.cursor as usize) < len {
                     let mut cur = self.cursor as usize;
@@ -277,7 +278,7 @@ impl TextField {
 
             ////////////////////////////////////////////////////////////////////
             // Scrolling in history or autocompletion list
-            Key::Arrow(Arrow::Up) => {
+            KeyCode::Up => {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
@@ -327,7 +328,7 @@ impl TextField {
                 WidgetRet::KeyHandled
             }
 
-            Key::Arrow(Arrow::Down) => {
+            KeyCode::Down => {
                 let mode = mem::replace(&mut self.mode, Mode::Edit);
 
                 match mode {
@@ -615,7 +616,10 @@ impl TextField {
     pub(crate) fn autocomplete(&mut self, dict: &Trie) {
         if self.in_autocomplete() {
             // AWFUL CODE YO
-            self.keypressed(Key::Arrow(Arrow::Up));
+            self.keypressed(KeyEvent {
+                code: KeyCode::Up,
+                modifiers: KeyModifiers::empty(),
+            });
             return;
         }
 
@@ -667,23 +671,42 @@ impl TextField {
 mod tests {
 
     use super::*;
-    use term_input::{Arrow, Key};
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    fn char_key(c: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers: KeyModifiers::empty(),
+        }
+    }
 
     #[test]
     fn text_field_bug() {
         let mut text_field = TextField::new(10);
-        text_field.keypressed(Key::Char('a'));
-        text_field.keypressed(Key::Char(' '));
-        text_field.keypressed(Key::Char('b'));
-        text_field.keypressed(Key::Char(' '));
-        text_field.keypressed(Key::Char('c'));
-        text_field.keypressed(Key::Char('\r'));
-        text_field.keypressed(Key::Arrow(Arrow::Up));
+        text_field.keypressed(char_key('a'));
+        text_field.keypressed(char_key(' '));
+        text_field.keypressed(char_key('b'));
+        text_field.keypressed(char_key(' '));
+        text_field.keypressed(char_key('c'));
+        text_field.keypressed(KeyEvent {
+            code: KeyCode::Enter,
+            modifiers: KeyModifiers::empty(),
+        });
+        text_field.keypressed(KeyEvent {
+            code: KeyCode::Up,
+            modifiers: KeyModifiers::empty(),
+        });
         // this panics:
-        text_field.keypressed(Key::CtrlArrow(Arrow::Left));
+        text_field.keypressed(KeyEvent {
+            code: KeyCode::Left,
+            modifiers: KeyModifiers::CONTROL,
+        });
         // a b ^c
         assert_eq!(text_field.cursor, 4);
-        text_field.keypressed(Key::CtrlArrow(Arrow::Right));
+        text_field.keypressed(KeyEvent {
+            code: KeyCode::Right,
+            modifiers: KeyModifiers::CONTROL,
+        });
         assert_eq!(text_field.cursor, 5);
     }
 }

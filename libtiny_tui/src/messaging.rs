@@ -1,4 +1,4 @@
-use term_input::Key;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use termbox_simple::Termbox;
 
 use std::convert::From;
@@ -146,51 +146,62 @@ impl MessagingUI {
         }
     }
 
-    pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
-        match key {
-            Key::Ctrl('c') => {
+    pub(crate) fn keypressed(&mut self, key: KeyEvent) -> WidgetRet {
+        let KeyEvent { code, modifiers } = key;
+        match code {
+            KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
                 self.toggle_exit_dialogue();
                 WidgetRet::KeyHandled
             }
 
-            Key::Ctrl('u') | Key::PageUp => {
+            KeyCode::PageUp => {
                 self.msg_area.page_up();
                 WidgetRet::KeyHandled
             }
 
-            Key::Ctrl('d') | Key::PageDown => {
+            KeyCode::Char('u') if modifiers.contains(KeyModifiers::CONTROL) => {
+                self.msg_area.page_up();
+                WidgetRet::KeyHandled
+            }
+
+            KeyCode::PageDown => {
                 self.msg_area.page_down();
                 WidgetRet::KeyHandled
             }
 
-            Key::ShiftUp => {
+            KeyCode::Char('d') if modifiers.contains(KeyModifiers::CONTROL) => {
+                self.msg_area.page_down();
+                WidgetRet::KeyHandled
+            }
+
+            KeyCode::Up if modifiers.contains(KeyModifiers::SHIFT) => {
                 self.msg_area.scroll_up();
                 WidgetRet::KeyHandled
             }
 
-            Key::ShiftDown => {
+            KeyCode::Down if modifiers.contains(KeyModifiers::SHIFT) => {
                 self.msg_area.scroll_down();
                 WidgetRet::KeyHandled
             }
 
-            Key::Tab => {
+            KeyCode::Tab => {
                 if self.exit_dialogue.is_none() {
                     self.input_field.autocomplete(&self.nicks);
                 }
                 WidgetRet::KeyHandled
             }
 
-            Key::Home => {
+            KeyCode::Home => {
                 self.msg_area.scroll_top();
                 WidgetRet::KeyHandled
             }
 
-            Key::End => {
+            KeyCode::End => {
                 self.msg_area.scroll_bottom();
                 WidgetRet::KeyHandled
             }
 
-            key => {
+            _ => {
                 let ret = {
                     if let Some(exit_dialogue) = self.exit_dialogue.as_ref() {
                         exit_dialogue.keypressed(key)

@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub(crate) enum WidgetRet {
     /// Key is handled by the widget.
     KeyHandled,

@@ -1,4 +1,4 @@
-use term_input::Key;
+use crossterm::event::{KeyCode, KeyEvent};
 use termbox_simple::Termbox;
 
 use crate::{config::Colors, widget::WidgetRet};
@@ -47,9 +47,9 @@ impl ExitDialogue {
         }
     }
 
-    pub(crate) fn keypressed(&self, key: Key) -> WidgetRet {
-        match key {
-            Key::Char('y') | Key::Char('\r') => WidgetRet::Abort,
+    pub(crate) fn keypressed(&self, key: KeyEvent) -> WidgetRet {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Enter => WidgetRet::Abort,
             _ => WidgetRet::Remove,
         }
     }

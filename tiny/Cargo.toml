@@ -28,6 +28,7 @@ log = "0.4"
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 time = "0.1"
+crossterm = "0.17.4"
 tokio = { version = "0.2.11", features = ["full"] }
 
 [build-dependencies]

@@ -5,7 +5,6 @@ members = [
     "libtiny_tui",
     "libtiny_ui",
     "libtiny_wire",
-    "term_input",
     "termbox",
     "tiny",
 ]
