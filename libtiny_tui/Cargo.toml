@@ -9,6 +9,7 @@ default = []
 desktop-notifications = ["notify-rust"]
 
 [dependencies]
+crossterm = { git = "https://github.com/osa1/crossterm", branch = "alt_arrow", features = ["event-stream"] }
 env_logger = "0.7"
 futures = "0.3.1"
 libtiny_ui = { path = "../libtiny_ui" }
@@ -17,7 +18,6 @@ notify-rust = { version = "3", optional = true }
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.7.1"
 tempfile = "3.0.3"
-term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
 tokio = { version = "0.2.11", features = ["full"] }

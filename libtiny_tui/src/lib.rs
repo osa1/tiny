@@ -25,12 +25,12 @@ mod tests;
 pub use crate::tab::TabStyle;
 pub use libtiny_ui::*;
 
+use crossterm::event as crossterm_event;
 use futures::select;
 use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
-use term_input::Input;
 use time::Tm;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
@@ -100,8 +100,9 @@ async fn input_handler(
     mut snd_ev: mpsc::Sender<Event>,
     mut snd_abort: mpsc::Sender<()>,
 ) {
-    let mut input = Input::new();
-    while let Some(mb_ev) = input.next().await {
+    let mut event_stream = crossterm_event::EventStream::new();
+
+    while let Some(mb_ev) = event_stream.next().await {
         use tui::TUIRet::*;
         match mb_ev {
             Err(io_err) => {

@@ -1,7 +1,7 @@
 use crate::tui::TUI;
 
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use libtiny_ui::*;
-use term_input::{Event, Key};
 use termbox_simple::CellBuf;
 use time;
 
@@ -70,7 +70,10 @@ fn expect_screen(screen: &str, tui: &TUI, w: u16, h: u16, caller: &'static Locat
 
 fn enter_string(tui: &mut TUI, s: &str) {
     for c in s.chars() {
-        tui.handle_input_event(Event::Key(Key::Char(c)));
+        tui.handle_input_event(Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers: KeyModifiers::empty(),
+        }));
     }
 }
 
@@ -237,7 +240,11 @@ fn ctrl_w() {
          |< irc.server_1.org #chan      |";
     expect_screen(screen, &tui, 30, 3, Location::caller());
 
-    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    let c_w = Event::Key(KeyEvent {
+        code: KeyCode::Char('w'),
+        modifiers: KeyModifiers::CONTROL,
+    });
+    tui.handle_input_event(c_w);
     tui.draw();
 
     #[rustfmt::skip]
@@ -249,7 +256,7 @@ fn ctrl_w() {
     expect_screen(screen, &tui, 30, 3, Location::caller());
 
     println!("~~~~~~~~~~~~~~~~~~~~~~");
-    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    tui.handle_input_event(c_w);
     println!("~~~~~~~~~~~~~~~~~~~~~~");
     tui.draw();
 
@@ -270,7 +277,7 @@ fn ctrl_w() {
 
     expect_screen(screen, &tui, 30, 3, Location::caller());
 
-    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    tui.handle_input_event(c_w);
     tui.draw();
 
     #[rustfmt::skip]

@@ -18,6 +18,11 @@
   (#184)
 - tiny now has a proper CLI, supporting `--help` and `--version` arguments.
 - Fixed handling of invalid UTF-8 sequences in messages. (#194)
+- Fixed HOME/END key handling on some terminals. (#89)
+- **Removed feature:** Pasting multi-line messages into tiny no longer runs
+  `$EDITOR`, it sends the string directly instead. Running `$EDITOR` in this
+  case was never documented so hopefully not a lot of people rely on this. If
+  this is a problem for you please open an issue.
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
