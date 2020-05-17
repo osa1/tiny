@@ -14,6 +14,8 @@
   something different than the server address in the tab bar (#186).
 - TUI: A text field bug is fixed when updating the scroll value after deleting a
   word with `C-w`.
+- Fixed a panic when a nick list of a server or the default nick list is empty.
+  (#184)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls

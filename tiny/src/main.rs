@@ -14,7 +14,9 @@ use libtiny_client::{Client, ServerInfo};
 use libtiny_logger::Logger;
 use libtiny_tui::{MsgTarget, TUI};
 use libtiny_ui::UI;
+
 use std::path::PathBuf;
+use std::process::exit;
 
 fn main() {
     let cli::Args {
@@ -32,26 +34,29 @@ fn main() {
             Err(yaml_err) => {
                 println!("Can't parse config file:");
                 println!("{}", yaml_err);
-                ::std::process::exit(1);
+                exit(1);
             }
-            Ok(config::Config {
-                servers,
-                defaults,
-                log_dir,
-            }) => {
+            Ok(config) => {
+                let config_errors = config::validate_config(&config);
+                if !config_errors.is_empty() {
+                    println!("Config file error(s):");
+                    for error in config_errors {
+                        println!("- {}", error);
+                    }
+                    exit(1);
+                }
+
+                let config::Config {
+                    servers,
+                    defaults,
+                    log_dir,
+                } = config;
+
                 let servers = if !server_args.is_empty() {
-                    // connect only to servers that match at least one of
-                    // the given patterns
+                    // Connect only to servers that match at least one of the given patterns
                     servers
                         .into_iter()
-                        .filter(|s| {
-                            for server_arg in &server_args {
-                                if s.addr.contains(server_arg) {
-                                    return true;
-                                }
-                            }
-                            false
-                        })
+                        .filter(|s| server_args.iter().any(|arg| s.addr.contains(arg)))
                         .collect()
                 } else {
                     servers
