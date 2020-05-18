@@ -226,151 +226,153 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
         }
     };
 
-    let ret = {
-        let mut slice: &[u8] = &buf[0..crlf_idx];
-
-        let pfx: Option<Pfx> = {
-            if slice[0] == b':' {
-                // parse prefix
-                let ws_idx = find_byte(slice, b' ').unwrap();
-                let (mut pfx, slice_) = slice.split_at(ws_idx);
-                // drop the : from pfx
-                pfx = &pfx[1..];
-                slice = &slice_[1..]; // drop the space
-                Some(parse_pfx(pfx))
-            } else {
-                None
-            }
-        };
-
-        let msg_ty: MsgType = {
-            let ws_idx = find_byte(slice, b' ').unwrap();
-            let (cmd, slice_) = slice.split_at(ws_idx);
-            slice = &slice_[1..]; // drop the space
-            match parse_reply_num(cmd) {
-                None => MsgType::Cmd(unsafe {
-                    // Cmd strings are added by the server and they're always ASCII strings, so
-                    // this is safe and O(1).
-                    str::from_utf8_unchecked(cmd)
-                }),
-                Some(num) => MsgType::Num(num),
-            }
-        };
-
-        let params: Vec<&str> = parse_params(unsafe { str::from_utf8_unchecked(slice) });
-        let cmd = match msg_ty {
-            MsgType::Cmd("PRIVMSG") | MsgType::Cmd("NOTICE") if params.len() == 2 => {
-                let is_notice = if let MsgType::Cmd("NOTICE") = msg_ty {
-                    true
-                } else {
-                    false
-                };
-                let target = params[0];
-                let mut msg = params[1];
-                let target = if target.starts_with('#') {
-                    MsgTarget::Chan(target.to_owned())
-                } else {
-                    MsgTarget::User(target.to_owned())
-                };
-
-                let mut ctcp: Option<CTCP> = None;
-                if !msg.is_empty() && msg.as_bytes()[0] == 0x01 {
-                    // Drop 0x01
-                    msg = &msg[1..];
-                    // Parse message type
-                    for (byte_idx, byte) in msg.as_bytes().iter().enumerate() {
-                        if *byte == 0x01 {
-                            let ctcp_type = &msg[0..byte_idx];
-                            ctcp = Some(CTCP::parse(ctcp_type));
-                            msg = &msg[byte_idx + 1..];
-                            break;
-                        } else if *byte == b' ' {
-                            let ctcp_type = &msg[0..byte_idx];
-                            ctcp = Some(CTCP::parse(ctcp_type));
-                            msg = &msg[byte_idx + 1..];
-                            if !msg.is_empty() && msg.as_bytes()[msg.len() - 1] == 0x01 {
-                                msg = &msg[..msg.len() - 1];
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                Cmd::PRIVMSG {
-                    target,
-                    msg: msg.to_owned(),
-                    is_notice,
-                    ctcp,
-                }
-            }
-            MsgType::Cmd("JOIN") if params.len() == 1 => {
-                let chan = params[0];
-                Cmd::JOIN {
-                    chan: chan.to_owned(),
-                }
-            }
-            MsgType::Cmd("PART") if params.len() == 1 || params.len() == 2 => {
-                let mb_msg = if params.len() == 2 {
-                    Some(params[1].to_owned())
-                } else {
-                    None
-                };
-                Cmd::PART {
-                    chan: params[0].to_owned(),
-                    msg: mb_msg,
-                }
-            }
-            MsgType::Cmd("QUIT") if params.is_empty() || params.len() == 1 => {
-                let mb_msg = params.get(1).map(|s| (*s).to_owned());
-
-                Cmd::QUIT {
-                    msg: mb_msg,
-                    chans: Vec::new(),
-                }
-            }
-            MsgType::Cmd("NICK") if params.len() == 1 => {
-                let nick = params[0];
-                Cmd::NICK {
-                    nick: nick.to_owned(),
-                    chans: Vec::new(),
-                }
-            }
-            MsgType::Cmd("PING") if params.len() == 1 => Cmd::PING {
-                server: params[0].to_owned(),
-            },
-            MsgType::Cmd("PONG") if !params.is_empty() => Cmd::PONG {
-                server: params[0].to_owned(),
-            },
-            MsgType::Cmd("ERROR") if params.len() == 1 => Cmd::ERROR {
-                msg: params[0].to_owned(),
-            },
-            MsgType::Cmd("TOPIC") if params.len() == 2 => Cmd::TOPIC {
-                chan: params[0].to_owned(),
-                topic: params[1].to_owned(),
-            },
-            MsgType::Cmd("CAP") if params.len() == 3 => Cmd::CAP {
-                client: params[0].to_owned(),
-                subcommand: params[1].to_owned(),
-                params: params[2].split(' ').map(|s| s.to_owned()).collect(),
-            },
-            MsgType::Cmd("AUTHENTICATE") if params.len() == 1 => Cmd::AUTHENTICATE {
-                param: params[0].to_owned(),
-            },
-            MsgType::Num(n) => Cmd::Reply {
-                num: n,
-                params: params.into_iter().map(|s| s.to_owned()).collect(),
-            },
-            MsgType::Cmd(cmd) => Cmd::Other {
-                cmd: cmd.to_owned(),
-                params: params.into_iter().map(|s| s.to_owned()).collect(),
-            },
-        };
-
-        Msg { pfx, cmd }
-    };
+    let ret = parse_one_message(&buf[0..crlf_idx]);
 
     buf.drain(0..crlf_idx + 2);
+
     Some(ret)
+}
+
+// NB. does not include '\r\n' suffix.
+fn parse_one_message(mut msg: &[u8]) -> Msg {
+    let pfx: Option<Pfx> = {
+        if msg[0] == b':' {
+            // parse prefix
+            let ws_idx = find_byte(msg, b' ').unwrap();
+            let (mut pfx, slice_) = msg.split_at(ws_idx);
+            // drop the : from pfx
+            pfx = &pfx[1..];
+            msg = &slice_[1..]; // drop the space
+            Some(parse_pfx(pfx))
+        } else {
+            None
+        }
+    };
+
+    let msg_ty: MsgType = {
+        let ws_idx = find_byte(msg, b' ').unwrap();
+        let (cmd, slice_) = msg.split_at(ws_idx);
+        msg = &slice_[1..]; // drop the space
+        match parse_reply_num(cmd) {
+            None => MsgType::Cmd(unsafe {
+                // Cmd strings are added by the server and they're always ASCII strings, so
+                // this is safe and O(1).
+                str::from_utf8_unchecked(cmd)
+            }),
+            Some(num) => MsgType::Num(num),
+        }
+    };
+
+    let params: Vec<&str> = parse_params(unsafe { str::from_utf8_unchecked(msg) });
+    let cmd = match msg_ty {
+        MsgType::Cmd("PRIVMSG") | MsgType::Cmd("NOTICE") if params.len() == 2 => {
+            let is_notice = if let MsgType::Cmd("NOTICE") = msg_ty {
+                true
+            } else {
+                false
+            };
+            let target = params[0];
+            let mut msg = params[1];
+            let target = if target.starts_with('#') {
+                MsgTarget::Chan(target.to_owned())
+            } else {
+                MsgTarget::User(target.to_owned())
+            };
+
+            let mut ctcp: Option<CTCP> = None;
+            if !msg.is_empty() && msg.as_bytes()[0] == 0x01 {
+                // Drop 0x01
+                msg = &msg[1..];
+                // Parse message type
+                for (byte_idx, byte) in msg.as_bytes().iter().enumerate() {
+                    if *byte == 0x01 {
+                        let ctcp_type = &msg[0..byte_idx];
+                        ctcp = Some(CTCP::parse(ctcp_type));
+                        msg = &msg[byte_idx + 1..];
+                        break;
+                    } else if *byte == b' ' {
+                        let ctcp_type = &msg[0..byte_idx];
+                        ctcp = Some(CTCP::parse(ctcp_type));
+                        msg = &msg[byte_idx + 1..];
+                        if !msg.is_empty() && msg.as_bytes()[msg.len() - 1] == 0x01 {
+                            msg = &msg[..msg.len() - 1];
+                        }
+                        break;
+                    }
+                }
+            }
+
+            Cmd::PRIVMSG {
+                target,
+                msg: msg.to_owned(),
+                is_notice,
+                ctcp,
+            }
+        }
+        MsgType::Cmd("JOIN") if params.len() == 1 => {
+            let chan = params[0];
+            Cmd::JOIN {
+                chan: chan.to_owned(),
+            }
+        }
+        MsgType::Cmd("PART") if params.len() == 1 || params.len() == 2 => {
+            let mb_msg = if params.len() == 2 {
+                Some(params[1].to_owned())
+            } else {
+                None
+            };
+            Cmd::PART {
+                chan: params[0].to_owned(),
+                msg: mb_msg,
+            }
+        }
+        MsgType::Cmd("QUIT") if params.is_empty() || params.len() == 1 => {
+            let mb_msg = params.get(1).map(|s| (*s).to_owned());
+
+            Cmd::QUIT {
+                msg: mb_msg,
+                chans: Vec::new(),
+            }
+        }
+        MsgType::Cmd("NICK") if params.len() == 1 => {
+            let nick = params[0];
+            Cmd::NICK {
+                nick: nick.to_owned(),
+                chans: Vec::new(),
+            }
+        }
+        MsgType::Cmd("PING") if params.len() == 1 => Cmd::PING {
+            server: params[0].to_owned(),
+        },
+        MsgType::Cmd("PONG") if !params.is_empty() => Cmd::PONG {
+            server: params[0].to_owned(),
+        },
+        MsgType::Cmd("ERROR") if params.len() == 1 => Cmd::ERROR {
+            msg: params[0].to_owned(),
+        },
+        MsgType::Cmd("TOPIC") if params.len() == 2 => Cmd::TOPIC {
+            chan: params[0].to_owned(),
+            topic: params[1].to_owned(),
+        },
+        MsgType::Cmd("CAP") if params.len() == 3 => Cmd::CAP {
+            client: params[0].to_owned(),
+            subcommand: params[1].to_owned(),
+            params: params[2].split(' ').map(|s| s.to_owned()).collect(),
+        },
+        MsgType::Cmd("AUTHENTICATE") if params.len() == 1 => Cmd::AUTHENTICATE {
+            param: params[0].to_owned(),
+        },
+        MsgType::Num(n) => Cmd::Reply {
+            num: n,
+            params: params.into_iter().map(|s| s.to_owned()).collect(),
+        },
+        MsgType::Cmd(cmd) => Cmd::Other {
+            cmd: cmd.to_owned(),
+            params: params.into_iter().map(|s| s.to_owned()).collect(),
+        },
+    };
+
+    Msg { pfx, cmd }
 }
 
 fn parse_pfx(pfx: &[u8]) -> Pfx {
