@@ -26,7 +26,6 @@ mod tests;
 pub use crate::tab::TabStyle;
 pub use libtiny_ui::*;
 
-use crossterm::event as crossterm_event;
 use futures::select;
 use futures::stream::StreamExt;
 use std::cell::RefCell;
@@ -47,7 +46,9 @@ pub struct TUI {
 
 impl TUI {
     pub fn run(config_path: PathBuf) -> (TUI, mpsc::Receiver<Event>) {
-        let tui = Rc::new(RefCell::new(tui::TUI::new(config_path)));
+        let (snd_editor_out, rcv_editor_out) = mpsc::channel(1);
+
+        let tui = Rc::new(RefCell::new(tui::TUI::new(config_path, snd_editor_out)));
         let inner = Rc::downgrade(&tui);
 
         let (snd_ev, rcv_ev) = mpsc::channel(10);
@@ -59,7 +60,7 @@ impl TUI {
         spawn_local(sigwinch_handler(inner.clone(), rcv_abort));
 
         // Spawn input handler task
-        spawn_local(input_handler(tui, snd_ev, snd_abort));
+        spawn_local(input_handler(tui, snd_ev, snd_abort, rcv_editor_out));
 
         (TUI { inner }, rcv_ev)
     }
@@ -100,56 +101,84 @@ async fn input_handler(
     tui: Rc<RefCell<tui::TUI>>,
     mut snd_ev: mpsc::Sender<Event>,
     mut snd_abort: mpsc::Sender<()>,
+    rcv_editor_out: mpsc::Receiver<editor::Result>,
 ) {
-    let mut event_stream = crossterm_event::EventStream::new();
+    let mut rcv_editor_out = rcv_editor_out.fuse();
+    let mut event_stream = crossterm::event::EventStream::new().fuse();
 
-    while let Some(mb_ev) = event_stream.next().await {
-        use tui::TUIRet::*;
-        match mb_ev {
-            Err(io_err) => {
-                debug!("term_input error: {:?}", io_err);
-                return;
+    loop {
+        select! {
+            in_ev = event_stream.next() => {
+                let abort = handle_input_event(&*tui, &mut snd_ev, &mut snd_abort, in_ev);
+                if abort {
+                    return;
+                }
             }
-            Ok(ev) => {
-                let tui_ret = tui.borrow_mut().handle_input_event(ev);
-                match tui_ret {
-                    Abort => {
-                        snd_ev.try_send(Event::Abort).unwrap();
-                        let _ = snd_abort.try_send(());
-                        return;
-                    }
-                    KeyHandled | KeyIgnored(_) | EventIgnored(_) => {}
-                    Input { msg, from } => {
-                        if msg[0] == '/' {
-                            // Handle TUI commands, send others to downstream
-                            let cmd: String = (&msg[1..]).iter().collect();
-                            let handled = tui.borrow_mut().try_handle_cmd(&cmd, &from);
-                            if !handled {
-                                snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap();
-                            }
-                        } else {
-                            snd_ev
-                                .try_send(Event::Msg {
-                                    msg: msg.into_iter().collect(),
-                                    source: from,
-                                })
-                                .unwrap();
+            editor_out = rcv_editor_out.next() => {
+                handle_editor_out(&*tui, editor_out);
+            }
+        }
+    }
+}
+
+fn handle_input_event(
+    tui: &RefCell<tui::TUI>,
+    snd_ev: &mut mpsc::Sender<Event>,
+    snd_abort: &mut mpsc::Sender<()>,
+    ev: Option<Result<crossterm::event::Event, crossterm::ErrorKind>>,
+) -> bool {
+    use tui::TUIRet::*;
+    match ev {
+        None => {
+            debug!("crossterm error: event stream terminated");
+            return true;
+        }
+        Some(Err(io_err)) => {
+            debug!("crossterm error: {:?}", io_err);
+            return true;
+        }
+        Some(Ok(ev)) => {
+            let tui_ret = tui.borrow_mut().handle_input_event(ev);
+            match tui_ret {
+                Abort => {
+                    snd_ev.try_send(Event::Abort).unwrap();
+                    let _ = snd_abort.try_send(());
+                    return true;
+                }
+                KeyHandled | KeyIgnored(_) | EventIgnored(_) => {}
+                Input { msg, from } => {
+                    if msg[0] == '/' {
+                        // Handle TUI commands, send others to downstream
+                        let cmd: String = (&msg[1..]).iter().collect();
+                        let handled = tui.borrow_mut().try_handle_cmd(&cmd, &from);
+                        if !handled {
+                            snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap();
                         }
-                    }
-                    Lines { lines, from } => {
+                    } else {
                         snd_ev
-                            .try_send(Event::Lines {
-                                lines,
+                            .try_send(Event::Msg {
+                                msg: msg.into_iter().collect(),
                                 source: from,
                             })
                             .unwrap();
                     }
                 }
+                Lines { lines, from } => {
+                    snd_ev
+                        .try_send(Event::Lines {
+                            lines,
+                            source: from,
+                        })
+                        .unwrap();
+                }
             }
         }
-        tui.borrow_mut().draw();
     }
+    tui.borrow_mut().draw();
+    false
 }
+
+fn handle_editor_out(tui: &RefCell<tui::TUI>, editor_out: Option<editor::Result>) {}
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {

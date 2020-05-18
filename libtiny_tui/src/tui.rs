@@ -18,6 +18,7 @@ use crate::{MsgSource, MsgTarget};
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use termbox_simple::Termbox;
+use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
@@ -63,18 +64,21 @@ pub(crate) struct TUI {
     statusline_visible: bool,
     /// Config file path
     config_path: Option<PathBuf>,
+    /// Channel to pass to editor threads for return events. See `editor` module for details.
+    snd_editor_out: mpsc::Sender<editor::Result>,
 }
 
 impl TUI {
-    pub(crate) fn new(config_path: PathBuf) -> TUI {
+    pub(crate) fn new(config_path: PathBuf, snd_editor_out: mpsc::Sender<editor::Result>) -> TUI {
         let tb = Termbox::init().unwrap(); // TODO: check errors
-        TUI::new_tb(Some(config_path), tb)
+        TUI::new_tb(Some(config_path), tb, snd_editor_out)
     }
 
     #[cfg(test)]
     pub(crate) fn new_test(w: u16, h: u16) -> TUI {
+        let (_, snd_editor_out) = mpsc::channel(1);
         let tb = Termbox::init_test(w, h);
-        TUI::new_tb(None, tb)
+        TUI::new_tb(None, tb, snd_editor_out)
     }
 
     #[cfg(test)]
@@ -82,7 +86,11 @@ impl TUI {
         &self.tb
     }
 
-    fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
+    fn new_tb(
+        config_path: Option<PathBuf>,
+        tb: Termbox,
+        snd_editor_out: mpsc::Sender<editor::Result>,
+    ) -> TUI {
         // This is now done in reload_config() below
         // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
 
@@ -100,6 +108,7 @@ impl TUI {
             show_statusline: false,
             statusline_visible: statusline_visible(width, height),
             config_path,
+            snd_editor_out,
         };
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
@@ -429,52 +438,29 @@ impl TUI {
         self.fix_scroll_after_close();
     }
 
-    pub(crate) async fn handle_input_event(&mut self, ev: Event) -> TUIRet {
+    pub(crate) fn handle_input_event(&mut self, ev: Event) -> TUIRet {
         match ev {
             Event::Key(key) => self.keypressed(key),
             ev => TUIRet::EventIgnored(ev),
         }
     }
 
-    async fn edit_input(&mut self) -> TUIRet {
+    // Result of edit will be returned asynchronously as an input event, so this doens't have a
+    // return value
+    fn edit_input(&mut self) {
         let tab = &mut self.tabs[self.active_idx].widget;
         let (text_field_contents, _) = tab.flush_input_field();
-        let editor_ret = editor::edit(&mut self.tb, &text_field_contents).await;
-        self.handle_editor_ret(editor_ret)
-    }
-
-    async fn paste_lines(&mut self, pasted_string: &str) -> TUIRet {
-        let tab = &mut self.tabs[self.active_idx].widget;
-        let (text_field_contents, text_field_cursor) = tab.flush_input_field();
-        let editor_ret = editor::paste_lines(
+        editor::edit(
             &mut self.tb,
-            text_field_contents,
-            text_field_cursor,
-            pasted_string,
-        )
-        .await;
-        self.handle_editor_ret(editor_ret)
+            &text_field_contents,
+            self.snd_editor_out.clone(),
+        );
     }
 
-    fn handle_editor_ret(&mut self, ret: Result<Vec<String>, editor::EditorError>) -> TUIRet {
+    fn handle_editor_ret(&mut self, ret: Result<(), editor::EditorError>) {
         let tab = &mut self.tabs[self.active_idx].widget;
         match ret {
-            Ok(lines) => {
-                // If there's only one line just add it to the input field, do not send it
-                if lines.len() == 1 {
-                    tab.set_input_field(&lines[0]);
-                    TUIRet::KeyHandled
-                } else {
-                    // Otherwise add the lines to text field history and send it
-                    for line in &lines {
-                        tab.add_input_field_history(line);
-                    }
-                    TUIRet::Lines {
-                        lines,
-                        from: self.tabs[self.active_idx].src.clone(),
-                    }
-                }
-            }
+            Ok(()) => {}
             Err(err) => {
                 use std::env::VarError;
                 match err {
@@ -486,28 +472,25 @@ impl TUI {
                     }
                     editor::EditorError::Var(VarError::NotPresent) => {
                         self.add_client_err_msg(
-                            "Can't paste multi-line string: \
-                             make sure your $EDITOR is set",
+                            "Can't run editor: make sure your $EDITOR is set",
                             &MsgTarget::CurrentTab,
                         );
                     }
                     editor::EditorError::Var(VarError::NotUnicode(_)) => {
                         self.add_client_err_msg(
-                            "Can't paste multi-line string: \
-                             can't parse $EDITOR (not unicode)",
+                            "Can't run editor: can't parse $EDITOR (not unicode)",
                             &MsgTarget::CurrentTab,
                         );
                     }
                 }
-                TUIRet::KeyHandled
             }
         }
     }
 
-    async fn keypressed(&mut self, key: KeyEvent) -> TUIRet {
+    fn keypressed(&mut self, key: KeyEvent) -> TUIRet {
         match self.tabs[self.active_idx].widget.keypressed(key) {
             WidgetRet::KeyHandled => TUIRet::KeyHandled,
-            WidgetRet::KeyIgnored => self.handle_keypress(key).await,
+            WidgetRet::KeyIgnored => self.handle_keypress(key),
             WidgetRet::Input(input) => TUIRet::Input {
                 msg: input,
                 from: self.tabs[self.active_idx].src.clone(),
@@ -530,7 +513,10 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => self.edit_input().await,
+            KeyCode::Char('x') if modifiers.contains(KeyModifiers::CONTROL) => {
+                self.edit_input();
+                TUIRet::KeyHandled
+            }
 
             KeyCode::Char(c) if modifiers.contains(KeyModifiers::ALT) => match c.to_digit(10) {
                 Some(i) => {
