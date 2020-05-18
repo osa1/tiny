@@ -1,18 +1,25 @@
 //! Implements C-x ("edit message in $EDITOR") support
 
+use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::process::{Command, ExitStatus};
 use std::thread::spawn;
 use termbox_simple::Termbox;
 use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-use tokio::task::{spawn_blocking, JoinHandle};
 
 #[derive(Debug)]
 pub(crate) enum EditorError {
     Io(::std::io::Error),
     Var(::std::env::VarError),
-    // Recv(oneshot::error::RecvError),
+}
+
+impl fmt::Display for EditorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EditorError::Io(err) => err.fmt(f),
+            EditorError::Var(err) => err.fmt(f),
+        }
+    }
 }
 
 impl From<::std::io::Error> for EditorError {
@@ -26,14 +33,6 @@ impl From<::std::env::VarError> for EditorError {
         EditorError::Var(err)
     }
 }
-
-/*
-impl From<oneshot::error::RecvError> for EditorError {
-    fn from(err: oneshot::error::RecvError) -> EditorError {
-        EditorError::Recv(err)
-    }
-}
-*/
 
 pub(crate) type Result = std::result::Result<Vec<String>, EditorError>;
 
@@ -61,7 +60,7 @@ pub(crate) fn edit(tb: &mut Termbox, contents: &str, mut snd_editor_out: mpsc::S
 
     // TODO: Document the idea
 
-    tb.suspend();
+    tb.suspend(); // activated later in `handle_editor_out`
     spawn(move || {
         let ret: std::result::Result<ExitStatus, std::io::Error> =
             Command::new(editor).arg(tmp_file.path()).status();
@@ -108,6 +107,6 @@ pub(crate) fn edit(tb: &mut Termbox, contents: &str, mut snd_editor_out: mpsc::S
             }
         }
 
-        snd_editor_out.try_send(Ok(filtered_lines));
+        snd_editor_out.try_send(Ok(filtered_lines)).unwrap();
     });
 }

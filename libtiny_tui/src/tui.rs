@@ -445,6 +445,58 @@ impl TUI {
         }
     }
 
+    pub(crate) fn handle_editor_out(&mut self, editor_out: Option<editor::Result>) -> TUIRet {
+        self.tb.activate();
+        use std::env::VarError;
+        match editor_out {
+            None => {
+                self.add_client_err_msg(
+                    "Error while running $EDITOR: editor thread terminated unexpectedly",
+                    &MsgTarget::CurrentTab,
+                );
+                TUIRet::KeyHandled
+            }
+            Some(Err(editor::EditorError::Io(err))) => {
+                self.add_client_err_msg(
+                    &format!("Error while running $EDITOR: {:?}", err),
+                    &MsgTarget::CurrentTab,
+                );
+                TUIRet::KeyHandled
+            }
+            Some(Err(editor::EditorError::Var(VarError::NotPresent))) => {
+                self.add_client_err_msg(
+                    "Can't run editor: make sure your $EDITOR is set",
+                    &MsgTarget::CurrentTab,
+                );
+                TUIRet::KeyHandled
+            }
+            Some(Err(editor::EditorError::Var(VarError::NotUnicode(_)))) => {
+                self.add_client_err_msg(
+                    "Can't run editor: can't parse $EDITOR (not unicode)",
+                    &MsgTarget::CurrentTab,
+                );
+                TUIRet::KeyHandled
+            }
+            Some(Ok(lines)) => {
+                let tab = &mut self.tabs[self.active_idx].widget;
+                // If there's only one line just add it to the input field, do not send it
+                if lines.len() == 1 {
+                    tab.set_input_field(&lines[0]);
+                    TUIRet::KeyHandled
+                } else {
+                    // Otherwise add the lines to text field history and send it
+                    for line in &lines {
+                        tab.add_input_field_history(line);
+                    }
+                    TUIRet::Lines {
+                        lines,
+                        from: self.tabs[self.active_idx].src.clone(),
+                    }
+                }
+            }
+        }
+    }
+
     // Result of edit will be returned asynchronously as an input event, so this doens't have a
     // return value
     fn edit_input(&mut self) {
@@ -455,36 +507,6 @@ impl TUI {
             &text_field_contents,
             self.snd_editor_out.clone(),
         );
-    }
-
-    fn handle_editor_ret(&mut self, ret: Result<(), editor::EditorError>) {
-        let tab = &mut self.tabs[self.active_idx].widget;
-        match ret {
-            Ok(()) => {}
-            Err(err) => {
-                use std::env::VarError;
-                match err {
-                    editor::EditorError::Io(err) => {
-                        self.add_client_err_msg(
-                            &format!("Error while running $EDITOR: {:?}", err),
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    editor::EditorError::Var(VarError::NotPresent) => {
-                        self.add_client_err_msg(
-                            "Can't run editor: make sure your $EDITOR is set",
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    editor::EditorError::Var(VarError::NotUnicode(_)) => {
-                        self.add_client_err_msg(
-                            "Can't run editor: can't parse $EDITOR (not unicode)",
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                }
-            }
-        }
     }
 
     fn keypressed(&mut self, key: KeyEvent) -> TUIRet {

@@ -115,7 +115,7 @@ async fn input_handler(
                 }
             }
             editor_out = rcv_editor_out.next() => {
-                handle_editor_out(&*tui, editor_out);
+                handle_editor_out(&*tui, &mut snd_ev, editor_out);
             }
         }
     }
@@ -178,7 +178,21 @@ fn handle_input_event(
     false
 }
 
-fn handle_editor_out(tui: &RefCell<tui::TUI>, editor_out: Option<editor::Result>) {}
+fn handle_editor_out(
+    tui: &RefCell<tui::TUI>,
+    snd_ev: &mut mpsc::Sender<Event>,
+    editor_out: Option<editor::Result>,
+) {
+    let ret = tui.borrow_mut().handle_editor_out(editor_out);
+    if let tui::TUIRet::Lines { lines, from } = ret {
+        snd_ev
+            .try_send(Event::Lines {
+                lines,
+                source: from,
+            })
+            .unwrap();
+    }
+}
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
