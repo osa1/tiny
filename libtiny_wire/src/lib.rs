@@ -216,9 +216,9 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 
 /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
 /// Otherwise the buffer is left unchanged.
-pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
-    // find "\r\n" separator. `IntoSearcher` implementation for slice needs `str` (why??) so
-    // using this hacky method instead.
+pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Result<Msg, String>> {
+    // Find "\r\n" separator. We can't do this *after* generating the lossy UTF-8, as that may have
+    // different size than the original buffer after inserting "REPLACEMENT CHARACTER"s.
     let crlf_idx = {
         match buf.windows(2).position(|sub| sub == CRLF) {
             None => return None,
@@ -226,23 +226,27 @@ pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Msg> {
         }
     };
 
-    let ret = parse_one_message(&buf[0..crlf_idx]);
+    let msg_owned: String = String::from_utf8_lossy(&buf[0..crlf_idx]).to_string();
+    let msg: &str = &msg_owned;
 
+    let ret = parse_one_message(msg);
     buf.drain(0..crlf_idx + 2);
 
     Some(ret)
 }
 
-// NB. does not include '\r\n' suffix.
-fn parse_one_message(mut msg: &[u8]) -> Msg {
+// NB. 'msg' does not contain '\r\n' suffix.
+fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
     let pfx: Option<Pfx> = {
-        if msg[0] == b':' {
+        if let Some(':') = msg.chars().next() {
             // parse prefix
-            let ws_idx = find_byte(msg, b' ').unwrap();
-            let (mut pfx, slice_) = msg.split_at(ws_idx);
+            let ws_idx = msg.find(' ').ok_or(format!(
+                "Can't find prefix terminator (' ') in msg: {:?}",
+                msg
+            ))?;
             // drop the : from pfx
-            pfx = &pfx[1..];
-            msg = &slice_[1..]; // drop the space
+            let pfx = &msg[1..ws_idx];
+            msg = &msg[ws_idx + 1..]; // drop the space
             Some(parse_pfx(pfx))
         } else {
             None
@@ -250,20 +254,19 @@ fn parse_one_message(mut msg: &[u8]) -> Msg {
     };
 
     let msg_ty: MsgType = {
-        let ws_idx = find_byte(msg, b' ').unwrap();
-        let (cmd, slice_) = msg.split_at(ws_idx);
-        msg = &slice_[1..]; // drop the space
-        match parse_reply_num(cmd) {
-            None => MsgType::Cmd(unsafe {
-                // Cmd strings are added by the server and they're always ASCII strings, so
-                // this is safe and O(1).
-                str::from_utf8_unchecked(cmd)
-            }),
-            Some(num) => MsgType::Num(num),
+        let ws_idx = msg.find(' ').ok_or(format!(
+            "Can't find message type terminator (' ') in msg: {:?}",
+            msg
+        ))?;
+        let cmd = &msg[..ws_idx];
+        msg = &msg[ws_idx + 1..];
+        match cmd.parse::<u16>() {
+            Ok(num) => MsgType::Num(num),
+            Err(_) => MsgType::Cmd(cmd),
         }
     };
 
-    let params: Vec<&str> = parse_params(unsafe { str::from_utf8_unchecked(msg) });
+    let params: Vec<&str> = parse_params(msg);
     let cmd = match msg_ty {
         MsgType::Cmd("PRIVMSG") | MsgType::Cmd("NOTICE") if params.len() == 2 => {
             let is_notice = if let MsgType::Cmd("NOTICE") = msg_ty {
@@ -372,35 +375,17 @@ fn parse_one_message(mut msg: &[u8]) -> Msg {
         },
     };
 
-    Msg { pfx, cmd }
+    Ok(Msg { pfx, cmd })
 }
 
-fn parse_pfx(pfx: &[u8]) -> Pfx {
-    match find_byte(pfx, b'!') {
-        None => Pfx::Server(unsafe { str::from_utf8_unchecked(pfx).to_owned() }),
+fn parse_pfx(pfx: &str) -> Pfx {
+    match pfx.find('!') {
+        None => Pfx::Server(pfx.to_owned()),
         Some(idx) => Pfx::User {
-            nick: unsafe { str::from_utf8_unchecked(&pfx[0..idx]) }.to_owned(),
-            user: unsafe { str::from_utf8_unchecked(&pfx[idx + 1..]) }.to_owned(),
+            nick: (&pfx[0..idx]).to_owned(),
+            user: (&pfx[idx + 1..]).to_owned(),
         },
     }
-}
-
-fn parse_reply_num(bs: &[u8]) -> Option<u16> {
-    fn is_num_ascii(b: u8) -> bool {
-        b >= b'0' && b <= b'9'
-    }
-
-    if bs.len() == 3 {
-        let n3 = bs[0];
-        let n2 = bs[1];
-        let n1 = bs[2];
-        if is_num_ascii(n3) && is_num_ascii(n2) && is_num_ascii(n1) {
-            return Some(
-                u16::from(n3 - b'0') * 100 + u16::from(n2 - b'0') * 10 + u16::from(n1 - b'0'),
-            );
-        }
-    }
-    None
 }
 
 fn parse_params(chrs: &str) -> Vec<&str> {
@@ -411,28 +396,19 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     let mut slice_begins = 0;
     for (char_idx, char) in chrs.char_indices() {
         if char == ':' {
-            ret.push(unsafe { chrs.get_unchecked(char_idx + 1..chrs.len()) });
+            ret.push(&chrs[char_idx + 1..chrs.len()]);
             return ret;
         } else if char == ' ' {
-            ret.push(unsafe { chrs.get_unchecked(slice_begins..char_idx) });
+            ret.push(&chrs[slice_begins..char_idx]);
             slice_begins = char_idx + 1;
         }
     }
 
     if slice_begins != chrs.len() {
-        ret.push(unsafe { chrs.get_unchecked(slice_begins..chrs.len()) });
+        ret.push(&chrs[slice_begins..chrs.len()]);
     }
 
     ret
-}
-
-pub fn find_byte(buf: &[u8], byte0: u8) -> Option<usize> {
-    for (byte_idx, byte) in buf.iter().enumerate() {
-        if *byte == byte0 {
-            return Some(byte_idx);
-        }
-    }
-    None
 }
 
 /// Nicks may have prefixes, indicating it is a operator, founder, or something else.
@@ -473,8 +449,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf),
-            Some(Msg {
+            parse_irc_msg(&mut buf).unwrap().unwrap(),
+            Msg {
                 pfx: Some(Pfx::User {
                     nick: "nick".to_owned(),
                     user: "~nick@unaffiliated/nick".to_owned(),
@@ -485,7 +461,7 @@ mod tests {
                     is_notice: false,
                     ctcp: None,
                 },
-            })
+            }
         );
         assert_eq!(buf.len(), 0);
     }
@@ -499,8 +475,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf),
-            Some(Msg {
+            parse_irc_msg(&mut buf).unwrap().unwrap(),
+            Msg {
                 pfx: Some(Pfx::Server("barjavel.freenode.net".to_owned())),
                 cmd: Cmd::PRIVMSG {
                     target: MsgTarget::User("*".to_owned()),
@@ -508,7 +484,7 @@ mod tests {
                     is_notice: true,
                     ctcp: None,
                 },
-            })
+            }
         );
     }
 
@@ -553,8 +529,8 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@123.123.123.123 PART #haskell\r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf),
-            Some(Msg {
+            parse_irc_msg(&mut buf).unwrap().unwrap(),
+            Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
                     user: "~tiny@123.123.123.123".to_owned(),
@@ -563,7 +539,7 @@ mod tests {
                     chan: "#haskell".to_owned(),
                     msg: None,
                 },
-            })
+            }
         );
     }
 
@@ -572,8 +548,8 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":tiny!~tiny@192.168.0.1 JOIN #haskell\r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf),
-            Some(Msg {
+            parse_irc_msg(&mut buf).unwrap().unwrap(),
+            Msg {
                 pfx: Some(Pfx::User {
                     nick: "tiny".to_owned(),
                     user: "~tiny@192.168.0.1".to_owned(),
@@ -581,7 +557,7 @@ mod tests {
                 cmd: Cmd::JOIN {
                     chan: "#haskell".to_owned(),
                 },
-            })
+            }
         );
         assert_eq!(buf.len(), 0);
     }
@@ -596,8 +572,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf),
-            Some(Msg {
+            parse_irc_msg(&mut buf).unwrap().unwrap(),
+            Msg {
                 pfx: Some(Pfx::User {
                     nick: "dan".to_owned(),
                     user: "u@localhost".to_owned(),
@@ -608,7 +584,7 @@ mod tests {
                     is_notice: false,
                     ctcp: Some(CTCP::Action),
                 },
-            })
+            }
         );
         assert_eq!(buf.len(), 0);
     }
@@ -627,7 +603,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf).unwrap().cmd,
+            parse_irc_msg(&mut buf).unwrap().unwrap().cmd,
             Cmd::PRIVMSG {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "msg contents".to_owned(),
@@ -640,7 +616,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":a!b@c PRIVMSG target :\x01ACTION \r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf).unwrap().cmd,
+            parse_irc_msg(&mut buf).unwrap().unwrap().cmd,
             Cmd::PRIVMSG {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "".to_owned(),
@@ -655,7 +631,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":a!b@c PRIVMSG target :’’’’’’’\r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf).unwrap().cmd,
+            parse_irc_msg(&mut buf).unwrap().unwrap().cmd,
             Cmd::PRIVMSG {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "’’’’’’’".to_owned(),
@@ -671,7 +647,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":a!b@c PRIVMSG target :\x01VERSION\x01\r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf).unwrap().cmd,
+            parse_irc_msg(&mut buf).unwrap().unwrap().cmd,
             Cmd::PRIVMSG {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "".to_owned(),
@@ -683,7 +659,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":a!b@c PRIVMSG target :\x01VERSION \x01\r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf).unwrap().cmd,
+            parse_irc_msg(&mut buf).unwrap().unwrap().cmd,
             Cmd::PRIVMSG {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "".to_owned(),
@@ -698,7 +674,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":a!b@c PRIVMSG target :\x01blah blah \x01\r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf).unwrap().cmd,
+            parse_irc_msg(&mut buf).unwrap().unwrap().cmd,
             Cmd::PRIVMSG {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "blah ".to_owned(),
@@ -710,7 +686,7 @@ mod tests {
         let mut buf = vec![];
         write!(&mut buf, ":a!b@c PRIVMSG target :\x01blah blah \r\n").unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf).unwrap().cmd,
+            parse_irc_msg(&mut buf).unwrap().unwrap().cmd,
             Cmd::PRIVMSG {
                 target: MsgTarget::User("target".to_owned()),
                 msg: "blah ".to_owned(),
@@ -729,13 +705,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            parse_irc_msg(&mut buf),
-            Some(Msg {
+            parse_irc_msg(&mut buf).unwrap().unwrap(),
+            Msg {
                 pfx: None,
                 cmd: Cmd::ERROR {
                     msg: "Closing Link: 212.252.143.51 (Excess Flood)".to_owned(),
                 },
-            }),
+            },
         );
     }
 }

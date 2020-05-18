@@ -3,7 +3,7 @@
 use crate::utils;
 use crate::{Event, ServerInfo};
 use libtiny_wire as wire;
-use libtiny_wire::{find_byte, Msg, Pfx};
+use libtiny_wire::{Msg, Pfx};
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -253,7 +253,7 @@ impl StateInner {
                 // Example args: ["osa1", "osa1=+omer@moz-s8a.9ac.93.91.IP "]
 
                 let param = &params[1];
-                match find_byte(param.as_bytes(), b'=') {
+                match param.find('=') {
                     None => {
                         // TODO: Log this
                     }
@@ -501,8 +501,7 @@ impl StateInner {
 fn parse_servername(params: &[String]) -> Option<String> {
     let msg = params.get(1).or_else(|| params.get(0))?;
     let slice1 = &msg[13..];
-    let servername_ends =
-        find_byte(slice1.as_bytes(), b'[').or_else(|| find_byte(slice1.as_bytes(), b','))?;
+    let servername_ends = slice1.find('[').or_else(|| slice1.find(','))?;
     Some((&slice1[..servername_ends]).to_owned())
 }
 

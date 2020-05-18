@@ -102,6 +102,15 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) {
         Msg(msg) => {
             handle_irc_msg(ui, client, msg);
         }
+        WireError(err) => {
+            ui.add_err_msg(
+                &format!("Wire protocol error: {}", err),
+                time::now(),
+                &MsgTarget::Server {
+                    serv: client.get_serv_name(),
+                },
+            );
+        }
     }
 }
 

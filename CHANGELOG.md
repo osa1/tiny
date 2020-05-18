@@ -17,6 +17,7 @@
 - Fixed a panic when a nick list of a server or the default nick list is empty.
   (#184)
 - tiny now has a proper CLI, supporting `--help` and `--version` arguments.
+- Fixed handling of invalid UTF-8 sequences in messages. (#194)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls

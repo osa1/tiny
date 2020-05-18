@@ -98,6 +98,8 @@ pub enum Event {
     NickChange(String),
     /// A message from the server
     Msg(wire::Msg),
+    /// A wire-protocol error
+    WireError(String),
 }
 
 impl From<StreamError> for Event {
@@ -490,11 +492,18 @@ async fn main_loop(
                         }
                         Ok(bytes) => {
                             parse_buf.extend_from_slice(&read_buf[0..bytes]);
-                            while let Some(mut msg) = wire::parse_irc_msg(&mut parse_buf) {
-                                debug!("parsed msg: {:?}", msg);
-                                pinger.reset();
-                                irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
-                                snd_ev.send(Event::Msg(msg)).await.unwrap();
+                            while let Some(msg) = wire::parse_irc_msg(&mut parse_buf) {
+                                match msg {
+                                    Err(err) => {
+                                        snd_ev.send(Event::WireError(err)).await.unwrap();
+                                    }
+                                    Ok(mut msg) => {
+                                        debug!("parsed msg: {:?}", msg);
+                                        pinger.reset();
+                                        irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
+                                        snd_ev.send(Event::Msg(msg)).await.unwrap();
+                                    }
+                                }
                             }
                         }
                     }
