@@ -2,7 +2,7 @@
 name = "termbox_simple"
 version = "0.2.3"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
-description = "A hacked version of termbox (see README)"
+description = "An implementation of termbox API"
 repository = "https://github.com/osa1/tiny"
 license = "MIT"
 edition = "2018"
