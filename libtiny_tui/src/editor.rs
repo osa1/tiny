@@ -1,6 +1,5 @@
 //! Implements C-x ("edit message in $EDITOR") support
 
-use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::process::{Command, ExitStatus};
 use std::thread::spawn;

@@ -76,7 +76,7 @@ impl TUI {
 
     #[cfg(test)]
     pub(crate) fn new_test(w: u16, h: u16) -> TUI {
-        let (_, snd_editor_out) = mpsc::channel(1);
+        let (snd_editor_out, _) = mpsc::channel(1);
         let tb = Termbox::init_test(w, h);
         TUI::new_tb(None, tb, snd_editor_out)
     }
