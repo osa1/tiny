@@ -13,15 +13,6 @@ pub(crate) enum EditorError {
     Var(::std::env::VarError),
 }
 
-impl fmt::Display for EditorError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EditorError::Io(err) => err.fmt(f),
-            EditorError::Var(err) => err.fmt(f),
-        }
-    }
-}
-
 impl From<::std::io::Error> for EditorError {
     fn from(err: ::std::io::Error) -> EditorError {
         EditorError::Io(err)
