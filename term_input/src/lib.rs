@@ -5,6 +5,9 @@
 //! Keyboard events are read from stdin. We look for byte strings of key combinations that we care
 //! about. E.g. Alt-arrow keys, C-w etc.
 
+#[cfg(test)]
+mod tests;
+
 use std::char;
 use std::collections::VecDeque;
 use std::pin::Pin;
@@ -196,15 +199,15 @@ impl Stream for Input {
             let mut buf_slice: &[u8] = &self_.buf;
 
             while !buf_slice.is_empty() {
-                // Special treatment for 127 (backspace) and 13 ('\r')
+                // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD)
                 let fst = buf_slice[0];
-                let read_fn = if (fst < 32 && fst != 13) || fst == 127 {
-                    read_key_comb
+                let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
+                    parse_key_comb
                 } else {
-                    read_chars
+                    parse_chars
                 };
 
-                match read_fn(buf_slice, &mut self_.evs) {
+                match parse_fn(buf_slice, &mut self_.evs) {
                     Some(buf_slice_) => {
                         buf_slice = buf_slice_;
                     }
@@ -242,7 +245,15 @@ impl Stream for Input {
     }
 }
 
-fn read_chars<'a>(mut buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<&'a [u8]> {
+#[cfg(test)]
+pub(crate) fn parse_chars_<'a>(
+    buf_slice: &'a [u8],
+    evs: &mut VecDeque<Event>,
+) -> Option<&'a [u8]> {
+    parse_chars(buf_slice, evs)
+}
+
+fn parse_chars<'a>(mut buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<&'a [u8]> {
     debug_assert!(!buf_slice.is_empty());
 
     // Use a fast path for the common case: Single utf-8 character.
@@ -276,10 +287,17 @@ fn read_chars<'a>(mut buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<
     })
 }
 
-fn read_key_comb<'a>(buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<&'a [u8]> {
+#[cfg(test)]
+pub(crate) fn parse_key_comb_<'a>(
+    buf_slice: &'a [u8],
+    evs: &mut VecDeque<Event>,
+) -> Option<&'a [u8]> {
+    parse_key_comb(buf_slice, evs)
+}
+
+fn parse_key_comb<'a>(buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<&'a [u8]> {
     debug_assert!(!buf_slice.is_empty());
 
-    // TODO: This is not working, see https://github.com/rust-lang/rust/issues/36401
     for &(byte, ref ev) in XTERM_SINGLE_BYTES.iter() {
         if byte == buf_slice[0] {
             evs.push_back(ev.clone());
