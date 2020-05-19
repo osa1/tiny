@@ -97,8 +97,9 @@ static XTERM_HOME: [u8; 3] = [27, 91, 72];
 static XTERM_END: [u8; 3] = [27, 91, 70];
 static XTERM_HOME_2: [u8; 3] = [27, 79, 72];
 static XTERM_END_2: [u8; 3] = [27, 79, 70];
+static XTERM_END_3: [u8; 4] = [27, 91, 52, 126];
 
-static XTERM_KEY_SEQS: [(&[u8], Event); 27] = [
+static XTERM_KEY_SEQS: [(&[u8], Event); 28] = [
     (
         &XTERM_ALT_ARROW_DOWN,
         Event::Key(Key::AltArrow(Arrow::Down)),
@@ -142,6 +143,7 @@ static XTERM_KEY_SEQS: [(&[u8], Event); 27] = [
     (&XTERM_END, Event::Key(Key::End)),
     (&XTERM_HOME_2, Event::Key(Key::Home)),
     (&XTERM_END_2, Event::Key(Key::End)),
+    (&XTERM_END_3, Event::Key(Key::End)),
     (&XTERM_FOCUS_GAINED, Event::FocusGained),
     (&XTERM_FOCUS_LOST, Event::FocusLost),
 ];
@@ -188,10 +190,7 @@ impl Input {
 impl Stream for Input {
     type Item = std::io::Result<Event>;
 
-    fn poll_next(
-        mut self: Pin<&mut Input>,
-        cx: &mut Context,
-    ) -> Poll<Option<std::io::Result<Event>>> {
+    fn poll_next(mut self: Pin<&mut Input>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         let self_: &mut Input = &mut *self;
 
         // Try to parse any bytes in the input buffer from the last poll
@@ -207,9 +206,10 @@ impl Stream for Input {
                     parse_chars
                 };
 
-                match parse_fn(buf_slice, &mut self_.evs) {
-                    Some(buf_slice_) => {
-                        buf_slice = buf_slice_;
+                match parse_fn(buf_slice) {
+                    Some((ev, used)) => {
+                        buf_slice = &buf_slice[used..];
+                        self_.evs.push_back(ev);
                     }
                     None => {
                         self_.evs.push_back(Event::Unknown(buf_slice.to_owned()));
@@ -246,87 +246,86 @@ impl Stream for Input {
 }
 
 #[cfg(test)]
-pub(crate) fn parse_chars_<'a>(
-    buf_slice: &'a [u8],
-    evs: &mut VecDeque<Event>,
-) -> Option<&'a [u8]> {
-    parse_chars(buf_slice, evs)
+pub(crate) fn parse_single_event(buf: &[u8]) -> Event {
+    let fst = buf[0];
+    let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
+        parse_key_comb
+    } else {
+        parse_chars
+    };
+
+    let (ev, used) = match parse_fn(buf) {
+        Some((ev, used)) => (ev, used),
+        None => (Event::Unknown(buf.to_owned()), buf.len()),
+    };
+
+    assert_eq!(buf.len(), used);
+
+    ev
 }
 
-fn parse_chars<'a>(mut buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<&'a [u8]> {
-    debug_assert!(!buf_slice.is_empty());
+fn parse_chars(buf: &[u8]) -> Option<(Event, usize)> {
+    debug_assert!(!buf.is_empty());
 
     // Use a fast path for the common case: Single utf-8 character.
     // (TODO: What about other encodings?)
 
-    utf8_char_len(buf_slice[0]).map(|char_len| {
-        if char_len as usize == buf_slice.len() {
-            // fast path: single character
-            evs.push_back(Event::Key(Key::Char(get_utf8_char(buf_slice, char_len))));
-            &buf_slice[char_len as usize..]
+    utf8_char_len(buf[0]).map(|char_len| {
+        if char_len as usize == buf.len() {
+            // Fast path: single character
+            let ev = Event::Key(Key::Char(get_utf8_char(buf, char_len)));
+            (ev, char_len as usize)
         } else {
-            // probably a paste: allocate a string and collect chars
-            let mut string = String::with_capacity(10);
+            // Probably a paste: allocate a string and collect chars
+            let mut string = String::with_capacity(1000);
+            let mut start_idx = 0;
             loop {
-                if buf_slice.is_empty() {
+                if start_idx == buf.len() {
                     break;
                 }
-                match utf8_char_len(buf_slice[0]) {
+                match utf8_char_len(buf[start_idx]) {
                     Some(char_len) => {
-                        string.push(get_utf8_char(buf_slice, char_len));
-                        buf_slice = &buf_slice[char_len as usize..];
+                        string.push(get_utf8_char(&buf[start_idx..], char_len));
+                        start_idx += char_len as usize;
                     }
                     None => {
                         break;
                     }
                 }
             }
-            evs.push_back(Event::String(string));
-            buf_slice
+            let ev = Event::String(string);
+            (ev, start_idx)
         }
     })
 }
 
-#[cfg(test)]
-pub(crate) fn parse_key_comb_<'a>(
-    buf_slice: &'a [u8],
-    evs: &mut VecDeque<Event>,
-) -> Option<&'a [u8]> {
-    parse_key_comb(buf_slice, evs)
-}
-
-fn parse_key_comb<'a>(buf_slice: &'a [u8], evs: &mut VecDeque<Event>) -> Option<&'a [u8]> {
-    debug_assert!(!buf_slice.is_empty());
+fn parse_key_comb(buf: &[u8]) -> Option<(Event, usize)> {
+    debug_assert!(!buf.is_empty());
 
     for &(byte, ref ev) in XTERM_SINGLE_BYTES.iter() {
-        if byte == buf_slice[0] {
-            evs.push_back(ev.clone());
-            return Some(&buf_slice[1..]);
+        if byte == buf[0] {
+            return Some((ev.clone(), 1));
         }
     }
 
     for &(byte_seq, ref ev) in XTERM_KEY_SEQS.iter() {
-        if buf_slice.starts_with(byte_seq) {
-            evs.push_back(ev.clone());
-            return Some(&buf_slice[byte_seq.len()..]);
+        if buf.starts_with(byte_seq) {
+            return Some((ev.clone(), byte_seq.len()));
         }
     }
 
-    if buf_slice[0] == 27 {
+    if buf[0] == 27 {
+        // 0x1B, ESC
         // 27 not followed by anything is an actual ESC
-        if buf_slice.len() == 1 {
-            evs.push_back(Event::Key(Key::Esc));
-            return Some(&buf_slice[1..]);
+        if buf.len() == 1 {
+            return Some((Event::Key(Key::Esc), 1));
         }
         // otherwise it's probably alt + key
         else {
-            debug_assert!(buf_slice.len() >= 2);
-            return utf8_char_len(buf_slice[1]).map(|char_len| {
-                evs.push_back(Event::Key(Key::AltChar(get_utf8_char(
-                    &buf_slice[1..],
-                    char_len,
-                ))));
-                &buf_slice[char_len as usize + 1..]
+            debug_assert!(buf.len() >= 2);
+            return utf8_char_len(buf[1]).map(|char_len| {
+                let ev = Event::Key(Key::AltChar(get_utf8_char(&buf[1..], char_len)));
+                (ev, char_len as usize + 1)
             });
         }
     }
