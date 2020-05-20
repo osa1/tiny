@@ -16,6 +16,8 @@ use std::task::{Context, Poll};
 use futures::stream::Stream;
 use tokio::io::PollEvented;
 
+use term_input_macros::byte_seq_parser;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public types
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,114 +58,65 @@ pub enum Event {
     /// Usually a paste.
     String(String),
 
-    FocusGained,
-    FocusLost,
-
+    // These are not generated anymore. I needed these for a feature, but never really got around
+    // implementing it.
+    // FocusGained,
+    // FocusLost,
     /// An unknown sequence of bytes (probably for a key combination that we don't care about).
     Unknown(Vec<u8>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Byte sequences of key pressed we want to capture
-// (TODO: We only support xterm for now)
+// Byte sequences of key presses we want to capture
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static XTERM_ALT_ARROW_DOWN: [u8; 6] = [27, 91, 49, 59, 51, 66];
-static XTERM_ALT_ARROW_LEFT: [u8; 6] = [27, 91, 49, 59, 51, 68];
-static XTERM_ALT_ARROW_RIGHT: [u8; 6] = [27, 91, 49, 59, 51, 67];
-static XTERM_ALT_ARROW_UP: [u8; 6] = [27, 91, 49, 59, 51, 65];
-static XTERM_ARROW_DOWN: [u8; 3] = [27, 91, 66];
-static XTERM_ARROW_DOWN_2: [u8; 3] = [27, 79, 66];
-static XTERM_ARROW_LEFT: [u8; 3] = [27, 91, 68];
-static XTERM_ARROW_LEFT_2: [u8; 3] = [27, 79, 68];
-static XTERM_ARROW_RIGHT: [u8; 3] = [27, 91, 67];
-static XTERM_ARROW_RIGHT_2: [u8; 3] = [27, 79, 67];
-static XTERM_ARROW_UP: [u8; 3] = [27, 91, 65];
-static XTERM_ARROW_UP_2: [u8; 3] = [27, 79, 65];
-static XTERM_CTRL_ARROW_DOWN: [u8; 6] = [27, 91, 49, 59, 53, 66];
-static XTERM_CTRL_ARROW_LEFT: [u8; 6] = [27, 91, 49, 59, 53, 68];
-static XTERM_CTRL_ARROW_RIGHT: [u8; 6] = [27, 91, 49, 59, 53, 67];
-static XTERM_CTRL_ARROW_UP: [u8; 6] = [27, 91, 49, 59, 53, 65];
-static XTERM_DEL: [u8; 4] = [27, 91, 51, 126];
-static XTERM_PAGE_DOWN: [u8; 4] = [27, 91, 54, 126];
-static XTERM_PAGE_UP: [u8; 4] = [27, 91, 53, 126];
-static XTERM_SHIFT_UP: [u8; 6] = [27, 91, 49, 59, 50, 65];
-static XTERM_SHIFT_DOWN: [u8; 6] = [27, 91, 49, 59, 50, 66];
-static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];
-static XTERM_FOCUS_LOST: [u8; 3] = [27, 91, 79];
-// FIXME: For some reason term_input test program gets first two of these bytes while tiny gets the
-// latter two. Tried to debug this a little bit by changing termattrs but no luck...
-static XTERM_HOME: [u8; 3] = [27, 91, 72];
-static XTERM_END: [u8; 3] = [27, 91, 70];
-static XTERM_HOME_2: [u8; 3] = [27, 79, 72];
-static XTERM_END_2: [u8; 3] = [27, 79, 70];
-static XTERM_END_3: [u8; 4] = [27, 91, 52, 126];
+byte_seq_parser! {
+    parse_key_bytes -> Key, // Function name. Generation function type is
+                            // fn(&[u8]) -> Option<(Key, usize)>.
 
-static XTERM_KEY_SEQS: [(&[u8], Event); 28] = [
-    (
-        &XTERM_ALT_ARROW_DOWN,
-        Event::Key(Key::AltArrow(Arrow::Down)),
-    ),
-    (
-        &XTERM_ALT_ARROW_LEFT,
-        Event::Key(Key::AltArrow(Arrow::Left)),
-    ),
-    (
-        &XTERM_ALT_ARROW_RIGHT,
-        Event::Key(Key::AltArrow(Arrow::Right)),
-    ),
-    (&XTERM_ALT_ARROW_UP, Event::Key(Key::AltArrow(Arrow::Up))),
-    (&XTERM_ARROW_DOWN, Event::Key(Key::Arrow(Arrow::Down))),
-    (&XTERM_ARROW_DOWN_2, Event::Key(Key::Arrow(Arrow::Down))),
-    (&XTERM_ARROW_LEFT, Event::Key(Key::Arrow(Arrow::Left))),
-    (&XTERM_ARROW_LEFT_2, Event::Key(Key::Arrow(Arrow::Left))),
-    (&XTERM_ARROW_RIGHT, Event::Key(Key::Arrow(Arrow::Right))),
-    (&XTERM_ARROW_RIGHT_2, Event::Key(Key::Arrow(Arrow::Right))),
-    (&XTERM_ARROW_UP, Event::Key(Key::Arrow(Arrow::Up))),
-    (&XTERM_ARROW_UP_2, Event::Key(Key::Arrow(Arrow::Up))),
-    (
-        &XTERM_CTRL_ARROW_DOWN,
-        Event::Key(Key::CtrlArrow(Arrow::Down)),
-    ),
-    (
-        &XTERM_CTRL_ARROW_LEFT,
-        Event::Key(Key::CtrlArrow(Arrow::Left)),
-    ),
-    (
-        &XTERM_CTRL_ARROW_RIGHT,
-        Event::Key(Key::CtrlArrow(Arrow::Right)),
-    ),
-    (&XTERM_CTRL_ARROW_UP, Event::Key(Key::CtrlArrow(Arrow::Up))),
-    (&XTERM_DEL, Event::Key(Key::Del)),
-    (&XTERM_PAGE_DOWN, Event::Key(Key::PageDown)),
-    (&XTERM_PAGE_UP, Event::Key(Key::PageUp)),
-    (&XTERM_SHIFT_UP, Event::Key(Key::ShiftUp)),
-    (&XTERM_SHIFT_DOWN, Event::Key(Key::ShiftDown)),
-    (&XTERM_HOME, Event::Key(Key::Home)),
-    (&XTERM_END, Event::Key(Key::End)),
-    (&XTERM_HOME_2, Event::Key(Key::Home)),
-    (&XTERM_END_2, Event::Key(Key::End)),
-    (&XTERM_END_3, Event::Key(Key::End)),
-    (&XTERM_FOCUS_GAINED, Event::FocusGained),
-    (&XTERM_FOCUS_LOST, Event::FocusLost),
-];
+    [27, 91, 49, 59, 51, 66] => Key::AltArrow(Arrow::Down),
+    [27, 91, 49, 59, 51, 68] => Key::AltArrow(Arrow::Left),
+    [27, 91, 49, 59, 51, 67] => Key::AltArrow(Arrow::Right),
+    [27, 91, 49, 59, 51, 65] => Key::AltArrow(Arrow::Up),
+    [27, 91, 66] => Key::Arrow(Arrow::Down),
+    [27, 79, 66] => Key::Arrow(Arrow::Down),
+    [27, 91, 68] => Key::Arrow(Arrow::Left),
+    [27, 79, 68] => Key::Arrow(Arrow::Left),
+    [27, 91, 67] => Key::Arrow(Arrow::Right),
+    [27, 79, 67] => Key::Arrow(Arrow::Right),
+    [27, 91, 65] => Key::Arrow(Arrow::Up),
+    [27, 79, 65] => Key::Arrow(Arrow::Up),
+    [27, 91, 49, 59, 53, 66] => Key::Arrow(Arrow::Down),
+    [27, 91, 49, 59, 53, 68] => Key::Arrow(Arrow::Left),
+    [27, 91, 49, 59, 53, 67] => Key::Arrow(Arrow::Right),
+    [27, 91, 49, 59, 53, 65] => Key::CtrlArrow(Arrow::Up),
+    [27, 91, 51, 126] => Key::Del,
+    [27, 91, 54, 126] => Key::PageDown,
+    [27, 91, 53, 126] => Key::PageUp,
+    [27, 91, 49, 59, 50, 65] => Key::ShiftUp,
+    [27, 91, 49, 59, 50, 66] => Key::ShiftDown,
+    [27, 91, 72] => Key::Home,
+    [27, 91, 70] => Key::End,
+    [27, 79, 72] => Key::Home,
+    [27, 79, 70] => Key::End,
+    [27, 91, 52, 126] => Key::End,
+    [9] => Key::Tab,
+    [127] => Key::Backspace,
+    [1] => Key::Ctrl('a'),
+    [5] => Key::Ctrl('e'),
+    [23] => Key::Ctrl('w'),
+    [11] => Key::Ctrl('k'),
+    [4] => Key::Ctrl('d'),
+    [3] => Key::Ctrl('c'),
+    [17] => Key::Ctrl('q'),
+    [16] => Key::Ctrl('p'),
+    [14] => Key::Ctrl('n'),
+    [21] => Key::Ctrl('u'),
+    [24] => Key::Ctrl('x'),
+}
 
-// Make sure not to use 27 (ESC) because it's used as a prefix in many combinations.
-static XTERM_SINGLE_BYTES: [(u8, Event); 13] = [
-    (9, Event::Key(Key::Tab)),
-    (127, Event::Key(Key::Backspace)),
-    (1, Event::Key(Key::Ctrl('a'))),
-    (5, Event::Key(Key::Ctrl('e'))),
-    (23, Event::Key(Key::Ctrl('w'))),
-    (11, Event::Key(Key::Ctrl('k'))),
-    (4, Event::Key(Key::Ctrl('d'))),
-    (3, Event::Key(Key::Ctrl('c'))),
-    (17, Event::Key(Key::Ctrl('q'))),
-    (16, Event::Key(Key::Ctrl('p'))),
-    (14, Event::Key(Key::Ctrl('n'))),
-    (21, Event::Key(Key::Ctrl('u'))),
-    (24, Event::Key(Key::Ctrl('x'))),
-];
+// static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];
+// static XTERM_FOCUS_LOST: [u8; 3] = [27, 91, 79];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -302,16 +255,8 @@ fn parse_chars(buf: &[u8]) -> Option<(Event, usize)> {
 fn parse_key_comb(buf: &[u8]) -> Option<(Event, usize)> {
     debug_assert!(!buf.is_empty());
 
-    for &(byte, ref ev) in XTERM_SINGLE_BYTES.iter() {
-        if byte == buf[0] {
-            return Some((ev.clone(), 1));
-        }
-    }
-
-    for &(byte_seq, ref ev) in XTERM_KEY_SEQS.iter() {
-        if buf.starts_with(byte_seq) {
-            return Some((ev.clone(), byte_seq.len()));
-        }
+    if let Some((key, used)) = parse_key_bytes(buf) {
+        return Some((Event::Key(key), used));
     }
 
     if buf[0] == 27 {
