@@ -17,14 +17,11 @@ impl Trie {
     }
 
     pub(crate) fn insert(&mut self, str: &str) {
-        let mut trie_ptr: *mut Trie = &mut *self;
+        let mut node = self;
         for char in str.chars() {
-            trie_ptr = get_char_node_for_insert(trie_ptr, char);
+            node = get_char_node_for_insert(node, char);
         }
-
-        unsafe {
-            (*trie_ptr).word = true;
-        }
+        node.word = true;
     }
 
     pub(crate) fn contains(&self, str: &str) -> bool {
@@ -90,15 +87,11 @@ impl Trie {
     }
 }
 
-fn get_char_node_for_insert(trie: *mut Trie, char: char) -> *mut Trie {
-    let trie_ref: &mut Trie = unsafe { &mut *trie };
-    match trie_ref
-        .vec
-        .binary_search_by(|&(char_, _)| char_.cmp(&char))
-    {
-        Ok(idx) => &mut *trie_ref.vec[idx].1,
+fn get_char_node_for_insert(trie: &mut Trie, char: char) -> &mut Trie {
+    match trie.vec.binary_search_by(|&(char_, _)| char_.cmp(&char)) {
+        Ok(idx) => &mut trie.vec[idx].1,
         Err(idx) => {
-            trie_ref.vec.insert(
+            trie.vec.insert(
                 idx,
                 (
                     char,
@@ -108,7 +101,7 @@ fn get_char_node_for_insert(trie: *mut Trie, char: char) -> *mut Trie {
                     }),
                 ),
             );
-            &mut *trie_ref.vec[idx].1
+            &mut trie.vec[idx].1
         }
     }
 }
