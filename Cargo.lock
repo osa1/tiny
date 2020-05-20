@@ -504,7 +504,7 @@ dependencies = [
  "serde",
  "serde_yaml",
  "tempfile",
- "term_input 0.1.5",
+ "term_input 0.2.0",
  "termbox_simple",
  "time",
  "tokio",
@@ -1207,16 +1207,6 @@ dependencies = [
 [[package]]
 name = "term_input"
 version = "0.1.5"
-dependencies = [
- "futures",
- "libc",
- "mio",
- "tokio",
-]
-
-[[package]]
-name = "term_input"
-version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ad2df816a0a43d0075d4c888328d31c888ba1e418e25a4638f27eac170ac824"
 dependencies = [
@@ -1225,12 +1215,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "term_input"
+version = "0.2.0"
+dependencies = [
+ "futures",
+ "libc",
+ "mio",
+ "term_input_macros",
+ "tokio",
+]
+
+[[package]]
+name = "term_input_macros"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "termbox_simple"
 version = "0.2.3"
 dependencies = [
  "libc",
  "mio",
- "term_input 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "term_input 0.1.5",
  "termion",
  "unicode-width",
 ]

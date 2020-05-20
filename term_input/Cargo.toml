@@ -1,6 +1,6 @@
 [package]
 name = "term_input"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "Input handling for xterm-compatible terminals"
 repository = "https://github.com/osa1/tiny"
@@ -11,4 +11,5 @@ edition = "2018"
 futures = "0.3.1"
 libc = "0.2"
 mio = "0.6"
+term_input_macros = { path = "../term_input_macros" }
 tokio = { version = "0.2.11", features = ["full"] }
