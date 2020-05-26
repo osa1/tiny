@@ -46,3 +46,16 @@ fn test_utf8_char() {
 fn test_tab_key() {
     assert_eq!(parse_single_event("\t".as_bytes()), Event::Key(Key::Tab));
 }
+
+#[test]
+fn test_mousewheel_up_down() {
+    // ignoring the mouse cursor location data
+    assert_eq!(
+        parse_single_event("<64".as_bytes()),
+        Event::Key(Key::MouseButton(MouseWheel::WheelUp))
+    );
+    assert_eq!(
+        parse_single_event("<65".as_bytes()),
+        Event::Key(Key::MouseButton(MouseWheel::WheelDown))
+    );
+}

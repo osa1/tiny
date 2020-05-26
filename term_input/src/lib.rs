@@ -40,6 +40,7 @@ pub enum Key {
     ShiftDown,
     ShiftUp,
     Tab,
+    MouseButton(MouseWheel),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,6 +49,12 @@ pub enum Arrow {
     Right,
     Up,
     Down,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MouseWheel {
+    WheelUp,
+    WheelDown,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,6 +120,8 @@ byte_seq_parser! {
     [14] => Key::Ctrl('n'),
     [21] => Key::Ctrl('u'),
     [24] => Key::Ctrl('x'),
+    [60, 54, 52] => Key::MouseButton(MouseWheel::WheelUp),
+    [60, 54, 53] => Key::MouseButton(MouseWheel::WheelDown),
 }
 
 // static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];
@@ -151,9 +160,13 @@ impl Stream for Input {
             let mut buf_slice: &[u8] = &self_.buf;
 
             while !buf_slice.is_empty() {
-                // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD)
+                // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD) and 60 ('<', 0x3C) for mouse buttons
                 let fst = buf_slice[0];
                 let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
+                    parse_key_comb
+                } else if fst == 60 {
+                    // Only use first 3 bytes. The rest are mouse cursor locations
+                    buf_slice = &buf_slice[0..=2];
                     parse_key_comb
                 } else {
                     parse_chars
@@ -199,9 +212,12 @@ impl Stream for Input {
 }
 
 #[cfg(test)]
-pub(crate) fn parse_single_event(buf: &[u8]) -> Event {
+pub(crate) fn parse_single_event(mut buf: &[u8]) -> Event {
     let fst = buf[0];
     let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
+        parse_key_comb
+    } else if fst == 60 {
+        buf = &buf[0..=2];
         parse_key_comb
     } else {
         parse_chars

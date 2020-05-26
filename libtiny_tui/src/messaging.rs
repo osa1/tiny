@@ -1,4 +1,4 @@
-use term_input::Key;
+use term_input::{Key, MouseWheel};
 use termbox_simple::Termbox;
 
 use std::convert::From;
@@ -163,12 +163,12 @@ impl MessagingUI {
                 WidgetRet::KeyHandled
             }
 
-            Key::ShiftUp => {
+            Key::ShiftUp | Key::MouseButton(MouseWheel::WheelUp) => {
                 self.msg_area.scroll_up();
                 WidgetRet::KeyHandled
             }
 
-            Key::ShiftDown => {
+            Key::ShiftDown | Key::MouseButton(MouseWheel::WheelDown) => {
                 self.msg_area.scroll_down();
                 WidgetRet::KeyHandled
             }

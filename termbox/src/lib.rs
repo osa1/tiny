@@ -14,7 +14,8 @@ use unicode_width::UnicodeWidthChar;
 pub const TB_DEFAULT: u16 = 0x0000;
 pub const TB_BOLD: u16 = 0x0100;
 pub const TB_UNDERLINE: u16 = 0x0200;
-
+pub const ENTER_MOUSE_SEQUENCE: &str = "\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h";
+pub const EXIT_MOUSE_SEQUENCE: &str = "\x1b[?1006l\x1b[?1015l\x1b[?1002l\x1b[?1000l";
 pub struct Termbox {
     // Not available in test instances
     tty: Option<File>,
@@ -125,6 +126,9 @@ impl Termbox {
         unsafe { libc::tcsetattr(libc::STDOUT_FILENO, libc::TCSAFLUSH, &new_term) };
         // T_ENTER_CA for xterm
         tty.write_all(b"\x1b[?1049h").unwrap();
+
+        // enter mouse mode
+        tty.write_all(ENTER_MOUSE_SEQUENCE.as_bytes()).unwrap();
 
         // Done with setting terminal attributes
 
@@ -478,6 +482,9 @@ impl Drop for Termbox {
             .extend_from_slice(termion::clear::All.as_ref());
         // T_EXIT_CA for xterm
         self.output_buffer.extend_from_slice(b"\x1b[?1049l");
+        // Give back mouse control to terminal
+        self.output_buffer
+            .extend_from_slice(EXIT_MOUSE_SEQUENCE.as_bytes());
         self.flush_output_buffer();
 
         if self.tty.is_some() {
