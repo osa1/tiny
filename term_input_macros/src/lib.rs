@@ -16,7 +16,6 @@ pub fn byte_seq_parser(input: TokenStream) -> TokenStream {
     let fn_body = tree::build_decision_tree(rules);
 
     quote!(fn #fn_name(buf: &[u8]) -> Option<(#fn_return_type, usize)> {
-        let mut i: usize = 0;
         #fn_body
     })
     .into()

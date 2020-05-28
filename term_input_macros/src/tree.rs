@@ -7,24 +7,26 @@ use std::collections::HashMap;
 use syn;
 
 struct Node {
+    idx: usize,
     value: Option<syn::Expr>,
     next: HashMap<u8, Node>,
 }
 
 impl Node {
-    fn new() -> Self {
+    fn new(idx: usize) -> Self {
         Node {
+            idx,
             value: None,
             next: HashMap::new(),
         }
     }
 
     fn to_token_stream(&self) -> TokenStream {
-        let Node { value, next } = self;
+        let Node { idx, value, next } = self;
 
         let node_value = match value {
             None => quote!(None),
-            Some(expr) => quote!(Some((#expr, i))),
+            Some(expr) => quote!(Some((#expr, #idx))),
         };
 
         // Optimize the case when the node is a leaf. Not necessary for correctness, but makes the
@@ -38,7 +40,6 @@ impl Node {
             let next_tokens = next.to_token_stream();
             match_arms.push(quote!(
                 #byte => {
-                    i += 1;
                     #next_tokens
                 }
             ));
@@ -46,7 +47,7 @@ impl Node {
         match_arms.push(quote!(_ => #node_value));
 
         quote!(
-            match buf.get(i) {
+            match buf.get(#idx) {
                 None => #node_value,
                 Some(byte) => {
                     match byte {
@@ -68,7 +69,7 @@ impl Node {
 
         match self.next.get_mut(&byte) {
             None => {
-                let mut node = Node::new();
+                let mut node = Node::new(1);
                 node.add_rule_(rest, value);
                 self.next.insert(byte, node);
             }
@@ -88,7 +89,7 @@ impl Node {
 
             match self.next.get_mut(&byte) {
                 None => {
-                    let mut node = Node::new();
+                    let mut node = Node::new(self.idx + 1);
                     node.add_rule_(rest, value);
                     self.next.insert(byte, node);
                 }
@@ -102,7 +103,7 @@ impl Node {
 
 pub(crate) fn build_decision_tree(rules: Vec<Rule>) -> TokenStream {
     let mut stream = TokenStream::new();
-    let mut tree = Node::new();
+    let mut tree = Node::new(0);
     for rule in rules {
         tree.add_rule(rule);
     }
