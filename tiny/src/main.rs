@@ -15,6 +15,7 @@ use libtiny_logger::Logger;
 use libtiny_tui::{MsgTarget, TUI};
 use libtiny_ui::UI;
 
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -75,6 +76,19 @@ fn run(
 ) {
     env_logger::builder()
         .target(env_logger::Target::Stderr)
+        .format(|buf, record| {
+            let timestamp = buf.timestamp_seconds();
+
+            writeln!(
+                buf,
+                "[{}] {} [{}:{}] {}",
+                timestamp,
+                record.level(),
+                record.file().unwrap_or_default(),
+                record.line().unwrap_or_default(),
+                record.args()
+            )
+        })
         .init();
 
     // One task for each client to handle IRC events
