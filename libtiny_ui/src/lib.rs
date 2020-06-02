@@ -2,6 +2,7 @@ pub use objekt::clone_box;
 use time::Tm;
 
 /// Target of a message to be shown in a UI.
+#[derive(Debug)]
 pub enum MsgTarget<'a> {
     /// Show the message in the server tab.
     Server { serv: &'a str },

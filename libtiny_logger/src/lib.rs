@@ -104,6 +104,7 @@ macro_rules! report_io_err {
     ( $f:expr, $e:expr ) => {
         match $e {
             Err(err) => {
+                debug!("{:?}", err);
                 $f(format!("{:?}", err));
                 return;
             }
@@ -128,10 +129,6 @@ impl LoggerInner {
     }
 
     fn new_server_tab(&mut self, serv: &str, _alias: Option<String>) {
-        if self.servers.contains_key(serv) {
-            return;
-        }
-
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         debug!("Trying to open log file: {:?}", path);
@@ -156,63 +153,59 @@ impl LoggerInner {
     }
 
     fn new_chan_tab(&mut self, serv: &str, chan: &str) {
-        if !self.servers.contains_key(serv) {
-            (self.report_err)(format!("Logger::new_chan_tab: can't find server: {}", serv));
-            return;
+        match self.servers.get_mut(serv) {
+            None => {
+                debug!("new_chan_tab: can't find server: {}", serv);
+                return;
+            }
+            Some(server) => {
+                let mut path = self.log_dir.clone();
+                path.push(&format!("{}_{}.txt", serv, chan));
+                debug!("Trying to open log file: {:?}", path);
+                let mut fd = report_io_err!(
+                    self.report_err,
+                    OpenOptions::new().create(true).append(true).open(path)
+                );
+                report_io_err!(self.report_err, print_header(&mut fd));
+                server.chans.insert(chan.to_string(), fd);
+            }
         }
-
-        let server = self.servers.get_mut(serv).unwrap();
-        let mut path = self.log_dir.clone();
-        path.push(&format!("{}_{}.txt", serv, chan));
-        debug!("Trying to open log file: {:?}", path);
-        let mut fd = report_io_err!(
-            self.report_err,
-            OpenOptions::new().create(true).append(true).open(path)
-        );
-        report_io_err!(self.report_err, print_header(&mut fd));
-        server.chans.insert(chan.to_string(), fd);
     }
 
     fn close_chan_tab(&mut self, serv: &str, chan: &str) {
-        if !self.servers.contains_key(serv) {
-            (self.report_err)(format!(
-                "Logger::close_chan_tab: can't find server: {}",
-                serv
-            ));
-            return;
+        match self.servers.get_mut(serv) {
+            None => {
+                debug!("close_chan_tab: can't find server: {}", serv);
+                return;
+            }
+            Some(server) => {
+                server.chans.remove(chan);
+            }
         }
-
-        let server = self.servers.get_mut(serv).unwrap();
-        server.chans.remove(chan);
     }
 
-    // TODO: Where's new_user_tab?
-
     fn close_user_tab(&mut self, serv: &str, nick: &str) {
-        if !self.servers.contains_key(serv) {
-            (self.report_err)(format!(
-                "Logger::close_user_tab: can't find server: {}",
-                serv
-            ));
-            return;
+        match self.servers.get_mut(serv) {
+            None => {
+                debug!("close_user_tab: can't find server: {}", serv);
+                return;
+            }
+            Some(server) => {
+                server.users.remove(nick);
+            }
         }
-
-        let server = self.servers.get_mut(serv).unwrap();
-        server.users.remove(nick);
     }
 
     fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
         let now = now();
-        self.apply_to_target(target, move |fd: &mut File| {
-            // TODO: Report errors?
-            let _ = writeln!(fd, "[{}] [client] {}", now, msg);
+        self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
+            report_io_err!(report_err, writeln!(fd, "[{}] [client] {}", now, msg));
         });
     }
 
     fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, |fd: &mut File| {
-            // TODO: Report errors?
-            let _ = writeln!(fd, "[{}] {}", strf(&ts), msg);
+        self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
+            report_io_err!(report_err, writeln!(fd, "[{}] {}", strf(&ts), msg));
         });
     }
 
@@ -241,22 +234,24 @@ impl LoggerInner {
         _highlight: bool,
         is_action: bool,
     ) {
-        self.apply_to_target(target, |fd: &mut File| {
-            // TODO: Report errors?
-            if is_action {
-                let _ = writeln!(fd, "[{}] {} {}", strf(&ts), sender, msg);
+        self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
+            let io_ret = if is_action {
+                writeln!(fd, "[{}] {} {}", strf(&ts), sender, msg)
             } else {
-                let _ = writeln!(fd, "[{}] {}: {}", strf(&ts), sender, msg);
-            }
+                writeln!(fd, "[{}] {}: {}", strf(&ts), sender, msg)
+            };
+            report_io_err!(report_err, io_ret);
         });
     }
 
     fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         if let Some(_ts) = ts {
             // This method is only called when a user joins a chan
-            self.apply_to_target(target, |fd: &mut File| {
-                // TODO: Report errors?
-                let _ = writeln!(fd, "[{}] {} joined the channel.", now(), nick);
+            self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
+                report_io_err!(
+                    report_err,
+                    writeln!(fd, "[{}] {} joined the channel.", now(), nick)
+                );
             });
         }
     }
@@ -264,31 +259,34 @@ impl LoggerInner {
     fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         if let Some(_ts) = ts {
             // TODO: Did the user leave a channel or the server? Currently we can't tell.
-            self.apply_to_target(target, |fd: &mut File| {
-                // TODO: Report errors?
-                let _ = writeln!(fd, "[{}] {} left.", now(), nick);
+            self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
+                report_io_err!(report_err, writeln!(fd, "[{}] {} left.", now(), nick));
             });
         }
     }
 
     fn rename_nick(&mut self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, |fd: &mut File| {
-            // TODO: Report errors?
-            let _ = writeln!(
-                fd,
-                "[{}] {} is now known as {}.",
-                strf(&ts),
-                old_nick,
-                new_nick
+        self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
+            report_io_err!(
+                report_err,
+                writeln!(
+                    fd,
+                    "[{}] {} is now known as {}.",
+                    strf(&ts),
+                    old_nick,
+                    new_nick
+                )
             );
         });
     }
 
     fn set_topic(&mut self, topic: &str, ts: Tm, serv: &str, chan: &str) {
         let target = MsgTarget::Chan { serv, chan };
-        self.apply_to_target(&target, |fd: &mut File| {
-            // TODO: Report errors?
-            let _ = writeln!(fd, "[{}] Channel topic: {}.", strf(&ts), topic);
+        self.apply_to_target(&target, |fd: &mut File, report_err: &dyn Fn(String)| {
+            report_io_err!(
+                report_err,
+                writeln!(fd, "[{}] Channel topic: {}.", strf(&ts), topic)
+            );
         });
     }
 
@@ -296,73 +294,75 @@ impl LoggerInner {
         // Nothing to do here
     }
 
-    fn apply_to_target(&mut self, target: &MsgTarget, f: impl Fn(&mut File)) {
+    fn apply_to_target(&mut self, target: &MsgTarget, f: impl Fn(&mut File, &dyn Fn(String))) {
         match *target {
-            MsgTarget::Server { serv } => {
-                if !self.servers.contains_key(serv) {
-                    (self.report_err)(format!("Logger: can't find server: {}", serv));
+            MsgTarget::Server { serv } => match self.servers.get_mut(serv) {
+                None => {
+                    debug!("Can't find server: {}", serv);
+                }
+                Some(ServerLogs { ref mut fd, .. }) => {
+                    f(fd, &*self.report_err);
+                }
+            },
+            MsgTarget::Chan { serv, chan } => match self.servers.get_mut(serv) {
+                None => {
+                    debug!("Can't find server: {}", serv);
                     return;
                 }
-                let ServerLogs { ref mut fd, .. } = self.servers.get_mut(serv).unwrap();
-                f(fd);
-            }
-            MsgTarget::Chan { serv, chan } => {
-                if !self.servers.contains_key(serv) {
-                    (self.report_err)(format!("Logger: can't find server: {}", serv));
-                    return;
-                }
-                let ServerLogs { ref mut chans, .. } = self.servers.get_mut(serv).unwrap();
-                if !chans.contains_key(chan) {
-                    (self.report_err)(format!(
-                        "Logger: can't find chan {} in server {}",
-                        chan, serv
-                    ));
-                    return;
-                }
-                let fd = chans.get_mut(chan).unwrap();
-                f(fd);
-            }
+                Some(ServerLogs { ref mut chans, .. }) => match chans.get_mut(chan) {
+                    None => {
+                        debug!("Can't find chan {} in server {}", chan, serv);
+                    }
+                    Some(fd) => {
+                        f(fd, &*self.report_err);
+                    }
+                },
+            },
             MsgTarget::User { serv, nick } => {
-                if !self.servers.contains_key(serv) {
-                    (self.report_err)(format!("Logger: can't find server: {}", serv));
-                    return;
+                match self.servers.get_mut(serv) {
+                    None => {
+                        debug!("Can't find server: {}", serv);
+                        return;
+                    }
+                    Some(ServerLogs { ref mut users, .. }) => {
+                        if !users.contains_key(nick) {
+                            // We don't have a `new_user_tab` trait method so user log files are
+                            // created here
+                            let mut path = self.log_dir.clone();
+                            path.push(&format!("{}_{}.txt", serv, nick));
+                            debug!("Trying to open log file: {:?}", path);
+                            let mut fd = report_io_err!(
+                                self.report_err,
+                                OpenOptions::new().create(true).append(true).open(path)
+                            );
+                            report_io_err!(self.report_err, print_header(&mut fd));
+                            users.insert(nick.to_owned(), fd);
+                        }
+                        let fd = users.get_mut(nick).unwrap();
+                        f(fd, &*self.report_err);
+                    }
                 }
-                let ServerLogs { ref mut users, .. } = self.servers.get_mut(serv).unwrap();
-                if !users.contains_key(nick) {
-                    // We don't have a `new_user_tab` trait method so user log files are created
-                    // here
-                    let mut path = self.log_dir.clone();
-                    path.push(&format!("{}_{}.txt", serv, nick));
-                    debug!("Trying to open log file: {:?}", path);
-                    let mut fd = report_io_err!(
-                        self.report_err,
-                        OpenOptions::new().create(true).append(true).open(path)
-                    );
-                    report_io_err!(self.report_err, print_header(&mut fd));
-                    users.insert(nick.to_owned(), fd);
-                }
-                let fd = users.get_mut(nick).unwrap();
-                f(fd);
             }
-            MsgTarget::AllServTabs { serv } => {
-                if !self.servers.contains_key(serv) {
-                    (self.report_err)(format!("Logger: can't find server: {}", serv));
+            MsgTarget::AllServTabs { serv } => match self.servers.get_mut(serv) {
+                None => {
+                    debug!("Can't find server: {}", serv);
                     return;
                 }
-                let ServerLogs {
+                Some(ServerLogs {
                     ref mut fd,
                     ref mut chans,
                     ref mut users,
                     ..
-                } = self.servers.get_mut(serv).unwrap();
-                f(fd);
-                for (_, fd) in chans.iter_mut() {
-                    f(fd);
+                }) => {
+                    f(fd, &*self.report_err);
+                    for (_, fd) in chans.iter_mut() {
+                        f(fd, &*self.report_err);
+                    }
+                    for (_, fd) in users.iter_mut() {
+                        f(fd, &*self.report_err);
+                    }
                 }
-                for (_, fd) in users.iter_mut() {
-                    f(fd);
-                }
-            }
+            },
             MsgTarget::CurrentTab => {
                 // Probably a cmd error; these are ignored
             }
