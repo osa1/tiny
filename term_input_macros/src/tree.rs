@@ -4,7 +4,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use quote::TokenStreamExt;
 use std::collections::HashMap;
-use syn;
 
 struct Node {
     idx: usize,
@@ -32,7 +31,7 @@ impl Node {
         // Optimize the case when the node is a leaf. Not necessary for correctness, but makes the
         // generated code smaller.
         if next.is_empty() {
-            return quote!(#node_value).into();
+            return quote!(#node_value);
         }
 
         let mut match_arms = vec![];
@@ -56,7 +55,6 @@ impl Node {
                 }
             }
         )
-        .into()
     }
 
     fn add_rule(&mut self, rule: Rule) {

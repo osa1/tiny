@@ -156,7 +156,6 @@ impl LoggerInner {
         match self.servers.get_mut(serv) {
             None => {
                 debug!("new_chan_tab: can't find server: {}", serv);
-                return;
             }
             Some(server) => {
                 let mut path = self.log_dir.clone();
@@ -176,7 +175,6 @@ impl LoggerInner {
         match self.servers.get_mut(serv) {
             None => {
                 debug!("close_chan_tab: can't find server: {}", serv);
-                return;
             }
             Some(server) => {
                 server.chans.remove(chan);
@@ -188,7 +186,6 @@ impl LoggerInner {
         match self.servers.get_mut(serv) {
             None => {
                 debug!("close_user_tab: can't find server: {}", serv);
-                return;
             }
             Some(server) => {
                 server.users.remove(nick);
@@ -307,7 +304,6 @@ impl LoggerInner {
             MsgTarget::Chan { serv, chan } => match self.servers.get_mut(serv) {
                 None => {
                     debug!("Can't find server: {}", serv);
-                    return;
                 }
                 Some(ServerLogs { ref mut chans, .. }) => match chans.get_mut(chan) {
                     None => {
@@ -322,7 +318,6 @@ impl LoggerInner {
                 match self.servers.get_mut(serv) {
                     None => {
                         debug!("Can't find server: {}", serv);
-                        return;
                     }
                     Some(ServerLogs { ref mut users, .. }) => {
                         if !users.contains_key(nick) {
@@ -346,7 +341,6 @@ impl LoggerInner {
             MsgTarget::AllServTabs { serv } => match self.servers.get_mut(serv) {
                 None => {
                     debug!("Can't find server: {}", serv);
-                    return;
                 }
                 Some(ServerLogs {
                     ref mut fd,
