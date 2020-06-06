@@ -1,13 +1,14 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::utils;
+use crate::dcc::DCCRecord;
+use crate::{utils, DCCType};
 use crate::{Cmd, Event, ServerInfo};
 use libtiny_common::{ChanName, ChanNameRef};
 use libtiny_wire as wire;
 use libtiny_wire::{Msg, Pfx};
 
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -77,6 +78,36 @@ impl State {
     pub(crate) fn kill_join_tasks(&self) {
         self.inner.borrow_mut().kill_join_tasks();
     }
+
+    /// Gets a DCCRecord and removes it
+    pub(crate) fn get_dcc_rec(&self, origin: &str, argument: &str) -> Option<DCCRecord> {
+        self.inner
+            .borrow_mut()
+            .dcc_recs
+            .remove(&(origin.to_string(), argument.to_string()))
+    }
+
+    /// Adds a DCC record and returns the type, argument and filesize if successfully created
+    pub(crate) fn add_dcc_rec(
+        &self,
+        origin: &str,
+        msg: &str,
+    ) -> Option<(DCCType, String, Option<u32>)> {
+        let record = DCCRecord::from(origin, &self.get_nick(), msg);
+        debug!("record: {:?}", record);
+        if let Ok(record) = record {
+            let argument = record.get_argument().clone();
+            let dcc_type = record.get_type().clone();
+            let file_size = record.get_file_size();
+            self.inner
+                .borrow_mut()
+                .dcc_recs
+                .insert((origin.to_string(), argument.to_string()), record);
+            Some((dcc_type, argument, file_size))
+        } else {
+            None
+        }
+    }
 }
 
 struct StateInner {
@@ -103,6 +134,9 @@ struct StateInner {
     /// TODO: I'm not sure if this is necessary. Why not just create channel tabs in the specified
     /// order, in TUI?
     chans: Vec<Chan>,
+
+    /// Map of DCCRecords indexed by the nickname of the sender and the argument (filename or 'chat')
+    dcc_recs: HashMap<(String, String), DCCRecord>,
 
     /// Away reason if away mode is on. `None` otherwise.
     away_status: Option<String>,
@@ -213,6 +247,7 @@ impl StateInner {
             current_nick_idx: 0,
             current_nick,
             chans,
+            dcc_recs: HashMap::new(),
             away_status: None,
             servername: None,
             usermask: None,

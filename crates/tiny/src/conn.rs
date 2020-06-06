@@ -4,6 +4,8 @@
 //! IRC event handling
 
 use crate::ui::UI;
+
+use libtiny_client::DCCType;
 use libtiny_common::{ChanNameRef, MsgTarget, TabStyle};
 use libtiny_wire as wire;
 
@@ -17,6 +19,8 @@ pub(crate) trait Client {
     fn get_nick(&self) -> String;
 
     fn is_nick_accepted(&self) -> bool;
+
+    fn create_dcc_rec(&self, origin: &str, msg: &str) -> Option<(DCCType, String, Option<u32>)>;
 }
 
 impl Client for libtiny_client::Client {
@@ -30,6 +34,10 @@ impl Client for libtiny_client::Client {
 
     fn is_nick_accepted(&self) -> bool {
         self.is_nick_accepted()
+    }
+
+    fn create_dcc_rec(&self, origin: &str, msg: &str) -> Option<(DCCType, String, Option<u32>)> {
+        self.create_dcc_rec(origin, msg)
     }
 }
 
@@ -183,6 +191,37 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                     &format!("Received version request from {}", sender),
                     &msg_target,
                 );
+                return;
+            }
+
+            if ctcp == Some(wire::CTCP::DCC) {
+                let msg_target = if ui.user_tab_exists(serv, sender) {
+                    MsgTarget::User { serv, nick: sender }
+                } else {
+                    MsgTarget::Server { serv }
+                };
+                if let Some((dcc_type, argument, file_size)) =
+                    client.create_dcc_rec(&sender.to_owned(), &msg)
+                {
+                    match dcc_type {
+                        DCCType::SEND => {
+                            let file_size =
+                                file_size.map_or("unknown size".to_string(), |s| s.to_string());
+                            ui.add_client_msg(
+                                &format!(
+                                    "{} wants to send file - {} ({} bytes)",
+                                    sender, argument, file_size
+                                ),
+                                &msg_target,
+                            );
+                            ui.add_client_msg(
+                                &format!("Command to accept: /dcc get {} {}", sender, argument),
+                                &msg_target,
+                            );
+                        }
+                        DCCType::CHAT => {}
+                    }
+                }
                 return;
             }
 

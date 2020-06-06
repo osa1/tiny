@@ -1,5 +1,6 @@
 use crate::conn;
 use crate::ui::UI;
+use client::DCCType;
 use libtiny_common::ChanName;
 use libtiny_tui::test_utils::expect_screen;
 use libtiny_tui::TUI;
@@ -32,6 +33,10 @@ impl conn::Client for TestClient {
 
     fn is_nick_accepted(&self) -> bool {
         true
+    }
+
+    fn create_dcc_rec(&self, _origin: &str, _msg: &str) -> Option<(DCCType, String, Option<u32>)> {
+        None
     }
 }
 

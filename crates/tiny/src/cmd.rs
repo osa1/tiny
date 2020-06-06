@@ -95,7 +95,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 9] = [
+static CMDS: [&Cmd; 10] = [
     &AWAY_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
@@ -104,6 +104,7 @@ static CMDS: [&Cmd; 9] = [
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
+    &DCC_CMD,
     &HELP_CMD,
 ];
 
@@ -530,6 +531,65 @@ fn help(args: CmdArgs) {
     }
 }
 
+static DCC_CMD: Cmd = Cmd {
+    name: "dcc",
+    cmd_fn: dcc,
+    description: "Accepts DCC request",
+    usage: "/dcc get <sender> <filename>",
+};
+
+const GET: &str = "get";
+const SEND: &str = "send";
+
+fn dcc(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        ui,
+        clients,
+        src,
+        defaults,
+        ..
+    } = args;
+
+    if let Some(client) = find_client(clients, &src.serv_name()) {
+        // parse args, ex. GET <sender nick> <filename>
+        let mut params = args.split_whitespace();
+        if let Some(sub_cmd) = params.next() {
+            match sub_cmd {
+                GET => {
+                    if let Some(origin) = params.next() {
+                        if let Some(file_name) = params.next() {
+                            if let Some(dir) = &defaults.download_dir {
+                                let found = client.get_dcc_rec(origin, dir.clone(), file_name);
+                                match found {
+                                    true => ui.add_client_msg(
+                                        "DCC Record found...starting download",
+                                        &MsgTarget::CurrentTab,
+                                    ),
+                                    false => ui.add_client_msg(
+                                        "DCC Record not found.",
+                                        &MsgTarget::CurrentTab,
+                                    ),
+                                }
+                            } else {
+                                ui.add_client_err_msg(
+                                    "No default download directory found in config.",
+                                    &MsgTarget::CurrentTab,
+                                )
+                            }
+                        }
+                    }
+                }
+                // TODO: Support this if people request it
+                SEND => ui.add_client_err_msg(
+                    "SEND command not implemented yet.",
+                    &MsgTarget::CurrentTab,
+                ),
+                _ => ui.add_client_err_msg(DCC_CMD.usage, &MsgTarget::CurrentTab),
+            }
+        }
+    }
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]

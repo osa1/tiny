@@ -1,11 +1,13 @@
 #![allow(clippy::unneeded_field_pattern)]
 #![allow(clippy::cognitive_complexity)]
 
+mod dcc;
 mod pinger;
 mod state;
 mod stream;
 mod utils;
 
+pub use dcc::DCCType;
 use libtiny_common::{ChanName, ChanNameRef};
 pub use libtiny_wire as wire;
 
@@ -14,11 +16,14 @@ use state::State;
 use stream::{Stream, StreamError};
 
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use futures_util::future::FutureExt;
+use tokio::fs::OpenOptions;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
+use tokio::time::timeout;
 use tokio::{pin, select};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
@@ -254,6 +259,36 @@ impl Client {
     /// Get all nicks in a channel.
     pub fn get_chan_nicks(&self, chan: &ChanNameRef) -> Vec<String> {
         self.state.get_chan_nicks(chan)
+    }
+
+    /// Checks if we have a stored DCCRecord for the provided parameters
+    /// Starts download of file if a record is found.
+    /// Deletes record after download attempt
+    /// Returns boolean if record is found
+    pub fn get_dcc_rec(&mut self, origin: &str, download_dir: PathBuf, file_name: &str) -> bool {
+        let rec = self.state.get_dcc_rec(origin, file_name);
+        if let Some(rec) = rec {
+            debug!("found rec {:?}", rec);
+            dcc_file_get(
+                &mut self.msg_chan,
+                *rec.get_addr(),
+                download_dir,
+                file_name.to_string(),
+                rec.get_receiver().to_string(),
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Creates a dcc record and returns the argument (filename) and file size if provided
+    pub fn create_dcc_rec(
+        &self,
+        origin: &str,
+        msg: &str,
+    ) -> Option<(dcc::DCCType, String, Option<u32>)> {
+        self.state.add_dcc_rec(origin, msg)
     }
 }
 
@@ -675,4 +710,128 @@ async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
             }
         }
     }
+}
+
+/// Spawns a task to connect to given address to download
+/// a file
+/// https://www.irchelp.org/protocol/ctcpspec.html
+fn dcc_file_get(
+    msg_chan: &mut mpsc::Sender<Cmd>,
+    addr: SocketAddr,
+    mut download_dir: PathBuf,
+    file_name: String,
+    target: String,
+) {
+    let mut msg_chan = msg_chan.clone();
+    tokio::task::spawn(async move {
+        let stream = match timeout(
+            tokio::time::Duration::from_secs(25),
+            tokio::net::TcpStream::connect(addr),
+        )
+        .await
+        {
+            Err(err) => {
+                error!("{}", err);
+                let err_msg = "File transfer connection timed out.";
+                dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg).await;
+                return;
+            }
+            Ok(stream) => match stream {
+                Err(err) => {
+                    error!("{}", err);
+                    let err_msg = "File transfer connection failed.";
+                    dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg).await;
+                    return;
+                }
+                Ok(stream) => stream,
+            },
+        };
+
+        let (mut rx, mut tx) = tokio::io::split(stream);
+
+        // Try to create the download directory if it isn't there
+        if let Err(err) = tokio::fs::create_dir_all(&download_dir).await {
+            // Directory already exists
+            if err.kind() != tokio::io::ErrorKind::AlreadyExists {
+                error!("{}", err);
+                let err_msg = "Couldn't create download directory.";
+                dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg).await;
+                return;
+            }
+        }
+        // Add the file name to the file path
+        download_dir.push(&file_name);
+        // Create a new file for write inside the download directory
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(download_dir)
+            .await
+        {
+            Err(err) => {
+                error!("{}", err);
+                let err_msg = format!("Couldn't create file: {}.", file_name);
+                dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg.as_str()).await;
+                return;
+            }
+            Ok(file) => file,
+        };
+        // Stores total bytes received
+        let mut bytes_received: u32 = 0;
+        loop {
+            let mut buf: [u8; 1024] = [0; 1024];
+            match rx.read(&mut buf).await {
+                Err(err) => {
+                    error!("{}", err);
+                    let err_msg = "Error reading from socket for dcc.";
+                    dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg).await;
+                    return;
+                }
+                Ok(0) => break,
+                Ok(bytes) => {
+                    bytes_received += bytes as u32;
+                    // Write bytes to file
+                    if let Err(err) = file.write(&buf[..bytes]).await {
+                        error!("{}", err);
+                        let err_msg = "Error writing to file.";
+                        dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg).await;
+                        return;
+                    }
+                    // Send back number of bytes read
+                    let response: [u8; 4] = [
+                        (bytes_received >> 24) as u8,
+                        (bytes_received >> 16) as u8,
+                        (bytes_received >> 8) as u8,
+                        (bytes_received) as u8,
+                    ];
+                    if let Err(err) = tx.write(&response).await {
+                        error!("{}", err);
+                        let err_msg = "Error responding to sender.";
+                        dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg).await;
+                        return;
+                    }
+                }
+            }
+        }
+        // sync file to filesystem
+        if let Err(err) = file.sync_all().await {
+            error!("{}", err);
+            let err_msg = "Error syncing file to disk.";
+            dcc_to_msgchan(&mut msg_chan, target.as_str(), err_msg).await;
+            return;
+        }
+        // Write message to client that file was successfully downloaded
+        let success_msg = format!(
+            "Downloaded file: {} ({1:.2}KB)",
+            file_name,
+            (bytes_received as f32 / 1024 as f32)
+        );
+        dcc_to_msgchan(&mut msg_chan, target.as_str(), success_msg.as_str()).await;
+    });
+}
+
+async fn dcc_to_msgchan(msg_chan: &mut mpsc::Sender<Cmd>, target: &str, msg: &str) {
+    msg_chan
+        .try_send(Cmd::Msg(wire::notice(target, msg)))
+        .unwrap();
 }

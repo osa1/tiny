@@ -35,6 +35,7 @@ defaults:
     realname: yourname
     join: []
     tls: false
+    download_dir: '/tmp/tiny_downloads'
 
 # Where to put log files
 log_dir: "{}"

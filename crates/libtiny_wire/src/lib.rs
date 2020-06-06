@@ -57,6 +57,11 @@ pub fn privmsg(msgtarget: &str, msg: &str) -> String {
     format!("PRIVMSG {} :{}\r\n", msgtarget, msg)
 }
 
+pub fn notice(msgtarget: &str, msg: &str) -> String {
+    assert!(msgtarget.len() + msg.len() + 12 <= 512);
+    format!("NOTICE {} :{}\r\n", msgtarget, msg)
+}
+
 pub fn action(msgtarget: &str, msg: &str) -> String {
     assert!(msgtarget.len() + msg.len() + 21 <= 512); // See comments in `privmsg`
     format!("PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
@@ -199,6 +204,7 @@ pub struct Msg {
 pub enum CTCP {
     Version,
     Action,
+    DCC,
     Other(String),
 }
 
@@ -207,6 +213,7 @@ impl CTCP {
         match s {
             "VERSION" => CTCP::Version,
             "ACTION" => CTCP::Action,
+            "DCC" => CTCP::DCC,
             _ => CTCP::Other(s.to_owned()),
         }
     }

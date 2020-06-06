@@ -62,6 +62,7 @@ pub(crate) struct Defaults {
     pub(crate) join: Vec<String>,
     #[serde(default)]
     pub(crate) tls: bool,
+    pub(crate) download_dir: Option<PathBuf>,
 }
 
 #[derive(Deserialize)]
@@ -251,6 +252,7 @@ mod tests {
                 realname: "".to_owned(),
                 join: vec![],
                 tls: false,
+                download_dir: None,
             },
             log_dir: None,
         };
