@@ -143,6 +143,10 @@ impl MsgArea {
         self.line_buf.set_style(style);
     }
 
+    pub(crate) fn set_indent(&mut self, indent: i32) {
+        self.line_buf.set_indent(indent);
+    }
+
     pub(crate) fn add_text(&mut self, str: &str) {
         self.line_buf.add_text(str);
     }

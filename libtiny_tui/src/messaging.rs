@@ -266,11 +266,15 @@ impl MessagingUI {
 ////////////////////////////////////////////////////////////////////////////////
 // Adding new messages
 
+const TS_WIDTH: i32 = 6;
+
 impl MessagingUI {
     fn add_timestamp(&mut self, ts: Timestamp) {
         if let Some(ts_) = self.last_activity_ts {
             if ts_ != ts {
                 ts.stamp(&mut self.msg_area);
+            } else {
+                self.msg_area.add_text("      ");
             }
         } else {
             ts.stamp(&mut self.msg_area);
@@ -283,6 +287,7 @@ impl MessagingUI {
 
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::Topic));
+        self.msg_area.set_indent(TS_WIDTH);
         self.msg_area.add_text(topic);
 
         self.msg_area.flush_line();
@@ -327,11 +332,13 @@ impl MessagingUI {
     ) {
         self.reset_activity_line();
         self.add_timestamp(ts);
+        let mut indent: i32 = TS_WIDTH;
 
         if is_action {
             self.msg_area
                 .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
             self.msg_area.add_text("** ");
+            indent += 3;
         }
 
         {
@@ -339,6 +346,8 @@ impl MessagingUI {
             let style = SegStyle::Index(nick_color);
             self.msg_area.set_style(style);
             self.msg_area.add_text(sender);
+            // TODO wide characters
+            indent += sender.chars().count() as i32;
         }
 
         self.msg_area
@@ -346,14 +355,17 @@ impl MessagingUI {
 
         if !is_action {
             self.msg_area.add_char(':');
+            indent += 1;
         }
         self.msg_area.add_char(' ');
+        indent += 1;
 
         if highlight {
             self.msg_area
                 .set_style(SegStyle::SchemeStyle(SchemeStyle::Highlight));
         }
 
+        self.msg_area.set_indent(indent);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -364,6 +376,7 @@ impl MessagingUI {
         self.add_timestamp(ts);
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
+        self.msg_area.set_indent(TS_WIDTH);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }
@@ -374,6 +387,7 @@ impl MessagingUI {
         self.add_timestamp(ts);
         self.msg_area
             .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
+        self.msg_area.set_indent(TS_WIDTH);
         self.msg_area.add_text(msg);
         self.msg_area.flush_line();
     }

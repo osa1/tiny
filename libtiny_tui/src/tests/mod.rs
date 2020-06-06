@@ -209,7 +209,7 @@ fn small_screen_2() {
     #[rustfmt::skip]
     let screen =
         "|00:00 Blah blah blah-|
-         |+123456              |
+         |      +123456        |
          |osa1:                |
          |< #chan              |";
     expect_screen(screen, &tui, 21, 4, Location::caller());

@@ -16,6 +16,9 @@ pub(crate) struct Line {
     /// Number of characters in the line (includes all segments).
     len_chars: i32,
 
+    /// Indent to render each time after wrapping the line.
+    indent: i32,
+
     /// Char indices (NOT byte indices!) of split positions of the line - when
     /// the line doesn't fit into the screen we split it into multiple lines
     /// using these positions as split points.
@@ -97,6 +100,7 @@ impl Line {
                 style: SegStyle::SchemeStyle(SchemeStyle::UserMsg),
             },
             len_chars: 0,
+            indent: 0,
             splits: Vec::new(),
         }
     }
@@ -115,6 +119,10 @@ impl Line {
             );
             self.segs.push(seg);
         }
+    }
+
+    pub(crate) fn set_indent(&mut self, indent: i32) {
+        self.indent = indent;
     }
 
     pub(crate) fn add_text(&mut self, str: &str) {
@@ -165,11 +173,12 @@ impl Line {
     pub(crate) fn rendered_height(&self, width: i32) -> i32 {
         let mut lines: i32 = 1;
         let mut line_start: i32 = 0;
+        let mut indent: i32 = 0;
 
         for split_idx in 0..self.splits.len() {
             let char_idx = self.splits[split_idx];
             // debug!("rendered_height: char_idx: {}", char_idx);
-            let col = char_idx - line_start;
+            let col = (indent + char_idx) - line_start;
 
             // How many more chars can we render in this line?
             let slots_in_line: i32 = width - (col + 1);
@@ -186,6 +195,7 @@ impl Line {
                 // debug!("splitting at {}", char_idx);
                 lines += 1;
                 line_start = char_idx + 1;
+                indent = self.indent;
             }
         }
 
@@ -244,7 +254,7 @@ impl Line {
                         if line >= height {
                             break;
                         }
-                        col = pos_x;
+                        col = pos_x + self.indent;
                     }
                 } else {
                     debug_assert!(!char.is_ascii_control());
