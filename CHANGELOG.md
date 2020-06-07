@@ -18,6 +18,9 @@
   (#184)
 - tiny now has a proper CLI, supporting `--help` and `--version` arguments.
 - Fixed handling of invalid UTF-8 sequences in messages. (#194)
+- Input field now grows vertically on overflow, instead of scrolling. The old
+  scrolling behavior is used when there isn't enough space in the window to
+  extend input field vertically. (#101)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
