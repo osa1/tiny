@@ -38,6 +38,10 @@ impl MsgArea {
         }
     }
 
+    pub(crate) fn get_height(&self) -> i32 {
+        self.height
+    }
+
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
         self.width = width;
         self.height = height;
