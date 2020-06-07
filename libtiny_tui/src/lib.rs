@@ -23,6 +23,7 @@ mod widget;
 mod tests;
 
 pub use crate::tab::TabStyle;
+use crate::tui::TUIRet;
 pub use libtiny_ui::*;
 
 use futures::select;
@@ -102,7 +103,6 @@ async fn input_handler(
 ) {
     let mut input = Input::new();
     while let Some(mb_ev) = input.next().await {
-        use tui::TUIRet::*;
         match mb_ev {
             Err(io_err) => {
                 debug!("term_input error: {:?}", io_err);
@@ -111,13 +111,13 @@ async fn input_handler(
             Ok(ev) => {
                 let tui_ret = tui.borrow_mut().handle_input_event(ev);
                 match tui_ret {
-                    Abort => {
+                    TUIRet::Abort => {
                         snd_ev.try_send(Event::Abort).unwrap();
                         let _ = snd_abort.try_send(());
                         return;
                     }
-                    KeyHandled | KeyIgnored(_) | EventIgnored(_) => {}
-                    Input { msg, from } => {
+                    TUIRet::KeyHandled | TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
+                    TUIRet::Input { msg, from } => {
                         if msg[0] == '/' {
                             // Handle TUI commands, send others to downstream
                             let cmd: String = (&msg[1..]).iter().collect();
@@ -134,7 +134,7 @@ async fn input_handler(
                                 .unwrap();
                         }
                     }
-                    Lines { lines, from } => {
+                    TUIRet::Lines { lines, from } => {
                         snd_ev
                             .try_send(Event::Lines {
                                 lines,
