@@ -4,32 +4,32 @@ use termbox_simple::Termbox;
 
 #[derive(Clone, Debug)]
 pub(crate) struct InputLine {
-    /// Text that is being input
+    /// Input buffer
     buffer: Vec<char>,
-    /// Vector of indexes of `buffer` where new lines start
-    /// Used when there is enough text in the buffer for wrapping
-    /// Gets invalidated/emptied when calculate_height is called
-    line_starts: Vec<i32>,
+
+    /// Vector of whitespace indices in `buffer`. Used to split lines in wrapping mode. Gets
+    /// invalidated in `calculate_height` is called.
+    ws_indices: Vec<i32>,
 }
 
 impl InputLine {
     pub(crate) fn new() -> InputLine {
         InputLine {
             buffer: Vec::with_capacity(512),
-            line_starts: Vec::with_capacity(32),
+            ws_indices: Vec::with_capacity(32),
         }
     }
 
-    /// Creates an InputLine from a buffer and generates word_splits
+    /// Creates an InputLine from a buffer.
     pub(crate) fn from_buffer(buffer: Vec<char>) -> InputLine {
         InputLine {
             buffer,
-            line_starts: Vec::with_capacity(32),
+            ws_indices: Vec::with_capacity(32),
         }
     }
 
     /// Returns pointer to InputLine's buffer
-    pub(crate) fn get_buffer(&self) -> &Vec<char> {
+    pub(crate) fn get_buffer(&self) -> &[char] {
         &self.buffer
     }
 
@@ -57,8 +57,7 @@ impl InputLine {
 
     /// Interface for Vec::remove()
     pub(crate) fn remove(&mut self, idx: usize) -> char {
-        let removed = self.buffer.remove(idx);
-        removed
+        self.buffer.remove(idx)
     }
 
     /// Interface for Vec::insert()
@@ -66,20 +65,26 @@ impl InputLine {
         self.buffer.insert(idx, element);
     }
 
-    /// Calculate how many lines of text will be in the textfield
-    /// based on the width of the widget, taking nickname length into account
-    /// Only needed when buffer is wider than width and scrolling is off
+    /**
+     **    End of InputLine::buffer interface
+     **/
+
+    /// Calculate hedight of the widget, taking nickname length into account. Only needed when
+    /// buffer is wider than width and scrolling is off.
     pub(crate) fn calculate_height(&mut self, width: i32, nick_length: usize) -> usize {
         let mut line_count: i32 = 1;
         let mut line_width: i32 = width - nick_length as i32;
         let mut last_whitespace_idx: Option<i32> = None;
         let mut prev_char_is_whitespace = false;
-        let mut current_idx = 0;
         let mut current_line_length = 0;
-        // clear cached indexes
-        self.line_starts.clear();
-        for c in &self.buffer {
+
+        // clear cached indices
+        self.ws_indices.clear();
+
+        for (current_idx, c) in self.buffer.iter().enumerate() {
+            let current_idx = current_idx as i32;
             current_line_length += 1;
+
             if c.is_whitespace() {
                 // Splitting
                 if current_line_length > line_width {
@@ -87,10 +92,11 @@ impl InputLine {
                     line_count += 1;
                     // this character will be the first one on the next line
                     current_line_length = 1;
-                    // set width to full width
+                    // nick is shown on the first line, set width to full width in the consecutive
+                    // lines
                     line_width = width;
                     // store index for drawing
-                    self.line_starts.push(current_idx);
+                    self.ws_indices.push(current_idx);
                 }
                 // store whitespace for splitting
                 last_whitespace_idx = Some(current_idx);
@@ -98,17 +104,18 @@ impl InputLine {
             } else {
                 // Splitting
                 if current_line_length > line_width {
-                    // if the previous character was a whitespace, then we had a clean split
+                    // if the previous character was a whitespace, then we have a clean split
                     if !prev_char_is_whitespace && last_whitespace_idx.is_some() {
-                        // move back to the last whitespace and get the difference of characters that will be on the next line
+                        // move back to the last whitespace and get the length of the input that
+                        // will be on the next line
                         current_line_length = current_idx - last_whitespace_idx.unwrap();
                         // store index for drawing
-                        self.line_starts.push(last_whitespace_idx.unwrap() + 1);
+                        self.ws_indices.push(last_whitespace_idx.unwrap() + 1);
                     } else {
                         // unclean split on non-whitespace
                         current_line_length = 1;
                         // store index for drawing
-                        self.line_starts.push(current_idx);
+                        self.ws_indices.push(current_idx);
                     }
                     // invalidate whitespace since we split here
                     last_whitespace_idx = None;
@@ -119,10 +126,9 @@ impl InputLine {
                 }
                 prev_char_is_whitespace = false;
             }
-            current_idx += 1;
         }
 
-        // ending line length is width, make room for cursor
+        // Last line length is `line_width`, make room for cursor
         if current_line_length == line_width {
             line_count += 1;
         }
@@ -143,7 +149,7 @@ fn draw_line_scroll(
 ) {
     let slice: &[char] =
         &line[scroll as usize..min(line.len(), (scroll + (width - pos_x)) as usize)];
-    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().cloned());
+    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().copied());
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
@@ -183,9 +189,8 @@ fn draw_line_wrapped(
             cursor_xychar = (pos_x, pos_y, c);
         }
     };
-    let mut char_idx: usize = 0;
-    let mut line_starts_iter = line.line_starts.iter().peekable();
-    for c in line.buffer.iter() {
+    let mut ws_indices_iter = line.ws_indices.iter().copied().peekable();
+    for (char_idx, c) in line.buffer.iter().enumerate() {
         let mut style = colors.user_msg;
         // for autocompletion highlighting
         if let Some(completion_range) = completion_range {
@@ -193,17 +198,16 @@ fn draw_line_wrapped(
                 style = colors.completion;
             }
         }
-        // If next_line_start is Some we already know the indexes for the start of each line
-        // If it is None then we just continue outputting on this line
-        let next_line_start = line_starts_iter.peek();
-        if let Some(next_line_start) = next_line_start {
-            if char_idx == **next_line_start as usize {
+        // If ws_indices_iter yields we already know the indices for the start of each line. If it
+        // does not then we just continue outputting on this line.
+        if let Some(next_line_start) = ws_indices_iter.peek() {
+            if char_idx == *next_line_start as usize {
                 // move to next line
                 line_num += 1;
                 // reset column
                 col = 0;
                 // move to the next line start index
-                line_starts_iter.next();
+                ws_indices_iter.next();
             }
         }
         // Write out the character
@@ -211,7 +215,6 @@ fn draw_line_wrapped(
         // Check if the cursor is on this character
         check_cursor(char_idx, cursor, col, pos_y + line_num, *c);
         col += 1;
-        char_idx += 1;
     }
 
     // Cursor may be (probably) after all text
@@ -220,7 +223,7 @@ fn draw_line_wrapped(
         line_num += 1;
         col = 0;
     }
-    check_cursor(char_idx, cursor, col, pos_y + line_num, ' ');
+    check_cursor(line.buffer.len(), cursor, col, pos_y + line_num, ' ');
 
     tb.change_cell(
         cursor_xychar.0,
@@ -237,7 +240,7 @@ pub(crate) fn draw_line_autocomplete(
     original_buffer: &InputLine,
     insertion_point: usize,
     word_starts: usize,
-    ref completions: &Vec<String>,
+    completions: &[String],
     current_completion: usize,
     tb: &mut Termbox,
     colors: &Colors,
@@ -250,7 +253,7 @@ pub(crate) fn draw_line_autocomplete(
 ) {
     let completion: &str = &completions[current_completion];
 
-    let mut orig_buf_iter = original_buffer.get_buffer().iter().cloned();
+    let mut orig_buf_iter = original_buffer.get_buffer().iter().copied();
     let mut completion_iter = completion.chars();
 
     if should_scroll {

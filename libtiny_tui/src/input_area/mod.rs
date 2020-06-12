@@ -1,18 +1,14 @@
-use std::{
-    cmp::{max, min},
-    mem,
-};
+use std::cmp::{max, min};
+use std::mem;
 
 use term_input::{Arrow, Key};
 use termbox_simple::Termbox;
 
-use crate::{
-    config::{Colors, Style},
-    termbox,
-    trie::Trie,
-    utils,
-    widget::WidgetRet,
-};
+use crate::config::{Colors, Style};
+use crate::termbox;
+use crate::trie::Trie;
+use crate::utils;
+use crate::widget::WidgetRet;
 
 pub(crate) mod input_line;
 use self::input_line::{draw_line, draw_line_autocomplete, InputLine};
@@ -30,10 +26,12 @@ pub(crate) struct TextField {
     /// The message that's currently being edited (not yet sent)
     buffer: InputLine,
 
+    /// Cursor position
     cursor: i32,
 
     /// Width of the widget
     width: i32,
+
     /// Height of the widget, invalidated on input and resize
     height: Option<i32>,
 
@@ -50,6 +48,8 @@ pub(crate) struct TextField {
 
     mode: Mode,
 
+    /// Current nickname. Not available on initialization (e.g. before registration with the
+    /// server). Set with `set_nick`.
     nick: Option<Nickname>,
 }
 
@@ -76,17 +76,18 @@ pub(crate) struct Nickname {
 }
 
 static NICKNAME_SUFFIX: &str = ": ";
+
 impl Nickname {
     fn new(value: String, color: usize) -> Nickname {
         Nickname { value, color }
     }
 
-    /// Calculates the length of the nickname based on given width, including the NICKNAME_SUFFIX
-    /// width should be the width of TextField
-    /// When the length of the Nickname area is 30% or less of the width, then show
-    fn len(&self, width: i32) -> usize {
+    /// Calculates the length of the nickname based on given width, including the NICKNAME_SUFFIX.
+    /// Width should be the width of the `TextField`. When length of the nick is 30% or less of the
+    /// `TextField` width we show it (returns width of the nick), otherwise we don't (returns 0).
+    fn len(&self, textfield_width: i32) -> usize {
         let len = self.value.len() + NICKNAME_SUFFIX.len();
-        if len as f32 <= width as f32 * (30f32 / 100f32) {
+        if len as f32 <= textfield_width as f32 * (30f32 / 100f32) {
             len
         } else {
             0
@@ -132,14 +133,13 @@ impl TextField {
 
     pub(crate) fn get_nick(&self) -> Option<String> {
         if let Some(nick) = &self.nick {
-            let nick_string = nick.value.clone();
-            Some(nick_string)
+            Some(nick.value.clone())
         } else {
             None
         }
     }
 
-    /// Resizes TextArea
+    /// Resizes input area
     pub(crate) fn resize(&mut self, width: i32, max_lines: i32) {
         self.width = width;
         self.height = None;
@@ -221,7 +221,7 @@ impl TextField {
 
                     self.move_cursor(0);
 
-                    WidgetRet::Input(ret.get_buffer().to_vec())
+                    WidgetRet::Input(ret.get_buffer().to_owned())
                 } else {
                     WidgetRet::KeyHandled
                 }
@@ -516,9 +516,8 @@ impl TextField {
         }
     }
 
-    /// Gets the height of the widget
-    /// If the height is larger than the allowed max lines turn on scroll
-    /// else turn off scroll
+    /// Gets the height of the widget. If the height is larger than the allowed max lines (set on
+    /// initialization) turn on scroll else turn off scroll.
     pub(crate) fn get_height(&mut self, width: i32) -> i32 {
         let height = match self.height {
             Some(height) => height,
