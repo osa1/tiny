@@ -16,13 +16,13 @@ use self::input_line::{draw_line, draw_line_autocomplete, InputLine};
 /// Inspired by vim's 'scrolloff': minimal number of characters to keep above and below the cursor.
 const SCROLL_OFF: i32 = 5;
 
-/// Minimum width of TextField for wrapping
+/// Minimum width of InputArea for wrapping
 const SCROLL_FALLBACK_WIDTH: i32 = 36;
 
 /// Input history size
 const HIST_SIZE: usize = 30;
 
-pub(crate) struct TextField {
+pub(crate) struct InputArea {
     /// The message that's currently being edited (not yet sent)
     buffer: InputLine,
 
@@ -83,11 +83,11 @@ impl Nickname {
     }
 
     /// Calculates the length of the nickname based on given width, including the NICKNAME_SUFFIX.
-    /// Width should be the width of the `TextField`. When length of the nick is 30% or less of the
+    /// Width should be the width of the `InputArea`. When length of the nick is 30% or less of the
     /// `TextField` width we show it (returns width of the nick), otherwise we don't (returns 0).
-    fn len(&self, textfield_width: i32) -> usize {
+    fn len(&self, input_area_width: i32) -> usize {
         let len = self.value.len() + NICKNAME_SUFFIX.len();
-        if len as f32 <= textfield_width as f32 * (30f32 / 100f32) {
+        if len as f32 <= input_area_width as f32 * (30f32 / 100f32) {
             len
         } else {
             0
@@ -112,9 +112,9 @@ impl Nickname {
     }
 }
 
-impl TextField {
-    pub(crate) fn new(width: i32, max_lines: i32) -> TextField {
-        TextField {
+impl InputArea {
+    pub(crate) fn new(width: i32, max_lines: i32) -> InputArea {
+        InputArea {
             buffer: InputLine::new(),
             cursor: 0,
             width,
@@ -709,7 +709,7 @@ impl TextField {
     }
 }
 
-impl TextField {
+impl InputArea {
     pub(crate) fn autocomplete(&mut self, dict: &Trie) {
         if self.in_autocomplete() {
             // AWFUL CODE YO
@@ -776,7 +776,7 @@ mod tests {
 
     #[test]
     fn text_field_bug() {
-        let mut text_field = TextField::new(10, 50);
+        let mut text_field = InputArea::new(10, 50);
         text_field.keypressed(Key::Char('a'));
         text_field.keypressed(Key::Char(' '));
         text_field.keypressed(Key::Char('b'));

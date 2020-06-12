@@ -5,17 +5,13 @@ use std::convert::From;
 
 use time::{self, Tm};
 
-use crate::{
-    config::Colors,
-    exit_dialogue::ExitDialogue,
-    input_area::TextField,
-    msg_area::{
-        line::{SchemeStyle, SegStyle},
-        MsgArea,
-    },
-    trie::Trie,
-    widget::WidgetRet,
-};
+use crate::config::Colors;
+use crate::exit_dialogue::ExitDialogue;
+use crate::input_area::InputArea;
+use crate::msg_area::line::{SchemeStyle, SegStyle};
+use crate::msg_area::MsgArea;
+use crate::trie::Trie;
+use crate::widget::WidgetRet;
 
 /// A messaging screen is just a text field to type messages and msg area to
 /// show incoming/sent messages.
@@ -25,7 +21,7 @@ pub(crate) struct MessagingUI {
 
     // exit_dialogue handles input when available.
     // two fields (instead of an enum etc.) to avoid borrowchk problems
-    input_field: TextField,
+    input_field: InputArea,
     exit_dialogue: Option<ExitDialogue>,
 
     width: i32,
@@ -77,7 +73,7 @@ impl MessagingUI {
     pub(crate) fn new(width: i32, height: i32, status: bool) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1),
-            input_field: TextField::new(width, get_input_field_max_height(height)),
+            input_field: InputArea::new(width, get_input_field_max_height(height)),
             exit_dialogue: None,
             width,
             height,
