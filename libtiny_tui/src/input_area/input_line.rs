@@ -7,8 +7,9 @@ pub(crate) struct InputLine {
     /// Input buffer
     buffer: Vec<char>,
 
-    /// Vector of whitespace indices in `buffer`. Used to split lines in wrapping mode. Gets
-    /// invalidated in `calculate_height` is called.
+    /// Vector of whitespace indices in `buffer`. Used to split lines in wrapping mode.
+    /// Generated/updated in `calculate_height`, used when drawing.
+    // TODO (osa): Cache this and generate only when needed when drawing?
     ws_indices: Vec<i32>,
 }
 
