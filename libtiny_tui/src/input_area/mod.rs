@@ -5,6 +5,7 @@ use term_input::{Arrow, Key};
 use termbox_simple::Termbox;
 
 use crate::config::{Colors, Style};
+use crate::msg_area::MsgArea;
 use crate::termbox;
 use crate::trie::Trie;
 use crate::utils;
@@ -146,7 +147,21 @@ impl InputArea {
         self.max_lines = max_lines;
     }
 
-    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(
+        &mut self,
+        tb: &mut Termbox,
+        colors: &Colors,
+        pos_x: i32,
+        parent_y: i32,
+        parent_height: i32,
+        msg_area: &mut MsgArea,
+    ) {
+        let input_field_height = self.get_height(self.width);
+        // if the height of msg_area needs to change...
+        if parent_height - input_field_height != msg_area.get_height() {
+            msg_area.resize(self.width, parent_height - input_field_height);
+        }
+        let pos_y = parent_y + parent_height - input_field_height;
         let mut nick_length = 0;
         if let Some(nick) = &self.nick {
             nick.draw(tb, colors, pos_x, pos_y, self.width);
@@ -547,18 +562,16 @@ impl InputArea {
     }
 
     fn calculate_height(&mut self, width: i32) -> i32 {
-        let mut line_count: i32 = 1;
         let mut nick_length = 0;
         if let Some(nick) = &self.nick {
             nick_length = nick.len(self.width);
         }
-        if self.current_buffer_len() >= width - nick_length as i32 {
-            if self.in_autocomplete() {
-                line_count = self.calculate_height_autocomplete(width, nick_length) as i32;
-            } else {
-                line_count = self.shown_line().calculate_height(width, nick_length) as i32;
-            }
-        }
+        let line_count = if self.in_autocomplete() {
+            self.calculate_height_autocomplete(width, nick_length) as i32
+        } else {
+            self.shown_line().calculate_height(width, nick_length) as i32
+        };
+        self.height = Some(line_count);
         line_count
     }
 
