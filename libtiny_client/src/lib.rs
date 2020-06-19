@@ -1,5 +1,5 @@
 #![recursion_limit = "512"]
-#![feature(test)]
+#![feature(test, pattern)]
 #![allow(clippy::unneeded_field_pattern)]
 #![allow(clippy::cognitive_complexity)]
 
