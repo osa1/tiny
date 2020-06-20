@@ -98,24 +98,17 @@ impl MessagingUI {
     }
 
     pub(crate) fn draw(&mut self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
-        let input_field_height = self.input_field.get_height(self.width);
-
-        // if the height of msg_area needs to change...
-        if self.height - input_field_height != self.msg_area.get_height() {
-            self.msg_area
-                .resize(self.width, self.height - input_field_height);
-        }
-        self.msg_area.draw(tb, colors, pos_x, pos_y);
-
-        let input_field_y = pos_y + self.height - input_field_height;
         match &self.exit_dialogue {
             Some(exit_dialogue) => {
-                exit_dialogue.draw(tb, colors, pos_x, input_field_y);
+                exit_dialogue.draw(tb, colors, pos_x, self.height - 1);
             }
             None => {
-                self.input_field.draw(tb, colors, pos_x, input_field_y);
+                // Draw InputArea first because it can trigger a resize of MsgArea
+                self.input_field
+                    .draw(tb, colors, pos_x, pos_y, self.height, &mut self.msg_area);
             }
         }
+        self.msg_area.draw(tb, colors, pos_x, pos_y);
     }
 
     pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
