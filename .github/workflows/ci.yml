@@ -32,7 +32,9 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Install native dependencies
-        run: sudo apt-get install libdbus-1-dev pkg-config libssl-dev
+        run: |
+            sudo apt-get update
+            sudo apt-get install libdbus-1-dev pkg-config libssl-dev
 
       - name: Get nightly toolchain
         uses: actions-rs/toolchain@v1
