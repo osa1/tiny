@@ -19,6 +19,9 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 
+#[macro_use]
+extern crate log;
+
 fn main() {
     let cli::Args {
         servers: server_args,

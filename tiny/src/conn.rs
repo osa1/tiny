@@ -317,76 +317,72 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
             client: _,
             subcommand,
             params,
-        } => {
-            match subcommand.as_ref() {
-                "NAK" => {
-                    if params.iter().any(|cap| cap.as_str() == "sasl") {
-                        let msg_target = MsgTarget::Server { serv };
-                        ui.add_err_msg(
-                            "Server rejected using SASL authenication capability",
-                            time::now(),
-                            &msg_target,
-                        );
-                    }
-                }
-                "LS" => {
-                    if !params.iter().any(|cap| cap.as_str() == "sasl") {
-                        let msg_target = MsgTarget::Server { serv };
-                        ui.add_err_msg(
-                            "Server does not support SASL authenication",
-                            time::now(),
-                            &msg_target,
-                        );
-                    }
-                }
-                "ACK" => {}
-                _cmd => {
-                    // self.logger
-                    //     .get_debug_logs()
-                    //     .write_line(format_args!("CAP subcommand {} is not handled", cmd));
+        } => match subcommand.as_ref() {
+            "NAK" => {
+                if params.iter().any(|cap| cap.as_str() == "sasl") {
+                    let msg_target = MsgTarget::Server { serv };
+                    ui.add_err_msg(
+                        "Server rejected using SASL authenication capability",
+                        time::now(),
+                        &msg_target,
+                    );
                 }
             }
-        }
+            "LS" => {
+                if !params.iter().any(|cap| cap.as_str() == "sasl") {
+                    let msg_target = MsgTarget::Server { serv };
+                    ui.add_err_msg(
+                        "Server does not support SASL authenication",
+                        time::now(),
+                        &msg_target,
+                    );
+                }
+            }
+            "ACK" => {}
+            cmd => {
+                debug!("Ignoring CAP subcommand {}: params={:?}", cmd, params);
+            }
+        },
 
         AUTHENTICATE { .. } => {
             // Ignore
         }
 
         Reply { num: n, params } => {
-            if n <= 003 /* RPL_WELCOME, RPL_YOURHOST, RPL_CREATED */
-                    || n == 251 /* RPL_LUSERCLIENT */
-                    || n == 255 /* RPL_LUSERME */
-                    || n == 372 /* RPL_MOTD */
-                    || n == 375 /* RPL_MOTDSTART */
+            let n_params = params.len();
+            if (
+                n <= 003 // RPL_WELCOME, RPL_YOURHOST, RPL_CREATED
+                    || n == 251 // RPL_LUSERCLIENT
+                    || n == 255 // RPL_LUSERME
+                    || n == 372 // RPL_MOTD
+                    || n == 375 // RPL_MOTDSTART
                     || n == 376
-            /* RPL_ENDOFMOTD */
+                // RPL_ENDOFMOTD
+            ) && n_params == 2
             {
-                debug_assert_eq!(params.len(), 2);
                 let msg = &params[1];
                 ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
             } else if n == 4 // RPL_MYINFO
                     || n == 5 // RPL_BOUNCE
                     || (n >= 252 && n <= 254)
-            /* RPL_LUSEROP, RPL_LUSERUNKNOWN, */
-            /* RPL_LUSERCHANNELS */
+            // RPL_LUSEROP, RPL_LUSERUNKNOWN, RPL_LUSERCHANNELS
             {
                 let msg = params.into_iter().collect::<Vec<String>>().join(" ");
                 ui.add_msg(&msg, time::now(), &MsgTarget::Server { serv });
-            } else if n == 265 || n == 266 || n == 250 {
-                let msg = &params[params.len() - 1];
+            } else if (n == 265 || n == 266 || n == 250) && n_params > 0 {
+                let msg = &params[n_params - 1];
                 ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
             }
             // RPL_TOPIC
-            else if n == 332 {
-                // FIXME: RFC 2812 says this will have 2 arguments, but freenode
-                // sends 3 arguments (extra one being our nick).
-                assert!(params.len() == 3 || params.len() == 2);
-                let chan = &params[params.len() - 2];
-                let topic = &params[params.len() - 1];
+            else if n == 332 && (n_params == 3 || n_params == 2) {
+                // RFC 2812 says this will have 2 arguments, but freenode sends 3 arguments (extra
+                // one being our nick).
+                let chan = &params[n_params - 2];
+                let topic = &params[n_params - 1];
                 ui.set_topic(topic, time::now(), serv, chan);
             }
             // RPL_NAMREPLY: List of users in a channel
-            else if n == 353 {
+            else if n == 353 && n_params > 3 {
                 let chan = &params[2];
                 let chan_target = MsgTarget::Chan { serv, chan };
 
@@ -398,17 +394,17 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
             else if n == 366 {
             }
             // RPL_UNAWAY or RPL_NOWAWAY
-            else if n == 305 || n == 306 {
+            else if (n == 305 || n == 306) && n_params > 1 {
                 let msg = &params[1];
                 ui.add_client_msg(msg, &MsgTarget::AllServTabs { serv });
             }
             // ERR_NOSUCHNICK
-            else if n == 401 {
+            else if n == 401 && n_params > 2 {
                 let nick = &params[1];
                 let msg = &params[2];
                 ui.add_client_msg(msg, &MsgTarget::User { serv, nick });
             // RPL_AWAY
-            } else if n == 301 {
+            } else if n == 301 && n_params > 2 {
                 let nick = &params[1];
                 let msg = &params[2];
                 ui.add_client_msg(
@@ -429,18 +425,17 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                         );
                         ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
-                    _pfx => {
-                        // add everything else to debug file
-                        // self.logger.get_debug_logs().write_line(format_args!(
-                        //     "Ignoring numeric reply msg:\nPfx: {:?}, num: {:?}, args: {:?}",
-                        //     pfx, n, params
-                        // ));
+                    pfx => {
+                        debug!(
+                            "Ignoring numeric reply {}: pfx={:?}, params={:?}",
+                            n, pfx, params
+                        );
                     }
                 }
             }
         }
 
-        Other { cmd: _, params } => match pfx {
+        Other { cmd, params } => match pfx {
             Some(Server(msg_serv)) => {
                 let msg_target = MsgTarget::Server { serv };
                 ui.add_privmsg(
@@ -453,13 +448,11 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 );
                 ui.set_tab_style(TabStyle::NewMsg, &msg_target);
             }
-            _pfx => {
-                // self.logger.get_debug_logs().write_line(format_args!(
-                //     "Ignoring msg:\nPfx: {:?}, msg: {} :{}",
-                //     pfx,
-                //     cmd,
-                //     params.join(" "),
-                // ));
+            pfx => {
+                debug!(
+                    "Ignoring server command {}: pfx={:?}, params={:?}",
+                    cmd, pfx, params
+                );
             }
         },
     }

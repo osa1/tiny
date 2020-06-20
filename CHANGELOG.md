@@ -21,6 +21,8 @@
 - Input field now grows vertically on overflow, instead of scrolling. The old
   scrolling behavior is used when there isn't enough space in the window to
   extend input field vertically. (#101)
+- A few crashes when connecting to some IRC servers fixed. tiny is now more
+  resilient to non-standard-conforming messages from servers. (#211)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
