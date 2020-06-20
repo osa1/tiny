@@ -15,6 +15,7 @@ jobs:
 
       - name: Install native dependencies
         run: |
+            sudo apt-get update
             sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
                 musl musl-dev musl-tools
 
