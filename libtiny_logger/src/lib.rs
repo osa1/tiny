@@ -113,6 +113,14 @@ macro_rules! report_io_err {
     };
 }
 
+// '/' is valid in channel names but we can't use it in file names, so we replace it with '-'.
+// According to RFC 2812 nick names can't contain '/', but we still use this in nicks just to be
+// safe. Other special characters mentioned in the RFC ("[]\`^{|}") can be used in file names so we
+// don't replace those.
+fn replace_forward_slash(path: &str) -> String {
+    path.replace('/', "-")
+}
+
 // This is a macro to avoid borrow checking issues
 macro_rules! try_open_log_file {
     ( $report_err:expr, $path:expr ) => {
@@ -169,7 +177,7 @@ impl LoggerInner {
             }
             Some(server) => {
                 let mut path = self.log_dir.clone();
-                path.push(&format!("{}_{}.txt", serv, chan));
+                path.push(&format!("{}_{}.txt", serv, replace_forward_slash(chan)));
                 debug!("Trying to open log file: {:?}", path);
                 if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
                     report_io_err!(self.report_err, print_header(&mut fd));
@@ -336,7 +344,7 @@ impl LoggerInner {
                                 // We don't have a `new_user_tab` trait method so user log files
                                 // are created here
                                 let mut path = self.log_dir.clone();
-                                path.push(&format!("{}_{}.txt", serv, nick));
+                                path.push(&format!("{}_{}.txt", serv, replace_forward_slash(nick)));
                                 debug!("Trying to open log file: {:?}", path);
                                 if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
                                     report_io_err!(self.report_err, print_header(&mut fd));

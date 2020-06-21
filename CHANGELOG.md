@@ -23,6 +23,8 @@
   extend input field vertically. (#101)
 - A few crashes when connecting to some IRC servers fixed. tiny is now more
   resilient to non-standard-conforming messages from servers. (#211)
+- Fixed a bug in logger when the channel name contains forward slash character.
+  (#214)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
