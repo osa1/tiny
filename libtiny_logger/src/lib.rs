@@ -121,17 +121,14 @@ fn replace_forward_slash(path: &str) -> String {
     path.replace('/', "-")
 }
 
-// This is a macro to avoid borrow checking issues
-macro_rules! try_open_log_file {
-    ( $report_err:expr, $path:expr ) => {
-        match OpenOptions::new().create(true).append(true).open($path) {
-            Ok(fd) => Some(fd),
-            Err(err) => {
-                $report_err(format!("Couldn't open file {:?}: {}", $path, err));
-                None
-            }
+fn try_open_log_file(path: &PathBuf, report_err: &dyn Fn(String)) -> Option<File> {
+    match OpenOptions::new().create(true).append(true).open(path) {
+        Ok(fd) => Some(fd),
+        Err(err) => {
+            report_err(format!("Couldn't open file {:?}: {}", path, err));
+            None
         }
-    };
+    }
 }
 
 impl LoggerInner {
@@ -153,7 +150,7 @@ impl LoggerInner {
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         debug!("Trying to open log file: {:?}", path);
-        if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
+        if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
             report_io_err!(self.report_err, print_header(&mut fd));
             self.servers.insert(
                 serv.to_string(),
@@ -179,7 +176,7 @@ impl LoggerInner {
                 let mut path = self.log_dir.clone();
                 path.push(&format!("{}_{}.txt", serv, replace_forward_slash(chan)));
                 debug!("Trying to open log file: {:?}", path);
-                if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
+                if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                     report_io_err!(self.report_err, print_header(&mut fd));
                     server.chans.insert(chan.to_string(), fd);
                 }
@@ -346,7 +343,7 @@ impl LoggerInner {
                                 let mut path = self.log_dir.clone();
                                 path.push(&format!("{}_{}.txt", serv, replace_forward_slash(nick)));
                                 debug!("Trying to open log file: {:?}", path);
-                                if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
+                                if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                                     report_io_err!(self.report_err, print_header(&mut fd));
                                     f(&mut fd, &*self.report_err);
                                     users.insert(nick.to_owned(), fd);
