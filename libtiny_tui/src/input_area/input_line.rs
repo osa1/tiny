@@ -83,7 +83,7 @@ impl LineDataCache {
     /// will be needed to render the text with word wrapping.
     /// If an offset is provided, it will continue the calculation
     /// from the saved state and save the new line count in `line_count`.
-    fn calculate_height(&mut self, buffer: &Vec<char>, offset: usize) {
+    fn calculate_height(&mut self, buffer: &[char], offset: usize) {
         debug_assert!(offset <= buffer.len());
         let mut temp_count = 1;
         if let Some(line_count) = self.line_count {
