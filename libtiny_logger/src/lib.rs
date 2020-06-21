@@ -113,6 +113,19 @@ macro_rules! report_io_err {
     };
 }
 
+// This is a macro to avoid borrow checking issues
+macro_rules! try_open_log_file {
+    ( $report_err:expr, $path:expr ) => {
+        match OpenOptions::new().create(true).append(true).open($path) {
+            Ok(fd) => Some(fd),
+            Err(err) => {
+                $report_err(format!("Couldn't open file {:?}: {}", $path, err));
+                None
+            }
+        }
+    };
+}
+
 impl LoggerInner {
     fn new(log_dir: PathBuf, report_err: Box<dyn Fn(String)>) -> Result<LoggerInner> {
         if let Err(err) = fs::create_dir(&log_dir) {
@@ -132,20 +145,17 @@ impl LoggerInner {
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         debug!("Trying to open log file: {:?}", path);
-        let mut fd = report_io_err!(
-            self.report_err,
-            OpenOptions::new().create(true).append(true).open(path)
-        );
-        report_io_err!(self.report_err, print_header(&mut fd));
-
-        self.servers.insert(
-            serv.to_string(),
-            ServerLogs {
-                fd,
-                chans: HashMap::new(),
-                users: HashMap::new(),
-            },
-        );
+        if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
+            report_io_err!(self.report_err, print_header(&mut fd));
+            self.servers.insert(
+                serv.to_string(),
+                ServerLogs {
+                    fd,
+                    chans: HashMap::new(),
+                    users: HashMap::new(),
+                },
+            );
+        }
     }
 
     fn close_server_tab(&mut self, serv: &str) {
@@ -161,12 +171,10 @@ impl LoggerInner {
                 let mut path = self.log_dir.clone();
                 path.push(&format!("{}_{}.txt", serv, chan));
                 debug!("Trying to open log file: {:?}", path);
-                let mut fd = report_io_err!(
-                    self.report_err,
-                    OpenOptions::new().create(true).append(true).open(path)
-                );
-                report_io_err!(self.report_err, print_header(&mut fd));
-                server.chans.insert(chan.to_string(), fd);
+                if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
+                    report_io_err!(self.report_err, print_header(&mut fd));
+                    server.chans.insert(chan.to_string(), fd);
+                }
             }
         }
     }
@@ -320,21 +328,23 @@ impl LoggerInner {
                         debug!("Can't find server: {}", serv);
                     }
                     Some(ServerLogs { ref mut users, .. }) => {
-                        if !users.contains_key(nick) {
-                            // We don't have a `new_user_tab` trait method so user log files are
-                            // created here
-                            let mut path = self.log_dir.clone();
-                            path.push(&format!("{}_{}.txt", serv, nick));
-                            debug!("Trying to open log file: {:?}", path);
-                            let mut fd = report_io_err!(
-                                self.report_err,
-                                OpenOptions::new().create(true).append(true).open(path)
-                            );
-                            report_io_err!(self.report_err, print_header(&mut fd));
-                            users.insert(nick.to_owned(), fd);
+                        match users.get_mut(nick) {
+                            Some(fd) => {
+                                f(fd, &*self.report_err);
+                            }
+                            None => {
+                                // We don't have a `new_user_tab` trait method so user log files
+                                // are created here
+                                let mut path = self.log_dir.clone();
+                                path.push(&format!("{}_{}.txt", serv, nick));
+                                debug!("Trying to open log file: {:?}", path);
+                                if let Some(mut fd) = try_open_log_file!(self.report_err, &path) {
+                                    report_io_err!(self.report_err, print_header(&mut fd));
+                                    f(&mut fd, &*self.report_err);
+                                    users.insert(nick.to_owned(), fd);
+                                }
+                            }
                         }
-                        let fd = users.get_mut(nick).unwrap();
-                        f(fd, &*self.report_err);
                     }
                 }
             }
