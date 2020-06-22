@@ -11,7 +11,7 @@ mod ui;
 mod utils;
 
 use libtiny_client::{Client, ServerInfo};
-use libtiny_logger::Logger;
+use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::{MsgTarget, TUI};
 use libtiny_ui::UI;
 
@@ -121,11 +121,12 @@ fn run(
         };
         let logger: Option<Logger> =
             log_dir.and_then(|log_dir| match Logger::new(log_dir, report_logger_error) {
-                Err(err) => {
+                Err(LoggerInitError::CouldNotCreateDir { dir_path, err }) => {
                     tui.add_client_err_msg(
-                        &format!("Can't create logger: {}", err),
-                        &MsgTarget::CurrentTab,
+                        &format!("Could not create log directory {:?}: {}", dir_path, err),
+                        &MsgTarget::Server { serv: "mentions" },
                     );
+                    tui.draw();
                     None
                 }
                 Ok(logger) => {

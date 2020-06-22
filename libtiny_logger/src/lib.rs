@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
-use std::io::Result;
 use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -19,8 +18,16 @@ pub struct Logger {
     inner: Rc<RefCell<LoggerInner>>,
 }
 
+#[derive(Debug)]
+pub enum LoggerInitError {
+    CouldNotCreateDir { dir_path: PathBuf, err: io::Error },
+}
+
 impl Logger {
-    pub fn new(log_dir: PathBuf, report_err: Box<dyn Fn(String)>) -> Result<Logger> {
+    pub fn new(
+        log_dir: PathBuf,
+        report_err: Box<dyn Fn(String)>,
+    ) -> Result<Logger, LoggerInitError> {
         Ok(Logger {
             inner: Rc::new(RefCell::new(LoggerInner::new(log_dir, report_err)?)),
         })
@@ -90,7 +97,7 @@ struct ServerLogs {
     users: HashMap<String, File>,
 }
 
-fn print_header(fd: &mut File) -> Result<()> {
+fn print_header(fd: &mut File) -> io::Result<()> {
     writeln!(fd)?;
     writeln!(
         fd,
@@ -132,10 +139,16 @@ fn try_open_log_file(path: &PathBuf, report_err: &dyn Fn(String)) -> Option<File
 }
 
 impl LoggerInner {
-    fn new(log_dir: PathBuf, report_err: Box<dyn Fn(String)>) -> Result<LoggerInner> {
+    fn new(
+        log_dir: PathBuf,
+        report_err: Box<dyn Fn(String)>,
+    ) -> Result<LoggerInner, LoggerInitError> {
         if let Err(err) = fs::create_dir(&log_dir) {
             if err.kind() != io::ErrorKind::AlreadyExists {
-                return Err(err);
+                return Err(LoggerInitError::CouldNotCreateDir {
+                    dir_path: log_dir,
+                    err,
+                });
             }
         }
 
