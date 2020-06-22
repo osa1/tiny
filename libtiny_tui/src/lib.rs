@@ -7,6 +7,7 @@ mod config;
 mod editor;
 mod exit_dialogue;
 mod input_area;
+mod line_split;
 mod messaging;
 #[doc(hidden)]
 // FIXME: This is "pub" to be able to use in an example
