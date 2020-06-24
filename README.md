@@ -193,11 +193,13 @@ Commands start with `/` character.
   Running this command in a server tab applies it to all channels of that
   server. You can check your notify state in the status line.
 
-## Server Commands
+## Server commands
 
-For commands not supported by tiny as a slash command, sending the command in the server tab will send the message directly to the server.
+For commands not supported by tiny as a slash command, sending the command in
+the server tab will send the message directly to the server.
 
 ### Examples:
+
 - `LIST` will list all channels on the server
 - `MOTD` will display the server Message of the Day
 - `RULES` will display server rules
@@ -206,3 +208,7 @@ For commands not supported by tiny as a slash command, sending the command in th
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+Join us at #tiny in [irc.oftc.net][oftc] to chat about anything related to tiny!
+
+[oftc]: https://www.oftc.net/

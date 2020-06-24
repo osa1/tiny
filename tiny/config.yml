@@ -1,17 +1,17 @@
 # Servers to auto-connect
 servers:
-    - addr: chat.freenode.net
+    - addr: irc.oftc.net
       port: 6697
       tls: true
       realname: yourname
       nicks: [tiny_user]
 
       # (optional) Server alias for display in tab line
-      # alias: Freenode
+      # alias: OFTC
 
       # Channels to automatically join
       join:
-          - '##rust'
+          - '#tiny'
 
       # Three authentication methods: pass, sasl, and nickserv_ident
       # These are optional and you probably only need one of these, delete
@@ -42,13 +42,16 @@ log_dir: '{}'
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
 #
+# Below are the defaults. You can delete them if you don't want to change
+# anything.
+#
 # Accepted color names are:
 # default (0), black (0), maroon (1), green (2), olive (3), navy (4),
 # purple (5), teal (6), silver (7), gray (8), red (9), lime (10),
 # yellow (11), blue (12), magenta (13), cyan (14), white (15)
 #
 # Attributes can be combined (e.g [bold, underline]), and valid values are bold
-# and underline
+# and underline.
 colors:
     nick: [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ]
 
