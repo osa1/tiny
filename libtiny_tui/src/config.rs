@@ -13,6 +13,8 @@ pub use termbox_simple::*;
 pub(crate) struct Config {
     #[serde(default)]
     pub(crate) colors: Colors,
+    #[serde(default = "usize::max_value")]
+    pub(crate) scrollback: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -50,6 +50,9 @@ pub(crate) struct TUI {
     /// Color scheme
     colors: Colors,
 
+    /// Max number of message lines
+    scrollback: usize,
+
     tabs: Vec<Tab>,
     active_idx: usize,
     width: i32,
@@ -91,6 +94,7 @@ impl TUI {
         let mut tui = TUI {
             tb,
             colors: Colors::default(),
+            scrollback: usize::MAX,
             tabs: Vec::new(),
             active_idx: 0,
             width,
@@ -227,7 +231,10 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                Ok(Config { colors }) => self.set_colors(colors),
+                Ok(Config { colors, scrollback }) => {
+                    self.set_colors(colors);
+                    self.scrollback = scrollback.max(1);
+                }
             }
         }
     }
@@ -291,7 +298,12 @@ impl TUI {
             idx,
             Tab {
                 alias,
-                widget: MessagingUI::new(self.width, self.height - 1 - statusline_height, status),
+                widget: MessagingUI::new(
+                    self.width,
+                    self.height - 1 - statusline_height,
+                    status,
+                    self.scrollback,
+                ),
                 src,
                 style: TabStyle::Normal,
                 switch,

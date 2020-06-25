@@ -1,14 +1,15 @@
 pub(crate) mod line;
 
+use std::collections::VecDeque;
 use std::{cmp::max, mem, str};
-
 use termbox_simple::Termbox;
 
 pub(crate) use self::line::{Line, SegStyle};
 use crate::config::Colors;
 
 pub(crate) struct MsgArea {
-    lines: Vec<Line>,
+    lines: VecDeque<Line>,
+    scrollback: usize,
 
     // Rendering related
     width: i32,
@@ -27,9 +28,10 @@ pub(crate) struct MsgArea {
 }
 
 impl MsgArea {
-    pub(crate) fn new(width: i32, height: i32) -> MsgArea {
+    pub(crate) fn new(width: i32, height: i32, scrollback: usize) -> MsgArea {
         MsgArea {
-            lines: Vec::new(),
+            lines: VecDeque::with_capacity(512.min(scrollback)),
+            scrollback,
             width,
             height,
             scroll: 0,
@@ -157,8 +159,13 @@ impl MsgArea {
 
     pub(crate) fn flush_line(&mut self) -> usize {
         let line_height = self.line_buf.rendered_height(self.width);
+        // Check if we're about to overflow
+        if self.lines.len() == self.scrollback {
+            // Remove oldest line
+            self.lines.pop_front();
+        }
         self.lines
-            .push(mem::replace(&mut self.line_buf, Line::new()));
+            .push_back(mem::replace(&mut self.line_buf, Line::new()));
         if self.scroll != 0 {
             self.scroll += line_height;
         }
@@ -189,7 +196,7 @@ mod tests {
 
     #[test]
     fn newline_scrolling() {
-        let mut msg_area = MsgArea::new(100, 1);
+        let mut msg_area = MsgArea::new(100, 1, usize::MAX);
         // Adding a new line when scroll is 0 should not change it
         assert_eq!(msg_area.scroll, 0);
         msg_area.add_text("line1");
@@ -205,5 +212,22 @@ mod tests {
         msg_area.add_text("line3");
         msg_area.flush_line();
         assert_eq!(msg_area.scroll, 2);
+    }
+
+    #[test]
+    fn test_max_lines() {
+        // Can't show more than 3 lines.
+        let mut msg_area = MsgArea::new(100, 1, 3);
+        msg_area.add_text("first");
+        msg_area.flush_line();
+        msg_area.add_text("second");
+        msg_area.flush_line();
+        msg_area.add_text("third");
+        msg_area.flush_line();
+        assert_eq!(msg_area.lines.len(), 3);
+        msg_area.add_text("fourth");
+        // Will pop out "first" line
+        msg_area.flush_line();
+        assert_eq!(msg_area.lines.len(), 3);
     }
 }
