@@ -25,6 +25,8 @@
   resilient to non-standard-conforming messages from servers. (#211)
 - Fixed a bug in logger when the channel name contains forward slash character.
   (#214)
+- A new setting 'scrollback' added to limit max. number of lines in tabs. The
+  limit is off by default (old behavior). (#219)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
