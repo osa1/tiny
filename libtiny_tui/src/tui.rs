@@ -442,71 +442,73 @@ impl TUI {
             Event::Key(key) => self.keypressed(key),
 
             Event::String(str) => {
-                // For some reason on my terminal newlines in text are
-                // translated to carriage returns when pasting so we check for
-                // both just to make sure
+                // For some reason on my terminal newlines in text are translated to carriage
+                // returns when pasting so we check for both just to make sure
                 if str.contains('\n') || str.contains('\r') {
-                    return self.edit_input(&str);
-                } else {
-                    // TODO this may be too slow for pasting long single lines
-                    for ch in str.chars() {
-                        self.handle_input_event(Event::Key(Key::Char(ch)));
+                    // NB. This code path used to implement "run input in $EDITOR" feature. However
+                    // it's quite difficult to implement that feature without adding lots of hacks
+                    // everywhere, and it wasn't clear to me whether it's useful/needed, so I
+                    // removed it.
+                    //
+                    // There were two main difficulties:
+                    //
+                    // - We need to stop handling stdin so that the spawned process (e.g. vim) can
+                    //   read it, but we don't have control over tokio event loop and/or the
+                    //   term_input handle here, and even if we had, it's not clear to me how to do
+                    //   this.
+                    //
+                    // - We need a task that will wait for the spawned process to exit, and send
+                    //   the output to TUI. Because we don't want to block the event loop
+                    //   (otherwise connections will time out, see #185) we have to wait the
+                    //   spawned process in a new thread, and then send the results back to TUI.
+                    //   For this we either need a channel registered in the event loop and send
+                    //   the output via that, or make TUI a `Arc<Mutex<TUI>>` instead of
+                    //   `Rc<RefCell<TUI>>`. I don't know if this feature is worth adding these
+                    //   overheads and making the code more complicated.
+                    //
+                    // Currently: send all lines but the last line. Last line will be used as the
+                    // input field contents.
+                    let tab = &mut self.tabs[self.active_idx].widget;
+
+                    let mut lines = vec![];
+
+                    let mut first = true;
+                    for line in str.split(&['\n', '\r'][..]) {
+                        if first {
+                            // First line is appended to the text field contents
+                            let mut tf = tab.flush_input_field();
+                            tf.push_str(line);
+                            lines.push(tf);
+                            first = false;
+                        } else {
+                            lines.push(line.to_owned());
+                        }
                     }
-                }
-                TUIRet::KeyHandled
-            }
 
-            ev => TUIRet::EventIgnored(ev),
-        }
-    }
-
-    /// Edit current input + `str` before sending.
-    fn edit_input(&mut self, str: &str) -> TUIRet {
-        let tab = &mut self.tabs[self.active_idx].widget;
-        let tf = tab.flush_input_field();
-        match paste_lines(&mut self.tb, tf, &str) {
-            Ok(lines) => {
-                // If there's only one line just add it to the input field, do not send it
-                if lines.len() == 1 {
-                    tab.set_input_field(&lines[0]);
-                    TUIRet::KeyHandled
-                } else {
-                    // Otherwise add the lines to text field history and send it
+                    // unwrap below never fails as we know the string contains '\n' or '\r' at this
+                    // point, so `lines` will have at least two elements.
+                    let last_line = lines.pop().unwrap();
                     for line in &lines {
                         tab.add_input_field_history(line);
                     }
-                    TUIRet::Lines {
+                    tab.set_input_field(&last_line);
+                    let ret = TUIRet::Lines {
                         lines,
                         from: self.tabs[self.active_idx].src.clone(),
+                    };
+
+                    debug!("{:?}", ret);
+
+                    ret
+                } else {
+                    for ch in str.chars() {
+                        self.handle_input_event(Event::Key(Key::Char(ch)));
                     }
+                    TUIRet::KeyHandled
                 }
             }
-            Err(err) => {
-                use std::env::VarError;
-                match err {
-                    PasteError::Io(err) => {
-                        self.add_client_err_msg(
-                            &format!("Error while running $EDITOR: {:?}", err),
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    PasteError::Var(VarError::NotPresent) => {
-                        self.add_client_err_msg(
-                            "Can't paste multi-line string: \
-                             make sure your $EDITOR is set",
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    PasteError::Var(VarError::NotUnicode(_)) => {
-                        self.add_client_err_msg(
-                            "Can't paste multi-line string: \
-                             can't parse $EDITOR (not unicode)",
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                }
-                TUIRet::KeyHandled
-            }
+
+            ev => TUIRet::EventIgnored(ev),
         }
     }
 
@@ -534,8 +536,6 @@ impl TUI {
                 self.prev_tab();
                 TUIRet::KeyHandled
             }
-
-            Key::Ctrl('x') => self.edit_input(""),
 
             Key::AltChar(c) => match c.to_digit(10) {
                 Some(i) => {
@@ -1371,67 +1371,4 @@ impl From<::std::env::VarError> for PasteError {
     fn from(err: ::std::env::VarError) -> PasteError {
         PasteError::Var(err)
     }
-}
-
-/// The user tried to paste the multi-line string passed as the argument. Run $EDITOR to edit a
-/// temporary file with the string as the contents. On exit, parse the final contents of the file
-/// (ignore comment lines), and send each line in the file as a message. Abort if any of the lines
-/// look like a command (e.g. `/msg ...`). I don't know what's the best way to handle commands in
-/// this context.
-///
-/// Ok(str) => final string to send
-/// Err(str) => err message to show
-///
-/// FIXME: Ideally this function should get a `Termbox` argument and return a new `Termbox` because
-/// we shutdown the current termbox instance and initialize it again after running $EDITOR.
-fn paste_lines(tb: &mut Termbox, tf: String, str: &str) -> Result<Vec<String>, PasteError> {
-    use std::{
-        io::{Read, Seek, SeekFrom, Write},
-        process::Command,
-    };
-
-    let editor = ::std::env::var("EDITOR")?;
-    let mut tmp_file = ::tempfile::NamedTempFile::new()?;
-
-    writeln!(
-        tmp_file,
-        "\
-         # You pasted a multi-line message. When you close the editor final version of\n\
-         # this file will be sent (ignoring these lines). Delete contents to abort the\n\
-         # paste."
-    )?;
-    write!(tmp_file, "{}", tf)?;
-    write!(tmp_file, "{}", str.replace('\r', "\n"))?;
-
-    tb.suspend();
-    let ret = Command::new(editor).arg(tmp_file.path()).status();
-    tb.activate();
-
-    let ret = ret?;
-    if !ret.success() {
-        return Ok(vec![]); // assume aborted
-    }
-
-    let mut tmp_file = tmp_file.into_file();
-    tmp_file.seek(SeekFrom::Start(0))?;
-
-    let mut file_contents = String::new();
-    tmp_file.read_to_string(&mut file_contents)?;
-
-    let mut filtered_lines = vec![];
-    for s in file_contents.lines() {
-        // Ignore if the char is '#'. To actually send a `#` add space.
-        // For empty lines, send " ".
-        let first_char = s.chars().next();
-        if first_char == Some('#') {
-            // skip this line
-            continue;
-        } else if s.is_empty() {
-            filtered_lines.push(" ".to_owned());
-        } else {
-            filtered_lines.push(s.to_owned());
-        }
-    }
-
-    Ok(filtered_lines)
 }

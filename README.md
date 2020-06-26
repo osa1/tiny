@@ -148,8 +148,6 @@ You can use `--config <path>` to specify your config file location.
 
 - `alt-left/right` move tab to left/right
 
-- `C-x` edit current message in `$EDITOR`
-
 ## Commands
 
 Commands start with `/` character.
