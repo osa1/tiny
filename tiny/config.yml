@@ -39,6 +39,9 @@ defaults:
 # Where to put log files
 log_dir: '{}'
 
+# (Optional) Limits the maximum number of messages stored for each UI tab. Defaults to unlimited.
+# scrollback: 512
+
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
 #

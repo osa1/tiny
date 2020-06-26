@@ -70,9 +70,9 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub(crate) fn new(width: i32, height: i32, status: bool) -> MessagingUI {
+    pub(crate) fn new(width: i32, height: i32, status: bool, scrollback: usize) -> MessagingUI {
         MessagingUI {
-            msg_area: MsgArea::new(width, height - 1),
+            msg_area: MsgArea::new(width, height - 1, scrollback),
             input_field: InputArea::new(width, get_input_field_max_height(height)),
             exit_dialogue: None,
             width,
