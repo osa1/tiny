@@ -126,19 +126,19 @@ You can use `--config <path>` to specify your config file location.
 
 ## Key bindings
 
-- `C-a`/`C-e` to move cursor beginning/end in the input field
+- `C-a`/`C-e` move cursor to beginning/end in the input field
 
-- `C-k` for deleting rest of the line
+- `C-k` delete rest of the line
 
-- `C-w` for deleting a word
+- `C-w` delete a word backwards
 
-- `C-left`/`C-right` for moving one word backward/forward
+- `C-left`/`C-right` move one word backward/forward
 
-- `page up`/`page down` or `shift-up`/`shift-down` or  for scrolling
+- `page up`/`page down`, `shift-up`/`shift-down`, or `C-u`/`C-d` to scroll
 
-- `C-n`/`C-p` for next/previous tab
+- `C-n`/`C-p` next/previous tab
 
-- `C-c enter` to quit.
+- `C-c enter` quit (asks for confirmation)
 
 - `alt-{1,9}` switch to nth tab
 
