@@ -12,6 +12,20 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
 fn main() {
+    run_bench();
+
+    let mut rusage: libc::rusage = unsafe { ::std::mem::zeroed() };
+    match unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut rusage as *mut _) } {
+        0 => {
+            println!("Max RSS (ru_maxrss): {} kb", rusage.ru_maxrss);
+        }
+        i => {
+            println!("getrusage() returned {}", i);
+        }
+    }
+}
+
+fn run_bench() {
     let args = std::env::args().collect::<Vec<_>>();
     let file_path = &args[1];
     let file = File::open(file_path).unwrap();
