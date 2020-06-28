@@ -70,7 +70,7 @@ fn expect_screen(screen: &str, tui: &TUI, w: u16, h: u16, caller: &'static Locat
 
 fn enter_string(tui: &mut TUI, s: &str) {
     for c in s.chars() {
-        tui.handle_input_event(Event::Key(Key::Char(c)));
+        tui.handle_input_event(Event::Key(Key::Char(c)), &mut None);
     }
 }
 
@@ -240,7 +240,7 @@ fn ctrl_w() {
          |< irc.server_1.org #chan      |";
     expect_screen(screen, &tui, 30, 3, Location::caller());
 
-    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    tui.handle_input_event(Event::Key(Key::Ctrl('w')), &mut None);
     tui.draw();
 
     #[rustfmt::skip]
@@ -252,7 +252,7 @@ fn ctrl_w() {
     expect_screen(screen, &tui, 30, 3, Location::caller());
 
     println!("~~~~~~~~~~~~~~~~~~~~~~");
-    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    tui.handle_input_event(Event::Key(Key::Ctrl('w')), &mut None);
     println!("~~~~~~~~~~~~~~~~~~~~~~");
     tui.draw();
 
@@ -273,7 +273,7 @@ fn ctrl_w() {
 
     expect_screen(screen, &tui, 30, 3, Location::caller());
 
-    tui.handle_input_event(Event::Key(Key::Ctrl('w')));
+    tui.handle_input_event(Event::Key(Key::Ctrl('w')), &mut None);
     tui.draw();
 
     #[rustfmt::skip]
@@ -305,11 +305,11 @@ fn test_text_field_wrap() {
 
     for _ in 0..37 {
         let event = term_input::Event::Key(Key::Char('a'));
-        tui.handle_input_event(event);
+        tui.handle_input_event(event, &mut None);
     }
     for _ in 0..5 {
         let event = term_input::Event::Key(Key::Char('b'));
-        tui.handle_input_event(event);
+        tui.handle_input_event(event, &mut None);
     }
 
     tui.draw();
@@ -351,7 +351,7 @@ fn test_text_field_wrap() {
     // the text field
     for _ in 0..6 {
         let event = term_input::Event::Key(Key::Backspace);
-        tui.handle_input_event(event);
+        tui.handle_input_event(event, &mut None);
     }
 
     tui.draw();
@@ -373,7 +373,7 @@ fn test_text_field_wrap() {
     tui.set_size(30, 8);
     for _ in 0..5 {
         let event = term_input::Event::Key(Key::Char('b'));
-        tui.handle_input_event(event);
+        tui.handle_input_event(event, &mut None);
     }
     tui.draw();
 
@@ -409,16 +409,16 @@ fn test_text_field_wrap() {
     // Wrapping on words - splits lines on whitespace
     for _ in 0..6 {
         let event = term_input::Event::Key(Key::Backspace);
-        tui.handle_input_event(event);
+        tui.handle_input_event(event, &mut None);
     }
     // InputLine cache gets invalidated after backspace, need to redraw to calculate.
     tui.draw();
     let event = term_input::Event::Key(Key::Char(' '));
-    tui.handle_input_event(event);
+    tui.handle_input_event(event, &mut None);
 
     for _ in 0..5 {
         let event = term_input::Event::Key(Key::Char('b'));
-        tui.handle_input_event(event);
+        tui.handle_input_event(event, &mut None);
     }
 
     tui.draw();
