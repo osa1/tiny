@@ -133,7 +133,8 @@ impl LineDataCache {
                         self.line_lengths
                             .push(self.line_width - self.current_line_length);
                         // store index for drawing
-                        self.split_indices.push(self.last_whitespace_idx.unwrap() + 1);
+                        self.split_indices
+                            .push(self.last_whitespace_idx.unwrap() + 1);
                     } else {
                         // Save previous line length
                         self.line_lengths.push(self.current_line_length - 1);
@@ -162,7 +163,7 @@ impl LineDataCache {
 
     /// Reverses an iteration of calculate_height() by one.
     /// Used for removing one character at the end of the buffer.
-    pub fn remove_one(&mut self, buffer: &Vec<char>, removed_char: char) {
+    pub fn remove_one(&mut self, buffer: &[char], removed_char: char) {
         // subtract the cursor line if there is one
         let mut temp_count = 1;
         if let Some(line_count) = self.line_count {
@@ -175,63 +176,69 @@ impl LineDataCache {
         // if on the first line there will be no reversal of line wrapping
         if temp_count == 1 {
             if removed_char.is_whitespace() {
-                self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
+                self.last_whitespace_idx = buffer
+                    .iter()
+                    .rposition(|c| c.is_whitespace())
+                    .map(|idx| idx as i32);
             }
             self.current_line_length -= 1;
-        } else {
-            if removed_char.is_whitespace() {
-                if self.current_line_length == 1 {
-                    trace!("removed a whitespace on beginning of line. going to previous line.");
-                    // if we're on the second line, then we need to reset to the first line, which
-                    // has the nickname on it
-                    if temp_count == 2 {
-                        self.line_width = self.width - self.nick_length as i32;
-                    }
-                    self.current_line_length = self.line_lengths.pop().unwrap();
-                    self.split_indices.pop();
-                    temp_count -= 1;
-                } else {
-                    self.current_line_length -= 1;
+        } else if removed_char.is_whitespace() {
+            if self.current_line_length == 1 {
+                trace!("removed a whitespace on beginning of line. going to previous line.");
+                // if we're on the second line, then we need to reset to the first line, which
+                // has the nickname on it
+                if temp_count == 2 {
+                    self.line_width = self.width - self.nick_length as i32;
                 }
-                self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
+                self.current_line_length = self.line_lengths.pop().unwrap();
+                self.split_indices.pop();
+                temp_count -= 1;
             } else {
-                if self.current_line_length == 1 {
-                    trace!("removing non-whitespace on beginning of line. going to previous line.");
-                    if temp_count == 2 {
-                        self.line_width = self.width - self.nick_length as i32;
-                    }
-                    self.current_line_length = self.line_lengths.pop().unwrap();
-                    self.split_indices.pop();
-                    self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
-                    temp_count -= 1;
-                } else {
-                    if let Some(last_line_length) = self.line_lengths.last() {
-                        let mut last_line_width = self.line_width;
-                        if temp_count == 2 {
-                            last_line_width = self.width - self.nick_length as i32;
-                        }
-                        // check to see if there's enough space on previous line to reverse word wrapping
-                        // -1 because we already removed a character
-                        if self.current_line_length - 1 + last_line_length < last_line_width {
-                            trace!("reversing word wrap");
-                            if temp_count == 2 {
-                                self.line_width = self.width - self.nick_length as i32;
-                            }
-                            self.current_line_length = self.line_width;
-                            self.line_lengths.pop();
-                            self.split_indices.pop();
-                            self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
-                            temp_count -= 1;
-                        } else {
-                            trace!("subtracting non-whitespace");
-                            self.current_line_length -= 1;
-                        }
-                    } else {
-                        trace!("subtracting non-whitespace");
-                        self.current_line_length -= 1;
-                    }
-                }
+                self.current_line_length -= 1;
             }
+            self.last_whitespace_idx = buffer
+                .iter()
+                .rposition(|c| c.is_whitespace())
+                .map(|idx| idx as i32);
+        } else if self.current_line_length == 1 {
+            trace!("removing non-whitespace on beginning of line. going to previous line.");
+            if temp_count == 2 {
+                self.line_width = self.width - self.nick_length as i32;
+            }
+            self.current_line_length = self.line_lengths.pop().unwrap();
+            self.split_indices.pop();
+            self.last_whitespace_idx = buffer
+                .iter()
+                .rposition(|c| c.is_whitespace())
+                .map(|idx| idx as i32);
+            temp_count -= 1;
+        } else if let Some(last_line_length) = self.line_lengths.last() {
+            let mut last_line_width = self.line_width;
+            if temp_count == 2 {
+                last_line_width = self.width - self.nick_length as i32;
+            }
+            // check to see if there's enough space on previous line to reverse word wrapping
+            // -1 because we already removed a character
+            if self.current_line_length - 1 + last_line_length < last_line_width {
+                trace!("reversing word wrap");
+                if temp_count == 2 {
+                    self.line_width = self.width - self.nick_length as i32;
+                }
+                self.current_line_length = self.line_width;
+                self.line_lengths.pop();
+                self.split_indices.pop();
+                self.last_whitespace_idx = buffer
+                    .iter()
+                    .rposition(|c| c.is_whitespace())
+                    .map(|idx| idx as i32);
+                temp_count -= 1;
+            } else {
+                trace!("subtracting non-whitespace");
+                self.current_line_length -= 1;
+            }
+        } else {
+            trace!("subtracting non-whitespace");
+            self.current_line_length -= 1;
         }
 
         if let Some(ch) = buffer.last() {
