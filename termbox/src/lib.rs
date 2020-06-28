@@ -18,6 +18,8 @@ pub const TB_UNDERLINE: u16 = 0x0200;
 pub struct Termbox {
     // Not available in test instances
     tty: Option<File>,
+    // Used to save `tty` on `suspend` and restore on `activate`
+    old_tty: Option<File>,
     old_term: libc::termios,
     term_width: u16,
     term_height: u16,
@@ -137,6 +139,7 @@ impl Termbox {
         front_buffer.clear(clear_fg, clear_bg);
         let mut termbox = Termbox {
             tty: Some(tty),
+            old_tty: None,
             old_term,
             term_width,
             term_height,
@@ -162,6 +165,7 @@ impl Termbox {
     pub fn init_test(w: u16, h: u16) -> Termbox {
         Termbox {
             tty: None,
+            old_tty: None,
             old_term: unsafe { std::mem::zeroed() },
             term_width: w,
             term_height: h,
@@ -191,6 +195,7 @@ impl Termbox {
     // HACKY
     pub fn suspend(&mut self) {
         self.flip_terms();
+        self.old_tty = self.tty.take();
 
         self.output_buffer
             .extend_from_slice(termion::cursor::Show.as_ref());
@@ -207,6 +212,7 @@ impl Termbox {
     // HACKY
     pub fn activate(&mut self) {
         self.flip_terms();
+        self.tty = self.old_tty.take();
 
         // T_ENTER_CA for xterm
         if let Some(ref mut tty) = self.tty {

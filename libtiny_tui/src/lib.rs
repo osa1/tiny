@@ -103,14 +103,44 @@ async fn input_handler(
     mut snd_abort: mpsc::Sender<()>,
 ) {
     let mut input = Input::new();
-    while let Some(mb_ev) = input.next().await {
-        match mb_ev {
-            Err(io_err) => {
-                debug!("term_input error: {:?}", io_err);
-                return;
+
+    // See module documentation of `editor` for how editor stuff works
+    let mut rcv_editor_ret: Option<editor::ResultReceiver> = None;
+
+    loop {
+        if let Some(editor_ret) = rcv_editor_ret.take() {
+            // $EDITOR running, don't read stdin, wait for $EDITOR to finish
+            match editor_ret.await {
+                Err(recv_error) => {
+                    debug!("RecvError while waiting editor response: {:?}", recv_error);
+                }
+                Ok(editor_ret) => {
+                    if let Some((lines, from)) = tui.borrow_mut().handle_editor_result(editor_ret) {
+                        debug!("editor ret: {:?}", lines);
+                        snd_ev
+                            .try_send(Event::Lines {
+                                lines,
+                                source: from,
+                            })
+                            .unwrap();
+                    }
+                }
             }
-            Ok(ev) => {
-                let tui_ret = tui.borrow_mut().handle_input_event(ev);
+
+            tui.borrow_mut().activate();
+            tui.borrow_mut().draw();
+        }
+
+        match input.next().await {
+            None => {
+                break;
+            }
+            Some(Err(io_err)) => {
+                debug!("term_input error: {:?}", io_err);
+                break;
+            }
+            Some(Ok(ev)) => {
+                let tui_ret = tui.borrow_mut().handle_input_event(ev, &mut rcv_editor_ret);
                 match tui_ret {
                     TUIRet::Abort => {
                         snd_ev.try_send(Event::Abort).unwrap();
@@ -135,17 +165,10 @@ async fn input_handler(
                                 .unwrap();
                         }
                     }
-                    TUIRet::Lines { lines, from } => {
-                        snd_ev
-                            .try_send(Event::Lines {
-                                lines,
-                                source: from,
-                            })
-                            .unwrap();
-                    }
                 }
             }
         }
+
         tui.borrow_mut().draw();
     }
 }

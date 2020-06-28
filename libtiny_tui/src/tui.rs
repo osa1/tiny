@@ -8,7 +8,7 @@ use std::str::SplitWhitespace;
 use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style};
-use crate::editor::{edit, EditorError};
+use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
 use crate::statusline::{draw_statusline, statusline_visible};
@@ -31,12 +31,6 @@ pub(crate) enum TUIRet {
     // https://users.rust-lang.org/t/borrow-checker-bug/5165
     Input {
         msg: Vec<char>,
-        from: MsgSource,
-    },
-
-    /// A pasted string. Send directly.
-    Lines {
-        lines: Vec<String>,
         from: MsgSource,
     },
 }
@@ -83,6 +77,10 @@ impl TUI {
     #[cfg(test)]
     pub(crate) fn get_tb(&self) -> &Termbox {
         &self.tb
+    }
+
+    pub(crate) fn activate(&mut self) {
+        self.tb.activate()
     }
 
     fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
@@ -438,20 +436,24 @@ impl TUI {
         self.fix_scroll_after_close();
     }
 
-    pub(crate) fn handle_input_event(&mut self, ev: Event) -> TUIRet {
+    pub(crate) fn handle_input_event(
+        &mut self,
+        ev: Event,
+        rcv_editor_ret: &mut Option<editor::ResultReceiver>,
+    ) -> TUIRet {
         match ev {
-            Event::Key(key) => self.keypressed(key),
+            Event::Key(key) => self.keypressed(key, rcv_editor_ret),
 
             Event::String(str) => {
                 // For some reason on my terminal newlines in text are
                 // translated to carriage returns when pasting so we check for
                 // both just to make sure
                 if str.contains('\n') || str.contains('\r') {
-                    return self.edit_input(&str);
+                    self.run_editor(&str, rcv_editor_ret);
                 } else {
                     // TODO this may be too slow for pasting long single lines
                     for ch in str.chars() {
-                        self.handle_input_event(Event::Key(Key::Char(ch)));
+                        self.handle_input_event(Event::Key(Key::Char(ch)), rcv_editor_ret);
                     }
                 }
                 TUIRet::KeyHandled
@@ -461,60 +463,76 @@ impl TUI {
         }
     }
 
-    /// Edit current input + `str` before sending.
-    fn edit_input(&mut self, str: &str) -> TUIRet {
-        let tab = &mut self.tabs[self.active_idx].widget;
-        let tf = tab.flush_input_field();
-        match edit(&mut self.tb, tf, &str) {
+    pub(crate) fn handle_editor_result(
+        &mut self,
+        editor_ret: editor::Result<Vec<String>>,
+    ) -> Option<(Vec<String>, MsgSource)> {
+        match editor_ret {
+            Err(err) => {
+                self.handle_editor_err(err);
+                None
+            }
             Ok(lines) => {
+                let tab = &mut self.tabs[self.active_idx].widget;
                 // If there's only one line just add it to the input field, do not send it
                 if lines.len() == 1 {
                     tab.set_input_field(&lines[0]);
-                    TUIRet::KeyHandled
+                    None
                 } else {
                     // Otherwise add the lines to text field history and send it
                     for line in &lines {
                         tab.add_input_field_history(line);
                     }
-                    TUIRet::Lines {
-                        lines,
-                        from: self.tabs[self.active_idx].src.clone(),
-                    }
+                    Some((lines, self.tabs[self.active_idx].src.clone()))
                 }
-            }
-            Err(err) => {
-                use std::env::VarError;
-                match err {
-                    EditorError::Io(err) => {
-                        self.add_client_err_msg(
-                            &format!("Error while running $EDITOR: {:?}", err),
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    EditorError::Var(VarError::NotPresent) => {
-                        self.add_client_err_msg(
-                            "Can't paste multi-line string: \
-                             make sure your $EDITOR is set",
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                    EditorError::Var(VarError::NotUnicode(_)) => {
-                        self.add_client_err_msg(
-                            "Can't paste multi-line string: \
-                             can't parse $EDITOR (not unicode)",
-                            &MsgTarget::CurrentTab,
-                        );
-                    }
-                }
-                TUIRet::KeyHandled
             }
         }
     }
 
-    fn keypressed(&mut self, key: Key) -> TUIRet {
+    /// Edit current input + `str` before sending.
+    fn run_editor(&mut self, str: &str, rcv_editor_ret: &mut Option<editor::ResultReceiver>) {
+        let tab = &mut self.tabs[self.active_idx].widget;
+        let tf = tab.flush_input_field();
+        match editor::run(&mut self.tb, &tf, &str, rcv_editor_ret) {
+            Ok(()) => {}
+            Err(err) => self.handle_editor_err(err),
+        }
+    }
+
+    fn handle_editor_err(&mut self, err: editor::Error) {
+        use std::env::VarError;
+        match err {
+            editor::Error::Io(err) => {
+                self.add_client_err_msg(
+                    &format!("Error while running $EDITOR: {:?}", err),
+                    &MsgTarget::CurrentTab,
+                );
+            }
+            editor::Error::Var(VarError::NotPresent) => {
+                self.add_client_err_msg(
+                    "Can't paste multi-line string: \
+                             make sure your $EDITOR is set",
+                    &MsgTarget::CurrentTab,
+                );
+            }
+            editor::Error::Var(VarError::NotUnicode(_)) => {
+                self.add_client_err_msg(
+                    "Can't paste multi-line string: \
+                             can't parse $EDITOR (not unicode)",
+                    &MsgTarget::CurrentTab,
+                );
+            }
+        }
+    }
+
+    fn keypressed(
+        &mut self,
+        key: Key,
+        rcv_editor_ret: &mut Option<editor::ResultReceiver>,
+    ) -> TUIRet {
         match self.tabs[self.active_idx].widget.keypressed(key) {
             WidgetRet::KeyHandled => TUIRet::KeyHandled,
-            WidgetRet::KeyIgnored => self.handle_keypress(key),
+            WidgetRet::KeyIgnored => self.handle_keypress(key, rcv_editor_ret),
             WidgetRet::Input(input) => TUIRet::Input {
                 msg: input,
                 from: self.tabs[self.active_idx].src.clone(),
@@ -524,7 +542,11 @@ impl TUI {
         }
     }
 
-    fn handle_keypress(&mut self, key: Key) -> TUIRet {
+    fn handle_keypress(
+        &mut self,
+        key: Key,
+        rcv_editor_ret: &mut Option<editor::ResultReceiver>,
+    ) -> TUIRet {
         match key {
             Key::Ctrl('n') => {
                 self.next_tab();
@@ -536,7 +558,10 @@ impl TUI {
                 TUIRet::KeyHandled
             }
 
-            Key::Ctrl('x') => self.edit_input(""),
+            Key::Ctrl('x') => {
+                self.run_editor("", rcv_editor_ret);
+                TUIRet::KeyHandled
+            }
 
             Key::AltChar(c) => match c.to_digit(10) {
                 Some(i) => {
