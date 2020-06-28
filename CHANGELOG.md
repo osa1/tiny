@@ -31,6 +31,9 @@
   while an editor is running and cause connection timeouts when it runs for too
   long. Editors are now run in a separate thread without blocking tiny's event
   loop. (#185)
+- tiny now breaks long lines without whitespace into multiple lines. Previously
+  we'd only break lines at whitespace, so long lines without any whitespace
+  would be cut off at the end of the screen. (#202)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
