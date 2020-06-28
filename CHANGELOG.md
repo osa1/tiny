@@ -27,6 +27,10 @@
   (#214)
 - A new setting 'scrollback' added to limit max. number of lines in tabs. The
   limit is off by default (old behavior). (#219)
+- Fixed editor support (C-x). Old implementation used to block tiny's event loop
+  while an editor is running and cause connection timeouts when it runs for too
+  long. Editors are now run in a separate thread without blocking tiny's event
+  loop. (#185)
 
 [rustls]: https://github.com/ctz/rustls
 [native-tls]: https://github.com/sfackler/rust-native-tls
