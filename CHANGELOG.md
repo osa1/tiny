@@ -1,32 +1,43 @@
-# Unreleased
+# 2020/06/28: 0.6.0
+
+Thanks to @trevarj, @Kabouik, @meain, and @jbg for contributing to this
+release.
+
+## New features
+
+- It's now possible to build tiny with [rustls] instead of [native-tls]. See
+  README for instructions. (#172)
+- A new optional server field 'alias' added to the configuration file for
+  specifying aliases for servers, to be shown in the tab line. This is useful
+  when a server address is long, or just an IP address, or you want to show
+  something different than the server address in the tab bar (#186).
+- tiny now has a proper CLI, supporting `--help` and `--version` arguments.
+- Input field now grows vertically on overflow, instead of scrolling. The old
+  scrolling behavior is used when there isn't enough space in the window to
+  extend input field vertically. (#101)
+- A new setting 'scrollback' added to limit max. number of lines in tabs. The
+  limit is off by default (old behavior). (#219)
+
+[rustls]: https://github.com/ctz/rustls
+[native-tls]: https://github.com/sfackler/rust-native-tls
+
+## Bug fixes and other improvements
 
 - TUI: Tab bar scrolls to left after closing tabs to fit more tabs into the
   visible part of the tab bar (#164). See #164 for an example of previous
   behavior.
 - tiny now reads the system cert store (for TLS connections) only once, instead
   of on every new connection. (#172)
-- It's now possible to build tiny with [rustls] instead of [native-tls]. See
-  README for instructions. (#172)
 - A bug when rendering exit dialogue (shown on `C-c`) fixed.
-- A new optional server field 'alias' added to the configuration file for
-  specifying aliases for servers, to be shown in the tab line. This is useful
-  when a server address is long, or just an IP address, or you want to show
-  something different than the server address in the tab bar (#186).
 - TUI: A text field bug is fixed when updating the scroll value after deleting a
   word with `C-w`.
 - Fixed a panic when a nick list of a server or the default nick list is empty.
   (#184)
-- tiny now has a proper CLI, supporting `--help` and `--version` arguments.
 - Fixed handling of invalid UTF-8 sequences in messages. (#194)
-- Input field now grows vertically on overflow, instead of scrolling. The old
-  scrolling behavior is used when there isn't enough space in the window to
-  extend input field vertically. (#101)
 - A few crashes when connecting to some IRC servers fixed. tiny is now more
   resilient to non-standard-conforming messages from servers. (#211)
 - Fixed a bug in logger when the channel name contains forward slash character.
   (#214)
-- A new setting 'scrollback' added to limit max. number of lines in tabs. The
-  limit is off by default (old behavior). (#219)
 - Fixed editor support (C-x). Old implementation used to block tiny's event loop
   while an editor is running and cause connection timeouts when it runs for too
   long. Editors are now run in a separate thread without blocking tiny's event
@@ -34,9 +45,6 @@
 - tiny now breaks long lines without whitespace into multiple lines. Previously
   we'd only break lines at whitespace, so long lines without any whitespace
   would be cut off at the end of the screen. (#202)
-
-[rustls]: https://github.com/ctz/rustls
-[native-tls]: https://github.com/sfackler/rust-native-tls
 
 # 2020/01/08: 0.5.1
 
