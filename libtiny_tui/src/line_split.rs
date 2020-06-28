@@ -13,7 +13,7 @@ pub struct LineDataCache {
     /// Current nickname length. Used in determining if we need to invalidate due to resize.
     nick_length: usize,
     /// The index into InputLine::buffer of the last whitespace that we saw in calculate_height()
-    last_whitespace_idx: Vec<Option<i32>>,
+    last_whitespace_idx: Option<i32>,
     /// True if the last character was a whitespace character
     prev_char_is_whitespace: bool,
     /// The length of the current line that is being added to.
@@ -33,7 +33,7 @@ impl LineDataCache {
             width: 0,
             line_width: 0,
             nick_length: 0,
-            last_whitespace_idx: Vec::new(),
+            last_whitespace_idx: None,
             prev_char_is_whitespace: false,
             current_line_length: 0,
             line_lengths: Vec::new(),
@@ -67,7 +67,7 @@ impl LineDataCache {
         self.width = width;
         self.nick_length = nick_length;
         self.line_width = width - nick_length as i32;
-        self.last_whitespace_idx = Vec::new();
+        self.last_whitespace_idx = None;
         self.prev_char_is_whitespace = false;
         self.current_line_length = 0;
         self.line_lengths = Vec::new();
@@ -119,22 +119,21 @@ impl LineDataCache {
                     self.split_indices.push(current_idx);
                 }
                 // store whitespace for splitting
-                self.last_whitespace_idx.push(Some(current_idx));
+                self.last_whitespace_idx = Some(current_idx);
                 self.prev_char_is_whitespace = true;
             } else {
                 // Splitting
                 if self.current_line_length > self.line_width {
                     // if the previous character was a whitespace, then we have a clean split
-                    let last_whitespace_idx = self.last_whitespace_idx.last().unwrap_or(&None);
-                    if !self.prev_char_is_whitespace && last_whitespace_idx.is_some() {
+                    if !self.prev_char_is_whitespace && self.last_whitespace_idx.is_some() {
                         // move back to the last whitespace and get the length of the input that
                         // will be on the next line
-                        self.current_line_length = current_idx - last_whitespace_idx.unwrap();
+                        self.current_line_length = current_idx - self.last_whitespace_idx.unwrap();
                         // Save the previous line length
                         self.line_lengths
                             .push(self.line_width - self.current_line_length);
                         // store index for drawing
-                        self.split_indices.push(last_whitespace_idx.unwrap() + 1);
+                        self.split_indices.push(self.last_whitespace_idx.unwrap() + 1);
                     } else {
                         // Save previous line length
                         self.line_lengths.push(self.current_line_length - 1);
@@ -144,7 +143,7 @@ impl LineDataCache {
                         self.split_indices.push(current_idx);
                     }
                     // invalidate whitespace since we split here
-                    self.last_whitespace_idx.push(None);
+                    self.last_whitespace_idx = None;
                     // moved to next line
                     temp_count += 1;
                     // set width to full width
@@ -161,8 +160,8 @@ impl LineDataCache {
         self.line_count = Some(temp_count);
     }
 
-    /// Reverses the state of the LineDataCache by one step
-    /// Used for removing one character at the end of the buffer
+    /// Reverses an iteration of calculate_height() by one.
+    /// Used for removing one character at the end of the buffer.
     pub fn remove_one(&mut self, buffer: &Vec<char>, removed_char: char) {
         // subtract the cursor line if there is one
         let mut temp_count = 1;
@@ -176,7 +175,7 @@ impl LineDataCache {
         // if on the first line there will be no reversal of line wrapping
         if temp_count == 1 {
             if removed_char.is_whitespace() {
-                self.last_whitespace_idx.pop();
+                self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
             }
             self.current_line_length -= 1;
         } else {
@@ -194,7 +193,7 @@ impl LineDataCache {
                 } else {
                     self.current_line_length -= 1;
                 }
-                self.last_whitespace_idx.pop();
+                self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
             } else {
                 if self.current_line_length == 1 {
                     trace!("removing non-whitespace on beginning of line. going to previous line.");
@@ -203,7 +202,7 @@ impl LineDataCache {
                     }
                     self.current_line_length = self.line_lengths.pop().unwrap();
                     self.split_indices.pop();
-                    self.last_whitespace_idx.pop();
+                    self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
                     temp_count -= 1;
                 } else {
                     if let Some(last_line_length) = self.line_lengths.last() {
@@ -221,7 +220,7 @@ impl LineDataCache {
                             self.current_line_length = self.line_width;
                             self.line_lengths.pop();
                             self.split_indices.pop();
-                            self.last_whitespace_idx.pop();
+                            self.last_whitespace_idx = buffer.iter().rposition(|c| c.is_whitespace()).and_then(|idx| Some(idx as i32));
                             temp_count -= 1;
                         } else {
                             trace!("subtracting non-whitespace");
