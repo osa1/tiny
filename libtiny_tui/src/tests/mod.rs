@@ -412,7 +412,6 @@ fn test_text_field_wrap() {
         tui.handle_input_event(event, &mut None);
     }
     // InputLine cache gets invalidated after backspace, need to redraw to calculate.
-    tui.draw();
     let event = term_input::Event::Key(Key::Char(' '));
     tui.handle_input_event(event, &mut None);
 

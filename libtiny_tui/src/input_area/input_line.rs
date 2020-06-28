@@ -59,8 +59,14 @@ impl InputLine {
 
     /// Interface for Vec::remove()
     pub(crate) fn remove(&mut self, idx: usize) -> char {
-        self.line_data.set_dirty();
-        self.buffer.remove(idx)
+        // self.line_data.set_dirty();
+        let removed = self.buffer.remove(idx);
+        if idx == self.buffer.len() {
+            self.line_data.remove_one(&self.buffer, removed);
+        } else {
+            self.line_data.set_dirty();
+        }
+        removed
     }
 
     /// Interface for Vec::insert()
@@ -85,6 +91,7 @@ impl InputLine {
     /// buffer is wider than width and scrolling is off.
     pub(crate) fn calculate_height(&mut self, width: i32, nick_length: usize) -> usize {
         if self.line_data.is_dirty() || self.line_data.needs_resize(width, nick_length) {
+            debug!("Recalculating inputline height");
             self.line_data.reset(width, nick_length);
             self.line_data
                 .calculate_height(&mut self.buffer.iter().copied(), 0);
