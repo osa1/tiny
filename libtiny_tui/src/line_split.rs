@@ -1,6 +1,6 @@
 /// Cache that stores the state of a line's height calculation.
 /// `line_count` is used as the dirty bit to invalidate the cache.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LineDataCache {
     /// Indices to split on when we draw, not always whitespaces
     split_indices: Vec<i32>,
@@ -163,8 +163,8 @@ impl LineDataCache {
 
     /// Reverses an iteration of calculate_height() by one.
     /// Used for removing one character at the end of the buffer.
-    pub fn remove_one(&mut self, buffer: &[char], removed_char: char) {
-        // subtract the cursor line if there is one
+    pub fn reverse_by_one(&mut self, buffer: &[char], removed_char: char) {
+        // Subtract the cursor line if there is one
         let mut temp_count = 1;
         if let Some(line_count) = self.line_count {
             temp_count = line_count;
@@ -173,64 +173,58 @@ impl LineDataCache {
                 temp_count -= 1;
             }
         }
-        // if on the first line there will be no reversal of line wrapping
+        // Helper to go backwards and find the last whitespace index
+        fn find_last_whitespace_idx(buffer: &[char]) -> Option<i32> {
+            buffer
+                .iter()
+                .rposition(|c| c.is_whitespace())
+                .map(|idx| idx as i32)
+        }
+
+        // If we're on the second line, then we need to reset to the first line, which
+        // has the nickname on it
+        let mut last_line_width = self.line_width;
+        if temp_count == 2 {
+            last_line_width = self.width - self.nick_length as i32;
+        }
+
+        // If on the first line there will be no reversal of line wrapping
         if temp_count == 1 {
             if removed_char.is_whitespace() {
-                self.last_whitespace_idx = buffer
-                    .iter()
-                    .rposition(|c| c.is_whitespace())
-                    .map(|idx| idx as i32);
+                self.last_whitespace_idx = find_last_whitespace_idx(buffer);
             }
             self.current_line_length -= 1;
         } else if removed_char.is_whitespace() {
             if self.current_line_length == 1 {
                 trace!("removed a whitespace on beginning of line. going to previous line.");
-                // if we're on the second line, then we need to reset to the first line, which
-                // has the nickname on it
-                if temp_count == 2 {
-                    self.line_width = self.width - self.nick_length as i32;
-                }
+                self.line_width = last_line_width;
                 self.current_line_length = self.line_lengths.pop().unwrap();
                 self.split_indices.pop();
                 temp_count -= 1;
             } else {
+                trace!("subtracting non-whitespace");
                 self.current_line_length -= 1;
             }
-            self.last_whitespace_idx = buffer
-                .iter()
-                .rposition(|c| c.is_whitespace())
-                .map(|idx| idx as i32);
+            self.last_whitespace_idx = find_last_whitespace_idx(buffer);
         } else if self.current_line_length == 1 {
             trace!("removing non-whitespace on beginning of line. going to previous line.");
-            if temp_count == 2 {
-                self.line_width = self.width - self.nick_length as i32;
-            }
+            self.line_width = last_line_width;
+            // If the character is a non-whitespace and also the only character
+            // on this line, then we know the previous line was filled to the end.
             self.current_line_length = self.line_lengths.pop().unwrap();
             self.split_indices.pop();
-            self.last_whitespace_idx = buffer
-                .iter()
-                .rposition(|c| c.is_whitespace())
-                .map(|idx| idx as i32);
+            self.last_whitespace_idx = find_last_whitespace_idx(buffer);
             temp_count -= 1;
         } else if let Some(last_line_length) = self.line_lengths.last() {
-            let mut last_line_width = self.line_width;
-            if temp_count == 2 {
-                last_line_width = self.width - self.nick_length as i32;
-            }
-            // check to see if there's enough space on previous line to reverse word wrapping
+            // Check to see if there's enough space on previous line to reverse word wrapping
             // -1 because we already removed a character
             if self.current_line_length - 1 + last_line_length < last_line_width {
                 trace!("reversing word wrap");
-                if temp_count == 2 {
-                    self.line_width = self.width - self.nick_length as i32;
-                }
+                self.line_width = last_line_width;
                 self.current_line_length = self.line_width;
                 self.line_lengths.pop();
                 self.split_indices.pop();
-                self.last_whitespace_idx = buffer
-                    .iter()
-                    .rposition(|c| c.is_whitespace())
-                    .map(|idx| idx as i32);
+                self.last_whitespace_idx = find_last_whitespace_idx(buffer);
                 temp_count -= 1;
             } else {
                 trace!("subtracting non-whitespace");
@@ -250,5 +244,37 @@ impl LineDataCache {
             temp_count += 1;
         }
         self.line_count = Some(temp_count);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn reverse_by_one_test() {
+        // Test a lot of different widths
+        for i in 0..13 {
+            let mut buffer: Vec<char> = ['h', 'e', 'l', 'l', 'o'].to_vec();
+            let mut line_data = LineDataCache::new(true);
+            line_data.reset(i, 0);
+            // Do full calculation
+            line_data.calculate_height(buffer.iter().copied(), 0);
+            // Save state
+            let line_data_save = line_data.clone();
+            // Add some characters
+            let buffer2 = " world!";
+            for c in buffer2.chars() {
+                buffer.push(c);
+                // Update line data for character added at end of buffer
+                line_data.calculate_height(buffer.iter().copied(), buffer.len() - 1);
+            }
+            // Reverse until saved state
+            for _ in 0..buffer2.len() {
+                let removed = buffer.pop().unwrap();
+                line_data.reverse_by_one(&buffer, removed);
+            }
+            // Check state went back to it was before adding and removing
+            assert_eq!(line_data, line_data_save);
+        }
     }
 }

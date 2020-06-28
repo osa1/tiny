@@ -58,11 +58,13 @@ impl InputLine {
     }
 
     /// Interface for Vec::remove()
+    /// When removing from the end of the buffer
+    /// we can use the saved state to quickly calculate if
+    /// we're moving to the previous line, without fully recalculating.
     pub(crate) fn remove(&mut self, idx: usize) -> char {
-        // self.line_data.set_dirty();
         let removed = self.buffer.remove(idx);
         if idx == self.buffer.len() {
-            self.line_data.remove_one(&self.buffer, removed);
+            self.line_data.reverse_by_one(&self.buffer, removed);
         } else {
             self.line_data.set_dirty();
         }
