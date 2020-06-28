@@ -50,7 +50,7 @@ impl MsgArea {
         self.lines_height = None;
     }
 
-    pub(crate) fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
+    pub(crate) fn draw(&mut self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
         // Where to render current line
         let mut row = pos_y + self.height - 1;
 
@@ -60,7 +60,7 @@ impl MsgArea {
         // Draw lines in reverse order
         let mut line_idx = (self.lines.len() as i32) - 1;
         while line_idx >= 0 && row >= pos_y {
-            let line = &self.lines[line_idx as usize];
+            let line = &mut self.lines[line_idx as usize];
             let line_height = line.rendered_height(self.width);
             debug_assert!(line_height > 0);
 
@@ -80,7 +80,7 @@ impl MsgArea {
             // How many lines to skip in the `Line` before rendering
             let render_from = max(0, pos_y - line_row);
 
-            line.draw(tb, colors, pos_x, line_row, render_from, height, self.width);
+            line.draw(tb, colors, pos_x, line_row, render_from, height);
             row = line_row - 1;
             line_idx -= 1;
             skip = 0;
@@ -101,7 +101,7 @@ impl MsgArea {
             Some(height) => height,
             None => {
                 let mut total_height = 0;
-                for line in &self.lines {
+                for line in &mut self.lines {
                     total_height += line.rendered_height(self.width);
                 }
                 self.lines_height = Some(total_height);

@@ -1,34 +1,28 @@
+use crate::{
+    config, config::Colors, line_split::LineDataCache, utils::translate_irc_control_chars,
+};
 use std::mem;
 use termbox_simple::{self, Termbox};
-
-use crate::{config, config::Colors, utils::translate_irc_control_chars};
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
 #[derive(Debug)]
 pub(crate) struct Line {
     /// Line segments.
-    segs: Vec<Seg>,
+    string_segments: Vec<StyledString>,
 
     /// The segment we're currently extending.
-    current_seg: Seg,
+    current_seg: StyledString,
 
     /// Number of characters in the line (includes all segments).
     len_chars: i32,
 
-    /// Char indices (NOT byte indices!) of split positions of the line - when
-    /// the line doesn't fit into the screen we split it into multiple lines
-    /// using these positions as split points.
-    ///
-    /// It's important that these are really indices ignoring invisible chars,
-    /// as we use difference between two indices in this vector as length of
-    /// substrings.
-    splits: Vec<i32>,
+    line_data: LineDataCache,
 }
 
 #[derive(Debug)]
-struct Seg {
-    text: String,
+struct StyledString {
+    string: String,
     style: SegStyle,
 }
 
@@ -59,7 +53,7 @@ pub(crate) enum SchemeStyle {
     Timestamp,
 }
 
-impl Seg {
+impl StyledString {
     pub(crate) fn style(&self, colors: &Colors) -> config::Style {
         match self.style {
             SegStyle::Fixed(style) => style,
@@ -91,29 +85,29 @@ const TERMBOX_COLOR_PREFIX: char = '\x00';
 impl Line {
     pub(crate) fn new() -> Line {
         Line {
-            segs: vec![],
-            current_seg: Seg {
-                text: String::new(),
+            string_segments: vec![],
+            current_seg: StyledString {
+                string: String::new(),
                 style: SegStyle::SchemeStyle(SchemeStyle::UserMsg),
             },
             len_chars: 0,
-            splits: Vec::new(),
+            line_data: LineDataCache::new(false),
         }
     }
 
     pub(crate) fn set_style(&mut self, style: SegStyle) {
         // Just update the last segment if it's empty
-        if self.current_seg.text.is_empty() {
+        if self.current_seg.string.is_empty() {
             self.current_seg.style = style;
         } else if self.current_seg.style != style {
             let seg = mem::replace(
                 &mut self.current_seg,
-                Seg {
-                    text: String::new(),
+                StyledString {
+                    string: String::new(),
                     style,
                 },
             );
-            self.segs.push(seg);
+            self.string_segments.push(seg);
         }
     }
 
@@ -129,7 +123,7 @@ impl Line {
             );
         }
         let str = translate_irc_control_chars(str, push_color);
-        self.current_seg.text.reserve(str.len());
+        self.current_seg.string.reserve(str.len());
 
         let mut iter = str.chars();
         while let Some(char) = iter.next() {
@@ -142,10 +136,7 @@ impl Line {
                 let style = config::Style { fg, bg };
                 self.set_style(SegStyle::Fixed(style));
             } else if char > '\x08' {
-                self.current_seg.text.push(char);
-                if char.is_whitespace() {
-                    self.splits.push(self.len_chars);
-                }
+                self.current_seg.string.push(char);
                 self.len_chars += 1;
             }
         }
@@ -153,43 +144,25 @@ impl Line {
 
     pub(crate) fn add_char(&mut self, char: char) {
         assert_ne!(char, TERMBOX_COLOR_PREFIX);
-        if char.is_whitespace() {
-            self.splits.push(self.len_chars);
-        }
-        self.current_seg.text.push(char);
+
+        self.current_seg.string.push(char);
         self.len_chars += 1;
     }
 
     /// How many lines does this take when rendered? O(n) where n = number of
     /// split positions in the line (i.e. whitespaces).
-    pub(crate) fn rendered_height(&self, width: i32) -> i32 {
-        let mut lines: i32 = 1;
-        let mut line_start: i32 = 0;
-
-        for split_idx in 0..self.splits.len() {
-            let char_idx = self.splits[split_idx];
-            // debug!("rendered_height: char_idx: {}", char_idx);
-            let col = char_idx - line_start;
-
-            // How many more chars can we render in this line?
-            let slots_in_line: i32 = width - (col + 1);
-
-            // How many chars do we need to render until the next split point?
-            let chars_until_next_split: i32 =
-                // -1 because we don't need to render the last space.
-                *self.splits.get(split_idx + 1).unwrap_or(&self.len_chars) - 1 - char_idx;
-
-            // debug!("rendered_height: slots_in_line: {}, chars_until_next_split: {}",
-            //        slots_in_line, chars_until_next_split);
-
-            if (chars_until_next_split as i32) > slots_in_line {
-                // debug!("splitting at {}", char_idx);
-                lines += 1;
-                line_start = char_idx + 1;
-            }
+    pub(crate) fn rendered_height(&mut self, width: i32) -> i32 {
+        if self.line_data.is_dirty() || self.line_data.needs_resize(width, 0) {
+            self.line_data.reset(width, 0);
+            // Get all segs together
+            let mut full_line = self
+                .string_segments
+                .iter()
+                .flat_map(|s| s.string.chars())
+                .chain(self.current_seg.string.chars());
+            self.line_data.calculate_height(&mut full_line, 0);
         }
-
-        lines
+        self.line_data.get_line_count().unwrap() as i32
     }
 
     pub(crate) fn draw(
@@ -200,65 +173,44 @@ impl Line {
         pos_y: i32,
         first_line: i32,
         height: i32,
-        width: i32,
     ) {
         let mut col = pos_x;
-        let mut line = 0;
+        let mut line_num = 0;
+        let mut char_idx = 0;
+        let mut split_indices_iter = self.line_data.get_splits().iter().copied().peekable();
 
-        let mut next_split_idx: usize = 0;
-
-        let mut char_idx: i32 = 0;
-
-        let last_seg: [&Seg; 1] = [&self.current_seg];
-        for seg in self.segs.iter().chain(last_seg.iter().copied()) {
+        for seg in self
+            .string_segments
+            .iter()
+            .chain(std::iter::once(&self.current_seg))
+        {
             let sty = seg.style(colors);
-
-            for char in seg.text.chars() {
-                if char.is_whitespace() {
-                    // We may want to move to the next line
-                    next_split_idx += 1;
-                    let next_split = self.splits.get(next_split_idx).unwrap_or(&self.len_chars);
-
-                    // How many more chars can we render in this line?
-                    let slots_in_line = width - (col - pos_x);
-
-                    // How many chars do we need to render if until the next
-                    // split point?
-                    assert!(*next_split > char_idx);
-                    let chars_until_next_split: i32 = *next_split - char_idx;
-
-                    // debug!("chars_until_next_split: {},
-                    //        slots_in_line: {}",
-                    //        chars_until_next_split,
-                    //        slots_in_line);
-
-                    if (chars_until_next_split as i32) <= slots_in_line {
-                        // keep rendering chars
-                        if line >= first_line {
-                            tb.change_cell(col, pos_y + line, char, sty.fg, sty.bg);
-                        }
-                        col += 1;
-                    } else {
-                        // Need to split here. Ignore whitespace char.
-                        line += 1;
-                        if line >= height {
+            for c in seg.string.chars() {
+                // If split_indices_iter yields we already know the indices for the start of each line. If it
+                // does not then we just continue outputting on this line.
+                if let Some(next_line_start) = split_indices_iter.peek() {
+                    if char_idx == *next_line_start as usize {
+                        // Move to next line
+                        line_num += 1;
+                        if line_num >= height {
                             break;
                         }
-                        col = pos_x;
-                    }
-                } else {
-                    debug_assert!(!char.is_ascii_control());
-
-                    // Not possible to split. Need to make sure we don't render out
-                    // of bounds.
-                    if col - pos_x < width {
-                        if line >= first_line {
-                            tb.change_cell(col, pos_y + line, char, sty.fg, sty.bg);
+                        // Reset column
+                        col = 0;
+                        // Move to the next line start index
+                        split_indices_iter.next();
+                        // Don't draw whitespaces
+                        if c.is_whitespace() {
+                            char_idx += 1;
+                            continue;
                         }
-                        col += 1;
                     }
                 }
-
+                // Write out the character
+                if line_num >= first_line {
+                    tb.change_cell(col, pos_y + line_num, c, sty.fg, sty.bg);
+                }
+                col += 1;
                 char_idx += 1;
             }
         }
@@ -307,7 +259,7 @@ mod tests {
     fn height_test_1() {
         let mut line = Line::new();
         line.add_text("a b c d e");
-        assert_eq!(line.rendered_height(1), 5);
+        assert_eq!(line.rendered_height(1), 9);
         assert_eq!(line.rendered_height(2), 5);
         assert_eq!(line.rendered_height(3), 3);
         assert_eq!(line.rendered_height(4), 3);
@@ -322,7 +274,7 @@ mod tests {
     fn height_test_2() {
         let mut line = Line::new();
         line.add_text("ab c d e");
-        assert_eq!(line.rendered_height(1), 4);
+        assert_eq!(line.rendered_height(1), 8);
         assert_eq!(line.rendered_height(2), 4);
         assert_eq!(line.rendered_height(3), 3);
         assert_eq!(line.rendered_height(4), 2);
@@ -336,8 +288,8 @@ mod tests {
     fn height_test_3() {
         let mut line = Line::new();
         line.add_text("ab cd e");
-        assert_eq!(line.rendered_height(1), 3);
-        assert_eq!(line.rendered_height(2), 3);
+        assert_eq!(line.rendered_height(1), 7);
+        assert_eq!(line.rendered_height(2), 4);
         assert_eq!(line.rendered_height(3), 3);
         assert_eq!(line.rendered_height(4), 2);
         assert_eq!(line.rendered_height(5), 2);
@@ -349,8 +301,8 @@ mod tests {
     fn height_test_4() {
         let mut line = Line::new();
         line.add_text("ab cde");
-        assert_eq!(line.rendered_height(1), 2);
-        assert_eq!(line.rendered_height(2), 2);
+        assert_eq!(line.rendered_height(1), 6);
+        assert_eq!(line.rendered_height(2), 4);
         assert_eq!(line.rendered_height(3), 2);
         assert_eq!(line.rendered_height(4), 2);
         assert_eq!(line.rendered_height(5), 2);
@@ -359,15 +311,6 @@ mod tests {
 
     #[test]
     fn height_test_5() {
-        let mut line = Line::new();
-        line.add_text("abcde");
-        for i in 0..6 {
-            assert_eq!(line.rendered_height(i), 1);
-        }
-    }
-
-    #[test]
-    fn height_test_6() {
         let text: String = {
             let mut text = String::new();
             let mut single_line = String::new();
@@ -388,7 +331,7 @@ mod tests {
         line.add_text(&text);
         // lipsum.txt has 1160 words in it. each line should contain at most one
         // word so we should have 1160 lines.
-        assert_eq!(line.rendered_height(1), 1160);
+        assert_eq!(line.rendered_height(80), 102);
     }
 
     #[bench]
