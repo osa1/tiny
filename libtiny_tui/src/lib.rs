@@ -4,6 +4,7 @@
 #![feature(track_caller, or_patterns)]
 
 mod config;
+mod editor;
 mod exit_dialogue;
 mod input_area;
 mod messaging;
