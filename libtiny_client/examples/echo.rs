@@ -1,6 +1,6 @@
 //! An echo bot that just repeats stuff sent to it (either in a channel or as PRIVMSG).
 
-use libtiny_client::{Client, Event, ServerInfo};
+use libtiny_client::{Client, ClientInfo, Event, ServerInfo};
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 
 use futures::stream::StreamExt;
@@ -42,13 +42,17 @@ fn main() {
 
     println!("{:?}", server_info);
 
+    let client_info = ClientInfo {
+        version: String::from("testing"),
+    };
+
     let mut runtime = tokio::runtime::Builder::new()
         .basic_scheduler()
         .enable_all()
         .build()
         .unwrap();
     let local = tokio::task::LocalSet::new();
-    local.block_on(&mut runtime, echo_bot_task(server_info));
+    local.block_on(&mut runtime, echo_bot_task(server_info, client_info));
 }
 
 fn show_usage() {
@@ -57,8 +61,8 @@ fn show_usage() {
 
 static NICK_SEP: [&str; 4] = [": ", ", ", ":", ","];
 
-async fn echo_bot_task(server_info: ServerInfo) {
-    let (mut client, mut rcv_ev) = Client::new(server_info);
+async fn echo_bot_task(server_info: ServerInfo, client_info: ClientInfo) {
+    let (mut client, mut rcv_ev) = Client::new(server_info, client_info);
 
     while let Some(ev) = rcv_ev.next().await {
         println!("Client event: {:?}", ev);
