@@ -1,9 +1,9 @@
 #![allow(clippy::zero_prefixed_literal)]
 
 use crate::utils;
-use crate::{Event, ServerInfo};
+use crate::{Event, ServerInfo, ClientInfo};
 use libtiny_wire as wire;
-use libtiny_wire::{Msg, Pfx};
+use libtiny_wire::{Msg, MsgTarget, CTCP, Pfx};
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -16,9 +16,9 @@ pub struct State {
 }
 
 impl State {
-    pub(crate) fn new(server_info: ServerInfo) -> State {
+    pub(crate) fn new(server_info: ServerInfo, client_info: ClientInfo) -> State {
         State {
-            inner: Rc::new(RefCell::new(StateInner::new(server_info))),
+            inner: Rc::new(RefCell::new(StateInner::new(server_info, client_info))),
         }
     }
 
@@ -108,10 +108,13 @@ struct StateInner {
 
     /// Server information
     server_info: ServerInfo,
+
+    /// Client information
+    client_info: ClientInfo,
 }
 
 impl StateInner {
-    fn new(server_info: ServerInfo) -> StateInner {
+    fn new(server_info: ServerInfo, client_info: ClientInfo) -> StateInner {
         let current_nick = server_info.nicks[0].to_owned();
         let chans = server_info
             .auto_join
@@ -129,6 +132,7 @@ impl StateInner {
             usermask: None,
             nick_accepted: false,
             server_info,
+            client_info,
         }
     }
 
@@ -194,6 +198,16 @@ impl StateInner {
         match cmd {
             PING { server } => {
                 snd_irc_msg.try_send(wire::pong(server)).unwrap();
+            }
+
+            PRIVMSG { target, ctcp, .. } => {
+                if let Some(ctcp) = ctcp {
+                    if let CTCP::Version = ctcp {
+                        if let MsgTarget::User(target) = target {
+                            snd_irc_msg.try_send(wire::version_reply(target, &self.client_info.version)).unwrap();
+                        }
+                    }
+                }
             }
 
             //

@@ -54,6 +54,16 @@ pub fn action(msgtarget: &str, msg: &str) -> String {
     format!("PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
 }
 
+pub fn version(msgtarget: &str) -> String {
+    assert!(msgtarget.len() + 21 <= 512); // See comments in `privmsg`
+    format!("PRIVMSG {} :\x01VERSION\x01\r\n", msgtarget)
+}
+
+pub fn version_reply(msgtarget: &str, version: &str) -> String {
+    assert!(msgtarget.len() + 21 <= 512); // See comments in `privmsg`
+    format!("NOTICE {} :\x01VERSION {}\x01\r\n", msgtarget, version)
+}
+
 pub fn away(msg: Option<&str>) -> String {
     match msg {
         None => "AWAY\r\n".to_string(),

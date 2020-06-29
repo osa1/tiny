@@ -149,7 +149,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                     MsgTarget::Server { serv }
                 };
                 ui.add_client_msg(
-                    &format!("Received version request from {}", origin),
+                    &format!("Received version request from {}, {}", origin,  msg),
                     &msg_target,
                 );
                 return;

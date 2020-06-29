@@ -15,13 +15,19 @@ pub(crate) struct Args {
     pub(crate) config_path: Option<PathBuf>,
 }
 
-/// Parses command line arguments.
-pub(crate) fn parse() -> Args {
+/// Gets the current version of Tiny and git commit hash if available
+pub(crate) fn get_version() -> String {
     let mut version = crate_version!().to_owned();
     let commit_hash = env!("GIT_HASH");
     if !commit_hash.is_empty() {
         version = format!("{} ({})", version, commit_hash);
     }
+    version
+}
+
+/// Parses command line arguments.
+pub(crate) fn parse() -> Args {
+    let version = get_version();
 
     let m = App::new(crate_name!())
         .version(version.as_str())

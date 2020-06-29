@@ -10,7 +10,7 @@ mod conn;
 mod ui;
 mod utils;
 
-use libtiny_client::{Client, ServerInfo};
+use libtiny_client::{Client, ServerInfo, ClientInfo};
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::{MsgTarget, TUI};
 use libtiny_ui::UI;
@@ -162,7 +162,10 @@ fn run(
                 }),
             };
 
-            let (client, rcv_conn_ev) = Client::new(server_info);
+            let client_info = ClientInfo {
+                version: get_tiny_version()
+            };
+            let (client, rcv_conn_ev) = Client::new(server_info, client_info);
             // TODO: Somehow it's quite hard to expose this objekt call with a different name and less
             // polymorphic type in libtiny_ui ...
             let tui_clone = libtiny_ui::clone_box(&*tui);
@@ -179,4 +182,8 @@ fn run(
     });
 
     runtime.block_on(local);
+}
+
+pub(crate) fn get_tiny_version() -> String {
+    format!("tiny {}", crate::cli::get_version())
 }

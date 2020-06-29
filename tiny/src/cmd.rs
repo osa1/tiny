@@ -3,7 +3,7 @@
 
 use crate::config;
 use crate::utils;
-use libtiny_client::{Client, ServerInfo};
+use libtiny_client::{Client, ServerInfo, ClientInfo};
 use libtiny_ui::{MsgSource, MsgTarget, UI};
 use std::path::Path;
 
@@ -96,7 +96,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 8] = [
+static CMDS: [&Cmd; 9] = [
     &AWAY_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
@@ -105,6 +105,7 @@ static CMDS: [&Cmd; 8] = [
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
+    &VERSION_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,7 +259,11 @@ fn connect_(
         auto_join: defaults.join.clone(),
         nickserv_ident: None,
         sasl_auth: None,
-    });
+    },
+    ClientInfo {
+        version: crate::get_tiny_version()
+    }
+);
 
     // Spawn UI task
     let ui_clone = libtiny_ui::clone_box(&**ui);
@@ -455,6 +460,31 @@ fn nick(args: CmdArgs) {
         }
     } else {
         ui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static VERSION_CMD: Cmd = Cmd {
+    name: "version",
+    cmd_fn: version,
+};
+
+fn version(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        ui,
+        clients,
+        src,
+        ..
+    } = args;
+    let target: Vec<&str> = args.split_whitespace().collect();
+    if target.len() == 1 {
+        if let Some(client) = find_client(clients, src.serv_name()) {
+            client.version(target[0]);
+        }
+    } else {
+        ui.add_client_err_msg("/version usage: /version <server|nick>", &MsgTarget::CurrentTab);
     }
 }
 

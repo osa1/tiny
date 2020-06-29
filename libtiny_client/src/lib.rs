@@ -62,6 +62,11 @@ pub struct ServerInfo {
     pub sasl_auth: Option<SASLAuth>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ClientInfo {
+    pub version: String,
+}
+
 /// SASL authentication credentials
 #[derive(Debug, Clone)]
 pub struct SASLAuth {
@@ -130,8 +135,8 @@ pub struct Client {
 impl Client {
     /// Create a new client. Spawns two `tokio` tasks on the given `runtime`. If not given, tasks
     /// are created on the default executor using `tokio::spawn`.
-    pub fn new(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
-        connect(server_info)
+    pub fn new(server_info: ServerInfo, client_info: ClientInfo) -> (Client, mpsc::Receiver<Event>) {
+        connect(server_info, client_info)
     }
 
     /// Reconnect to the server, possibly using a new port.
@@ -237,6 +242,12 @@ impl Client {
             .unwrap()
     }
 
+    pub fn version(&mut self, target: &str) {
+        self.msg_chan
+            .try_send(Cmd::Msg(wire::version(target)))
+            .unwrap()
+    }
+
     /// Send a QUIT message to the server, with optional "reason". This stops the client; so the
     /// sender end of the `Cmd` channel and the receiver end of the IRC message channel (for
     /// outgoing messages) will be dropped.
@@ -267,7 +278,7 @@ enum Cmd {
     Quit(Option<String>),
 }
 
-fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
+fn connect(server_info: ServerInfo, client_info: ClientInfo) -> (Client, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //
@@ -284,7 +295,7 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
     // Create the main loop task
     //
 
-    let irc_state = State::new(server_info.clone());
+    let irc_state = State::new(server_info.clone(), client_info.clone());
     let irc_state_clone = irc_state.clone();
 
     let task = main_loop(server_info, irc_state_clone, snd_ev, rcv_cmd);
