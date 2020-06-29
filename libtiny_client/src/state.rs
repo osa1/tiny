@@ -200,6 +200,10 @@ impl StateInner {
                 snd_irc_msg.try_send(wire::pong(server)).unwrap();
             }
 
+            // CTCP automatic response
+            // Currently only used for VERSION message, but can support other
+            // messages, such as USERINFO or FINGER
+            // https://www.irchelp.org/protocol/ctcpspec.html
             PRIVMSG {
                 target, msg, ctcp, ..
             } => {
