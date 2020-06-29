@@ -3,7 +3,7 @@
 
 use crate::config;
 use crate::utils;
-use libtiny_client::{Client, ServerInfo, ClientInfo};
+use libtiny_client::{Client, ClientInfo, ServerInfo};
 use libtiny_ui::{MsgSource, MsgTarget, UI};
 use std::path::Path;
 
@@ -249,21 +249,22 @@ fn connect_(
     let msg_target = MsgTarget::Server { serv: serv_name };
     ui.add_client_msg("Connecting...", &msg_target);
 
-    let (client, rcv_ev) = Client::new(ServerInfo {
-        addr: serv_name.to_owned(),
-        port: serv_port,
-        tls: defaults.tls,
-        realname: defaults.realname.clone(),
-        pass: pass.map(str::to_owned),
-        nicks: defaults.nicks.clone(),
-        auto_join: defaults.join.clone(),
-        nickserv_ident: None,
-        sasl_auth: None,
-    },
-    ClientInfo {
-        version: crate::get_tiny_version()
-    }
-);
+    let (client, rcv_ev) = Client::new(
+        ServerInfo {
+            addr: serv_name.to_owned(),
+            port: serv_port,
+            tls: defaults.tls,
+            realname: defaults.realname.clone(),
+            pass: pass.map(str::to_owned),
+            nicks: defaults.nicks.clone(),
+            auto_join: defaults.join.clone(),
+            nickserv_ident: None,
+            sasl_auth: None,
+        },
+        ClientInfo {
+            version: crate::get_tiny_version(),
+        },
+    );
 
     // Spawn UI task
     let ui_clone = libtiny_ui::clone_box(&**ui);
@@ -484,7 +485,10 @@ fn version(args: CmdArgs) {
             client.version(target[0]);
         }
     } else {
-        ui.add_client_err_msg("/version usage: /version <server|nick>", &MsgTarget::CurrentTab);
+        ui.add_client_err_msg(
+            "/version usage: /version <server|nick>",
+            &MsgTarget::CurrentTab,
+        );
     }
 }
 

@@ -1,9 +1,9 @@
 #![allow(clippy::zero_prefixed_literal)]
 
 use crate::utils;
-use crate::{Event, ServerInfo, ClientInfo};
+use crate::{ClientInfo, Event, ServerInfo};
 use libtiny_wire as wire;
-use libtiny_wire::{Msg, MsgTarget, CTCP, Pfx};
+use libtiny_wire::{Msg, MsgTarget, Pfx, CTCP};
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -200,11 +200,20 @@ impl StateInner {
                 snd_irc_msg.try_send(wire::pong(server)).unwrap();
             }
 
-            PRIVMSG { target, ctcp, .. } => {
+            PRIVMSG {
+                target, msg, ctcp, ..
+            } => {
                 if let Some(ctcp) = ctcp {
                     if let CTCP::Version = ctcp {
-                        if let MsgTarget::User(target) = target {
-                            snd_irc_msg.try_send(wire::version_reply(target, &self.client_info.version)).unwrap();
+                        if msg.is_empty() {
+                            if let MsgTarget::User(target) = target {
+                                snd_irc_msg
+                                    .try_send(wire::version_reply(
+                                        target,
+                                        &self.client_info.version,
+                                    ))
+                                    .unwrap();
+                            }
                         }
                     }
                 }

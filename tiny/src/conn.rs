@@ -148,10 +148,14 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 } else {
                     MsgTarget::Server { serv }
                 };
-                ui.add_client_msg(
-                    &format!("Received version request from {}, {}", origin,  msg),
-                    &msg_target,
-                );
+                if msg.is_empty() {
+                    ui.add_client_msg(
+                        &format!("Received version request from {}", origin),
+                        &msg_target,
+                    );
+                } else {
+                    ui.add_client_msg(&format!("{} is on {}", origin, msg), &msg_target);
+                }
                 return;
             }
 

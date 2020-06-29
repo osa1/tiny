@@ -135,7 +135,10 @@ pub struct Client {
 impl Client {
     /// Create a new client. Spawns two `tokio` tasks on the given `runtime`. If not given, tasks
     /// are created on the default executor using `tokio::spawn`.
-    pub fn new(server_info: ServerInfo, client_info: ClientInfo) -> (Client, mpsc::Receiver<Event>) {
+    pub fn new(
+        server_info: ServerInfo,
+        client_info: ClientInfo,
+    ) -> (Client, mpsc::Receiver<Event>) {
         connect(server_info, client_info)
     }
 
