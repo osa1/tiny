@@ -486,7 +486,7 @@ fn version(args: CmdArgs) {
         }
     } else {
         ui.add_client_err_msg(
-            "/version usage: /version <server|nick>",
+            "/version usage: /version <nick>",
             &MsgTarget::CurrentTab,
         );
     }
