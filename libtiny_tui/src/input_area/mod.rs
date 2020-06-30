@@ -460,6 +460,7 @@ impl InputArea {
     pub(crate) fn set(&mut self, str: &str) {
         self.mode = Mode::Edit;
         self.buffer = InputLine::from_buffer(str.chars().collect());
+        self.height = None;
         self.move_cursor_to_end();
     }
 
@@ -803,5 +804,14 @@ mod tests {
         assert_eq!(text_field.cursor, 4);
         text_field.keypressed(Key::CtrlArrow(Arrow::Right));
         assert_eq!(text_field.cursor, 5);
+    }
+
+    #[test]
+    fn test_set_buffer() {
+        let mut input_area = InputArea::new(40, 50);
+        // a string that will be more than one line - 41 characters
+        let multiline_string_no_spaces = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        input_area.set(&multiline_string_no_spaces);
+        assert_eq!(input_area.get_height(input_area.width), 2);
     }
 }
