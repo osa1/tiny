@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fixed a bug when pasting long single-line text using C-x. (#225)
+
 # 2020/06/28: 0.6.0
 
 Thanks to @trevarj, @Kabouik, @meain, and @jbg for contributing to this
