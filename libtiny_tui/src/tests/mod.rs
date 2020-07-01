@@ -439,3 +439,31 @@ fn test_text_field_wrap() {
     // TODO: Test changing nick (osa: I don't understand how nick length is taken into account when
     // falling back to scrolling)
 }
+
+#[test]
+fn test_join_part_overflow() {
+    let mut tui = TUI::new_test(21, 4);
+    let serv = "irc.server_1.org";
+    let chan = "#chan";
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+    tui.add_nick("123456", Some(ts), &target);
+    tui.add_nick("abcdef", Some(ts), &target);
+    tui.add_nick("hijklm", Some(ts), &target);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|00:00 +123456 +abcdef|
+         |+hijklm              |
+         |osa1:                |
+         |< #chan              |";
+
+    expect_screen(screen, &tui, 21, 4, Location::caller());
+}

@@ -149,8 +149,12 @@ impl Line {
         self.len_chars += 1;
     }
 
-    /// How many lines does this take when rendered? O(n) where n = number of
-    /// split positions in the line (i.e. whitespaces).
+    pub(crate) fn force_recalculation(&mut self) {
+        self.line_data.set_dirty()
+    }
+
+    /// Calculates the number of lines that this line will be.
+    /// The calculation is only done if the line_data is dirty or the window is resized.
     pub(crate) fn rendered_height(&mut self, width: i32) -> i32 {
         if self.line_data.is_dirty() || self.line_data.needs_resize(width, 0) {
             self.line_data.reset(width, 0);
