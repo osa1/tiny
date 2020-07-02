@@ -180,6 +180,8 @@ impl MsgArea {
         F: Fn(&mut Line),
     {
         f(&mut self.lines[idx]);
+        // Line was modified so we need to invalidate its height
+        self.lines[idx].force_recalculation();
     }
 
     pub(crate) fn clear(&mut self) {
