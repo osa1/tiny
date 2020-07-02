@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test))]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::cognitive_complexity)]
-#![feature(track_caller, or_patterns)]
+#![feature(or_patterns)]
 
 mod config;
 mod editor;
