@@ -1,6 +1,9 @@
 # Unreleased
 
-- Fixed a bug when pasting long single-line text using C-x. (#225)
+- Fixed a TUI bug introduced in 0.6.0 when pasting long single-line text using
+  C-x. (#225)
+- Fixed a TUI bug introduced in 0.6.0 when rendering a long line of join/leave
+  events. (#227)
 
 # 2020/06/28: 0.6.0
 
