@@ -176,15 +176,6 @@ mod tests {
             Ok(Config { servers, .. }) => {
                 assert_eq!(servers[0].join, vec!["#tiny".to_owned()]);
                 assert_eq!(servers[0].tls, true);
-                assert_eq!(servers[0].pass, Some("hunter2".to_owned()));
-                assert_eq!(
-                    servers[0].sasl_auth,
-                    Some(SASLAuth {
-                        username: "tiny_user".to_owned(),
-                        password: "hunter2".to_owned(),
-                    })
-                );
-                assert_eq!(servers[0].nickserv_ident, Some("hunter2".to_owned()));
             }
         }
     }
