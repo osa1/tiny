@@ -4,6 +4,10 @@
   C-x. (#225)
 - Fixed a TUI bug introduced in 0.6.0 when rendering a long line of join/leave
   events. (#227)
+- New command `/help` added.
+- Password fields in the default config file (created automatically on first
+  run) are now commented-out, to allow connecting to tiny IRC channel with the
+  default config without having to make changes.
 
 # 2020/06/28: 0.6.0
 

@@ -154,6 +154,8 @@ You can use `--config <path>` to specify your config file location.
 
 Commands start with `/` character.
 
+- `/help`: Show help messages of commands listed below.
+
 - `/msg <nick> <message>`: Send a message to a user. Creates a new tab.
 
 - `/join <channel>`: Join to a channel
