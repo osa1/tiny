@@ -38,6 +38,42 @@ pub(crate) enum TUIRet {
 const LEFT_ARROW: char = '<';
 const RIGHT_ARROW: char = '>';
 
+struct CmdUsage {
+    name: &'static str,
+    description: &'static str,
+    usage: &'static str,
+}
+
+impl CmdUsage {
+    const fn new(name: &'static str, description: &'static str, usage: &'static str) -> CmdUsage {
+        CmdUsage {
+            name,
+            description,
+            usage,
+        }
+    }
+}
+
+const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "/clear");
+const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "/ignore");
+const NOTIFY_CMD: CmdUsage = CmdUsage::new(
+    "notify",
+    "Set channel notifications",
+    "/notify [off|mentions|messages]",
+);
+const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
+const STATUSLINE_CMD: CmdUsage = CmdUsage::new("statusline", "Toggles statusline", "/statusline");
+const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
+
+const TUI_COMMANDS: [CmdUsage; 6] = [
+    CLEAR_CMD,
+    IGNORE_CMD,
+    NOTIFY_CMD,
+    SWITCH_CMD,
+    STATUSLINE_CMD,
+    RELOAD_CMD,
+];
+
 pub(crate) struct TUI {
     /// Termbox instance
     tb: Termbox,
@@ -139,12 +175,7 @@ impl TUI {
     fn notify(&mut self, words: &mut SplitWhitespace, src: &MsgSource) {
         let words: Vec<&str> = words.collect();
 
-        let mut show_usage = || {
-            self.add_client_err_msg(
-                "/notify usage: /notify [off|mentions|messages]",
-                &MsgTarget::CurrentTab,
-            )
-        };
+        let mut show_usage = || self.add_client_err_msg(NOTIFY_CMD.usage, &MsgTarget::CurrentTab);
 
         if words.is_empty() {
             self.show_notify_mode(&MsgTarget::CurrentTab);
@@ -202,10 +233,7 @@ impl TUI {
             Some("switch") => {
                 match words.next() {
                     Some(s) => self.switch(s),
-                    None => self.add_client_err_msg(
-                        "/switch usage: /switch <tab name>",
-                        &MsgTarget::CurrentTab,
-                    ),
+                    None => self.add_client_err_msg(SWITCH_CMD.usage, &MsgTarget::CurrentTab),
                 }
                 true
             }
@@ -216,6 +244,20 @@ impl TUI {
             Some("reload") => {
                 self.reload_config();
                 true
+            }
+            Some("help") => {
+                self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
+                for cmd in TUI_COMMANDS.iter() {
+                    self.add_client_msg(
+                        &format!(
+                            "/{:<10} - {:<25} - Usage: {}",
+                            cmd.name, cmd.description, cmd.usage
+                        ),
+                        &MsgTarget::CurrentTab,
+                    );
+                }
+                // false to fall through to print help for cmd.rs commands
+                false
             }
             _ => false,
         }
