@@ -19,11 +19,12 @@ pub(crate) struct CmdArgs<'a> {
 pub(crate) struct Cmd {
     /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
     pub(crate) name: &'static str,
-
-    // Command help message. Shown in `/help`.
-    // pub(crate) help: &'static str,
     /// Command function.
     pub(crate) cmd_fn: fn(CmdArgs),
+    /// Command description
+    description: &'static str,
+    /// Command usage
+    usage: &'static str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,7 +97,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 8] = [
+static CMDS: [&Cmd; 9] = [
     &AWAY_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
@@ -105,6 +106,7 @@ static CMDS: [&Cmd; 8] = [
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
+    &HELP_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,6 +114,8 @@ static CMDS: [&Cmd; 8] = [
 static AWAY_CMD: Cmd = Cmd {
     name: "away",
     cmd_fn: away,
+    description: "Sets/removes away message",
+    usage: "/away [msg]",
 };
 
 fn away(args: CmdArgs) {
@@ -130,6 +134,8 @@ fn away(args: CmdArgs) {
 static CLOSE_CMD: Cmd = Cmd {
     name: "close",
     cmd_fn: close,
+    description: "Closes current tab",
+    usage: "/close",
 };
 
 fn close(args: CmdArgs) {
@@ -163,6 +169,8 @@ fn close(args: CmdArgs) {
 static CONNECT_CMD: Cmd = Cmd {
     name: "connect",
     cmd_fn: connect,
+    description: "Connects to a server",
+    usage: "/connect <host>:<port> or /connect (to reconnect)",
 };
 
 fn connect(args: CmdArgs) {
@@ -183,10 +191,7 @@ fn connect(args: CmdArgs) {
         _ =>
         // wat
         {
-            ui.add_client_err_msg(
-                "/connect usage: /connect <host>:<port> or /connect (to reconnect)",
-                &MsgTarget::CurrentTab,
-            )
+            ui.add_client_err_msg(CONNECT_CMD.usage, &MsgTarget::CurrentTab)
         }
     }
 }
@@ -273,6 +278,8 @@ fn connect_(
 static JOIN_CMD: Cmd = Cmd {
     name: "join",
     cmd_fn: join,
+    description: "Joins a channel",
+    usage: "/join chan1[,chan2...]",
 };
 
 fn join(args: CmdArgs) {
@@ -285,10 +292,7 @@ fn join(args: CmdArgs) {
     } = args;
     let words = args.split_whitespace().collect::<Vec<_>>();
     if words.is_empty() {
-        return ui.add_client_err_msg(
-            "/join usage: /join chan1[,chan2...]",
-            &MsgTarget::CurrentTab,
-        );
+        return ui.add_client_err_msg(JOIN_CMD.usage, &MsgTarget::CurrentTab);
     }
 
     match find_client(clients, src.serv_name()) {
@@ -305,6 +309,8 @@ fn join(args: CmdArgs) {
 static ME_CMD: Cmd = Cmd {
     name: "me",
     cmd_fn: me,
+    description: "Sends emote message",
+    usage: "/me message",
 };
 
 fn me(args: CmdArgs) {
@@ -316,7 +322,7 @@ fn me(args: CmdArgs) {
         ..
     } = args;
     if args.is_empty() {
-        return ui.add_client_err_msg("/me usage: /me message", &MsgTarget::CurrentTab);
+        return ui.add_client_err_msg(ME_CMD.usage, &MsgTarget::CurrentTab);
     }
     crate::ui::send_msg(&**ui, clients, &src, args.to_string(), true);
 }
@@ -326,6 +332,8 @@ fn me(args: CmdArgs) {
 static MSG_CMD: Cmd = Cmd {
     name: "msg",
     cmd_fn: msg,
+    description: "Sends a message",
+    usage: "/msg target message",
 };
 
 fn split_msg_args(args: &str) -> Option<(&str, &str)> {
@@ -355,7 +363,7 @@ fn msg(args: CmdArgs) {
         ..
     } = args;
     let fail = || {
-        ui.add_client_err_msg("/msg usage: /msg target message", &MsgTarget::CurrentTab);
+        ui.add_client_err_msg(MSG_CMD.usage, &MsgTarget::CurrentTab);
     };
 
     let (target, msg) = match split_msg_args(args) {
@@ -392,6 +400,8 @@ fn msg(args: CmdArgs) {
 static NAMES_CMD: Cmd = Cmd {
     name: "names",
     cmd_fn: names,
+    description: "Shows users in channel",
+    usage: "/names",
 };
 
 fn names(args: CmdArgs) {
@@ -437,6 +447,8 @@ fn names(args: CmdArgs) {
 static NICK_CMD: Cmd = Cmd {
     name: "nick",
     cmd_fn: nick,
+    description: "Sets your nick",
+    usage: "/nick <nick>",
 };
 
 fn nick(args: CmdArgs) {
@@ -454,7 +466,28 @@ fn nick(args: CmdArgs) {
             client.nick(new_nick);
         }
     } else {
-        ui.add_client_err_msg("/nick usage: /nick <nick>", &MsgTarget::CurrentTab);
+        ui.add_client_err_msg(NICK_CMD.usage, &MsgTarget::CurrentTab);
+    }
+}
+
+static HELP_CMD: Cmd = Cmd {
+    name: "help",
+    cmd_fn: help,
+    description: "Displays this message",
+    usage: "/help",
+};
+
+fn help(args: CmdArgs) {
+    let CmdArgs { ui, .. } = args;
+    ui.add_client_msg("Client Commands:", &MsgTarget::CurrentTab);
+    for cmd in CMDS.iter() {
+        ui.add_client_msg(
+            &format!(
+                "/{:<10} - {:<25} - Usage: {}",
+                cmd.name, cmd.description, cmd.usage
+            ),
+            &MsgTarget::CurrentTab,
+        )
     }
 }
 
