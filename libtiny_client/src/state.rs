@@ -383,12 +383,17 @@ impl StateInner {
             }
 
             //
-            // RPL_ENDOFMOTD, join channels, set away status (TODO)
+            // RPL_ENDOFMOTD, join channels, set away status
             //
             Reply { num: 376, .. } => {
                 let chans: Vec<&str> = self.chans.iter().map(|(s, _)| s.as_str()).collect();
                 if !chans.is_empty() {
                     snd_irc_msg.try_send(wire::join(&chans)).unwrap();
+                }
+                if self.away_status.is_some() {
+                    snd_irc_msg
+                        .try_send(wire::away(self.away_status.as_deref()))
+                        .unwrap();
                 }
             }
 
