@@ -19,6 +19,7 @@ clap = "2.33"
 dirs = "1.0.2"
 env_logger = "0.7"
 futures = "0.3.1"
+lexical-sort = "0.3.0"
 libtiny_client = { path = "../libtiny_client", default-features = false }
 libtiny_logger = { path = "../libtiny_logger" }
 libtiny_tui = { path = "../libtiny_tui", default-features = false }

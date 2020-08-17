@@ -19,6 +19,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "any_ascii"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "365ec8abec704810c2a7990b0dd4f009524356b51310ed4c356d456e76c9c2b9"
+
+[[package]]
 name = "arc-swap"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,6 +452,15 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "lexical-sort"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14983e5d0cb68ae7983de223b8f640548cb55a34cb6ec5f1a7137bb5731ecc32"
+dependencies = [
+ "any_ascii",
+]
 
 [[package]]
 name = "libc"
@@ -1302,6 +1317,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "futures",
+ "lexical-sort",
  "libtiny_client",
  "libtiny_logger",
  "libtiny_tui",

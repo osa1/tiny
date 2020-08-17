@@ -70,9 +70,8 @@ struct StateInner {
     /// Nicks to try, in this order.
     nicks: Vec<String>,
 
-    /// NickServ passowrd.
+    /// NickServ password
     nickserv_ident: Option<String>,
-
     /// An index to `nicks`. When out of range we add `current_nick_idx - nicks.length()`
     /// underscores to the last nick in `nicks`
     current_nick_idx: usize,
@@ -233,6 +232,17 @@ impl StateInner {
                 }
             }
 
+            // Reply 477 is sent when user needs to be identified with NickServ to join a channel
+            // Only try re-join if nickserv_ident is configured
+            Reply { num: 477, params } => {
+                if self.nickserv_ident.is_some() {
+                    if let Some(chan) = params.get(1) {
+                        debug!("Attempting to re-join channel {}", chan);
+                        snd_irc_msg.try_send(wire::join(&[chan])).unwrap();
+                    }
+                }
+            }
+
             Reply { num: 396, params } => {
                 // :hobana.freenode.net 396 osa1 haskell/developer/osa1
                 // :is now your hidden host (set by services.)
@@ -255,7 +265,7 @@ impl StateInner {
                 let param = &params[1];
                 match param.find('=') {
                     None => {
-                        // TODO: Log this
+                        error!("Could not parse 302 RPL_USERHOST to set usermask.");
                     }
                     Some(mut i) => {
                         if param.as_bytes().get(i + 1) == Some(&b'+')
@@ -323,7 +333,7 @@ impl StateInner {
 
                 match parse_servername(params) {
                     None => {
-                        // TODO: Log
+                        error!("Could not parse server name in 002 RPL_YOURHOST message.");
                     }
                     Some(servername) => {
                         self.servername = Some(servername);
@@ -426,7 +436,7 @@ impl StateInner {
                 let nick = match pfx {
                     Some(Pfx::User { nick, .. }) => nick,
                     _ => {
-                        // TODO: WAT?
+                        error!("Could not extract nick from QUIT message.");
                         return;
                     }
                 };
@@ -496,7 +506,10 @@ impl StateInner {
 
     fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
         match utils::find_idx(&self.chans, |(s, _)| s == chan) {
-            None => vec![], // TODO: Log this, this is probably a bug
+            None => {
+                warn!("Could not find channel index in get_chan_nicks.");
+                vec![]
+            }
             Some(chan_idx) => self.chans[chan_idx].1.iter().cloned().collect(),
         }
     }
