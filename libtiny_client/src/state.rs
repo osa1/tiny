@@ -265,7 +265,7 @@ impl StateInner {
                 let param = &params[1];
                 match param.find('=') {
                     None => {
-                        error!("Could not parse 302 RPL_USERHOST to set usermask.");
+                        warn!("Could not parse 302 RPL_USERHOST to set usermask.");
                     }
                     Some(mut i) => {
                         if param.as_bytes().get(i + 1) == Some(&b'+')
@@ -436,7 +436,7 @@ impl StateInner {
                 let nick = match pfx {
                     Some(Pfx::User { nick, .. }) => nick,
                     _ => {
-                        error!("Could not extract nick from QUIT message.");
+                        warn!("Could not extract nick from QUIT message.");
                         return;
                     }
                 };
@@ -507,7 +507,7 @@ impl StateInner {
     fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
         match utils::find_idx(&self.chans, |(s, _)| s == chan) {
             None => {
-                warn!("Could not find channel index in get_chan_nicks.");
+                error!("Could not find channel index in get_chan_nicks.");
                 vec![]
             }
             Some(chan_idx) => self.chans[chan_idx].1.iter().cloned().collect(),
