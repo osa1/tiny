@@ -232,17 +232,6 @@ impl StateInner {
                 }
             }
 
-            // Reply 477 is sent when user needs to be identified with NickServ to join a channel
-            // Only try re-join if nickserv_ident is configured
-            Reply { num: 477, params } => {
-                if self.nickserv_ident.is_some() {
-                    if let Some(chan) = params.get(1) {
-                        debug!("Attempting to re-join channel {}", chan);
-                        snd_irc_msg.try_send(wire::join(&[chan])).unwrap();
-                    }
-                }
-            }
-
             Reply { num: 396, params } => {
                 // :hobana.freenode.net 396 osa1 haskell/developer/osa1
                 // :is now your hidden host (set by services.)
