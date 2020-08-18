@@ -422,9 +422,7 @@ fn names(args: CmdArgs) {
     };
 
     if let MsgSource::Chan { ref serv, ref chan } = src {
-        use lexical_sort::{lexical_only_alnum_cmp, StringSort};
-        let mut nicks_vec = client.get_chan_nicks(chan);
-        nicks_vec.string_sort_unstable(lexical_only_alnum_cmp);
+        let nicks_vec = client.get_chan_nicks(chan);
         let target = MsgTarget::Chan { serv, chan };
         if words.is_empty() {
             ui.add_client_msg(

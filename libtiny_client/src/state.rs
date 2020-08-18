@@ -499,7 +499,17 @@ impl StateInner {
                 error!("Could not find channel index in get_chan_nicks.");
                 vec![]
             }
-            Some(chan_idx) => self.chans[chan_idx].1.iter().cloned().collect(),
+            Some(chan_idx) => {
+                let mut nicks = self.chans[chan_idx]
+                    .1
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<String>>();
+                nicks.sort_unstable_by(|a, b| {
+                    a.to_lowercase().partial_cmp(&b.to_lowercase()).unwrap()
+                });
+                nicks
+            }
         }
     }
 }
