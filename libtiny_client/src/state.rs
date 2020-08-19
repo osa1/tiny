@@ -70,9 +70,8 @@ struct StateInner {
     /// Nicks to try, in this order.
     nicks: Vec<String>,
 
-    /// NickServ passowrd.
+    /// NickServ password
     nickserv_ident: Option<String>,
-
     /// An index to `nicks`. When out of range we add `current_nick_idx - nicks.length()`
     /// underscores to the last nick in `nicks`
     current_nick_idx: usize,
@@ -255,7 +254,7 @@ impl StateInner {
                 let param = &params[1];
                 match param.find('=') {
                     None => {
-                        // TODO: Log this
+                        warn!("Could not parse 302 RPL_USERHOST to set usermask.");
                     }
                     Some(mut i) => {
                         if param.as_bytes().get(i + 1) == Some(&b'+')
@@ -323,7 +322,7 @@ impl StateInner {
 
                 match parse_servername(params) {
                     None => {
-                        // TODO: Log
+                        error!("Could not parse server name in 002 RPL_YOURHOST message.");
                     }
                     Some(servername) => {
                         self.servername = Some(servername);
@@ -383,12 +382,17 @@ impl StateInner {
             }
 
             //
-            // RPL_ENDOFMOTD, join channels, set away status (TODO)
+            // RPL_ENDOFMOTD, join channels, set away status
             //
             Reply { num: 376, .. } => {
                 let chans: Vec<&str> = self.chans.iter().map(|(s, _)| s.as_str()).collect();
                 if !chans.is_empty() {
                     snd_irc_msg.try_send(wire::join(&chans)).unwrap();
+                }
+                if self.away_status.is_some() {
+                    snd_irc_msg
+                        .try_send(wire::away(self.away_status.as_deref()))
+                        .unwrap();
                 }
             }
 
@@ -421,7 +425,7 @@ impl StateInner {
                 let nick = match pfx {
                     Some(Pfx::User { nick, .. }) => nick,
                     _ => {
-                        // TODO: WAT?
+                        warn!("Could not extract nick from QUIT message.");
                         return;
                     }
                 };
@@ -491,8 +495,21 @@ impl StateInner {
 
     fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
         match utils::find_idx(&self.chans, |(s, _)| s == chan) {
-            None => vec![], // TODO: Log this, this is probably a bug
-            Some(chan_idx) => self.chans[chan_idx].1.iter().cloned().collect(),
+            None => {
+                error!("Could not find channel index in get_chan_nicks.");
+                vec![]
+            }
+            Some(chan_idx) => {
+                let mut nicks = self.chans[chan_idx]
+                    .1
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<String>>();
+                nicks.sort_unstable_by(|a, b| {
+                    a.to_lowercase().partial_cmp(&b.to_lowercase()).unwrap()
+                });
+                nicks
+            }
         }
     }
 }
