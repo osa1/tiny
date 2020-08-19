@@ -8,6 +8,9 @@
 - Password fields in the default config file (created automatically on first
   run) are now commented-out, to allow connecting to tiny IRC channel with the
   default config without having to make changes.
+- `/names` now sorts nicks lexicographically. (#235)
+- tiny now re-sets current away status on reconnect. Previously the away status
+  would be lost. (#234)
 
 # 2020/06/28: 0.6.0
 
