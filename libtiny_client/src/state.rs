@@ -514,12 +514,14 @@ impl StateInner {
     }
 }
 
+const SERVERNAME_PREFIX: &str = "Your host is ";
+const SERVERNAME_PREFIX_LEN: usize = SERVERNAME_PREFIX.len();
+
 /// Try to parse servername in a 002 RPL_YOURHOST reply
 fn parse_servername(params: &[String]) -> Option<String> {
-    use std::str::pattern::Pattern;
     let msg = params.get(1).or_else(|| params.get(0))?;
-    if "Your host is ".is_prefix_of(msg) {
-        let slice1 = &msg[13..];
+    if msg.len() >= SERVERNAME_PREFIX_LEN && &msg[..SERVERNAME_PREFIX_LEN] == SERVERNAME_PREFIX {
+        let slice1 = &msg[SERVERNAME_PREFIX_LEN..];
         let servername_ends = slice1.find('[').or_else(|| slice1.find(','))?;
         Some((&slice1[..servername_ends]).to_owned())
     } else {
