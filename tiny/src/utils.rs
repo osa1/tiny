@@ -45,7 +45,6 @@ pub(crate) fn is_nick_char(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use futures::stream::StreamExt;
 use std::io;
 use std::io::Write;

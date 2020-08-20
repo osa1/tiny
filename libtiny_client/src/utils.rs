@@ -74,9 +74,6 @@ pub(crate) fn find_idx<A, F: Fn(&A) -> bool>(slice: &[A], f: F) -> Option<usize>
 
 #[cfg(test)]
 mod tests {
-
-    extern crate test;
-
     use super::*;
 
     #[test]

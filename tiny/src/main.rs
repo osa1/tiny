@@ -1,5 +1,3 @@
-#![cfg_attr(test, feature(test))]
-#![feature(drain_filter)]
 #![feature(ptr_offset_from)]
 #![allow(clippy::zero_prefixed_literal)]
 
