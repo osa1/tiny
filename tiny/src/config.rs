@@ -1,11 +1,11 @@
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_yaml;
-use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::{exit, Command};
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) struct SASLAuth {
@@ -93,8 +93,8 @@ pub(crate) fn validate_config(config: &Config) -> Vec<String> {
     errors
 }
 
-fn is_shell_var(val: &str) -> bool {
-    let re = Regex::new(r"^\$[A-z][A-z0-9_]+$").unwrap();
+fn is_command(val: &str) -> bool {
+    let re = Regex::new(r"^![^!].*$").unwrap();
     return re.is_match(val);
 }
 
@@ -104,16 +104,36 @@ where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    if is_shell_var(&s) {
-        return match env::var(&s[1..]) {
-            Ok(value) => Ok(Some(value.to_string())),
-            Err(_) => {
-                eprintln!("Tried expanding env variable {} but unable to find it. If this is your password and not and env variable, add the password as ${}", &s, &s);
-                std::process::exit(1);
+    if is_command(&s) {
+        let output = Command::new("sh").arg("-c").arg(&s[1..]).output();
+
+        match output {
+            Ok(value) => {
+                if value.status.success() {
+                    println!("{}", String::from_utf8_lossy(&value.stderr).to_string());
+                    let mut value_str = String::from_utf8_lossy(&value.stdout).to_string();
+                    if value_str.ends_with('\n') {
+                        // Remove extra newline from cli output
+                        value_str.pop();
+                    }
+                    Ok(Some(value_str))
+                } else {
+                    println!(
+                        "Failed to get password from command `{}`: \n{}",
+                        &s[1..],
+                        String::from_utf8_lossy(&value.stderr).to_string()
+                    );
+                    println!("NOTE: You can use '!!' to escape if your password starts with '!'");
+                    exit(1);
+                }
             }
-        };
+            Err(_) => {
+                println!("Failed to get password from command `{}`", &s[1..]);
+                exit(1);
+            }
+        }
     } else {
-        if &s[0..2] == "$$" {
+        if &s[0..2] == "!!" {
             return Ok(Some(s[1..].to_string()));
         }
         Ok(Some(s))
