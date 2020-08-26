@@ -13,7 +13,6 @@ use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::{MsgTarget, TUI};
 use libtiny_ui::UI;
 
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -75,22 +74,21 @@ fn run(
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
 ) {
-    env_logger::builder()
-        .target(env_logger::Target::Stderr)
-        .format(|buf, record| {
-            let timestamp = buf.timestamp_seconds();
-
-            writeln!(
+    flexi_logger::Logger::with_env()
+        .format(|buf, now, record| {
+            write!(
                 buf,
                 "[{}] {} [{}:{}] {}",
-                timestamp,
+                now.now().format("%F %T"),
                 record.level(),
                 record.file().unwrap_or_default(),
                 record.line().unwrap_or_default(),
                 record.args()
             )
         })
-        .init();
+        .log_to_file()
+        .start()
+        .unwrap();
 
     // One task for each client to handle IRC events
     // One task for TUI events
