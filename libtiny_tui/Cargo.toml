@@ -9,7 +9,7 @@ default = []
 desktop-notifications = ["notify-rust"]
 
 [dependencies]
-futures = "0.3.1"
+futures = { version = "0.3.1", default-features = false, features = ["std", "async-await"] }
 libtiny_ui = { path = "../libtiny_ui" }
 log = "0.4"
 notify-rust = { version = "3", optional = true }
@@ -19,7 +19,7 @@ tempfile = "3.0.3"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
-tokio = { version = "0.2.11", default-features = false, features = [] }
+tokio = { version = "0.2.11", default-features = false, features = ["sync", "rt-core", "rt-util", "blocking", "signal", "stream", "time"] }
 
 [dev-dependencies]
 libc = "0.2.22"
