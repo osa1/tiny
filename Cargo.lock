@@ -448,7 +448,6 @@ name = "libtiny_client"
 version = "0.1.0"
 dependencies = [
  "base64 0.6.0",
- "env_logger",
  "futures",
  "lazy_static",
  "libtiny_logger",
@@ -465,7 +464,6 @@ dependencies = [
 name = "libtiny_logger"
 version = "0.1.0"
 dependencies = [
- "env_logger",
  "libtiny_ui",
  "log",
  "time",
@@ -475,7 +473,6 @@ dependencies = [
 name = "libtiny_tui"
 version = "0.1.0"
 dependencies = [
- "env_logger",
  "futures",
  "libc",
  "libtiny_ui",

@@ -12,7 +12,6 @@ tls-rustls = ["rustls-native-certs", "tokio-rustls"]
 
 [dependencies]
 base64 = "0.6.0"
-env_logger = "0.7"
 futures = "0.3.1"
 lazy_static = "1.4.0"
 libtiny_logger = { path = "../libtiny_logger" }
