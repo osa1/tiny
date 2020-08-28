@@ -8,11 +8,9 @@ use libtiny_wire::{Msg, Pfx};
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use tokio::{
-    select,
-    stream::StreamExt,
-    sync::mpsc::{Receiver, Sender},
-};
+
+use futures::{select, FutureExt, StreamExt};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(Clone)]
 pub struct State {
@@ -699,17 +697,21 @@ impl StateInner {
 async fn retry_channel_join(
     channel: String,
     mut snd_irc_msg: Sender<String>,
-    mut rcv_abort: Receiver<()>,
+    rcv_abort: Receiver<()>,
 ) {
     debug!("Attempting to re-join channel {}", channel);
+
     use tokio::time::{delay_for, Duration};
-    let mut delay = delay_for(Duration::from_secs(10));
+
+    let mut delay = delay_for(Duration::from_secs(10)).fuse();
+    let mut rcv_abort = rcv_abort.fuse();
+
     select! {
-        () = &mut delay => {
+        () = delay => {
             // Send join message
             snd_irc_msg.try_send(wire::join(&[&channel])).unwrap();
         },
-        Some(()) = rcv_abort.next() => {
+        _ = rcv_abort.next() => {
             // Channel tab was closed
         },
     };
