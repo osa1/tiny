@@ -100,6 +100,8 @@ pub enum Event {
     Msg(wire::Msg),
     /// A wire-protocol error
     WireError(String),
+    /// Channel join error message
+    ChannelJoinError { chan: String, msg: String },
 }
 
 impl From<StreamError> for Event {
@@ -220,7 +222,7 @@ impl Client {
 
     /// Leave a channel.
     pub fn part(&mut self, chan: &str) {
-        self.msg_chan.try_send(Cmd::Msg(wire::part(chan))).unwrap();
+        self.state.leave_channel(&mut self.msg_chan, chan)
     }
 
     /// Set away status. `None` means not away.
@@ -242,6 +244,8 @@ impl Client {
     /// outgoing messages) will be dropped.
     pub fn quit(&mut self, reason: Option<String>) {
         debug!("quit cmd received");
+        // Kill any retry join tasks to prevent quit delay
+        self.state.kill_join_tasks();
         self.msg_chan.try_send(Cmd::Quit(reason)).unwrap();
     }
 

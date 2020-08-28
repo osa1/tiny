@@ -270,11 +270,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
     let params: Vec<&str> = parse_params(msg);
     let cmd = match msg_ty {
         MsgType::Cmd("PRIVMSG" | "NOTICE") if params.len() == 2 => {
-            let is_notice = if let MsgType::Cmd("NOTICE") = msg_ty {
-                true
-            } else {
-                false
-            };
+            let is_notice = matches!(msg_ty, MsgType::Cmd("NOTICE"));
             let target = params[0];
             let mut msg = params[1];
             let target = if target.starts_with('#') {

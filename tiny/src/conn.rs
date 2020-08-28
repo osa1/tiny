@@ -111,6 +111,13 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) {
                 },
             );
         }
+        ChannelJoinError { chan, msg } => ui.add_client_msg(
+            &msg,
+            &MsgTarget::Chan {
+                serv: client.get_serv_name(),
+                chan: &chan,
+            },
+        ),
     }
 }
 
