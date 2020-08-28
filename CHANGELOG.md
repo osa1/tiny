@@ -11,6 +11,14 @@
 - `/names` now sorts nicks lexicographically. (#235)
 - tiny now re-sets current away status on reconnect. Previously the away status
   would be lost. (#234)
+- To make joining channels with +R mode (which means joining is only allowed
+  after identification via NickServ) more robust, tiny now makes 3 attempts to
+  join a channel (with a 10-second break after each attempt) when it gets a 477
+  response and the user has NickServ identification enabled (`nickserv_ident`
+  field in the config). Even though we send IDENTIFY messages (after
+  RPL_WELCOME) before JOIN messages (after RPL_ENDOFMOTD), sometimes
+  identification takes so long JOIN command fails with a 477. We now try joining
+  again with 10 seconds breaks, up to 3 times. (#236, #240)
 
 # 2020/06/28: 0.6.0
 

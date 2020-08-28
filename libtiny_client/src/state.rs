@@ -100,7 +100,7 @@ struct StateInner {
     /// order, in TUI?
     chans: Vec<Chan>,
 
-    /// Away reason if away mode is on. `None` otherwise. TODO: I don't think the message is used?
+    /// Away reason if away mode is on. `None` otherwise.
     away_status: Option<String>,
 
     /// servername to be used in PING messages. Read from 002 RPL_YOURHOST. `None` until 002.
