@@ -295,7 +295,10 @@ impl StateInner {
                         // Initialize channel state
                         match utils::find_idx(&self.chans, |c| &c.name == chan) {
                             None => {
-                                self.chans.push(Chan::new(chan.to_owned()));
+                                let mut chan = Chan::new(chan.to_owned());
+                                // Since nick was found in the prefix, we are in the channel
+                                chan.join_state = JoinState::Joined;
+                                self.chans.push(chan);
                             }
                             Some(chan_idx) => {
                                 // This happens because we initialize channel states for channels
