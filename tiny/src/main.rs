@@ -1,4 +1,3 @@
-#![feature(ptr_offset_from)]
 #![allow(clippy::zero_prefixed_literal)]
 
 mod cli;

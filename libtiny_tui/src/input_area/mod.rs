@@ -552,7 +552,7 @@ impl InputArea {
 
     fn scroll_on(&mut self) {
         // If scroll is already on, we don't need to calculate scroll
-        if let None = self.scroll {
+        if self.scroll.is_none() {
             self.scroll = Some(0);
             self.move_cursor(self.cursor);
         }
@@ -619,10 +619,7 @@ impl InputArea {
     ////////////////////////////////////////////////////////////////////////////
 
     fn in_autocomplete(&self) -> bool {
-        match self.mode {
-            Mode::Autocomplete { .. } => true,
-            _ => false,
-        }
+        matches!(self.mode, Mode::Autocomplete { .. })
     }
 
     fn modify(&mut self) {
