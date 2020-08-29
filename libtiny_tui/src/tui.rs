@@ -534,8 +534,8 @@ impl TUI {
     /// Edit current input + `str` before sending.
     fn run_editor(&mut self, str: &str, rcv_editor_ret: &mut Option<editor::ResultReceiver>) {
         let tab = &mut self.tabs[self.active_idx].widget;
-        let tf = tab.flush_input_field();
-        match editor::run(&mut self.tb, &tf, &str, rcv_editor_ret) {
+        let (msg, cursor) = tab.flush_input_field();
+        match editor::run(&mut self.tb, &msg, cursor, str, rcv_editor_ret) {
             Ok(()) => {}
             Err(err) => self.handle_editor_err(err),
         }

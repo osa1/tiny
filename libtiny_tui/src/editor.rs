@@ -20,6 +20,9 @@
 use termbox_simple::Termbox;
 use tokio::sync::oneshot;
 
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::process::Command;
+
 #[derive(Debug)]
 pub(crate) enum Error {
     Io(::std::io::Error),
@@ -42,17 +45,14 @@ pub(crate) type Result<A> = ::std::result::Result<A, Error>;
 
 pub(crate) type ResultReceiver = oneshot::Receiver<Result<Vec<String>>>;
 
+/// `cursor` is the cursor location in `text_field_contents`.
 pub(crate) fn run(
     tb: &mut Termbox,
     text_field_contents: &str,
+    cursor: i32, // location of cursor in `text_field_contents`
     pasted_text: &str,
     rcv_editor_ret: &mut Option<ResultReceiver>,
 ) -> Result<()> {
-    use std::{
-        io::{Read, Seek, SeekFrom, Write},
-        process::Command,
-    };
-
     let editor = ::std::env::var("EDITOR")?;
     let mut tmp_file = ::tempfile::NamedTempFile::new()?;
 
@@ -76,7 +76,25 @@ pub(crate) fn run(
     // won't be reading term_input until it reads from rcv_editor_ret, so the editor has control
     // over the tty, stdout, and stdin.
     tokio::task::spawn_blocking(move || {
-        let ret = Command::new(editor).arg(tmp_file.path()).status();
+        let mut cmd = Command::new(&editor);
+
+        // If the editor is (n)vim or emacs, pass parameters to move the cursor to its location in
+        // `text_field_contents`
+        match editor.as_ref() {
+            "vim" | "nvim" => {
+                if cursor == 0 {
+                    cmd.arg("-c").arg("normal! 3j");
+                } else {
+                    cmd.arg("-c").arg(format!("normal! 3j{}l", cursor));
+                }
+            }
+            "emacs" => {
+                cmd.arg(format!("+4:{}", cursor + 1));
+            }
+            _ => {}
+        }
+
+        let ret = cmd.arg(tmp_file.path()).status();
         let ret = match ret {
             Err(io_err) => {
                 snd_editor_ret.send(Err(io_err.into())).unwrap();

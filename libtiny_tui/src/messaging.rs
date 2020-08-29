@@ -190,8 +190,8 @@ impl MessagingUI {
         }
     }
 
-    /// Get contents of the input field and clear it.
-    pub(crate) fn flush_input_field(&mut self) -> String {
+    /// Get contents of the input field and cursor location and clear it.
+    pub(crate) fn flush_input_field(&mut self) -> (String, i32) {
         self.input_field.flush()
     }
 

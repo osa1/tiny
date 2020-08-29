@@ -19,6 +19,8 @@
   RPL_WELCOME) before JOIN messages (after RPL_ENDOFMOTD), sometimes
   identification takes so long JOIN command fails with a 477. We now try joining
   again with 10 seconds breaks, up to 3 times. (#236, #240)
+- When $EDITOR is (n)vim or emacs, C-x now places the cursor at its location in
+  the input field in the vim/emacs buffer. (#243)
 
 # 2020/06/28: 0.6.0
 
