@@ -480,7 +480,7 @@ impl StateInner {
 
                 // An example <servername>: cherryh.freenode.net[149.56.134.238/8001]
 
-                match parse_servername(params) {
+                match parse_servername(pfx.as_ref(), params) {
                     None => {
                         error!("Could not parse server name in 002 RPL_YOURHOST message.");
                     }
@@ -723,8 +723,8 @@ async fn retry_channel_join(
 const SERVERNAME_PREFIX: &str = "Your host is ";
 const SERVERNAME_PREFIX_LEN: usize = SERVERNAME_PREFIX.len();
 
-/// Try to parse servername in a 002 RPL_YOURHOST reply
-fn parse_servername(params: &[String]) -> Option<String> {
+/// Try to parse servername in a 002 RPL_YOURHOST reply params.
+fn parse_yourhost_msg(params: &[String]) -> Option<String> {
     let msg = params.get(1).or_else(|| params.get(0))?;
     if msg.len() >= SERVERNAME_PREFIX_LEN && &msg[..SERVERNAME_PREFIX_LEN] == SERVERNAME_PREFIX {
         let slice1 = &msg[SERVERNAME_PREFIX_LEN..];
@@ -735,6 +735,21 @@ fn parse_servername(params: &[String]) -> Option<String> {
     }
 }
 
+/// Get the server name from a prefix.
+fn parse_server_pfx(pfx: Option<&Pfx>) -> Option<String> {
+    if let Some(Pfx::Server(server_name)) = pfx {
+        Some(server_name.to_owned())
+    } else {
+        None
+    }
+}
+
+/// Parse server name from RPL_YOURHOST reply or fallback to using the server name inside
+/// Pfx::Server. See https://www.irc.com/dev/docs/refs/numerics/002.html for more info.
+fn parse_servername(pfx: Option<&Pfx>, params: &[String]) -> Option<String> {
+    parse_yourhost_msg(&params).or_else(|| parse_server_pfx(pfx))
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
@@ -743,27 +758,48 @@ mod tests {
 
     #[test]
     fn test_parse_servername_1() {
-        let args = vec![
-            "tiny_test".to_owned(),
-            "Your host is adams.freenode.net[94.125.182.252/8001], \
-             running version ircd-seven-1.1.4"
-                .to_owned(),
+        // IRC standard
+        let prefix = Some(Pfx::Server("card.freenode.net".to_string()));
+        let params = vec![
+            "nickname".to_string(),
+            "Your host is card.freenode.net[38.229.70.22/6697], running version ircd-seven-1.1.9"
+                .to_string(),
         ];
         assert_eq!(
-            parse_servername(&args),
-            Some("adams.freenode.net".to_owned())
+            parse_servername(prefix.as_ref(), &params),
+            Some("card.freenode.net".to_owned())
+        );
+
+        let prefix = Some(Pfx::Server("coulomb.oftc.net".to_string()));
+        let params = vec![
+            "nickname".to_string(),
+            "Your host is coulomb.oftc.net[109.74.200.93/6697], running version hybrid-7.2.2+oftc1.7.3".to_string(),
+        ];
+        assert_eq!(
+            parse_servername(prefix.as_ref(), &params),
+            Some("coulomb.oftc.net".to_owned())
+        );
+
+        let prefix = Some(Pfx::Server("irc.eagle.y.se".to_string()));
+        let params = vec![
+            "nickname".to_string(),
+            "Your host is irc.eagle.y.se, running version UnrealIRCd-4.0.18".to_string(),
+        ];
+        assert_eq!(
+            parse_servername(prefix.as_ref(), &params),
+            Some("irc.eagle.y.se".to_owned())
         );
     }
 
     #[test]
     fn test_parse_servername_2() {
-        let args = vec![
-            "tiny_test".to_owned(),
-            "Your host is belew.mozilla.org, running version InspIRCd-2.0".to_owned(),
-        ];
+        // Gitter variation
+        // Msg { pfx: Some(Server("irc.gitter.im")), cmd: Reply { num: 2, params: ["nickname", " 1.10.0"] } }
+        let prefix = Some(Pfx::Server("irc.gitter.im".to_string()));
+        let params = vec!["nickname".to_string(), " 1.10.0".to_string()];
         assert_eq!(
-            parse_servername(&args),
-            Some("belew.mozilla.org".to_owned())
+            parse_servername(prefix.as_ref(), &params),
+            Some("irc.gitter.im".to_owned())
         );
     }
 }
