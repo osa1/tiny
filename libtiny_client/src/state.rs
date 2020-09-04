@@ -474,13 +474,13 @@ impl StateInner {
             //
             // RPL_YOURHOST, set servername
             //
-            Reply { num: 002, .. } => {
+            Reply { num: 002, params } => {
                 // 002    RPL_YOURHOST
                 //        "Your host is <servername>, running version <ver>"
 
                 // An example <servername>: cherryh.freenode.net[149.56.134.238/8001]
 
-                match parse_servername(msg) {
+                match parse_servername(pfx, params) {
                     None => {
                         error!("Could not parse server name in 002 RPL_YOURHOST message.");
                     }
@@ -736,7 +736,7 @@ fn parse_yourhost_msg(params: &[String]) -> Option<String> {
 }
 
 /// Parse the server name from prefix
-fn parse_server_pfx(pfx: Option<&Pfx>) -> Option<String> {
+fn parse_server_pfx(pfx: &Option<Pfx>) -> Option<String> {
     if let Some(Pfx::Server(server_name)) = pfx {
         Some(server_name.to_owned())
     } else {
@@ -746,13 +746,8 @@ fn parse_server_pfx(pfx: Option<&Pfx>) -> Option<String> {
 
 /// Parse server name from RPL_YOURHOST reply
 /// or fallback to using the server name inside Pfx::Server
-fn parse_servername(msg: &Msg) -> Option<String> {
-    use wire::Cmd::Reply;
-    if let Reply { params, .. } = &msg.cmd {
-        parse_yourhost_msg(&params).or(parse_server_pfx(msg.pfx.as_ref()))
-    } else {
-        parse_server_pfx(msg.pfx.as_ref())
-    }
+fn parse_servername(pfx: &Option<Pfx>, params: &[String]) -> Option<String> {
+    parse_yourhost_msg(&params).or_else(|| parse_server_pfx(pfx))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -760,32 +755,31 @@ fn parse_servername(msg: &Msg) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wire::Cmd::*;
     #[test]
     fn test_parse_servername_1() {
         // Gitter variation
         // Msg { pfx: Some(Server("irc.gitter.im")), cmd: Reply { num: 2, params: ["nickname", " 1.10.0"] } }
-        let msg = Msg {
-            pfx: Some(Pfx::Server("irc.gitter.im".to_string())),
-            cmd: Reply {
-                num: 2,
-                params: vec!["nickname".to_string(), "1.0".to_string()],
-            },
-        };
-        assert_eq!(parse_servername(&msg), Some("irc.gitter.im".to_owned()));
+        let prefix = Some(Pfx::Server("irc.gitter.im".to_string()));
+        let params = vec!["nickname".to_string(), "1.0".to_string()];
+        assert_eq!(
+            parse_servername(&prefix, &params),
+            Some("irc.gitter.im".to_owned())
+        );
     }
 
     #[test]
     fn test_parse_servername_2() {
         // IRC standard
         // Msg { pfx: Some(Server("card.freenode.net")), cmd: Reply { num: 2, params: ["nickname", "Your host is card.freenode.net[38.229.70.22/6697], running version ircd-seven-1.1.9"] } }
-        let msg = Msg {
-            pfx: Some(Pfx::Server("card.freenode.net".to_string())),
-            cmd: Reply {
-                num: 2,
-                params: vec!["nickname".to_string(), "Your host is card.freenode.net[38.229.70.22/6697], running version ircd-seven-1.1.9".to_string()]
-            }
-        };
-        assert_eq!(parse_servername(&msg), Some("card.freenode.net".to_owned()));
+        let prefix = Some(Pfx::Server("card.freenode.net".to_string()));
+        let params = vec![
+            "nickname".to_string(),
+            "Your host is card.freenode.net[38.229.70.22/6697], running version ircd-seven-1.1.9"
+                .to_string(),
+        ];
+        assert_eq!(
+            parse_servername(&prefix, &params),
+            Some("card.freenode.net".to_owned())
+        );
     }
 }
