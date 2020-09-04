@@ -723,7 +723,7 @@ async fn retry_channel_join(
 const SERVERNAME_PREFIX: &str = "Your host is ";
 const SERVERNAME_PREFIX_LEN: usize = SERVERNAME_PREFIX.len();
 
-/// Try to parse servername in a 002 RPL_YOURHOST reply
+/// Try to parse servername in a 002 RPL_YOURHOST reply params.
 fn parse_yourhost_msg(params: &[String]) -> Option<String> {
     let msg = params.get(1).or_else(|| params.get(0))?;
     if msg.len() >= SERVERNAME_PREFIX_LEN && &msg[..SERVERNAME_PREFIX_LEN] == SERVERNAME_PREFIX {
@@ -735,7 +735,7 @@ fn parse_yourhost_msg(params: &[String]) -> Option<String> {
     }
 }
 
-/// Parse the server name from prefix
+/// Get the server name from a prefix.
 fn parse_server_pfx(pfx: Option<&Pfx>) -> Option<String> {
     if let Some(Pfx::Server(server_name)) = pfx {
         Some(server_name.to_owned())
@@ -744,8 +744,8 @@ fn parse_server_pfx(pfx: Option<&Pfx>) -> Option<String> {
     }
 }
 
-/// Parse server name from RPL_YOURHOST reply
-/// or fallback to using the server name inside Pfx::Server
+/// Parse server name from RPL_YOURHOST reply or fallback to using the server name inside
+/// Pfx::Server. See https://www.irc.com/dev/docs/refs/numerics/002.html for more info.
 fn parse_servername(pfx: Option<&Pfx>, params: &[String]) -> Option<String> {
     parse_yourhost_msg(&params).or_else(|| parse_server_pfx(pfx))
 }
