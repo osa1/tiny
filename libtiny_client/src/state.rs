@@ -680,7 +680,7 @@ impl StateInner {
                 JoinState::NotJoined => {}
                 JoinState::Joining { stop_task, .. } => {
                     debug!("Aborting task to retry joining {}", chan);
-                    let _ = stop_task.try_send(()).unwrap();
+                    let _ = stop_task.try_send(());
                 }
                 JoinState::Joined => msg_chan.try_send(Cmd::Msg(wire::part(chan))).unwrap(),
             }
@@ -691,7 +691,7 @@ impl StateInner {
     fn kill_join_tasks(&mut self) {
         for chan in &mut self.chans {
             if let JoinState::Joining { stop_task } = &mut chan.join_state {
-                let _ = stop_task.try_send(()).unwrap();
+                let _ = stop_task.try_send(());
             }
         }
     }
