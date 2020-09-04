@@ -21,6 +21,9 @@
   again with 10 seconds breaks, up to 3 times. (#236, #240)
 - When $EDITOR is (n)vim or emacs, C-x now places the cursor at its location in
   the input field in the vim/emacs buffer. (#243)
+- Improved RPL_YOURHOST parsing for parsing server names of some
+  non-standard-conforming servers. This is not a user-visible change unless
+  you're connecting to servers that don't follow IRC standards closely. (#239)
 
 # 2020/06/28: 0.6.0
 
