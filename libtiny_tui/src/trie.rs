@@ -172,6 +172,8 @@ mod benchs {
     use std::{fs::File, io::Read};
     use test::Bencher;
 
+    static DICT_FILE: &str = "/usr/share/dict/american-english";
+
     #[bench]
     fn bench_trie_build(b: &mut Bencher) {
         // Total words: 305,089
@@ -181,7 +183,7 @@ mod benchs {
         let mut contents = String::new();
         let mut words: Vec<&str> = vec![];
         {
-            match File::open("/usr/share/dict/american") {
+            match File::open(DICT_FILE) {
                 Err(_) => {
                     println!("Can't open dictionary file, aborting benchmark.");
                     return;
@@ -218,7 +220,7 @@ mod benchs {
         let mut contents = String::new();
         let mut words : Vec<&str> = vec![];
         {
-            let mut file = File::open("/usr/share/dict/american").unwrap();
+            let mut file = File::open(DICT_FILE).unwrap();
             file.read_to_string(&mut contents).unwrap();
             words.extend(contents.lines());
         }
@@ -242,7 +244,7 @@ mod benchs {
         let mut contents = String::new();
         let mut words: Vec<&str> = vec![];
         {
-            match File::open("/usr/share/dict/american") {
+            match File::open(DICT_FILE) {
                 Err(_) => {
                     println!("Can't open dictionary file, aborting benchmark.");
                     return;
@@ -271,7 +273,7 @@ mod benchs {
         let mut contents = String::new();
         let mut words: Vec<&str> = vec![];
         {
-            match File::open("/usr/share/dict/american") {
+            match File::open(DICT_FILE) {
                 Err(_) => {
                     println!("Can't open dictionary file, aborting benchmark.");
                     return;

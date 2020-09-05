@@ -350,6 +350,9 @@ mod tests {
 
         let mut line = Line::new();
         line.add_text(&text);
-        b.iter(|| line.rendered_height(1));
+        b.iter(|| {
+            line.force_recalculation();
+            line.rendered_height(1)
+        });
     }
 } // mod tests
