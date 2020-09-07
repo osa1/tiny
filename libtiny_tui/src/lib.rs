@@ -1,4 +1,3 @@
-#![cfg_attr(test, feature(test))]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::cognitive_complexity)]
 #![feature(or_patterns)]
@@ -10,14 +9,15 @@ mod input_area;
 mod line_split;
 mod messaging;
 #[doc(hidden)]
-// FIXME: This is "pub" to be able to use in an example
-pub mod msg_area;
+pub mod msg_area; // Public to be able to use in an example
 mod notifier;
 mod statusline;
 mod tab;
 mod termbox;
-mod trie;
-mod tui;
+#[doc(hidden)]
+pub mod trie; // Public for benchmarks
+#[doc(hidden)]
+pub mod tui; // Public for benchmarks
 mod utils;
 mod widget;
 

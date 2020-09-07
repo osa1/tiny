@@ -253,11 +253,8 @@ fn irc_color_to_termbox(irc_color: u8) -> u8 {
 #[cfg(test)]
 mod tests {
 
-    extern crate test;
-
     use super::*;
     use std::{fs::File, io::Read};
-    use test::Bencher;
 
     #[test]
     fn height_test_1() {
@@ -336,23 +333,5 @@ mod tests {
         // lipsum.txt has 1160 words in it. each line should contain at most one
         // word so we should have 1160 lines.
         assert_eq!(line.rendered_height(80), 102);
-    }
-
-    #[bench]
-    fn bench_rendered_height(b: &mut Bencher) {
-        // 1160 words, 2,237 ns/iter (+/- 150)
-
-        let mut text = String::new();
-        {
-            let mut file = File::open("test/lipsum.txt").unwrap();
-            file.read_to_string(&mut text).unwrap();
-        }
-
-        let mut line = Line::new();
-        line.add_text(&text);
-        b.iter(|| {
-            line.force_recalculation();
-            line.rendered_height(1)
-        });
     }
 } // mod tests
