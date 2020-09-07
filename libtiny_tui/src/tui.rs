@@ -830,6 +830,10 @@ impl TUI {
     pub(crate) fn draw(&mut self) {
         self.tb.clear();
 
+        if self.height < 2 {
+            return;
+        }
+
         let statusline_height = if self.statusline_visible && self.show_statusline {
             1
         } else {

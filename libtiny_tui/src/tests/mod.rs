@@ -5,6 +5,8 @@ use term_input::{Event, Key};
 use termbox_simple::CellBuf;
 use time::Tm;
 
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::panic::Location;
 
 fn buffer_str(buf: &CellBuf, w: u16, h: u16) -> String {
@@ -466,4 +468,51 @@ fn test_join_part_overflow() {
          |< #chan              |";
 
     expect_screen(screen, &tui, 21, 4, Location::caller());
+}
+
+#[test]
+fn test_resize() {
+    let mut tui = TUI::new_test(80, 50);
+
+    let server = "<server>";
+    tui.new_server_tab(server, None);
+
+    let ts: Tm = unsafe { ::std::mem::zeroed() };
+    let target = MsgTarget::CurrentTab;
+
+    let f = File::open("test/lipsum.txt").unwrap();
+    let f = BufReader::new(f);
+    for line in f.lines() {
+        let line = line.unwrap();
+        tui.add_msg(&line, ts, &target);
+    }
+
+    let mut w = 80;
+    let mut h = 50;
+
+    for _ in 0..50 {
+        w -= 1;
+        h -= 1;
+        tui.set_size(w, h);
+        tui.draw();
+    }
+
+    for _ in 0..30 {
+        w -= 1;
+        tui.set_size(w, h);
+        tui.draw();
+    }
+
+    for _ in 0..50 {
+        w += 1;
+        h += 1;
+        tui.set_size(w, h);
+        tui.draw();
+    }
+
+    for _ in 0..30 {
+        w += 1;
+        tui.set_size(w, h);
+        tui.draw();
+    }
 }

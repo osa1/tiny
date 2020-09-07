@@ -24,6 +24,7 @@
 - Improved RPL_YOURHOST parsing for parsing server names of some
   non-standard-conforming servers. This is not a user-visible change unless
   you're connecting to servers that don't follow IRC standards closely. (#239)
+- Fixed a TUI crash when the terminal height is less than two lines.
 
 # 2020/06/28: 0.6.0
 
