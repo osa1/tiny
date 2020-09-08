@@ -19,7 +19,7 @@ tempfile = "3.0.3"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
-tokio = { version = "0.2.11", default-features = false, features = ["sync", "rt-core", "rt-util", "blocking", "signal", "stream", "time"] }
+tokio = { version = "0.2.22", default-features = false, features = ["sync", "rt-core", "rt-util", "blocking", "signal", "stream", "time"] }
 
 [dev-dependencies]
 libc = "0.2.22"

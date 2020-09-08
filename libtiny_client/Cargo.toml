@@ -19,6 +19,6 @@ libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = { version = "0.2", optional = true }
 rustls-native-certs = { version = "0.4", optional = true }
-tokio = { version = "0.2.11", default-features = false, features = ["io-util", "io-driver", "signal", "sync", "stream", "rt-core", "time", "tcp", "rt-util", "blocking"] }
+tokio = { version = "0.2.22", default-features = false, features = ["io-util", "io-driver", "signal", "sync", "stream", "rt-core", "time", "tcp", "rt-util", "blocking"] }
 tokio-rustls = { version = "0.14", optional = true }
 tokio-tls = { version = "0.3", optional = true }
