@@ -17,7 +17,7 @@ desktop-notifications = ["libtiny_tui/desktop-notifications"]
 [dependencies]
 clap = "2.33"
 dirs = "1.0.2"
-env_logger = { version = "0.7", default-features = false, features = ["humantime"] }
+env_logger = { version = "0.7", default-features = false }
 futures = { version = "0.3.1", default-features = false }
 libtiny_client = { path = "../libtiny_client", default-features = false }
 libtiny_logger = { path = "../libtiny_logger" }

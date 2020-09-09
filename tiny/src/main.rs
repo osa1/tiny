@@ -4,6 +4,7 @@ mod cli;
 mod cmd;
 mod config;
 mod conn;
+mod debug_logging;
 mod ui;
 mod utils;
 
@@ -12,7 +13,6 @@ use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::{MsgTarget, TUI};
 use libtiny_ui::UI;
 
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -68,28 +68,23 @@ fn main() {
     }
 }
 
+const DEBUG_LOG_FILE: &str = "tiny_debug_logs.txt";
+
 fn run(
     servers: Vec<config::Server>,
     defaults: config::Defaults,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
 ) {
-    env_logger::builder()
-        .target(env_logger::Target::Stderr)
-        .format(|buf, record| {
-            let timestamp = buf.timestamp_seconds();
-
-            writeln!(
-                buf,
-                "[{}] {} [{}:{}] {}",
-                timestamp,
-                record.level(),
-                record.file().unwrap_or_default(),
-                record.line().unwrap_or_default(),
-                record.args()
-            )
-        })
-        .init();
+    let debug_log_file = match log_dir.as_ref() {
+        Some(log_dir) => {
+            let mut log_dir = log_dir.clone();
+            log_dir.push(DEBUG_LOG_FILE);
+            log_dir
+        }
+        None => DEBUG_LOG_FILE.into(),
+    };
+    debug_logging::init(debug_log_file);
 
     // One task for each client to handle IRC events
     // One task for TUI events
