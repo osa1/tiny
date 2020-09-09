@@ -1,6 +1,6 @@
-use mio::{unix::EventedFd, Events, Poll, PollOpt, Ready, Token};
 use term_input::{Event, Input, Key};
 use termbox_simple::*;
+use tokio::stream::StreamExt;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();
@@ -9,38 +9,29 @@ fn main() {
     let mut fg = true;
     draw(&mut tui, fg);
 
-    let poll = Poll::new().unwrap();
-    poll.register(
-        &EventedFd(&libc::STDIN_FILENO),
-        Token(libc::STDIN_FILENO as usize),
-        Ready::readable(),
-        PollOpt::level(),
-    )
-    .unwrap();
+    let mut runtime = tokio::runtime::Builder::new()
+        .basic_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
+    let local = tokio::task::LocalSet::new();
 
-    let mut input = Input::new();
-    let mut ev_buffer: Vec<Event> = Vec::new();
-    let mut events = Events::with_capacity(10);
-    'mainloop: loop {
-        match poll.poll(&mut events, None) {
-            Err(_) => {}
-            Ok(_) => {
-                input.read_input_events(&mut ev_buffer);
-                for ev in &ev_buffer {
-                    match *ev {
-                        Event::Key(Key::Tab) => {
-                            fg = !fg;
-                        }
-                        Event::Key(Key::Esc) => {
-                            break 'mainloop;
-                        }
-                        _ => {}
-                    }
+    local.block_on(&mut runtime, async move {
+        let mut input = Input::new();
+        while let Some(mb_ev) = input.next().await {
+            match mb_ev {
+                Err(_) => {}
+                Ok(Event::Key(Key::Tab)) => {
+                    fg = !fg;
                 }
-                draw(&mut tui, fg);
+                Ok(Event::Key(Key::Esc)) => {
+                    return;
+                }
+                Ok(_) => {}
             }
+            draw(&mut tui, fg);
         }
-    }
+    });
 }
 
 fn draw(tui: &mut Termbox, fg: bool) {
