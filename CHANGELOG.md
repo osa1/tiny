@@ -25,6 +25,10 @@
   non-standard-conforming servers. This is not a user-visible change unless
   you're connecting to servers that don't follow IRC standards closely. (#239)
 - Fixed a TUI crash when the terminal height is less than two lines.
+- Debug logs (enabled with `TINY_LOG` env variable using `env_logger` filter
+  syntax) are now printed to `tiny_debug_logs.txt` file in the log directory. If
+  logging is disabled then the file is created at tiny's working directory.
+  (#238)
 
 # 2020/06/28: 0.6.0
 
