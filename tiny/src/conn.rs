@@ -138,15 +138,15 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
             let pfx = match pfx {
                 Some(pfx) => pfx,
                 None => {
-                    // TODO: log this?
+                    debug!("PRIVMSG without prefix: {:?}", msg);
                     return;
                 }
             };
 
-            // sender to be shown in the UI
+            // Sender to be shown in the UI
             let origin = match pfx {
                 Server(_) => serv,
-                User { ref nick, .. } => nick,
+                User { ref nick, .. } | Ambiguous(ref nick) => nick,
             };
 
             if ctcp == Some(wire::CTCP::Version) {
@@ -184,12 +184,16 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                     }
                 }
                 wire::MsgTarget::User(target) => {
+                    // Message is sent to the user. If the sender is a server we show the message
+                    // in the server tab, otherwise we show it in a private tab. In case of an
+                    // ambiguity we again show in a private tab, as some bouncers send PRIVMSGs
+                    // from users with ambiguous prefix without a `user@host` part. See #247.
                     let msg_target = {
                         match pfx {
                             Server(_) => MsgTarget::Server { serv },
-                            User { ref nick, .. } => {
-                                // show NOTICE messages in server tabs if we don't have a tab
-                                // for the sender already (see #21)
+                            User { ref nick, .. } | Ambiguous(ref nick) => {
+                                // Show NOTICE messages in server tabs if we don't have a tab for
+                                // the sender already (see #21)
                                 if is_notice && !ui.user_tab_exists(serv, nick) {
                                     MsgTarget::Server { serv }
                                 } else {
@@ -202,7 +206,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                     if target == client.get_nick() {
                         ui.set_tab_style(TabStyle::Highlight, &msg_target);
                     } else {
-                        // not sure if this case can happen
+                        // Not sure if this case can happen
                         ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
                 }
@@ -211,9 +215,13 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
 
         JOIN { chan } => {
             let nick = match pfx {
-                Some(User { nick, .. }) => nick,
-                _ => {
-                    // TODO: log this?
+                Some(User { nick, .. }) | Some(Ambiguous(nick)) => nick,
+                Some(Server(_)) | None => {
+                    debug!(
+                        "JOIN with weird prefix: pfx={:?}, cmd={:?}",
+                        pfx,
+                        JOIN { chan }
+                    );
                     return;
                 }
             };
@@ -232,11 +240,15 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
             }
         }
 
-        PART { chan, .. } => {
+        PART { chan, msg } => {
             let nick = match pfx {
-                Some(User { nick, .. }) => nick,
-                _ => {
-                    // TODO: log this?
+                Some(User { nick, .. }) | Some(Ambiguous(nick)) => nick,
+                Some(Server(_)) | None => {
+                    debug!(
+                        "PART with weird prefix: pfx={:?}, cmd={:?}",
+                        pfx,
+                        PART { chan, msg }
+                    );
                     return;
                 }
             };
@@ -249,11 +261,15 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
             }
         }
 
-        QUIT { chans, .. } => {
+        QUIT { chans, msg } => {
             let nick = match pfx {
-                Some(User { ref nick, .. }) => nick,
-                _ => {
-                    // TODO: log this?
+                Some(User { ref nick, .. }) | Some(Ambiguous(ref nick)) => nick,
+                Some(Server(_)) | None => {
+                    debug!(
+                        "QUIT with weird prefix: pfx={:?}, cmd={:?}",
+                        pfx,
+                        QUIT { chans, msg }
+                    );
                     return;
                 }
             };
@@ -268,9 +284,13 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
 
         NICK { nick, chans } => {
             let old_nick = match pfx {
-                Some(User { nick, .. }) => nick,
-                _ => {
-                    // TODO: log this?
+                Some(User { nick, .. }) | Some(Ambiguous(nick)) => nick,
+                Some(Server(_)) | None => {
+                    debug!(
+                        "NICK with weird prefix: pfx={:?}, cmd={:?}",
+                        pfx,
+                        NICK { nick, chans }
+                    );
                     return;
                 }
             };
@@ -420,7 +440,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 );
             } else {
                 match pfx {
-                    Some(Server(msg_serv)) => {
+                    Some(Server(msg_serv)) | Some(Ambiguous(msg_serv)) => {
                         let msg_target = MsgTarget::Server { serv };
                         ui.add_privmsg(
                             &msg_serv,
@@ -432,7 +452,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                         );
                         ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
-                    pfx => {
+                    Some(User { .. }) | None => {
                         debug!(
                             "Ignoring numeric reply {}: pfx={:?}, params={:?}",
                             n, pfx, params
@@ -455,9 +475,9 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 );
                 ui.set_tab_style(TabStyle::NewMsg, &msg_target);
             }
-            pfx => {
+            Some(User { .. }) | Some(Ambiguous(_)) | None => {
                 debug!(
-                    "Ignoring server command {}: pfx={:?}, params={:?}",
+                    "Ignoring command {}: pfx={:?}, params={:?}",
                     cmd, pfx, params
                 );
             }

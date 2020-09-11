@@ -77,24 +77,42 @@ pub fn authenticate(msg: &str) -> String {
     format!("AUTHENTICATE {}\r\n", msg)
 }
 
-/// Sender of a message
-///
-/// `<prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]`
-///
-/// From RFC 2812:
-///
-/// > If the prefix is missing from the message, it is assumed to have originated from the
-/// > connection from which it was received from.
+/// Sender of a message ("prefix" in the RFC)
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pfx {
+    /// Sender is a server.
     Server(String),
 
-    /// <nick>!<user>@<host>
+    /// Sender is a nick.
     User {
+        /// Nick of the sender
         nick: String,
-        /// user@host
+        /// `user@host` part
         user: String,
     },
+
+    /// Server could be a server or nick, it's unclear. According to the RFC if we have something
+    /// like "localhost" which doesn't have '!', '@', or a character that 'servername' can have but
+    /// 'nickname' cannot, we can't tell whether the sender is a server or a nick. In those cases
+    /// we return this variant. See also #247.
+    Ambiguous(String),
+}
+
+// prefix = servername / ( nickname [ [ "!" user ] "@" host ] )
+fn parse_pfx(pfx: &str) -> Pfx {
+    match pfx.find(&['!', '@'][..]) {
+        Some(idx) => Pfx::User {
+            nick: (&pfx[0..idx]).to_owned(),
+            user: (&pfx[idx + 1..]).to_owned(),
+        },
+        None => {
+            // Nicks can't have '.' or '-'
+            match pfx.find(&['.', '-'][..]) {
+                Some(_) => Pfx::Server(pfx.to_owned()),
+                None => Pfx::Ambiguous(pfx.to_owned()),
+            }
+        }
+    }
 }
 
 /// Target of a message
@@ -107,6 +125,10 @@ pub enum MsgTarget {
 /// An IRC message
 #[derive(Debug, PartialEq, Eq)]
 pub struct Msg {
+    /// Sender of a message. According to RFC 2812 it's optional:
+    ///
+    /// > If the prefix is missing from the message, it is assumed to have originated from the
+    /// > connection from which it was received from.
     pub pfx: Option<Pfx>,
     pub cmd: Cmd,
 }
@@ -375,16 +397,6 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
     Ok(Msg { pfx, cmd })
 }
 
-fn parse_pfx(pfx: &str) -> Pfx {
-    match pfx.find('!') {
-        None => Pfx::Server(pfx.to_owned()),
-        Some(idx) => Pfx::User {
-            nick: (&pfx[0..idx]).to_owned(),
-            user: (&pfx[idx + 1..]).to_owned(),
-        },
-    }
-}
-
 fn parse_params(chrs: &str) -> Vec<&str> {
     debug_assert!(!chrs.starts_with(' '));
 
@@ -514,7 +526,11 @@ mod tests {
         .unwrap();
 
         let mut msgs = vec![];
-        while let Some(msg) = parse_irc_msg(&mut buf) {
+        while let Some(Ok(msg)) = parse_irc_msg(&mut buf) {
+            assert_eq!(
+                msg.pfx,
+                Some(Pfx::Server("barjavel.freenode.net".to_owned()))
+            );
             msgs.push(msg);
         }
 
