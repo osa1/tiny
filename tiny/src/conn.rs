@@ -145,7 +145,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
 
             // Sender to be shown in the UI
             let sender = match pfx {
-                Server(_) => serv,
+                Server(ref serv) => serv,
                 User { ref nick, .. } | Ambiguous(ref nick) => nick,
             };
 
