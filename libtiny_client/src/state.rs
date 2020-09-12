@@ -277,35 +277,70 @@ impl StateInner {
 
         use wire::Cmd::*;
         match cmd {
+            // PING: Send PONG
             PING { server } => {
                 snd_irc_msg.try_send(wire::pong(server)).unwrap();
             }
 
-            //
-            // Setting usermask using JOIN, RPL_USERHOST and 396 (?)
-            // Also initialize the channel state on JOIN
-            //
+            // JOIN: If this is us then update usermask if possible, create the channel state. If
+            // someone else add the nick to channel.
             JOIN { chan } => {
-                if let Some(Pfx::User { nick, user }) = pfx {
-                    if nick == &self.current_nick {
+                match pfx {
+                    Some(Pfx::User { nick, user }) if nick == &self.current_nick => {
                         // Set usermask
                         let usermask = format!("{}!{}", nick, user);
                         self.usermask = Some(usermask);
+                    }
+                    _ => {}
+                }
 
-                        // Initialize channel state
+                match pfx {
+                    Some(Pfx::User { nick, .. }) | Some(Pfx::Ambiguous(nick)) => {
+                        if nick == &self.current_nick {
+                            // We joined a channel, initialize channel state
+                            match utils::find_idx(&self.chans, |c| &c.name == chan) {
+                                None => {
+                                    let mut chan = Chan::new(chan.to_owned());
+                                    // Since nick was found in the prefix, we are in the channel
+                                    chan.join_state = JoinState::Joined;
+                                    self.chans.push(chan);
+                                }
+                                Some(chan_idx) => {
+                                    // This happens because we initialize channel states for channels
+                                    // that we will join on connection when the client is first created
+                                    let chan = &mut self.chans[chan_idx];
+                                    chan.join_state = JoinState::Joined;
+                                    chan.nicks.clear();
+                                }
+                            }
+                        } else {
+                            match utils::find_idx(&self.chans, |c| &c.name == chan) {
+                                Some(chan_idx) => {
+                                    self.chans[chan_idx]
+                                        .nicks
+                                        .insert(wire::drop_nick_prefix(nick).to_owned());
+                                }
+                                None => {
+                                    debug!("Can't find channel state for JOIN: {:?}", cmd);
+                                }
+                            }
+                        }
+                    }
+                    Some(Pfx::Server(_)) | None => {}
+                }
+            }
+
+            // PART: If this is us remove the channel state. Otherwise remove the nick from the
+            // channel.
+            PART { chan, .. } => match pfx {
+                Some(Pfx::User { nick, .. }) | Some(Pfx::Ambiguous(nick)) => {
+                    if nick == &self.current_nick {
                         match utils::find_idx(&self.chans, |c| &c.name == chan) {
                             None => {
-                                let mut chan = Chan::new(chan.to_owned());
-                                // Since nick was found in the prefix, we are in the channel
-                                chan.join_state = JoinState::Joined;
-                                self.chans.push(chan);
+                                debug!("Can't find channel state: {}", chan);
                             }
                             Some(chan_idx) => {
-                                // This happens because we initialize channel states for channels
-                                // that we will join on connection when the client is first created
-                                let chan = &mut self.chans[chan_idx];
-                                chan.join_state = JoinState::Joined;
-                                chan.nicks.clear();
+                                self.chans.remove(chan_idx);
                             }
                         }
                     } else {
@@ -313,13 +348,41 @@ impl StateInner {
                             Some(chan_idx) => {
                                 self.chans[chan_idx]
                                     .nicks
-                                    .insert(wire::drop_nick_prefix(nick).to_owned());
+                                    .remove(wire::drop_nick_prefix(nick));
                             }
                             None => {
-                                debug!("Can't find channel state for JOIN: {:?}", cmd);
+                                debug!("Can't find channel state for PART: {:?}", cmd);
                             }
                         }
                     }
+                }
+                Some(Pfx::Server(_)) | None => {}
+            },
+
+            // QUIT: Update the `chans` field for the channels that the user was in
+            QUIT { ref mut chans, .. } => {
+                let nick = match pfx {
+                    Some(Pfx::User { nick, .. }) | Some(Pfx::Ambiguous(nick)) => nick,
+                    Some(Pfx::Server(_)) | None => {
+                        return;
+                    }
+                };
+                for chan in self.chans.iter_mut() {
+                    if chan.nicks.contains(nick) {
+                        chans.push(chan.name.to_owned());
+                        chan.nicks.remove(nick);
+                    }
+                }
+            }
+
+            // 396: Try to set usermask.
+            Reply { num: 396, params } => {
+                // :hobana.freenode.net 396 osa1 haskell/developer/osa1
+                // :is now your hidden host (set by services.)
+                if params.len() == 3 {
+                    let usermask =
+                        format!("{}!~{}@{}", self.current_nick, self.nicks[0], params[1]);
+                    self.usermask = Some(usermask);
                 }
             }
 
@@ -390,16 +453,7 @@ impl StateInner {
                 }
             }
 
-            Reply { num: 396, params } => {
-                // :hobana.freenode.net 396 osa1 haskell/developer/osa1
-                // :is now your hidden host (set by services.)
-                if params.len() == 3 {
-                    let usermask =
-                        format!("{}!~{}@{}", self.current_nick, self.nicks[0], params[1]);
-                    self.usermask = Some(usermask);
-                }
-            }
-
+            // 302: Try to set usermask.
             Reply { num: 302, params } => {
                 // 302 RPL_USERHOST
                 // :ircd.stealth.net 302 yournick :syrk=+syrk@millennium.stealth.net
@@ -426,38 +480,7 @@ impl StateInner {
                 }
             }
 
-            //
-            // Remove channel state on PART
-            //
-            PART { chan, .. } => {
-                if let Some(Pfx::User { nick, .. }) = pfx {
-                    if nick == &self.current_nick {
-                        match utils::find_idx(&self.chans, |c| &c.name == chan) {
-                            None => {
-                                debug!("Can't find channel state: {}", chan);
-                            }
-                            Some(chan_idx) => {
-                                self.chans.remove(chan_idx);
-                            }
-                        }
-                    } else {
-                        match utils::find_idx(&self.chans, |c| &c.name == chan) {
-                            Some(chan_idx) => {
-                                self.chans[chan_idx]
-                                    .nicks
-                                    .remove(wire::drop_nick_prefix(nick));
-                            }
-                            None => {
-                                debug!("Can't find channel state for PART: {:?}", cmd);
-                            }
-                        }
-                    }
-                }
-            }
-
-            //
-            // RPL_WELCOME, start introduction sequence and NickServ authentication
-            //
+            // RPL_WELCOME: Start introduction sequence and NickServ authentication.
             Reply { num: 001, .. } => {
                 snd_ev.try_send(Event::Connected).unwrap();
                 snd_ev
@@ -471,9 +494,7 @@ impl StateInner {
                 }
             }
 
-            //
-            // RPL_YOURHOST, set servername
-            //
+            // RPL_YOURHOST: Set servername
             Reply { num: 002, params } => {
                 // 002    RPL_YOURHOST
                 //        "Your host is <servername>, running version <ver>"
@@ -490,11 +511,8 @@ impl StateInner {
                 }
             }
 
-            //
-            // ERR_NICKNAMEINUSE, try another nick if we don't have a nick yet
-            //
+            // ERR_NICKNAMEINUSE: Try another nick if we don't have a nick yet.
             Reply { num: 433, .. } => {
-                // ERR_NICKNAMEINUSE. If we don't have a nick already try next nick.
                 if !self.nick_accepted {
                     let new_nick = self.get_next_nick();
                     // debug!("new nick: {}", new_nick);
@@ -505,45 +523,44 @@ impl StateInner {
                 }
             }
 
-            //
             // NICK message sent from the server when our nick change request was successful
-            //
             NICK {
                 nick: new_nick,
                 ref mut chans,
             } => {
-                if let Some(Pfx::User { nick: old_nick, .. }) = pfx {
-                    if old_nick == &self.current_nick {
-                        snd_ev
-                            .try_send(Event::NickChange(new_nick.to_owned()))
-                            .unwrap();
+                match pfx {
+                    Some(Pfx::User { nick: old_nick, .. }) | Some(Pfx::Ambiguous(old_nick)) => {
+                        if old_nick == &self.current_nick {
+                            snd_ev
+                                .try_send(Event::NickChange(new_nick.to_owned()))
+                                .unwrap();
 
-                        match utils::find_idx(&self.nicks, |nick| nick == new_nick) {
-                            None => {
-                                self.nicks.push(new_nick.to_owned());
-                                self.current_nick_idx = self.nicks.len() - 1;
+                            match utils::find_idx(&self.nicks, |nick| nick == new_nick) {
+                                None => {
+                                    self.nicks.push(new_nick.to_owned());
+                                    self.current_nick_idx = self.nicks.len() - 1;
+                                }
+                                Some(nick_idx) => {
+                                    self.current_nick_idx = nick_idx;
+                                }
                             }
-                            Some(nick_idx) => {
-                                self.current_nick_idx = nick_idx;
-                            }
+
+                            self.current_nick = new_nick.to_owned();
                         }
 
-                        self.current_nick = new_nick.to_owned();
-                    }
-
-                    // Rename the nick in channel states, also populate the chan list
-                    for chan in &mut self.chans {
-                        if chan.nicks.remove(old_nick) {
-                            chan.nicks.insert(new_nick.to_owned());
-                            chans.push(chan.name.to_owned());
+                        // Rename the nick in channel states, also populate the chan list
+                        for chan in &mut self.chans {
+                            if chan.nicks.remove(old_nick) {
+                                chan.nicks.insert(new_nick.to_owned());
+                                chans.push(chan.name.to_owned());
+                            }
                         }
                     }
+                    Some(Pfx::Server(_)) | None => {}
                 }
             }
 
-            //
-            // RPL_ENDOFMOTD, join channels, set away status
-            //
+            // RPL_ENDOFMOTD: Join channels, set away status
             Reply { num: 376, .. } => {
                 let chans: Vec<&str> = self.chans.iter().map(|c| c.name.as_str()).collect();
                 if !chans.is_empty() {
@@ -556,9 +573,7 @@ impl StateInner {
                 }
             }
 
-            //
-            // RPL_NAMREPLY: users in a channel
-            //
+            // RPL_NAMREPLY: Set users in a channel
             Reply { num: 353, params } => {
                 let chan = &params[2];
                 match utils::find_idx(&self.chans, |c| &c.name == chan) {
@@ -578,28 +593,7 @@ impl StateInner {
                 }
             }
 
-            //
-            // QUIT: Update the `chans` field for the channels that the user was in
-            //
-            QUIT { ref mut chans, .. } => {
-                let nick = match pfx {
-                    Some(Pfx::User { nick, .. }) => nick,
-                    _ => {
-                        warn!("Could not extract nick from QUIT message.");
-                        return;
-                    }
-                };
-                for chan in self.chans.iter_mut() {
-                    if chan.nicks.contains(nick) {
-                        chans.push(chan.name.to_owned());
-                        chan.nicks.remove(nick);
-                    }
-                }
-            }
-
-            //
             // SASL authentication
-            //
             CAP {
                 client: _,
                 subcommand,
@@ -646,9 +640,7 @@ impl StateInner {
                 snd_irc_msg.try_send(wire::cap_end()).unwrap();
             }
 
-            //
             // Ignore the rest
-            //
             _ => {}
         }
     }
@@ -723,6 +715,12 @@ async fn retry_channel_join(
 const SERVERNAME_PREFIX: &str = "Your host is ";
 const SERVERNAME_PREFIX_LEN: usize = SERVERNAME_PREFIX.len();
 
+/// Parse server name from RPL_YOURHOST reply or fallback to using the server name inside
+/// Pfx::Server. See https://www.irc.com/dev/docs/refs/numerics/002.html for more info.
+fn parse_servername(pfx: Option<&Pfx>, params: &[String]) -> Option<String> {
+    parse_yourhost_msg(&params).or_else(|| parse_server_pfx(pfx))
+}
+
 /// Try to parse servername in a 002 RPL_YOURHOST reply params.
 fn parse_yourhost_msg(params: &[String]) -> Option<String> {
     let msg = params.get(1).or_else(|| params.get(0))?;
@@ -737,17 +735,12 @@ fn parse_yourhost_msg(params: &[String]) -> Option<String> {
 
 /// Get the server name from a prefix.
 fn parse_server_pfx(pfx: Option<&Pfx>) -> Option<String> {
-    if let Some(Pfx::Server(server_name)) = pfx {
-        Some(server_name.to_owned())
-    } else {
-        None
+    match pfx {
+        Some(Pfx::Server(server_name)) | Some(Pfx::Ambiguous(server_name)) => {
+            Some(server_name.to_owned())
+        }
+        Some(Pfx::User { .. }) | None => None,
     }
-}
-
-/// Parse server name from RPL_YOURHOST reply or fallback to using the server name inside
-/// Pfx::Server. See https://www.irc.com/dev/docs/refs/numerics/002.html for more info.
-fn parse_servername(pfx: Option<&Pfx>, params: &[String]) -> Option<String> {
-    parse_yourhost_msg(&params).or_else(|| parse_server_pfx(pfx))
 }
 
 ////////////////////////////////////////////////////////////////////////////////

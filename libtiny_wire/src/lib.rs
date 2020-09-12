@@ -77,24 +77,89 @@ pub fn authenticate(msg: &str) -> String {
     format!("AUTHENTICATE {}\r\n", msg)
 }
 
-/// Sender of a message
+/// Sender of a message ("prefix" in the RFC). Instead of returning a `String` we parse prefix part
+/// of the message according to the RFC because users of this library sometimes need to distinguish
+/// a server from a user. For example, in tiny if a PRIVMSG to us is coming from a server then we
+/// show it in the server tab. Otherwise we show it in the sender's (user) tab.
 ///
-/// `<prefix> ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]`
+/// (Note that the ambiguity in the RFC makes this a best-effort thing. When we get a PRIVMSG from
+/// e.g. "foo" it's not possible to know whether "foo" is a server or a user.)
 ///
-/// From RFC 2812:
-///
-/// > If the prefix is missing from the message, it is assumed to have originated from the
-/// > connection from which it was received from.
+/// One alternative here would be to defer parsing to the users so that, for example, if in the
+/// context we expect the message to be coming from a user we call `Pfx::parse_user()` which
+/// interprets the ambiguous case as "user" and `Pfx::parse_server()` which interprets it as
+/// "server". The downside is that'd sometimes means parsing the prefix multiple times. For
+/// example, in tiny, a Client would parse the prefix to get the nick to update the channel state,
+/// then we'd parse it again in tiny to update the TUI.
+
+// We could still provide `get_server()` and `get_nick()` that interpret the ambiguous case as
+// server and nick, respectively, but I don't think it'd be much more convenient that pattern
+// matching explicitly. See the commented-out code below.
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pfx {
+    /// Sender is a server.
     Server(String),
 
-    /// <nick>!<user>@<host>
+    /// Sender is a nick.
     User {
+        /// Nick of the sender
         nick: String,
-        /// user@host
+        /// `user@host` part
         user: String,
     },
+
+    /// Server could be a server or nick, it's unclear. According to the RFC if we have something
+    /// like "localhost" which doesn't have '!', '@', or a character that 'servername' can have but
+    /// 'nickname' cannot, we can't tell whether the sender is a server or a nick. In those cases
+    /// we return this variant. See also #247.
+    Ambiguous(String),
+}
+
+/*
+impl Pfx {
+    /// Get the server name if the prefix is for a server. Ambiguous case is interpreted as server.
+    pub fn get_server(&self) -> Option<&str> {
+        match self {
+            Pfx::Server(ref server) | Pfx::Ambiguous(ref server) => Some(server),
+            Pfx::User { .. } => None,
+        }
+    }
+
+    /// Get the nick if the prefix is for a user. Ambiguous case is interpreted as a nick.
+    pub fn get_nick(&self) -> Option<&str> {
+        match self {
+            Pfx::User { ref nick, .. } | Pfx::Ambiguous(ref nick) => Some(nick),
+            Pfx::Server(_) => None,
+        }
+    }
+}
+*/
+
+// RFC 2812 section 2.3.1
+fn parse_pfx(pfx: &str) -> Pfx {
+    match pfx.find(&['!', '@'][..]) {
+        Some(idx) => Pfx::User {
+            nick: (&pfx[0..idx]).to_owned(),
+            user: (&pfx[idx + 1..]).to_owned(),
+        },
+        None => {
+            // Chars that nicks can have but servernames cannot
+            match pfx.find(&['[', ']', '\\', '`', '_', '^', '{', '|', '}'][..]) {
+                Some(_) => Pfx::User {
+                    nick: pfx.to_owned(),
+                    user: "".to_owned(),
+                },
+                None => {
+                    // Nicks can't have '.'
+                    match pfx.find('.') {
+                        Some(_) => Pfx::Server(pfx.to_owned()),
+                        None => Pfx::Ambiguous(pfx.to_owned()),
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Target of a message
@@ -107,6 +172,10 @@ pub enum MsgTarget {
 /// An IRC message
 #[derive(Debug, PartialEq, Eq)]
 pub struct Msg {
+    /// Sender of a message. According to RFC 2812 it's optional:
+    ///
+    /// > If the prefix is missing from the message, it is assumed to have originated from the
+    /// > connection from which it was received from.
     pub pfx: Option<Pfx>,
     pub cmd: Cmd,
 }
@@ -375,16 +444,6 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
     Ok(Msg { pfx, cmd })
 }
 
-fn parse_pfx(pfx: &str) -> Pfx {
-    match pfx.find('!') {
-        None => Pfx::Server(pfx.to_owned()),
-        Some(idx) => Pfx::User {
-            nick: (&pfx[0..idx]).to_owned(),
-            user: (&pfx[idx + 1..]).to_owned(),
-        },
-    }
-}
-
 fn parse_params(chrs: &str) -> Vec<&str> {
     debug_assert!(!chrs.starts_with(' '));
 
@@ -514,7 +573,11 @@ mod tests {
         .unwrap();
 
         let mut msgs = vec![];
-        while let Some(msg) = parse_irc_msg(&mut buf) {
+        while let Some(Ok(msg)) = parse_irc_msg(&mut buf) {
+            assert_eq!(
+                msg.pfx,
+                Some(Pfx::Server("barjavel.freenode.net".to_owned()))
+            );
             msgs.push(msg);
         }
 
@@ -709,6 +772,39 @@ mod tests {
                     msg: "Closing Link: 212.252.143.51 (Excess Flood)".to_owned(),
                 },
             },
+        );
+    }
+
+    #[test]
+    fn test_parse_pfx() {
+        use Pfx::*;
+        assert_eq!(parse_pfx("xyz"), Ambiguous("xyz".to_string()));
+        assert_eq!(parse_pfx("xy-z"), Ambiguous("xy-z".to_string()),);
+        assert_eq!(parse_pfx("xy.z"), Server("xy.z".to_string()));
+        assert_eq!(
+            parse_pfx("xyz[m]"),
+            User {
+                nick: "xyz[m]".to_string(),
+                user: "".to_string()
+            }
+        );
+        assert_eq!(
+            parse_pfx("fe-00106.xyz.net"),
+            Server("fe-00106.xyz.net".to_string())
+        );
+        assert_eq!(
+            parse_pfx("osa1!osa1@x.y.im"),
+            User {
+                nick: "osa1".to_string(),
+                user: "osa1@x.y.im".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_pfx("IRC!IRC@fe-00106.xyz.net"),
+            User {
+                nick: "IRC".to_string(),
+                user: "IRC@fe-00106.xyz.net".to_string()
+            }
         );
     }
 }

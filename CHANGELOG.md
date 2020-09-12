@@ -29,6 +29,9 @@
   syntax) are now printed to `tiny_debug_logs.txt` file in the log directory. If
   logging is disabled then the file is created at tiny's working directory.
   (#238)
+- Handling of IRC messages with ambiguous prefix (when it's unclear whether the
+  sender is a server or nick) improved. tiny should now work better with some
+  bouncers such as soju. (#249)
 
 # 2020/06/28: 0.6.0
 
