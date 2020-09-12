@@ -77,7 +77,25 @@ pub fn authenticate(msg: &str) -> String {
     format!("AUTHENTICATE {}\r\n", msg)
 }
 
-/// Sender of a message ("prefix" in the RFC)
+/// Sender of a message ("prefix" in the RFC). Instead of returning a `String` we parse prefix part
+/// of the message according to the RFC because users of this library sometimes need to distinguish
+/// a server from a user. For example, in tiny if a PRIVMSG to us is coming from a server then we
+/// show it in the server tab. Otherwise we show it in the sender's (user) tab.
+///
+/// (Note that the ambiguity in the RFC makes this a best-effort thing. When we get a PRIVMSG from
+/// e.g. "foo" it's not possible to know whether "foo" is a server or a user.)
+///
+/// One alternative here would be to defer parsing to the users so that, for example, if in the
+/// context we expect the message to be coming from a user we call `Pfx::parse_user()` which
+/// interprets the ambiguous case as "user" and `Pfx::parse_server()` which interprets it as
+/// "server". The downside is that'd sometimes means parsing the prefix multiple times. For
+/// example, in tiny, a Client would parse the prefix to get the nick to update the channel state,
+/// then we'd parse it again in tiny to update the TUI.
+
+// We could still provide `get_server()` and `get_nick()` that interpret the ambiguous case as
+// server and nick, respectively, but I don't think it'd be much more convenient that pattern
+// matching explicitly. See the commented-out code below.
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Pfx {
     /// Sender is a server.
@@ -97,6 +115,26 @@ pub enum Pfx {
     /// we return this variant. See also #247.
     Ambiguous(String),
 }
+
+/*
+impl Pfx {
+    /// Get the server name if the prefix is for a server. Ambiguous case is interpreted as server.
+    pub fn get_server(&self) -> Option<&str> {
+        match self {
+            Pfx::Server(ref server) | Pfx::Ambiguous(ref server) => Some(server),
+            Pfx::User { .. } => None,
+        }
+    }
+
+    /// Get the nick if the prefix is for a user. Ambiguous case is interpreted as a nick.
+    pub fn get_nick(&self) -> Option<&str> {
+        match self {
+            Pfx::User { ref nick, .. } | Pfx::Ambiguous(ref nick) => Some(nick),
+            Pfx::Server(_) => None,
+        }
+    }
+}
+*/
 
 // RFC 2812 section 2.3.1
 fn parse_pfx(pfx: &str) -> Pfx {
