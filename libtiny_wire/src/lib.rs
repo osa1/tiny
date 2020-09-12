@@ -750,5 +750,23 @@ mod tests {
                 user: "".to_string()
             }
         );
+        assert_eq!(
+            parse_pfx("fe-00106.xyz.net"),
+            Server("fe-00106.xyz.net".to_string())
+        );
+        assert_eq!(
+            parse_pfx("osa1!osa1@x.y.im"),
+            User {
+                nick: "osa1".to_string(),
+                user: "osa1@x.y.im".to_string(),
+            }
+        );
+        assert_eq!(
+            parse_pfx("IRC!IRC@fe-00106.xyz.net"),
+            User {
+                nick: "IRC".to_string(),
+                user: "IRC@fe-00106.xyz.net".to_string()
+            }
+        );
     }
 }
