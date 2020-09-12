@@ -1,0 +1,5 @@
+[package]
+name = "libtiny_common"
+version = "0.1.0"
+authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
+edition = "2018"

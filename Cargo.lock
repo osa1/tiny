@@ -394,6 +394,7 @@ dependencies = [
  "base64",
  "futures",
  "lazy_static",
+ "libtiny_common",
  "libtiny_logger",
  "libtiny_wire",
  "log",
@@ -403,6 +404,10 @@ dependencies = [
  "tokio-rustls",
  "tokio-tls",
 ]
+
+[[package]]
+name = "libtiny_common"
+version = "0.1.0"
 
 [[package]]
 name = "libtiny_logger"
