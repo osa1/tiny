@@ -98,7 +98,7 @@ pub enum Pfx {
     Ambiguous(String),
 }
 
-// prefix = servername / ( nickname [ [ "!" user ] "@" host ] )
+// RFC 2812 section 2.3.1
 fn parse_pfx(pfx: &str) -> Pfx {
     match pfx.find(&['!', '@'][..]) {
         Some(idx) => Pfx::User {
@@ -106,10 +106,19 @@ fn parse_pfx(pfx: &str) -> Pfx {
             user: (&pfx[idx + 1..]).to_owned(),
         },
         None => {
-            // Nicks can't have '.' or '-'
-            match pfx.find(&['.', '-'][..]) {
-                Some(_) => Pfx::Server(pfx.to_owned()),
-                None => Pfx::Ambiguous(pfx.to_owned()),
+            // Chars that nicks can have but servernames cannot
+            match pfx.find(&['[', ']', '\\', '`', '_', '^', '{', '|', '}'][..]) {
+                Some(_) => Pfx::User {
+                    nick: pfx.to_owned(),
+                    user: "".to_owned(),
+                },
+                None => {
+                    // Nicks can't have '.'
+                    match pfx.find('.') {
+                        Some(_) => Pfx::Server(pfx.to_owned()),
+                        None => Pfx::Ambiguous(pfx.to_owned()),
+                    }
+                }
             }
         }
     }
@@ -725,6 +734,21 @@ mod tests {
                     msg: "Closing Link: 212.252.143.51 (Excess Flood)".to_owned(),
                 },
             },
+        );
+    }
+
+    #[test]
+    fn test_parse_pfx() {
+        use Pfx::*;
+        assert_eq!(parse_pfx("xyz"), Ambiguous("xyz".to_string()));
+        assert_eq!(parse_pfx("xy-z"), Ambiguous("xy-z".to_string()),);
+        assert_eq!(parse_pfx("xy.z"), Server("xy.z".to_string()));
+        assert_eq!(
+            parse_pfx("xyz[m]"),
+            User {
+                nick: "xyz[m]".to_string(),
+                user: "".to_string()
+            }
         );
     }
 }
