@@ -144,19 +144,19 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
             };
 
             // Sender to be shown in the UI
-            let origin = match pfx {
+            let sender = match pfx {
                 Server(_) => serv,
                 User { ref nick, .. } | Ambiguous(ref nick) => nick,
             };
 
             if ctcp == Some(wire::CTCP::Version) {
-                let msg_target = if ui.user_tab_exists(serv, origin) {
-                    MsgTarget::User { serv, nick: origin }
+                let msg_target = if ui.user_tab_exists(serv, sender) {
+                    MsgTarget::User { serv, nick: sender }
                 } else {
                     MsgTarget::Server { serv }
                 };
                 ui.add_client_msg(
-                    &format!("Received version request from {}", origin),
+                    &format!("Received version request from {}", sender),
                     &msg_target,
                 );
                 return;
@@ -169,17 +169,17 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                     let ui_msg_target = MsgTarget::Chan { serv, chan: &chan };
                     // highlight the message if it mentions us
                     if msg.find(&client.get_nick()).is_some() {
-                        ui.add_privmsg(origin, &msg, ts, &ui_msg_target, true, is_action);
+                        ui.add_privmsg(sender, &msg, ts, &ui_msg_target, true, is_action);
                         ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
                         let mentions_target = MsgTarget::Server { serv: "mentions" };
                         ui.add_msg(
-                            &format!("{} in {}:{}: {}", origin, serv, chan, msg),
+                            &format!("{} in {}:{}: {}", sender, serv, chan, msg),
                             ts,
                             &mentions_target,
                         );
                         ui.set_tab_style(TabStyle::Highlight, &mentions_target);
                     } else {
-                        ui.add_privmsg(origin, &msg, ts, &ui_msg_target, false, is_action);
+                        ui.add_privmsg(sender, &msg, ts, &ui_msg_target, false, is_action);
                         ui.set_tab_style(TabStyle::NewMsg, &ui_msg_target);
                     }
                 }
@@ -202,7 +202,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                             }
                         }
                     };
-                    ui.add_privmsg(origin, &msg, ts, &msg_target, false, is_action);
+                    ui.add_privmsg(sender, &msg, ts, &msg_target, false, is_action);
                     if target == client.get_nick() {
                         ui.set_tab_style(TabStyle::Highlight, &msg_target);
                     } else {
