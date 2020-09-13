@@ -9,14 +9,6 @@ use std::hash::Hash;
 /// Channel names according to RFC 2812, section 1.3. Channel names are case insensitive, so this
 /// type defines `Eq`, `Ord`, and `Hash` traits that work in a case-insensitive way. `Display`
 /// shows the channel name with the original casing.
-///
-/// Note that IRC is an ASCII-based protocol and non-ASCII characters in channel names should not
-/// be accepted, but some servers like Unreal3.2.10.3 allow unicode channel names but implement
-/// case insensitivity incorrectly and only handle case-insensitive comparison in ASCII characters
-/// in the channel name. For example, "#Ömer" and "#ömer" are different channels but "#Omer" and
-/// "#omer" (correctly) are the same. To play nicely with those servers (which are unfortunately
-/// used in the wild) we also implement that buggy behavior. In a standard-conforming server
-/// non-ASCII channel names should not be allowed and this behavior should not matter.
 #[derive(Debug, Clone)]
 pub struct ChanName {
     /// ASCII-lowercase version of the channel name, used when comparing and hashing.
@@ -25,11 +17,26 @@ pub struct ChanName {
     display: String,
 }
 
+// Used to normalize channel names. Rules are:
+//
+// - ASCII characters are mapped to their lowercase versions
+// - '[', ']', '\\', '~' are mapped to '{', '}', '|', '^', respectively. See RFC 2812 section 2.2.
+// - Non-ASCII characters are left unchanged.
+fn to_lower(c: char) -> char {
+    match c {
+        '[' => '{',
+        ']' => '}',
+        '\\' => '|',
+        '~' => '^',
+        _ => c.to_ascii_lowercase(),
+    }
+}
+
 impl ChanName {
     pub fn new(name: String) -> Self {
-        let name_ascii_lower = name.to_ascii_lowercase();
+        let name_lower = name.chars().map(to_lower).collect();
         ChanName {
-            normalized: name_ascii_lower,
+            normalized: name_lower,
             display: name,
         }
     }
