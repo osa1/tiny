@@ -32,6 +32,7 @@
 - Handling of IRC messages with ambiguous prefix (when it's unclear whether the
   sender is a server or nick) improved. tiny should now work better with some
   bouncers such as soju. (#249)
+- Fixed a bug in IRC message parser. (#251)
 
 # 2020/06/28: 0.6.0
 

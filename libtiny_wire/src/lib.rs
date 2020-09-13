@@ -314,9 +314,8 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
                 "Can't find prefix terminator (' ') in msg: {:?}",
                 msg
             ))?;
-            // drop the : from pfx
-            let pfx = &msg[1..ws_idx];
-            msg = &msg[ws_idx + 1..]; // drop the space
+            let pfx = &msg[1..ws_idx]; // consume ':'
+            msg = &msg[ws_idx + 1..]; // consume ' '
             Some(parse_pfx(pfx))
         } else {
             None
@@ -329,14 +328,14 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
             msg
         ))?;
         let cmd = &msg[..ws_idx];
-        msg = &msg[ws_idx + 1..];
+        msg = &msg[ws_idx + 1..]; // Consume ' '
         match cmd.parse::<u16>() {
             Ok(num) => MsgType::Num(num),
             Err(_) => MsgType::Cmd(cmd),
         }
     };
 
-    let params: Vec<&str> = parse_params(msg);
+    let params = parse_params(msg);
     let cmd = match msg_ty {
         MsgType::Cmd("PRIVMSG" | "NOTICE") if params.len() == 2 => {
             let is_notice = matches!(msg_ty, MsgType::Cmd("NOTICE"));
@@ -445,26 +444,57 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
 }
 
 fn parse_params(chrs: &str) -> Vec<&str> {
-    debug_assert!(!chrs.starts_with(' '));
+    // Spec:
+    //
+    //     params     =  *14( SPACE middle ) [ SPACE ":" trailing ]
+    //                =/ 14( SPACE middle ) [ SPACE [ ":" ] trailing ]
+    //
+    //     nospcrlfcl =  %x01-09 / %x0B-0C / %x0E-1F / %x21-39 / %x3B-FF
+    //                     ; any octet except NUL, CR, LF, " " and ":"
+    //     middle     =  nospcrlfcl *( ":" / nospcrlfcl )
+    //     trailing   =  *( ":" / " " / nospcrlfcl )
+    //
+    // The RFC doesn't explain the syntax with `14` here as if it's something standard. I'm
+    // guessing it's number of repetitions, and `*14` means "14 or less" repetitions.
 
-    let mut ret: Vec<&str> = Vec::new();
+    let mut params = Vec::new();
+    let mut char_indices = chrs.char_indices();
 
-    let mut slice_begins = 0;
-    for (char_idx, char) in chrs.char_indices() {
-        if char == ':' {
-            ret.push(&chrs[char_idx + 1..chrs.len()]);
-            return ret;
-        } else if char == ' ' {
-            ret.push(&chrs[slice_begins..char_idx]);
-            slice_begins = char_idx + 1;
+    loop {
+        match char_indices.next() {
+            Some((idx, c)) => {
+                if c == ':' {
+                    params.push(&chrs[idx + 1..]); // Skip ':'
+                    break;
+                }
+
+                if params.len() == 14 {
+                    params.push(&chrs[idx..]);
+                    break;
+                }
+
+                while c != ' ' {
+                    match char_indices.next() {
+                        Some((idx_, c)) => {
+                            if c == ' ' {
+                                params.push(&chrs[idx..idx_]);
+                                break;
+                            }
+                        }
+                        None => {
+                            params.push(&chrs[idx..]);
+                            break;
+                        }
+                    }
+                }
+            }
+            None => {
+                break;
+            }
         }
     }
 
-    if slice_begins != chrs.len() {
-        ret.push(&chrs[slice_begins..chrs.len()]);
-    }
-
-    ret
+    params
 }
 
 /// Nicks may have prefixes, indicating it is a operator, founder, or something else.
@@ -493,7 +523,25 @@ mod tests {
         let v: Vec<&str> = vec![];
         assert_eq!(parse_params(""), v);
         assert_eq!(parse_params(":foo bar baz "), vec!["foo bar baz "]);
+        assert_eq!(
+            parse_params(":foo : bar : baz :"),
+            vec!["foo : bar : baz :"]
+        );
         assert_eq!(parse_params(":"), vec![""]);
+        assert_eq!(parse_params("x:"), vec!["x:"]);
+        assert_eq!(parse_params("x:y"), vec!["x:y"]);
+        assert_eq!(parse_params("x:y:z"), vec!["x:y:z"]);
+        assert_eq!(parse_params(":::::"), vec!["::::"]);
+
+        let params = parse_params("1 2 3 4 5 6 7 8 9 10 11 12 13 14 blah blah blah");
+        assert_eq!(params.len(), 15);
+        assert_eq!(params[params.len() - 1], "blah blah blah");
+
+        assert_eq!(parse_params("   "), v); // Not valid according to the RFC, I think
+        assert_eq!(parse_params(":  "), vec!["  "]);
+        assert_eq!(parse_params(": : :"), vec![" : :"]);
+        assert_eq!(parse_params("x y : : :"), vec!["x", "y", " : :"]);
+        assert_eq!(parse_params("aaa://aaa"), vec!["aaa://aaa"]);
     }
 
     #[test]
