@@ -3,7 +3,6 @@ use crate::tui::TUI;
 use libtiny_ui::*;
 use term_input::{Event, Key};
 use termbox_simple::CellBuf;
-use time::Tm;
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -302,7 +301,7 @@ fn test_text_field_wrap() {
 
     // Write some stuff
     let target = MsgTarget::CurrentTab;
-    let ts: Tm = unsafe { ::std::mem::zeroed() };
+    let ts = time::empty_tm();
     tui.add_msg("test test test", ts, &target);
 
     for _ in 0..37 {
@@ -477,7 +476,7 @@ fn test_resize() {
     let server = "<server>";
     tui.new_server_tab(server, None);
 
-    let ts: Tm = unsafe { ::std::mem::zeroed() };
+    let ts = time::empty_tm();
     let target = MsgTarget::CurrentTab;
 
     let f = File::open("test/lipsum.txt").unwrap();
