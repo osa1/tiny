@@ -2,9 +2,9 @@
 #![allow(clippy::new_without_default)]
 #![allow(clippy::too_many_arguments)]
 
+use std::cmp::Ordering;
 use std::path::PathBuf;
-use std::str;
-use std::str::SplitWhitespace;
+use std::str::{self, SplitWhitespace};
 use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style};
@@ -74,7 +74,7 @@ const TUI_COMMANDS: [CmdUsage; 6] = [
     RELOAD_CMD,
 ];
 
-pub(crate) struct TUI {
+pub struct TUI {
     /// Termbox instance
     tb: Termbox,
 
@@ -104,8 +104,7 @@ impl TUI {
         TUI::new_tb(Some(config_path), tb)
     }
 
-    #[cfg(test)]
-    pub(crate) fn new_test(w: u16, h: u16) -> TUI {
+    pub fn new_test(w: u16, h: u16) -> TUI {
         let tb = Termbox::init_test(w, h);
         TUI::new_tb(None, tb)
     }
@@ -354,7 +353,7 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub(crate) fn new_server_tab(&mut self, serv: &str, alias: Option<String>) -> Option<usize> {
+    pub fn new_server_tab(&mut self, serv: &str, alias: Option<String>) -> Option<usize> {
         match self.find_serv_tab_idx(serv) {
             None => {
                 let tab_idx = self.tabs.len();
@@ -612,7 +611,6 @@ impl TUI {
                     } else {
                         i as usize - 1
                     };
-                    use std::cmp::Ordering;
                     match new_tab_idx.cmp(&self.active_idx) {
                         Ordering::Greater => {
                             for _ in 0..new_tab_idx - self.active_idx {
@@ -668,9 +666,8 @@ impl TUI {
         self.resize_();
     }
 
-    #[cfg(test)]
     /// Set terminal size. Useful when testing resizing.
-    pub(crate) fn set_size(&mut self, w: u16, h: u16) {
+    pub fn set_size(&mut self, w: u16, h: u16) {
         self.tb.set_buffer_size(w, h);
 
         self.width = i32::from(w);
@@ -687,6 +684,7 @@ impl TUI {
             } else {
                 0
             };
+
         for tab in &mut self.tabs {
             tab.widget
                 .resize(self.width, self.height - 1 - statusline_height);
@@ -827,7 +825,7 @@ impl TUI {
         (i, j)
     }
 
-    pub(crate) fn draw(&mut self) {
+    pub fn draw(&mut self) {
         self.tb.clear();
 
         if self.height < 2 {
@@ -1234,7 +1232,7 @@ impl TUI {
 
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
-    pub(crate) fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
+    pub fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| {
             tab.widget.add_msg(msg, Timestamp::from(ts));
         });
