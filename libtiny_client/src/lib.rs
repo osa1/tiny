@@ -544,7 +544,7 @@ enum TaskResult<A> {
 }
 
 async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
-    let delay = tokio::time::delay_for(Duration::from_secs(60)).fuse();
+    let delay = tokio::time::delay_for(Duration::from_secs(RECONNECT_SECS)).fuse();
     pin_mut!(delay);
 
     loop {

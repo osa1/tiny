@@ -36,6 +36,8 @@
 - Fixed a bug where on spotty connections a server tab (not the entire
   application) would get stuck in "Connecting..." stage (while opening a socket
   to the server) and not respond to user commands like `/connect`. (#255)
+- Fixed a bug where tiny would print "Reconnecting in 30 seconds" on connection
+  error (or timeout) but would actually reconnect in 60 seconds instead of 30.
 
 # 2020/06/28: 0.6.0
 
