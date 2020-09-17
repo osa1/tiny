@@ -33,6 +33,9 @@
   sender is a server or nick) improved. tiny should now work better with some
   bouncers such as soju. (#249)
 - Fixed a bug in IRC message parser. (#251)
+- Fixed a bug where on spotty connections a server tab (not the entire
+  application) would get stuck in "Connecting..." stage (while opening a socket
+  to the server) and not respond to user commands like `/connect`. (#255)
 
 # 2020/06/28: 0.6.0
 

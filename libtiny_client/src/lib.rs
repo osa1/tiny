@@ -304,8 +304,6 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
     )
 }
 
-use TaskResult::*;
-
 async fn main_loop(
     server_info: ServerInfo,
     irc_state: State,
@@ -324,20 +322,13 @@ async fn main_loop(
     'connect: loop {
         if wait {
             match wait_(&mut rcv_cmd).await {
-                Done(()) => {}
-                TryWithPort(new_port) => {
-                    port = new_port;
+                TaskResult::Done(()) => {}
+                TaskResult::Reconnect(mb_port) => {
+                    port = mb_port.unwrap_or(port);
                     wait = false;
                     continue;
                 }
-                TryReconnect => {
-                    wait = false;
-                    continue;
-                }
-                TryAfterDelay => {
-                    panic!("wait() returned TryAfterDelay");
-                }
-                Return => {
+                TaskResult::Return => {
                     return;
                 }
             }
@@ -359,28 +350,24 @@ async fn main_loop(
 
         let serv_name_clone = serv_name.clone();
 
-        let addr_iter = match resolve_addr(serv_name_clone, port, &mut rcv_cmd, &mut snd_ev).await {
-            Done(addr_iter) => {
+        let addr_iter = match resolve_addr(serv_name_clone, port, &mut rcv_cmd).await {
+            TaskResult::Done(Ok(addr_iter)) => {
                 debug!("resolve_addr: done");
                 addr_iter
             }
-            TryWithPort(new_port) => {
-                debug!("resolve_addr: try new port");
-                port = new_port;
-                wait = false;
-                continue;
-            }
-            TryReconnect => {
-                debug!("resolve_addr: try again");
-                wait = false;
-                continue;
-            }
-            TryAfterDelay => {
-                debug!("resolve_addr: try after delay");
+            TaskResult::Done(Err(err)) => {
+                debug!("resolve_addr: {:?}", err);
+                snd_ev.send(Event::IoErr(err)).await.unwrap();
                 wait = true;
                 continue;
             }
-            Return => {
+            TaskResult::Reconnect(mb_port) => {
+                debug!("resolve_addr: try again");
+                port = mb_port.unwrap_or(port);
+                wait = false;
+                continue;
+            }
+            TaskResult::Return => {
                 debug!("resolve_addr: return");
                 return;
             }
@@ -399,13 +386,29 @@ async fn main_loop(
         // Establish TCP connection to the server
         //
 
-        let stream = match try_connect(addrs, &serv_name, server_info.tls, &mut snd_ev).await {
-            None => {
+        let stream = match try_connect(
+            addrs,
+            &serv_name,
+            server_info.tls,
+            &mut rcv_cmd,
+            &mut snd_ev,
+        )
+        .await
+        {
+            TaskResult::Done(Some(stream)) => stream,
+            TaskResult::Done(None) => {
                 snd_ev.send(Event::Disconnected).await.unwrap();
                 wait = true;
                 continue;
             }
-            Some(stream) => stream,
+            TaskResult::Return => {
+                return;
+            }
+            TaskResult::Reconnect(mb_port) => {
+                port = mb_port.unwrap_or(port);
+                wait = false;
+                continue;
+            }
         };
 
         let (mut read_half, mut write_half) = tokio::io::split(stream);
@@ -536,48 +539,35 @@ async fn main_loop(
 
 enum TaskResult<A> {
     Done(A),
-    TryWithPort(u16),
-    TryReconnect,
-    TryAfterDelay,
     Return,
+    Reconnect(Option<u16>),
 }
 
 async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
-    // Weird code because of a bug in select!?
-    let delay = async {
-        tokio::time::delay_for(Duration::from_secs(60)).await;
-    }
-    .fuse();
+    let delay = tokio::time::delay_for(Duration::from_secs(60)).fuse();
     pin_mut!(delay);
 
     loop {
         select! {
             () = delay => {
-                return Done(());
+                return TaskResult::Done(());
             }
             cmd = rcv_cmd.next() => {
                 // FIXME: This whole block is duplicated below, but it's hard to reuse because it
-                // usese `continue` and `return`.
+                // uses `continue` and `return`.
                 match cmd {
                     None => {
                         // Channel closed, return from the main loop
-                        return Return;
+                        return TaskResult::Return;
                     }
                     Some(Cmd::Msg(_)) => {
                         continue;
                     }
                     Some(Cmd::Reconnect(mb_port)) => {
-                        match mb_port {
-                            None => {
-                                return TryReconnect;
-                            }
-                            Some(port) => {
-                                return TryWithPort(port);
-                            }
-                        }
+                        return TaskResult::Reconnect(mb_port);
                     }
                     Some(Cmd::Quit(_)) => {
-                        return Return;
+                        return TaskResult::Return;
                     }
                 }
             }
@@ -589,8 +579,7 @@ async fn resolve_addr(
     serv_name: String,
     port: u16,
     rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>,
-    snd_ev: &mut mpsc::Sender<Event>,
-) -> TaskResult<std::vec::IntoIter<SocketAddr>> {
+) -> TaskResult<Result<::std::vec::IntoIter<SocketAddr>, ::std::io::Error>> {
     let mut addr_iter_task =
         tokio::task::spawn_blocking(move || (serv_name.as_str(), port).to_socket_addrs()).fuse();
 
@@ -602,12 +591,8 @@ async fn resolve_addr(
                         // TODO (osa): Not sure about this
                         panic!("DNS thread failed: {:?}", join_err);
                     }
-                    Ok(Err(io_err)) => {
-                        snd_ev.send(Event::IoErr(io_err)).await.unwrap();
-                        return TryAfterDelay;
-                    }
-                    Ok(Ok(addr_iter)) => {
-                        return Done(addr_iter);
+                    Ok(ret) => {
+                        return TaskResult::Done(ret);
                     }
                 }
             }
@@ -615,23 +600,16 @@ async fn resolve_addr(
                 match cmd {
                     None => {
                         // Channel closed, return from the main loop
-                        return Return;
+                        return TaskResult::Return;
                     }
                     Some(Cmd::Msg(_)) => {
                         continue;
                     }
                     Some(Cmd::Reconnect(mb_port)) => {
-                        match mb_port {
-                            None => {
-                                return TryReconnect;
-                            }
-                            Some(port) => {
-                                return TryWithPort(port);
-                            }
-                        }
+                        return TaskResult::Reconnect(mb_port);
                     }
                     Some(Cmd::Quit(_)) => {
-                        return Return;
+                        return TaskResult::Return;
                     }
                 }
             }
@@ -643,24 +621,55 @@ async fn try_connect(
     addrs: Vec<SocketAddr>,
     serv_name: &str,
     use_tls: bool,
+    rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>,
     snd_ev: &mut mpsc::Sender<Event>,
-) -> Option<Stream> {
-    for addr in addrs {
-        snd_ev.send(Event::Connecting(addr)).await.unwrap();
-        let mb_stream = if use_tls {
-            Stream::new_tls(addr, &serv_name).await
-        } else {
-            Stream::new_tcp(addr).await
-        };
-        match mb_stream {
-            Err(err) => {
-                snd_ev.send(Event::from(err)).await.unwrap();
+) -> TaskResult<Option<Stream>> {
+    let connect_task = async move {
+        for addr in addrs {
+            snd_ev.send(Event::Connecting(addr)).await.unwrap();
+            let mb_stream = if use_tls {
+                Stream::new_tls(addr, &serv_name).await
+            } else {
+                Stream::new_tcp(addr).await
+            };
+            match mb_stream {
+                Err(err) => {
+                    snd_ev.send(Event::from(err)).await.unwrap();
+                }
+                Ok(stream) => {
+                    return Some(stream);
+                }
             }
-            Ok(stream) => {
-                return Some(stream);
+        }
+
+        None
+    };
+
+    let connect_task = connect_task.fuse();
+    pin_mut!(connect_task);
+
+    loop {
+        select! {
+            stream = connect_task => {
+                return TaskResult::Done(stream);
+            }
+            cmd = rcv_cmd.next() => {
+                match cmd {
+                    None => {
+                        // Channel closed, return from the main loop
+                        return TaskResult::Return;
+                    }
+                    Some(Cmd::Msg(_)) => {
+                        continue;
+                    }
+                    Some(Cmd::Reconnect(mb_port)) => {
+                        return TaskResult::Reconnect(mb_port);
+                    }
+                    Some(Cmd::Quit(_)) => {
+                        return TaskResult::Return;
+                    }
+                }
             }
         }
     }
-
-    None
 }
