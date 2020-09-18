@@ -1,6 +1,5 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::cognitive_complexity)]
-#![feature(or_patterns)]
 
 mod config;
 mod editor;

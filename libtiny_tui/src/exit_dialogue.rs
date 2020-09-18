@@ -49,7 +49,7 @@ impl ExitDialogue {
 
     pub(crate) fn keypressed(&self, key: Key) -> WidgetRet {
         match key {
-            Key::Char('y' | '\r') => WidgetRet::Abort,
+            Key::Char('y') | Key::Char('\r') => WidgetRet::Abort,
             _ => WidgetRet::Remove,
         }
     }

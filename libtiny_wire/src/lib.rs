@@ -1,4 +1,3 @@
-#![feature(or_patterns)]
 #![allow(clippy::write_with_newline)]
 
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
@@ -341,7 +340,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
 
     let params = parse_params(msg);
     let cmd = match msg_ty {
-        MsgType::Cmd("PRIVMSG" | "NOTICE") if params.len() == 2 => {
+        MsgType::Cmd("PRIVMSG") | MsgType::Cmd("NOTICE") if params.len() == 2 => {
             let is_notice = matches!(msg_ty, MsgType::Cmd("NOTICE"));
             let target = params[0];
             let mut msg = params[1];
