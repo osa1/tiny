@@ -281,6 +281,12 @@ impl MessagingUI {
         highlight: bool,
         is_action: bool,
     ) {
+        // HACK: Some servers (bridges) don't send RPL_NAMREPLY and JOIN/PART messages but we still
+        // want to support tab completion on those servers, so when we see a message from someone
+        // we add the user to the nick list so that tab completion will complete their nick. See
+        // #253 for details.
+        self.nicks.insert(sender);
+
         self.reset_activity_line();
         self.add_timestamp(ts);
 
