@@ -111,7 +111,7 @@ macro_rules! report_io_err {
     ( $f:expr, $e:expr ) => {
         match $e {
             Err(err) => {
-                debug!("{:?}", err);
+                info!("{:?}", err);
                 $f(format!("{:?}", err));
                 return;
             }
@@ -162,7 +162,6 @@ impl LoggerInner {
     fn new_server_tab(&mut self, serv: &str, _alias: Option<String>) {
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
-        debug!("Trying to open log file: {:?}", path);
         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
             report_io_err!(self.report_err, print_header(&mut fd));
             self.servers.insert(
@@ -183,12 +182,11 @@ impl LoggerInner {
     fn new_chan_tab(&mut self, serv: &str, chan: &str) {
         match self.servers.get_mut(serv) {
             None => {
-                debug!("new_chan_tab: can't find server: {}", serv);
+                info!("new_chan_tab: can't find server: {}", serv);
             }
             Some(server) => {
                 let mut path = self.log_dir.clone();
                 path.push(&format!("{}_{}.txt", serv, replace_forward_slash(chan)));
-                debug!("Trying to open log file: {:?}", path);
                 if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                     report_io_err!(self.report_err, print_header(&mut fd));
                     server.chans.insert(chan.to_string(), fd);
@@ -200,7 +198,7 @@ impl LoggerInner {
     fn close_chan_tab(&mut self, serv: &str, chan: &str) {
         match self.servers.get_mut(serv) {
             None => {
-                debug!("close_chan_tab: can't find server: {}", serv);
+                info!("close_chan_tab: can't find server: {}", serv);
             }
             Some(server) => {
                 server.chans.remove(chan);
@@ -211,7 +209,7 @@ impl LoggerInner {
     fn close_user_tab(&mut self, serv: &str, nick: &str) {
         match self.servers.get_mut(serv) {
             None => {
-                debug!("close_user_tab: can't find server: {}", serv);
+                info!("close_user_tab: can't find server: {}", serv);
             }
             Some(server) => {
                 server.users.remove(nick);
@@ -321,7 +319,7 @@ impl LoggerInner {
         match *target {
             MsgTarget::Server { serv } => match self.servers.get_mut(serv) {
                 None => {
-                    debug!("Can't find server: {}", serv);
+                    info!("Can't find server: {}", serv);
                 }
                 Some(ServerLogs { ref mut fd, .. }) => {
                     f(fd, &*self.report_err);
@@ -329,7 +327,7 @@ impl LoggerInner {
             },
             MsgTarget::Chan { serv, chan } => match self.servers.get_mut(serv) {
                 None => {
-                    debug!("Can't find server: {}", serv);
+                    info!("Can't find server: {}", serv);
                 }
                 Some(ServerLogs { ref mut chans, .. }) => match chans.get_mut(chan) {
                     None => {
@@ -337,7 +335,6 @@ impl LoggerInner {
                         // can't reuse it because of borrowchk issues.
                         let mut path = self.log_dir.clone();
                         path.push(&format!("{}_{}.txt", serv, replace_forward_slash(chan)));
-                        debug!("Trying to open log file: {:?}", path);
                         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                             report_io_err!(self.report_err, print_header(&mut fd));
                             f(&mut fd, &*self.report_err);
@@ -352,7 +349,7 @@ impl LoggerInner {
             MsgTarget::User { serv, nick } => {
                 match self.servers.get_mut(serv) {
                     None => {
-                        debug!("Can't find server: {}", serv);
+                        info!("Can't find server: {}", serv);
                     }
                     Some(ServerLogs { ref mut users, .. }) => {
                         match users.get_mut(nick) {
@@ -364,7 +361,6 @@ impl LoggerInner {
                                 // are created here
                                 let mut path = self.log_dir.clone();
                                 path.push(&format!("{}_{}.txt", serv, replace_forward_slash(nick)));
-                                debug!("Trying to open log file: {:?}", path);
                                 if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                                     report_io_err!(self.report_err, print_header(&mut fd));
                                     f(&mut fd, &*self.report_err);
@@ -377,7 +373,7 @@ impl LoggerInner {
             }
             MsgTarget::AllServTabs { serv } => match self.servers.get_mut(serv) {
                 None => {
-                    debug!("Can't find server: {}", serv);
+                    info!("Can't find server: {}", serv);
                 }
                 Some(ServerLogs {
                     ref mut fd,
