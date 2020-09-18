@@ -82,6 +82,7 @@ struct StateInner {
 
     /// NickServ password
     nickserv_ident: Option<String>,
+
     /// An index to `nicks`. When out of range we add `current_nick_idx - nicks.length()`
     /// underscores to the last nick in `nicks`
     current_nick_idx: usize,

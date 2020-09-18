@@ -225,13 +225,17 @@ pub enum Cmd {
 
     QUIT {
         msg: Option<String>,
-        /// Channels of the user that just quit.
+        /// Channels of the user that just quit. This is not a part of the IRC message, but
+        /// something `libtiny_client` fills in for the users. Currently used to update tabs of the
+        /// user in TUI.
         chans: Vec<String>,
     },
 
     NICK {
         nick: String,
-        /// Channels of the user.
+        /// Channels of the user. Channels of the user that just quit. This is not a part of the
+        /// IRC message, but something `libtiny_client` fills in for the users. Currently used to
+        /// update tabs of the user in TUI.
         chans: Vec<String>,
     },
 
