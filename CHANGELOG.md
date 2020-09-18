@@ -38,6 +38,11 @@
   to the server) and not respond to user commands like `/connect`. (#255)
 - Fixed a bug where tiny would print "Reconnecting in 30 seconds" on connection
   error (or timeout) but would actually reconnect in 60 seconds instead of 30.
+- TUI now adds a nick to the tab completion list of a channel when the user
+  posts for the first time. This is to support tab completion on some servers
+  that don't implement the RFCs properly. (#253)
+- Logger is slightly improved to work better with servers that don't implement
+  the RFCs properly. (85051ae)
 
 # 2020/06/28: 0.6.0
 
