@@ -24,7 +24,8 @@ impl Trie {
         node.word = true;
     }
 
-    pub fn contains(&self, str: &str) -> bool {
+    #[cfg(test)]
+    fn contains(&self, str: &str) -> bool {
         let mut trie = self;
         for char in str.chars() {
             if let Some(trie_) = get_char_node_for_lookup(trie, char) {

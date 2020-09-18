@@ -363,7 +363,7 @@ impl MessagingUI {
     }
 
     pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
-        if self.show_status && !self.nicks.contains(nick) {
+        if self.show_status {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
                 self.msg_area.modify_line(line_idx, |line| {
