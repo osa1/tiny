@@ -333,7 +333,16 @@ impl LoggerInner {
                 }
                 Some(ServerLogs { ref mut chans, .. }) => match chans.get_mut(chan) {
                     None => {
-                        debug!("Can't find chan {} in server {}", chan, serv);
+                        // Create a file for the channel. FIXME Code copied from new_chan_tab:
+                        // can't reuse it because of borrowchk issues.
+                        let mut path = self.log_dir.clone();
+                        path.push(&format!("{}_{}.txt", serv, replace_forward_slash(chan)));
+                        debug!("Trying to open log file: {:?}", path);
+                        if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
+                            report_io_err!(self.report_err, print_header(&mut fd));
+                            f(&mut fd, &*self.report_err);
+                            chans.insert(chan.to_string(), fd);
+                        }
                     }
                     Some(fd) => {
                         f(fd, &*self.report_err);
