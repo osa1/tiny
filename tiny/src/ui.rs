@@ -95,8 +95,6 @@ pub(crate) fn send_msg(
     msg: String,
     is_action: bool,
 ) {
-    eprintln!("src={:?}, msg={:?}, is_action={}", src, msg, is_action);
-
     if src.serv_name() == "mentions" {
         ui.add_client_err_msg(
             "Use `/connect <server>` to connect to a server",
