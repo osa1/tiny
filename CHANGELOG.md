@@ -1,27 +1,35 @@
-# Unreleased
+# 2020/09/20: 0.7.0
+
+Thanks to @trevarj, @kennylevinsen and @LordMZTE for contributing to this
+release.
+
+## New features
+
+- New command `/help` added. (ec00007)
+- `/names` now sorts nicks lexicographically. (#235)
+- To make joining channels with +R mode (which usually means joining is only
+  allowed after identification via NickServ) more robust, tiny now makes 3
+  attempts to join a channel, with a 10-second delay after each attempt, when it
+  gets a 477 response and the user has NickServ identification enabled
+  (`nickserv_ident` field in the config). Even though we send IDENTIFY messages
+  (after `RPL_WELCOME`) before JOIN messages (after `RPL_ENDOFMOTD`), sometimes
+  identification takes too long and JOIN command fails with a 477. We now try
+  joining again with 10 seconds breaks, up to 3 times. (#236, #240)
+- When `$EDITOR` is (n)vim or emacs, `C-x` now places the cursor at its location
+  in the input field in the vim/emacs buffer. (#243)
+
+## Bug fixes and other improvements
 
 - Fixed a TUI bug introduced in 0.6.0 when pasting long single-line text using
-  C-x. (#225)
+  `C-x`. (#225)
 - Fixed a TUI bug introduced in 0.6.0 when rendering a long line of join/leave
   events. (#227)
-- New command `/help` added.
 - Password fields in the default config file (created automatically on first
   run) are now commented-out, to allow connecting to tiny IRC channel with the
-  default config without having to make changes.
-- `/names` now sorts nicks lexicographically. (#235)
+  default config without having to make changes. (2af2357)
 - tiny now re-sets current away status on reconnect. Previously the away status
   would be lost. (#234)
-- To make joining channels with +R mode (which means joining is only allowed
-  after identification via NickServ) more robust, tiny now makes 3 attempts to
-  join a channel (with a 10-second break after each attempt) when it gets a 477
-  response and the user has NickServ identification enabled (`nickserv_ident`
-  field in the config). Even though we send IDENTIFY messages (after
-  RPL_WELCOME) before JOIN messages (after RPL_ENDOFMOTD), sometimes
-  identification takes so long JOIN command fails with a 477. We now try joining
-  again with 10 seconds breaks, up to 3 times. (#236, #240)
-- When $EDITOR is (n)vim or emacs, C-x now places the cursor at its location in
-  the input field in the vim/emacs buffer. (#243)
-- Improved RPL_YOURHOST parsing for parsing server names of some
+- Improved `RPL_YOURHOST` parsing for parsing server names of some
   non-standard-conforming servers. This is not a user-visible change unless
   you're connecting to servers that don't follow IRC standards closely. (#239)
 - Fixed a TUI crash when the terminal height is less than two lines.
@@ -38,6 +46,7 @@
   to the server) and not respond to user commands like `/connect`. (#255)
 - Fixed a bug where tiny would print "Reconnecting in 30 seconds" on connection
   error (or timeout) but would actually reconnect in 60 seconds instead of 30.
+  (bfd4e19)
 - TUI now adds a nick to the tab completion list of a channel when the user
   posts for the first time. This is to support tab completion on some servers
   that don't implement the RFCs properly. (#253)
@@ -46,15 +55,18 @@
 - Fixed a bug when first argument to `/msg` is a channel rather than a nick. The
   command is supposed to be used for sending a message to a user so we now do
   more error checking and reject the command if the first character is for a
-  channel name.
+  channel name. (62df491)
 - Implemented channel name case sensitivity rules according to RFC 2812. This
   fixes a bug when we join e.g. `#MyChannel` and someone sends a message to
-  `#mychannel`. In that case some servers send PRIVMSGs to users in the channel
-  with the sender's encoding (`#mychannel`), which would previously cause tiny
-  to (incorrectly) create a new tab for the channel `#mychannel` instead of
-  showing the message in `#MyChannel`. (#248)
+  `#mychannel`. In that case some servers send `PRIVMSG`s to users in the
+  channel with the sender's encoding (`#mychannel`), which would previously
+  cause tiny to (incorrectly) create a new tab for the channel `#mychannel`
+  instead of showing the message in `#MyChannel`. (#248)
 - TUI tab bar layout fixed when channel names contain non-ASCII unicode
-  characters.
+  characters. (0c86a32)
+- tiny binaries are much smaller, thanks to removed features in dependencies
+  like tokio, futures, and env_logger. For example, libdbus + libssl build is
+  4.9M in 0.6.0 and 4.0M in 0.7.0.
 
 # 2020/06/28: 0.6.0
 
