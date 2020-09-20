@@ -117,7 +117,7 @@ pub(crate) fn send_msg(
 
     // `ui_target`: Where to show the message on ui
     // `msg_target`: Actual PRIVMSG target to send to the server
-    let (ui_target, msg_target) = {
+    let (ui_target, msg_target): (MsgTarget, &str) = {
         match src {
             MsgSource::Serv { .. } => {
                 // we don't split raw messages to 512-bytes long chunks
@@ -125,7 +125,9 @@ pub(crate) fn send_msg(
                 return;
             }
 
-            MsgSource::Chan { ref serv, ref chan } => (MsgTarget::Chan { serv, chan }, chan),
+            MsgSource::Chan { ref serv, ref chan } => {
+                (MsgTarget::Chan { serv, chan }, chan.display())
+            }
 
             MsgSource::User { ref serv, ref nick } => {
                 let msg_target = if nick.eq_ignore_ascii_case("nickserv")

@@ -2,6 +2,7 @@
 
 use crate::utils;
 use crate::{Cmd, Event, ServerInfo};
+use libtiny_common::{ChanName, ChanNameRef};
 use libtiny_wire as wire;
 use libtiny_wire::{Msg, Pfx};
 
@@ -63,11 +64,11 @@ impl State {
         self.inner.borrow_mut().away_status = msg.map(str::to_owned);
     }
 
-    pub(crate) fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
+    pub(crate) fn get_chan_nicks(&self, chan: &ChanNameRef) -> Vec<String> {
         self.inner.borrow().get_chan_nicks(chan)
     }
 
-    pub(crate) fn leave_channel(&self, msg_chan: &mut Sender<Cmd>, chan: &str) {
+    pub(crate) fn leave_channel(&self, msg_chan: &mut Sender<Cmd>, chan: &ChanNameRef) {
         self.inner.borrow_mut().leave_channel(msg_chan, chan)
     }
 
@@ -123,7 +124,7 @@ struct StateInner {
 #[derive(Debug)]
 struct Chan {
     /// Name of the channel
-    name: String,
+    name: ChanName,
     /// Set of nicknames in channel
     nicks: HashSet<String>,
     /// Channel joined state
@@ -155,7 +156,7 @@ enum JoinState {
 const MAX_JOIN_RETRIES: u8 = 3;
 
 impl Chan {
-    fn new(name: String) -> Chan {
+    fn new(name: ChanName) -> Chan {
         Chan {
             name,
             nicks: HashSet::new(),
@@ -164,7 +165,7 @@ impl Chan {
         }
     }
 
-    fn with_nicks(name: String, nicks: HashSet<String>) -> Chan {
+    fn with_nicks(name: ChanName, nicks: HashSet<String>) -> Chan {
         Chan {
             name,
             nicks,
@@ -338,7 +339,7 @@ impl StateInner {
                     if nick == &self.current_nick {
                         match utils::find_idx(&self.chans, |c| &c.name == chan) {
                             None => {
-                                debug!("Can't find channel state: {}", chan);
+                                debug!("Can't find channel state: {}", chan.display());
                             }
                             Some(chan_idx) => {
                                 self.chans.remove(chan_idx);
@@ -392,6 +393,7 @@ impl StateInner {
             Reply { num: 477, params } => {
                 // Only try to automatically rejoin if nickserv_ident is configured
                 if let (Some(channel), Some(msg_477)) = (params.get(1), params.get(2)) {
+                    let channel = ChanNameRef::new(channel);
                     snd_ev
                         .try_send(Event::Msg(wire::Msg {
                             pfx: pfx.clone(),
@@ -399,7 +401,7 @@ impl StateInner {
                                 ctcp: None,
                                 is_notice: true,
                                 msg: msg_477.clone(),
-                                target: wire::MsgTarget::Chan(channel.clone()),
+                                target: wire::MsgTarget::Chan(channel.to_owned()),
                             },
                         }))
                         .unwrap();
@@ -407,7 +409,7 @@ impl StateInner {
                     if self.nickserv_ident.is_some() {
                         // Helper for creating an event
                         let create_message = |msg: String| Event::ChannelJoinError {
-                            chan: channel.clone(),
+                            chan: channel.to_owned(),
                             msg,
                         };
                         // Find channel in self.chans
@@ -417,7 +419,7 @@ impl StateInner {
                             if let Some(retries) = chan.retry_join() {
                                 let retry_msg = format!(
                                     "Attempting to rejoin {} in 10 seconds... ({}/{})",
-                                    channel,
+                                    channel.display(),
                                     MAX_JOIN_RETRIES - retries,
                                     MAX_JOIN_RETRIES
                                 );
@@ -434,13 +436,14 @@ impl StateInner {
                                     }
                                 }
                                 tokio::task::spawn_local(retry_channel_join(
-                                    channel.clone(),
+                                    channel.to_owned(),
                                     snd_irc_msg,
                                     rcv_abort,
                                 ));
                             } else {
                                 // No more retries
-                                let no_retries_msg = format!("Unable to join {}.", channel);
+                                let no_retries_msg =
+                                    format!("Unable to join {}.", channel.display());
                                 snd_ev.try_send(create_message(no_retries_msg)).unwrap();
                             }
                         } else {
@@ -563,7 +566,7 @@ impl StateInner {
 
             // RPL_ENDOFMOTD: Join channels, set away status
             Reply { num: 376, .. } => {
-                let chans: Vec<&str> = self.chans.iter().map(|c| c.name.as_str()).collect();
+                let chans: Vec<&ChanNameRef> = self.chans.iter().map(|c| c.name.as_ref()).collect();
                 if !chans.is_empty() {
                     snd_irc_msg.try_send(wire::join(&chans)).unwrap();
                 }
@@ -576,7 +579,7 @@ impl StateInner {
 
             // RPL_NAMREPLY: Set users in a channel
             Reply { num: 353, params } => {
-                let chan = &params[2];
+                let chan = ChanNameRef::new(&params[2]);
                 match utils::find_idx(&self.chans, |c| &c.name == chan) {
                     None => self.chans.push(Chan::with_nicks(
                         chan.to_owned(),
@@ -646,8 +649,8 @@ impl StateInner {
         }
     }
 
-    fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
-        match utils::find_idx(&self.chans, |c| c.name == chan) {
+    fn get_chan_nicks(&self, chan: &ChanNameRef) -> Vec<String> {
+        match utils::find_idx(&self.chans, |c| c.name == *chan) {
             None => {
                 error!("Could not find channel index in get_chan_nicks.");
                 vec![]
@@ -667,12 +670,12 @@ impl StateInner {
     }
 
     /// If channel is in Joining state cancel Joining task, otherwise sent part message
-    fn leave_channel(&mut self, msg_chan: &mut Sender<Cmd>, chan: &str) {
-        if let Some(idx) = utils::find_idx(&self.chans, |c| c.name == chan) {
+    fn leave_channel(&mut self, msg_chan: &mut Sender<Cmd>, chan: &ChanNameRef) {
+        if let Some(idx) = utils::find_idx(&self.chans, |c| c.name == *chan) {
             match &mut self.chans[idx].join_state {
                 JoinState::NotJoined => {}
                 JoinState::Joining { stop_task, .. } => {
-                    debug!("Aborting task to retry joining {}", chan);
+                    debug!("Aborting task to retry joining {}", chan.display());
                     let _ = stop_task.try_send(());
                 }
                 JoinState::Joined => msg_chan.try_send(Cmd::Msg(wire::part(chan))).unwrap(),
@@ -691,11 +694,11 @@ impl StateInner {
 }
 
 async fn retry_channel_join(
-    channel: String,
+    channel: ChanName,
     mut snd_irc_msg: Sender<String>,
     rcv_abort: Receiver<()>,
 ) {
-    debug!("Attempting to re-join channel {}", channel);
+    debug!("Attempting to re-join channel {}", channel.display());
 
     use tokio::time::{delay_for, Duration};
 

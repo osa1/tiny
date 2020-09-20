@@ -394,6 +394,7 @@ dependencies = [
  "base64",
  "futures",
  "lazy_static",
+ "libtiny_common",
  "libtiny_logger",
  "libtiny_wire",
  "log",
@@ -405,9 +406,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "libtiny_common"
+version = "0.1.0"
+
+[[package]]
 name = "libtiny_logger"
 version = "0.1.0"
 dependencies = [
+ "libtiny_common",
  "libtiny_ui",
  "log",
  "time",
@@ -420,6 +426,7 @@ dependencies = [
  "bencher",
  "futures",
  "libc",
+ "libtiny_common",
  "libtiny_ui",
  "log",
  "mio",
@@ -437,6 +444,7 @@ dependencies = [
 name = "libtiny_ui"
 version = "0.1.0"
 dependencies = [
+ "libtiny_common",
  "objekt",
  "time",
 ]
@@ -444,6 +452,9 @@ dependencies = [
 [[package]]
 name = "libtiny_wire"
 version = "0.1.0"
+dependencies = [
+ "libtiny_common",
+]
 
 [[package]]
 name = "linked-hash-map"
@@ -1099,6 +1110,7 @@ dependencies = [
  "env_logger",
  "futures",
  "libtiny_client",
+ "libtiny_common",
  "libtiny_logger",
  "libtiny_tui",
  "libtiny_ui",

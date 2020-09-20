@@ -8,17 +8,19 @@ use std::io::Read;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
+use libtiny_common::ChanNameRef;
 use libtiny_tui::TUI;
 use libtiny_ui::*;
 
 static SERV: &str = "debug";
 static CHAN: &str = "chan";
-static CHAN_TARGET: MsgTarget = MsgTarget::Chan {
-    serv: SERV,
-    chan: CHAN,
-};
 
 fn main() {
+    let chan_target = MsgTarget::Chan {
+        serv: SERV,
+        chan: ChanNameRef::new(CHAN),
+    };
+
     let mut runtime = tokio::runtime::Builder::new()
         .basic_scheduler()
         .enable_all()
@@ -30,8 +32,13 @@ fn main() {
     local.block_on(&mut runtime, async move {
         let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));
         tui.new_server_tab("debug", None);
-        tui.new_chan_tab("debug", "chan");
-        tui.set_topic("This is channel topic", time::now(), SERV, CHAN);
+        tui.new_chan_tab("debug", ChanNameRef::new("chan"));
+        tui.set_topic(
+            "This is channel topic",
+            time::now(),
+            SERV,
+            ChanNameRef::new(CHAN),
+        );
         tui.draw();
 
         {
@@ -42,8 +49,8 @@ fn main() {
             for (line_idx, line) in text.lines().enumerate() {
                 let now = time::now();
                 let nick = format!("nick_{}", line_idx);
-                tui.add_nick(&nick, Some(now), &CHAN_TARGET);
-                tui.add_privmsg(&nick, line, now, &CHAN_TARGET, false, false);
+                tui.add_nick(&nick, Some(now), &chan_target);
+                tui.add_privmsg(&nick, line, now, &chan_target, false, false);
             }
         }
 

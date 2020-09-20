@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "libtiny_client",
+    "libtiny_common",
     "libtiny_logger",
     "libtiny_tui",
     "libtiny_ui",

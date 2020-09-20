@@ -1,6 +1,10 @@
 pub use objekt::clone_box;
 use time::Tm;
 
+use std::borrow::Borrow;
+
+use libtiny_common::{ChanName, ChanNameRef};
+
 /// Target of a message to be shown in a UI.
 #[derive(Debug)]
 pub enum MsgTarget<'a> {
@@ -8,7 +12,10 @@ pub enum MsgTarget<'a> {
     Server { serv: &'a str },
 
     /// Show the message in the channel tab.
-    Chan { serv: &'a str, chan: &'a str },
+    Chan {
+        serv: &'a str,
+        chan: &'a ChanNameRef,
+    },
 
     /// Show the message in the privmsg tab.
     User { serv: &'a str, nick: &'a str },
@@ -27,7 +34,7 @@ pub enum MsgSource {
     Serv { serv: String },
 
     /// Message sent in a channel tab.
-    Chan { serv: String, chan: String },
+    Chan { serv: String, chan: ChanName },
 
     /// Message sent in a privmsg tab.
     User { serv: String, nick: String },
@@ -45,7 +52,10 @@ impl MsgSource {
     pub fn to_target(&self) -> MsgTarget {
         match self {
             MsgSource::Serv { serv } => MsgTarget::Server { serv },
-            MsgSource::Chan { serv, chan } => MsgTarget::Chan { serv, chan },
+            MsgSource::Chan { serv, chan } => MsgTarget::Chan {
+                serv,
+                chan: chan.borrow(),
+            },
             MsgSource::User { serv, nick } => MsgTarget::User { serv, nick },
         }
     }
@@ -53,7 +63,7 @@ impl MsgSource {
     pub fn visible_name(&self) -> &str {
         match self {
             MsgSource::Serv { serv, .. } => serv,
-            MsgSource::Chan { chan, .. } => chan,
+            MsgSource::Chan { chan, .. } => chan.display(),
             MsgSource::User { nick, .. } => nick,
         }
     }
@@ -98,10 +108,10 @@ pub trait UI: objekt::Clone {
     fn close_server_tab(&self, serv: &str);
 
     /// Create a channel tab in the given server.
-    fn new_chan_tab(&self, serv: &str, chan: &str);
+    fn new_chan_tab(&self, serv: &str, chan: &ChanNameRef);
 
     /// Close a channel tab.
-    fn close_chan_tab(&self, serv: &str, chan: &str);
+    fn close_chan_tab(&self, serv: &str, chan: &ChanNameRef);
 
     /// Close a user tab.
     fn close_user_tab(&self, serv: &str, nick: &str);
@@ -155,7 +165,7 @@ pub trait UI: objekt::Clone {
     fn rename_nick(&self, old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget);
 
     /// Set topic of given tabs.
-    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &str);
+    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &ChanNameRef);
 
     /// Set style of the given tabs.
     fn set_tab_style(&self, style: TabStyle, target: &MsgTarget);
@@ -188,12 +198,12 @@ impl<UI1: UI + Clone, UI2: UI + Clone> UI for CombinedUIs<UI1, UI2> {
         self.ui2.close_server_tab(serv);
     }
 
-    fn new_chan_tab(&self, serv: &str, chan: &str) {
+    fn new_chan_tab(&self, serv: &str, chan: &ChanNameRef) {
         self.ui1.new_chan_tab(serv, chan);
         self.ui2.new_chan_tab(serv, chan);
     }
 
-    fn close_chan_tab(&self, serv: &str, chan: &str) {
+    fn close_chan_tab(&self, serv: &str, chan: &ChanNameRef) {
         self.ui1.close_chan_tab(serv, chan);
         self.ui2.close_chan_tab(serv, chan);
     }
@@ -263,7 +273,7 @@ impl<UI1: UI + Clone, UI2: UI + Clone> UI for CombinedUIs<UI1, UI2> {
         self.ui2.rename_nick(old_nick, new_nick, ts, target);
     }
 
-    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &str) {
+    fn set_topic(&self, topic: &str, ts: Tm, serv: &str, chan: &ChanNameRef) {
         self.ui1.set_topic(topic, ts, serv, chan);
         self.ui2.set_topic(topic, ts, serv, chan);
     }

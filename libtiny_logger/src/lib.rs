@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use time::Tm;
 
+use libtiny_common::{ChanName, ChanNameRef};
 use libtiny_ui::*;
 
 #[macro_use]
@@ -46,8 +47,8 @@ impl UI for Logger {
     fn draw(&self) {}
     delegate!(new_server_tab(serv: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv: &str,));
-    delegate!(new_chan_tab(serv: &str, chan: &str,));
-    delegate!(close_chan_tab(serv: &str, chan: &str,));
+    delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
+    delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_user_tab(serv: &str, nick: &str,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
     delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
@@ -71,7 +72,12 @@ impl UI for Logger {
         ts: Tm,
         target: &MsgTarget,
     ));
-    delegate!(set_topic(topic: &str, ts: Tm, serv: &str, chan: &str,));
+    delegate!(set_topic(
+        topic: &str,
+        ts: Tm,
+        serv: &str,
+        chan: &ChanNameRef,
+    ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
 
     // TODO: Maybe just return true?
@@ -93,7 +99,7 @@ struct LoggerInner {
 
 struct ServerLogs {
     fd: File,
-    chans: HashMap<String, File>,
+    chans: HashMap<ChanName, File>,
     users: HashMap<String, File>,
 }
 
@@ -179,23 +185,28 @@ impl LoggerInner {
         self.servers.remove(serv);
     }
 
-    fn new_chan_tab(&mut self, serv: &str, chan: &str) {
+    fn new_chan_tab(&mut self, serv: &str, chan: &ChanNameRef) {
         match self.servers.get_mut(serv) {
             None => {
                 info!("new_chan_tab: can't find server: {}", serv);
             }
             Some(server) => {
                 let mut path = self.log_dir.clone();
-                path.push(&format!("{}_{}.txt", serv, replace_forward_slash(chan)));
+                let chan_name_normalized = chan.normalized();
+                path.push(&format!(
+                    "{}_{}.txt",
+                    serv,
+                    replace_forward_slash(&chan_name_normalized)
+                ));
                 if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                     report_io_err!(self.report_err, print_header(&mut fd));
-                    server.chans.insert(chan.to_string(), fd);
+                    server.chans.insert(ChanName::new(chan_name_normalized), fd);
                 }
             }
         }
     }
 
-    fn close_chan_tab(&mut self, serv: &str, chan: &str) {
+    fn close_chan_tab(&mut self, serv: &str, chan: &ChanNameRef) {
         match self.servers.get_mut(serv) {
             None => {
                 info!("close_chan_tab: can't find server: {}", serv);
@@ -301,7 +312,7 @@ impl LoggerInner {
         });
     }
 
-    fn set_topic(&mut self, topic: &str, ts: Tm, serv: &str, chan: &str) {
+    fn set_topic(&mut self, topic: &str, ts: Tm, serv: &str, chan: &ChanNameRef) {
         let target = MsgTarget::Chan { serv, chan };
         self.apply_to_target(&target, |fd: &mut File, report_err: &dyn Fn(String)| {
             report_io_err!(
@@ -334,11 +345,16 @@ impl LoggerInner {
                         // Create a file for the channel. FIXME Code copied from new_chan_tab:
                         // can't reuse it because of borrowchk issues.
                         let mut path = self.log_dir.clone();
-                        path.push(&format!("{}_{}.txt", serv, replace_forward_slash(chan)));
+                        let chan_name_normalized = chan.normalized();
+                        path.push(&format!(
+                            "{}_{}.txt",
+                            serv,
+                            replace_forward_slash(&chan_name_normalized)
+                        ));
                         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                             report_io_err!(self.report_err, print_header(&mut fd));
                             f(&mut fd, &*self.report_err);
-                            chans.insert(chan.to_string(), fd);
+                            chans.insert(ChanName::new(chan_name_normalized), fd);
                         }
                     }
                     Some(fd) => {
