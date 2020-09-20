@@ -3,6 +3,12 @@ pub struct Trie {
     word: bool,
 }
 
+impl Default for Trie {
+    fn default() -> Self {
+        Trie::new()
+    }
+}
+
 impl Trie {
     pub fn new() -> Trie {
         Trie {

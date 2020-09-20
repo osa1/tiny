@@ -463,36 +463,33 @@ fn parse_params(chrs: &str) -> Vec<&str> {
     let mut params = Vec::new();
     let mut char_indices = chrs.char_indices();
 
-    loop {
-        match char_indices.next() {
-            Some((idx, c)) => {
-                if c == ':' {
-                    params.push(&chrs[idx + 1..]); // Skip ':'
-                    break;
-                }
+    while let Some((idx, c)) = char_indices.next() {
+        if c == ':' {
+            params.push(&chrs[idx + 1..]); // Skip ':'
+            break;
+        }
 
-                if params.len() == 14 {
+        if params.len() == 14 {
+            params.push(&chrs[idx..]);
+            break;
+        }
+
+        if c == ' ' {
+            continue;
+        }
+
+        loop {
+            match char_indices.next() {
+                Some((idx_, c)) => {
+                    if c == ' ' {
+                        params.push(&chrs[idx..idx_]);
+                        break;
+                    }
+                }
+                None => {
                     params.push(&chrs[idx..]);
                     break;
                 }
-
-                while c != ' ' {
-                    match char_indices.next() {
-                        Some((idx_, c)) => {
-                            if c == ' ' {
-                                params.push(&chrs[idx..idx_]);
-                                break;
-                            }
-                        }
-                        None => {
-                            params.push(&chrs[idx..]);
-                            break;
-                        }
-                    }
-                }
-            }
-            None => {
-                break;
             }
         }
     }
@@ -523,8 +520,8 @@ mod tests {
     #[test]
     fn test_parse_params() {
         assert_eq!(parse_params("p1 p2 p3"), vec!["p1", "p2", "p3"]);
-        let v: Vec<&str> = vec![];
-        assert_eq!(parse_params(""), v);
+        let empty: Vec<&str> = vec![];
+        assert_eq!(parse_params(""), empty);
         assert_eq!(parse_params(":foo bar baz "), vec!["foo bar baz "]);
         assert_eq!(
             parse_params(":foo : bar : baz :"),
@@ -540,7 +537,7 @@ mod tests {
         assert_eq!(params.len(), 15);
         assert_eq!(params[params.len() - 1], "blah blah blah");
 
-        assert_eq!(parse_params("   "), v); // Not valid according to the RFC, I think
+        assert_eq!(parse_params("   "), empty); // Not valid according to the RFC, I think
         assert_eq!(parse_params(":  "), vec!["  "]);
         assert_eq!(parse_params(": : :"), vec![" : :"]);
         assert_eq!(parse_params("x y : : :"), vec!["x", "y", " : :"]);
