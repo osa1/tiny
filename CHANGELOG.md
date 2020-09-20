@@ -47,6 +47,12 @@
   command is supposed to be used for sending a message to a user so we now do
   more error checking and reject the command if the first character is for a
   channel name.
+- Implemented channel name case sensitivity rules according to RFC 2812. This
+  fixes a bug when we join e.g. `#MyChannel` and someone sends a message to
+  `#mychannel`. In that case some servers send PRIVMSGs to users in the channel
+  with the sender's encoding (`#mychannel`), which would previously cause tiny
+  to (incorrectly) create a new tab for the channel `#mychannel` instead of
+  showing the message in `#MyChannel`. (#248)
 
 # 2020/06/28: 0.6.0
 
