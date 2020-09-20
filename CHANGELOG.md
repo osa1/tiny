@@ -43,6 +43,10 @@
   that don't implement the RFCs properly. (#253)
 - Logger is slightly improved to work better with servers that don't implement
   the RFCs properly. (85051ae)
+- Fixed a bug when first argument to `/msg` is a channel rather than a nick. The
+  command is supposed to be used for sending a message to a user so we now do
+  more error checking and reject the command if the first character is for a
+  channel name.
 
 # 2020/06/28: 0.6.0
 

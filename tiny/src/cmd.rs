@@ -332,26 +332,34 @@ fn me(args: CmdArgs) {
 static MSG_CMD: Cmd = Cmd {
     name: "msg",
     cmd_fn: msg,
-    description: "Sends a message",
-    usage: "/msg target message",
+    description: "Sends a message to a user",
+    usage: "/msg nick message",
 };
 
 fn split_msg_args(args: &str) -> Option<(&str, &str)> {
-    // Apparently we can't break with a val in a for loop yet so using mut var
-    let mut target_msg: Option<(&str, &str)> = None;
-    for (i, c) in args.char_indices() {
-        if !utils::is_nick_char(c) {
-            // This is where we split the message into target and actual message, however if the
-            // current char is a whitespace then we don't include it in the message, otherwise most
-            // messages would start with a whitespace. See `test_msg_args` below for some examples.
-            let target = &args[0..i];
-            let i = if c.is_whitespace() { i + 1 } else { i };
-            let msg = &args[i..];
-            target_msg = Some((target, msg));
-            break;
+    let mut char_indices = args.char_indices();
+
+    // We could check for validity of the nick according to RFC 2812 but we do the simple thing for
+    // now and and only check the first character, to avoid confusing the UI by returning a
+    // `MsgSource::User` with a channel name as `nick`.
+    match char_indices.next() {
+        None => {
+            return None;
+        }
+        Some((_, c)) => {
+            if !utils::is_nick_first_char(c) {
+                return None;
+            }
         }
     }
-    target_msg
+
+    for (i, c) in char_indices {
+        if c.is_whitespace() {
+            return Some((&args[0..i], &args[i + 1..]));
+        }
+    }
+
+    None
 }
 
 fn msg(args: CmdArgs) {
@@ -493,40 +501,36 @@ fn help(args: CmdArgs) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_cmd() {
-        let ret = parse_cmd("msg NickServ identify notMyPassword");
-        match ret {
-            ParseCmdResult::Ok { cmd, rest } => {
-                assert_eq!(cmd.name, "msg");
-                assert_eq!(rest, "NickServ identify notMyPassword");
-            }
-            _ => {
-                panic!("Can't parse cmd");
-            }
+#[test]
+fn test_parse_cmd() {
+    let ret = parse_cmd("msg NickServ identify notMyPassword");
+    match ret {
+        ParseCmdResult::Ok { cmd, rest } => {
+            assert_eq!(cmd.name, "msg");
+            assert_eq!(rest, "NickServ identify notMyPassword");
         }
-
-        let ret = parse_cmd("join #foo");
-        match ret {
-            ParseCmdResult::Ok { cmd, rest } => {
-                assert_eq!(cmd.name, "join");
-                assert_eq!(rest, "#foo");
-            }
-            _ => {
-                panic!("Can't parse cmd");
-            }
+        _ => {
+            panic!("Can't parse cmd");
         }
     }
 
-    #[test]
-    fn test_msg_args() {
-        assert_eq!(split_msg_args("foo,bar"), Some(("foo", ",bar")));
-        assert_eq!(split_msg_args("foo bar"), Some(("foo", "bar")));
-        assert_eq!(split_msg_args("foo, bar"), Some(("foo", ", bar")));
-        assert_eq!(split_msg_args("foo ,bar"), Some(("foo", ",bar")));
+    let ret = parse_cmd("join #foo");
+    match ret {
+        ParseCmdResult::Ok { cmd, rest } => {
+            assert_eq!(cmd.name, "join");
+            assert_eq!(rest, "#foo");
+        }
+        _ => {
+            panic!("Can't parse cmd");
+        }
     }
+}
+
+#[test]
+fn test_msg_args() {
+    assert_eq!(split_msg_args("foo,bar"), None);
+    assert_eq!(split_msg_args("foo bar"), Some(("foo", "bar")));
+    assert_eq!(split_msg_args("foo, bar"), Some(("foo,", "bar"))); // nick not valid according to RFC but whatever
+    assert_eq!(split_msg_args("foo ,bar"), Some(("foo", ",bar")));
+    assert_eq!(split_msg_args("#blah blah"), None);
 }

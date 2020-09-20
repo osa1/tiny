@@ -25,21 +25,34 @@ pub(crate) fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn is_nick_char(c: char) -> bool {
-    // from RFC 2812:
-    //
-    // nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
-    // special    =  %x5B-60 / %x7B-7D
-    //                  ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
-    //
-    // we use a simpler check here (allows strictly more nicks)
+// RFC 2812:
+//
+// nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
+// letter     =  %x41-5A / %x61-7A ; A-Z / a-z
+// special    =  %x5B-60 / %x7B-7D ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
+//
+// we use a simpler check here (allows strictly more nicks)
 
-    c.is_alphanumeric()
+pub(crate) fn is_nick_first_char(c: char) -> bool {
+    c.is_alphabetic() || "[]\\`_^{|}".contains(c)
+}
+
+/*
+pub(crate) fn is_nick_char(c: char) -> bool {
+    c.is_alphanumeric() // 'letter' or 'digit'
         || (c as i32 >= 0x5B && c as i32 <= 0x60)
         || (c as i32 >= 0x7B && c as i32 <= 0x7D)
-        || c == '-' // not valid according to RFC 2812 but servers accept it and I've seen nicks with
-                    // this char in the wild
+        || "[]\\`_^{|}-".contains(c)
 }
+
+pub(crate) fn is_chan_first_char(c: char) -> bool {
+    // RFC 2812 section 1.3
+    //
+    // > Channels names are strings (beginning with a '&', '#', '+' or '!' character) of length up
+    // > to fifty (50) characters.
+    c == '#' || c == '&' || c == '+' || c == '!'
+}
+*/
 
 ////////////////////////////////////////////////////////////////////////////////
 
