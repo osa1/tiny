@@ -1,20 +1,17 @@
-//! This crate implements common types used by other libtiny crates. These types have their own
-//! crate to avoid dependencies between unrelated libtiny crates, like libtiny_tui and
-//! libtiny_client.
+//! This crate implements common types used by other libtiny crates.
 
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 /// Channel names according to RFC 2812, section 1.3. Channel names are case insensitive, so this
-/// type defines `Eq`, `Ord`, and `Hash` traits that work in a case-insensitive way. `display`
+/// type defines `Eq`, and `Hash` traits that work in a case-insensitive way. `ChanName::display`
 /// method shows the channel name with the original casing.
 #[derive(Debug, Clone)]
 pub struct ChanName(String);
 
 /// Slice version of `ChanName`
 #[derive(Debug)]
-#[repr(transparent)]
 pub struct ChanNameRef(str);
 
 impl Deref for ChanName {
@@ -28,7 +25,7 @@ impl Deref for ChanName {
 // https://github.com/rust-lang/rust/blob/10b3595ba6a4c658c9dea105488fc562c815e434/library/std/src/path.rs#L1735
 impl AsRef<ChanNameRef> for ChanName {
     fn as_ref(&self) -> &ChanNameRef {
-        unsafe { &*(self.0.as_ref() as *const str as *const ChanNameRef) }
+        ChanNameRef::new(self.0.as_ref())
     }
 }
 
