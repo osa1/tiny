@@ -53,6 +53,8 @@
   with the sender's encoding (`#mychannel`), which would previously cause tiny
   to (incorrectly) create a new tab for the channel `#mychannel` instead of
   showing the message in `#MyChannel`. (#248)
+- TUI tab bar layout fixed when channel names contain non-ASCII unicode
+  characters.
 
 # 2020/06/28: 0.6.0
 

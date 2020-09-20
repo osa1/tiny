@@ -25,6 +25,7 @@ term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
 tokio = { version = "0.2.22", default-features = false, features = ["sync", "rt-core", "rt-util", "blocking", "signal", "stream", "time"] }
+unicode-width = "0.1"
 
 [dev-dependencies]
 bencher = "0.1"

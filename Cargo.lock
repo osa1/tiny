@@ -438,6 +438,7 @@ dependencies = [
  "termbox_simple",
  "time",
  "tokio",
+ "unicode-width",
 ]
 
 [[package]]

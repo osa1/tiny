@@ -1,6 +1,8 @@
 pub use libtiny_ui::TabStyle;
 use termbox_simple::{Termbox, TB_UNDERLINE};
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::{
     config::{Colors, Style},
     messaging::MessagingUI,
@@ -46,8 +48,7 @@ impl Tab {
     }
 
     pub(crate) fn width(&self) -> i32 {
-        // TODO: assuming ASCII string here. We should probably switch to a AsciiStr type.
-        self.visible_name().len() as i32
+        self.visible_name().width() as i32
     }
 
     pub(crate) fn draw(
