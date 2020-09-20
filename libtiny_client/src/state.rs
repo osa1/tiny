@@ -708,7 +708,7 @@ async fn retry_channel_join(
     select! {
         () = delay => {
             // Send join message
-            snd_irc_msg.try_send(wire::join(&[channel.as_ref()])).unwrap();
+            snd_irc_msg.try_send(wire::join(&[&channel])).unwrap();
         },
         _ = rcv_abort.next() => {
             // Channel tab was closed

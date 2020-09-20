@@ -70,7 +70,7 @@ fn handle_input_ev(ui: &TUI, ev: Event) {
                         ui.close_server_tab(&serv);
                     }
                     MsgSource::Chan { serv, chan } => {
-                        ui.close_chan_tab(&serv, chan.as_ref());
+                        ui.close_chan_tab(&serv, &chan);
                     }
                     MsgSource::User { serv, nick } => {
                         ui.close_user_tab(&serv, &nick);
