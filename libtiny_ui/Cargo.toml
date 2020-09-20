@@ -6,5 +6,6 @@ description = "Defines the interface for the UI implementations for tiny"
 edition = "2018"
 
 [dependencies]
+libtiny_common = { path = "../libtiny_common" }
 objekt = "0.1"
 time = "0.1"

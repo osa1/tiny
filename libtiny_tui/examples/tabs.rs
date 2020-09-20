@@ -1,10 +1,12 @@
 // Open a lot of tabs. 10 servers tabs, each one having 3 channels.
 
 use futures::stream::StreamExt;
-use libtiny_tui::TUI;
-use libtiny_ui::*;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
+
+use libtiny_common::ChanNameRef;
+use libtiny_tui::TUI;
+use libtiny_ui::*;
 
 fn main() {
     let mut runtime = tokio::runtime::Builder::new()
@@ -22,25 +24,25 @@ fn main() {
             let server = format!("server_{}", serv_idx);
             tui.new_server_tab(&server, None);
 
-            tui.new_chan_tab(&server, "chan_0");
+            tui.new_chan_tab(&server, ChanNameRef::new("chan_0"));
             tui.set_tab_style(
                 TabStyle::NewMsg,
                 &MsgTarget::Chan {
                     serv: &server,
-                    chan: "chan_0",
+                    chan: ChanNameRef::new("chan_0"),
                 },
             );
 
-            tui.new_chan_tab(&server, "chan_1");
+            tui.new_chan_tab(&server, ChanNameRef::new("chan_1"));
             tui.set_tab_style(
                 TabStyle::Highlight,
                 &MsgTarget::Chan {
                     serv: &server,
-                    chan: "chan_1",
+                    chan: ChanNameRef::new("chan_1"),
                 },
             );
 
-            tui.new_chan_tab(&server, "chan_2");
+            tui.new_chan_tab(&server, ChanNameRef::new("chan_2"));
         }
 
         tui.draw();
@@ -68,7 +70,7 @@ fn handle_input_ev(ui: &TUI, ev: Event) {
                         ui.close_server_tab(&serv);
                     }
                     MsgSource::Chan { serv, chan } => {
-                        ui.close_chan_tab(&serv, &chan);
+                        ui.close_chan_tab(&serv, chan.as_ref());
                     }
                     MsgSource::User { serv, nick } => {
                         ui.close_user_tab(&serv, &nick);

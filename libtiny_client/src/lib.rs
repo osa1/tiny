@@ -7,6 +7,7 @@ mod state;
 mod stream;
 mod utils;
 
+use libtiny_common::{ChanName, ChanNameRef};
 pub use libtiny_wire as wire;
 
 use pinger::Pinger;
@@ -51,7 +52,7 @@ pub struct ServerInfo {
     pub nicks: Vec<String>,
 
     /// Channels to automatically join
-    pub auto_join: Vec<String>,
+    pub auto_join: Vec<ChanName>,
 
     /// Nickserv password. Sent to NickServ on connecting to the server and nick change, before
     /// join commands.
@@ -100,7 +101,7 @@ pub enum Event {
     /// A wire-protocol error
     WireError(String),
     /// Channel join error message
-    ChannelJoinError { chan: String, msg: String },
+    ChannelJoinError { chan: ChanName, msg: String },
 }
 
 impl From<StreamError> for Event {
@@ -213,14 +214,14 @@ impl Client {
     }
 
     /// Join the given list of channels.
-    pub fn join(&mut self, chans: &[&str]) {
+    pub fn join(&mut self, chans: &[&ChanNameRef]) {
         self.msg_chan
             .try_send(Cmd::Msg(wire::join(&chans)))
             .unwrap()
     }
 
     /// Leave a channel.
-    pub fn part(&mut self, chan: &str) {
+    pub fn part(&mut self, chan: &ChanNameRef) {
         self.state.leave_channel(&mut self.msg_chan, chan)
     }
 
@@ -249,7 +250,7 @@ impl Client {
     }
 
     /// Get all nicks in a channel.
-    pub fn get_chan_nicks(&self, chan: &str) -> Vec<String> {
+    pub fn get_chan_nicks(&self, chan: &ChanNameRef) -> Vec<String> {
         self.state.get_chan_nicks(chan)
     }
 }

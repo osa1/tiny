@@ -4,3 +4,6 @@ version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 edition = "2018"
 description = "IRC message parsing and generation"
+
+[dependencies]
+libtiny_common = { path = "../libtiny_common" }

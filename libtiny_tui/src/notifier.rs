@@ -41,7 +41,7 @@ impl Notifier {
         match *target {
             MsgTarget::Chan { chan, .. } => {
                 if *self == Notifier::Messages || (*self == Notifier::Mentions && mention) {
-                    notify(&format!("{} in {}", sender, chan), &msg)
+                    notify(&format!("{} in {}", sender, chan.display()), &msg)
                 }
             }
             MsgTarget::User {

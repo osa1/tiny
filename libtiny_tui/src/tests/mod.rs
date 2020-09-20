@@ -1,5 +1,6 @@
 use crate::tui::TUI;
 
+use libtiny_common::ChanNameRef;
 use libtiny_ui::*;
 use term_input::{Event, Key};
 use termbox_simple::CellBuf;
@@ -137,7 +138,7 @@ fn close_rightmost_tab() {
 fn small_screen_1() {
     let mut tui = TUI::new_test(21, 3);
     let serv = "irc.server_1.org";
-    let chan = "#chan";
+    let chan = ChanNameRef::new("#chan");
     tui.new_server_tab(serv, None);
     tui.set_nick(serv, "osa1");
     tui.new_chan_tab(serv, chan);
@@ -186,7 +187,7 @@ fn small_screen_1() {
 fn small_screen_2() {
     let mut tui = TUI::new_test(21, 4);
     let serv = "irc.server_1.org";
-    let chan = "#chan";
+    let chan = ChanNameRef::new("#chan");
     tui.new_server_tab(serv, None);
     tui.set_nick(serv, "osa1");
     tui.new_chan_tab(serv, chan);
@@ -223,7 +224,7 @@ fn small_screen_2() {
 fn ctrl_w() {
     let mut tui = TUI::new_test(30, 3);
     let serv = "irc.server_1.org";
-    let chan = "#chan";
+    let chan = ChanNameRef::new("#chan");
     tui.new_server_tab(serv, None);
     tui.set_nick(serv, "osa1");
     tui.new_chan_tab(serv, chan);
@@ -445,7 +446,7 @@ fn test_text_field_wrap() {
 fn test_join_part_overflow() {
     let mut tui = TUI::new_test(21, 4);
     let serv = "irc.server_1.org";
-    let chan = "#chan";
+    let chan = ChanNameRef::new("#chan");
     tui.new_server_tab(serv, None);
     tui.set_nick(serv, "osa1");
     tui.new_chan_tab(serv, chan);

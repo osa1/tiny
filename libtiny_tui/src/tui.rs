@@ -2,6 +2,7 @@
 #![allow(clippy::new_without_default)]
 #![allow(clippy::too_many_arguments)]
 
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
@@ -16,6 +17,7 @@ use crate::tab::{Tab, TabStyle};
 use crate::widget::WidgetRet;
 use crate::{MsgSource, MsgTarget};
 
+use libtiny_common::ChanNameRef;
 use term_input::{Arrow, Event, Key};
 use termbox_simple::Termbox;
 
@@ -159,7 +161,7 @@ impl TUI {
             MsgSource::Chan { serv, chan } => {
                 self.toggle_ignore(&MsgTarget::Chan {
                     serv: &serv,
-                    chan: &chan,
+                    chan: chan.borrow(),
                 });
             }
             MsgSource::User { serv, nick } => {
@@ -207,7 +209,10 @@ impl TUI {
             // can't use `MsgSource::to_target` here, `Serv` case is different
             let tab_target = match src {
                 MsgSource::Serv { ref serv } => MsgTarget::AllServTabs { serv },
-                MsgSource::Chan { ref serv, ref chan } => MsgTarget::Chan { serv, chan },
+                MsgSource::Chan { ref serv, ref chan } => MsgTarget::Chan {
+                    serv,
+                    chan: chan.borrow(),
+                },
                 MsgSource::User { ref serv, ref nick } => MsgTarget::User { serv, nick },
             };
             self.set_notifier(notifier, &tab_target);
@@ -384,7 +389,7 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub(crate) fn new_chan_tab(&mut self, serv: &str, chan: &str) -> Option<usize> {
+    pub(crate) fn new_chan_tab(&mut self, serv: &str, chan: &ChanNameRef) -> Option<usize> {
         match self.find_chan_tab_idx(serv, chan) {
             None => match self.find_last_serv_tab_idx(serv) {
                 None => {
@@ -427,7 +432,7 @@ impl TUI {
         }
     }
 
-    pub(crate) fn close_chan_tab(&mut self, serv: &str, chan: &str) {
+    pub(crate) fn close_chan_tab(&mut self, serv: &str, chan: &ChanNameRef) {
         if let Some(tab_idx) = self.find_chan_tab_idx(serv, chan) {
             self.tabs.remove(tab_idx);
             if self.active_idx == tab_idx {
@@ -972,7 +977,8 @@ impl TUI {
                     }
                 }
                 MsgSource::Chan { ref chan, .. } => {
-                    if chan.contains(string) {
+                    // TODO: Case sensitive matching here is not ideal
+                    if chan.display().contains(string) {
                         next_idx = tab_idx;
                         break;
                     }
@@ -1246,7 +1252,7 @@ impl TUI {
         });
     }
 
-    pub(crate) fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &str) {
+    pub(crate) fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &ChanNameRef) {
         let target = MsgTarget::Chan { serv, chan };
         self.apply_to_target(&target, &|tab: &mut Tab, _| {
             tab.widget.show_topic(title, Timestamp::from(ts));
@@ -1371,7 +1377,7 @@ impl TUI {
         None
     }
 
-    fn find_chan_tab_idx(&self, serv_: &str, chan_: &str) -> Option<usize> {
+    fn find_chan_tab_idx(&self, serv_: &str, chan_: &ChanNameRef) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             if let MsgSource::Chan { ref serv, ref chan } = tab.src {
                 if serv_ == serv && chan_ == chan {

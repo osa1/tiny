@@ -4,6 +4,8 @@
 
 use std::str;
 
+use libtiny_common::{ChanName, ChanNameRef};
+
 pub fn pass(pass: &str) -> String {
     format!("PASS {}\r\n", pass)
 }
@@ -32,12 +34,13 @@ pub fn pong(arg: &str) -> String {
     format!("PONG {}\r\n", arg)
 }
 
-pub fn join(chans: &[&str]) -> String {
+pub fn join(chans: &[&ChanNameRef]) -> String {
+    let chans = chans.iter().map(|c| c.display()).collect::<Vec<_>>();
     format!("JOIN {}\r\n", chans.join(","))
 }
 
-pub fn part(channel: &str) -> String {
-    format!("PART {}\r\n", channel)
+pub fn part(chan: &ChanNameRef) -> String {
+    format!("PART {}\r\n", chan.display())
 }
 
 pub fn privmsg(msgtarget: &str, msg: &str) -> String {
@@ -164,7 +167,7 @@ fn parse_pfx(pfx: &str) -> Pfx {
 /// Target of a message
 #[derive(Debug, PartialEq, Eq)]
 pub enum MsgTarget {
-    Chan(String),
+    Chan(ChanName),
     User(String),
 }
 
@@ -212,13 +215,13 @@ pub enum Cmd {
 
     JOIN {
         // TODO: Same as above, this should be a list ...
-        chan: String, // TODO: key field might be useful when joining restricted channels. In practice I've never
-                      // needed it.
+        chan: ChanName, // TODO: key field might be useful when joining restricted channels. In
+                        // practice I've never needed it.
     },
 
     PART {
         // TODO: List of channels
-        chan: String,
+        chan: ChanName,
         msg: Option<String>,
     },
 
@@ -227,7 +230,7 @@ pub enum Cmd {
         /// Channels of the user that just quit. This is not a part of the IRC message, but
         /// something `libtiny_client` fills in for the users. Currently used to update tabs of the
         /// user in TUI.
-        chans: Vec<String>,
+        chans: Vec<ChanName>,
     },
 
     NICK {
@@ -235,7 +238,7 @@ pub enum Cmd {
         /// Channels of the user. Channels of the user that just quit. This is not a part of the
         /// IRC message, but something `libtiny_client` fills in for the users. Currently used to
         /// update tabs of the user in TUI.
-        chans: Vec<String>,
+        chans: Vec<ChanName>,
     },
 
     PING {
@@ -251,7 +254,7 @@ pub enum Cmd {
     },
 
     TOPIC {
-        chan: String,
+        chan: ChanName,
         topic: String,
     },
 
@@ -345,7 +348,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
             let target = params[0];
             let mut msg = params[1];
             let target = if target.starts_with('#') {
-                MsgTarget::Chan(target.to_owned())
+                MsgTarget::Chan(ChanName::new(target.to_owned()))
             } else {
                 MsgTarget::User(target.to_owned())
             };
@@ -383,7 +386,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
         MsgType::Cmd("JOIN") if params.len() == 1 => {
             let chan = params[0];
             Cmd::JOIN {
-                chan: chan.to_owned(),
+                chan: ChanName::new(chan.to_owned()),
             }
         }
         MsgType::Cmd("PART") if params.len() == 1 || params.len() == 2 => {
@@ -393,7 +396,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
                 None
             };
             Cmd::PART {
-                chan: params[0].to_owned(),
+                chan: ChanName::new(params[0].to_owned()),
                 msg: mb_msg,
             }
         }
@@ -422,7 +425,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
             msg: params[0].to_owned(),
         },
         MsgType::Cmd("TOPIC") if params.len() == 2 => Cmd::TOPIC {
-            chan: params[0].to_owned(),
+            chan: ChanName::new(params[0].to_owned()),
             topic: params[1].to_owned(),
         },
         MsgType::Cmd("CAP") if params.len() == 3 => Cmd::CAP {
@@ -644,7 +647,7 @@ mod tests {
                     user: "~tiny@123.123.123.123".to_owned(),
                 }),
                 cmd: Cmd::PART {
-                    chan: "#haskell".to_owned(),
+                    chan: ChanName::new("#haskell".to_owned()),
                     msg: None,
                 },
             }
@@ -663,7 +666,7 @@ mod tests {
                     user: "~tiny@192.168.0.1".to_owned(),
                 }),
                 cmd: Cmd::JOIN {
-                    chan: "#haskell".to_owned(),
+                    chan: ChanName::new("#haskell".to_owned()),
                 },
             }
         );
@@ -687,7 +690,7 @@ mod tests {
                     user: "u@localhost".to_owned(),
                 }),
                 cmd: Cmd::PRIVMSG {
-                    target: MsgTarget::Chan("#ircv3".to_owned()),
+                    target: MsgTarget::Chan(ChanName::new("#ircv3".to_owned())),
                     msg: "writes some specs!".to_owned(),
                     is_notice: false,
                     ctcp: Some(CTCP::Action),

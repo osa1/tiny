@@ -4,10 +4,12 @@
 //! IRC event handling
 
 use futures::stream::StreamExt;
+use tokio::sync::mpsc;
+
 use libtiny_client::Client;
+use libtiny_common::ChanNameRef;
 use libtiny_ui::{MsgTarget, TabStyle, UI};
 use libtiny_wire as wire;
-use tokio::sync::mpsc;
 
 pub(crate) async fn task(
     mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
@@ -173,7 +175,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                         ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
                         let mentions_target = MsgTarget::Server { serv: "mentions" };
                         ui.add_msg(
-                            &format!("{} in {}:{}: {}", sender, serv, chan, msg),
+                            &format!("{} in {}:{}: {}", sender, serv, chan.display(), msg),
                             ts,
                             &mentions_target,
                         );
@@ -406,12 +408,15 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 // one being our nick).
                 let chan = &params[n_params - 2];
                 let topic = &params[n_params - 1];
-                ui.set_topic(topic, time::now(), serv, chan);
+                ui.set_topic(topic, time::now(), serv, ChanNameRef::new(chan));
             }
             // RPL_NAMREPLY: List of users in a channel
             else if n == 353 && n_params > 3 {
                 let chan = &params[2];
-                let chan_target = MsgTarget::Chan { serv, chan };
+                let chan_target = MsgTarget::Chan {
+                    serv,
+                    chan: ChanNameRef::new(chan),
+                };
 
                 for nick in params[3].split_whitespace() {
                     ui.add_nick(wire::drop_nick_prefix(nick), None, &chan_target);

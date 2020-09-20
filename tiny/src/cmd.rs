@@ -4,7 +4,10 @@
 use crate::config;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
+use libtiny_common::ChanNameRef;
 use libtiny_ui::{MsgSource, MsgTarget, UI};
+
+use std::borrow::Borrow;
 use std::path::Path;
 
 pub(crate) struct CmdArgs<'a> {
@@ -154,7 +157,7 @@ fn close(args: CmdArgs) {
             client.quit(None);
         }
         MsgSource::Chan { serv, chan } => {
-            ui.close_chan_tab(&serv, &chan);
+            ui.close_chan_tab(&serv, chan.borrow());
             let client_idx = find_client_idx(&clients, &serv).unwrap();
             clients[client_idx].part(&chan);
         }
@@ -260,7 +263,11 @@ fn connect_(
         realname: defaults.realname.clone(),
         pass: pass.map(str::to_owned),
         nicks: defaults.nicks.clone(),
-        auto_join: defaults.join.clone(),
+        auto_join: defaults
+            .join
+            .iter()
+            .map(|c| ChanNameRef::new(c).to_owned())
+            .collect(),
         nickserv_ident: None,
         sasl_auth: None,
     });
@@ -290,7 +297,10 @@ fn join(args: CmdArgs) {
         src,
         ..
     } = args;
-    let words = args.split_whitespace().collect::<Vec<_>>();
+    let words = args
+        .split_whitespace()
+        .map(|c| ChanNameRef::new(c))
+        .collect::<Vec<_>>();
     if words.is_empty() {
         return ui.add_client_err_msg(JOIN_CMD.usage, &MsgTarget::CurrentTab);
     }

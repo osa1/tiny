@@ -1,6 +1,7 @@
 //! An echo bot that just repeats stuff sent to it (either in a channel or as PRIVMSG).
 
 use libtiny_client::{Client, Event, ServerInfo};
+use libtiny_common::ChanNameRef;
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 
 use futures::stream::StreamExt;
@@ -26,7 +27,10 @@ fn main() {
         }
     };
 
-    let chans = &args_vec[1..];
+    let chans = args_vec[1..]
+        .iter()
+        .map(|c| ChanNameRef::new(c).to_owned())
+        .collect::<Vec<_>>();
 
     let server_info = ServerInfo {
         addr: server,
@@ -83,7 +87,7 @@ async fn echo_bot_task(server_info: ServerInfo) {
                                 break;
                             }
                         }
-                        Some((chan, msg.to_owned()))
+                        Some((chan.display().to_owned(), msg.to_owned()))
                     } else {
                         None
                     }

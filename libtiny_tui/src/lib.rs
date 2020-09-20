@@ -25,6 +25,7 @@ mod tests;
 
 pub use crate::tab::TabStyle;
 use crate::tui::TUIRet;
+use libtiny_common::ChanNameRef;
 pub use libtiny_ui::*;
 
 use futures::select;
@@ -187,8 +188,8 @@ impl UI for TUI {
     delegate!(draw());
     delegate!(new_server_tab(serv_name: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv_name: &str,));
-    delegate!(new_chan_tab(serv_name: &str, chan: &str,));
-    delegate!(close_chan_tab(serv_name: &str, chan: &str,));
+    delegate!(new_chan_tab(serv_name: &str, chan: &ChanNameRef,));
+    delegate!(close_chan_tab(serv_name: &str, chan: &ChanNameRef,));
     delegate!(close_user_tab(serv_name: &str, nick: &str,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
     delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
@@ -216,7 +217,7 @@ impl UI for TUI {
         topic: &str,
         ts: Tm,
         serv_name: &str,
-        chan_name: &str,
+        chan_name: &ChanNameRef,
     ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
 
