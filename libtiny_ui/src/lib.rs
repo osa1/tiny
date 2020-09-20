@@ -35,26 +35,26 @@ pub enum MsgSource {
 
 impl MsgSource {
     pub fn serv_name(&self) -> &str {
-        match *self {
-            MsgSource::Serv { ref serv }
-            | MsgSource::Chan { ref serv, .. }
-            | MsgSource::User { ref serv, .. } => serv,
+        match self {
+            MsgSource::Serv { serv }
+            | MsgSource::Chan { serv, .. }
+            | MsgSource::User { serv, .. } => serv,
         }
     }
 
     pub fn to_target(&self) -> MsgTarget {
-        match *self {
-            MsgSource::Serv { ref serv } => MsgTarget::Server { serv },
-            MsgSource::Chan { ref serv, ref chan } => MsgTarget::Chan { serv, chan },
-            MsgSource::User { ref serv, ref nick } => MsgTarget::User { serv, nick },
+        match self {
+            MsgSource::Serv { serv } => MsgTarget::Server { serv },
+            MsgSource::Chan { serv, chan } => MsgTarget::Chan { serv, chan },
+            MsgSource::User { serv, nick } => MsgTarget::User { serv, nick },
         }
     }
 
     pub fn visible_name(&self) -> &str {
-        match *self {
-            MsgSource::Serv { ref serv, .. } => serv,
-            MsgSource::Chan { ref chan, .. } => chan,
-            MsgSource::User { ref nick, .. } => nick,
+        match self {
+            MsgSource::Serv { serv, .. } => serv,
+            MsgSource::Chan { chan, .. } => chan,
+            MsgSource::User { nick, .. } => nick,
         }
     }
 }
