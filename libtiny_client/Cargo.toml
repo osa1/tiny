@@ -15,7 +15,6 @@ base64 = "0.12"
 futures = { version = "0.3.1", default-features = false, features = ["std", "async-await"] }
 lazy_static = "1.4.0"
 libtiny_common = { path = "../libtiny_common" }
-libtiny_logger = { path = "../libtiny_logger" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = { version = "0.2", optional = true }

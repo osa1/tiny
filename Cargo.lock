@@ -395,7 +395,6 @@ dependencies = [
  "futures",
  "lazy_static",
  "libtiny_common",
- "libtiny_logger",
  "libtiny_wire",
  "log",
  "native-tls",
