@@ -48,8 +48,8 @@ tiny is an IRC client written in Rust.
 
 ## Installation
 
-For pre-built binaries see [releases]. To build from source install Rust nightly
-toolchain. By default tiny uses [rustls] for TLS support, and desktop
+For pre-built binaries see [releases]. To build from source make sure you have
+Rust 1.47.0 or newer. By default tiny uses [rustls] for TLS support, and desktop
 notifications are disabled.
 
 [releases]: https://github.com/osa1/tiny/releases

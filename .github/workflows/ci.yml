@@ -9,10 +9,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Get nightly toolchain
+      - name: Get stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain: stable
             components: rustfmt
             override: true
 
@@ -36,10 +36,10 @@ jobs:
             sudo apt-get update
             sudo apt-get install libdbus-1-dev pkg-config libssl-dev
 
-      - name: Get nightly toolchain
+      - name: Get stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain: stable
             components: rustfmt
             override: true
 
@@ -55,10 +55,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Get nightly toolchain
+      - name: Get stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain: stable
             components: rustfmt
             override: true
 
@@ -74,10 +74,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Get nightly toolchain
+      - name: Get stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain: stable
             components: rustfmt
             override: true
 

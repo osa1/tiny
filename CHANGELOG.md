@@ -1,3 +1,8 @@
+# Unreleased
+
+- It's now possible to build tiny with stable Rust 1.47.0 or newer. Previously
+  tiny required nightly toolchain. (#241)
+
 # 2020/09/20: 0.7.0
 
 Thanks to @trevarj, @kennylevinsen and @LordMZTE for contributing to this
