@@ -695,14 +695,14 @@ impl StateInner {
 
 async fn retry_channel_join(
     channel: ChanName,
-    mut snd_irc_msg: Sender<String>,
+    snd_irc_msg: Sender<String>,
     rcv_abort: Receiver<()>,
 ) {
     debug!("Attempting to re-join channel {}", channel.display());
 
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
-    let mut delay = delay_for(Duration::from_secs(10)).fuse();
+    let mut delay = sleep(Duration::from_secs(10)).fuse();
     let mut rcv_abort = rcv_abort.fuse();
 
     select! {

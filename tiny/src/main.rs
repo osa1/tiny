@@ -89,14 +89,13 @@ fn run(
 
     // One task for each client to handle IRC events
     // One task for TUI events
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
     let local = tokio::task::LocalSet::new();
 
-    local.block_on(&mut runtime, async move {
+    local.block_on(&runtime, async move {
         // Create TUI task
         let (tui, rcv_tui_ev) = TUI::run(config_path.clone());
         tui.draw();

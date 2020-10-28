@@ -5,11 +5,12 @@
 //
 // Useful for benchmarking TUI::draw().
 
-use libtiny_tui::TUI;
-use libtiny_ui::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+
+use libtiny_tui::TUI;
+use libtiny_ui::*;
 
 fn main() {
     run_bench();
@@ -32,15 +33,14 @@ fn run_bench() {
     let file_buffered = BufReader::new(file);
     let lines = file_buffered.lines().map(Result::unwrap).collect();
 
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
     let local = tokio::task::LocalSet::new();
 
-    local.block_on(&mut runtime, async move {
+    local.block_on(&runtime, async move {
         let (tui, _) = TUI::run(PathBuf::from("../tiny/config.yml"));
         tui.draw();
         bench_task(tui, lines).await;

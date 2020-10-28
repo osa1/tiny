@@ -10,11 +10,12 @@ mod tests;
 
 use std::char;
 use std::collections::VecDeque;
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures::stream::Stream;
-use tokio::io::PollEvented;
+use tokio::io::unix::AsyncFd;
 
 use term_input_macros::byte_seq_parser;
 
@@ -120,6 +121,14 @@ byte_seq_parser! {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct RawFd_(RawFd);
+
+impl AsRawFd for RawFd_ {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0
+    }
+}
+
 pub struct Input {
     /// Queue of events waiting to be polled.
     evs: VecDeque<Event>,
@@ -127,7 +136,7 @@ pub struct Input {
     /// Used when reading from stdin.
     buf: Vec<u8>,
 
-    stdin: PollEvented<mio::unix::EventedFd<'static>>,
+    stdin: AsyncFd<RawFd_>,
 }
 
 impl Input {
@@ -135,7 +144,7 @@ impl Input {
         Input {
             evs: VecDeque::new(),
             buf: Vec::with_capacity(100),
-            stdin: PollEvented::new(mio::unix::EventedFd(&libc::STDIN_FILENO)).unwrap(),
+            stdin: AsyncFd::new(RawFd_(libc::STDIN_FILENO)).unwrap(),
         }
     }
 }
@@ -180,15 +189,12 @@ impl Stream for Input {
         }
 
         // Otherwise read stdin and loop if successful
-        match self_.stdin.poll_read_ready(cx, mio::Ready::readable()) {
-            Poll::Ready(Ok(_)) => {
+        match self_.stdin.poll_read_ready(cx) {
+            Poll::Ready(Ok(mut ready)) => {
                 if read_stdin(&mut self_.buf) {
                     Input::poll_next(self, cx)
                 } else {
-                    self_
-                        .stdin
-                        .clear_read_ready(cx, mio::Ready::readable())
-                        .unwrap();
+                    ready.clear_ready();
                     Poll::Pending
                 }
             }

@@ -10,6 +10,6 @@ edition = "2018"
 [dependencies]
 futures = { version = "0.3.1", default-features = false }
 libc = "0.2"
-mio = "0.6"
+mio = "0.7"
 term_input_macros = { path = "../term_input_macros" }
-tokio = { version = "0.2.22", default-features = false, features = ["io-driver", "rt-core", "rt-util"] }
+tokio = { version = "0.3.3", default-features = false, features = ["rt", "net"] }

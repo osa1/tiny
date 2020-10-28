@@ -5,7 +5,7 @@ use futures::FutureExt;
 use futures::{pin_mut, select, stream::StreamExt};
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 pub(crate) struct Pinger {
     snd_rst: mpsc::Sender<()>,
@@ -24,15 +24,15 @@ enum PingerState {
     ExpectPong,
 }
 
-async fn pinger_task(rcv_rst: mpsc::Receiver<()>, mut snd_ev: mpsc::Sender<Event>) {
+async fn pinger_task(rcv_rst: mpsc::Receiver<()>, snd_ev: mpsc::Sender<Event>) {
     let mut rcv_rst_fused = rcv_rst.fuse();
     let mut state = PingerState::SendPing;
     loop {
         // NOTE: The code about does not work:
-        // let mut delay = delay_for(Duration::from_secs(30));
+        // let mut delay = sleep(Duration::from_secs(30));
         // Instead I need this weird code below. Not sure if this is a bug or not.
         let delay = async {
-            delay_for(Duration::from_secs(60)).await;
+            sleep(Duration::from_secs(60)).await;
         }
         .fuse();
         pin_mut!(delay);

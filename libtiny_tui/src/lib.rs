@@ -100,8 +100,8 @@ async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receive
 
 async fn input_handler(
     tui: Rc<RefCell<tui::TUI>>,
-    mut snd_ev: mpsc::Sender<Event>,
-    mut snd_abort: mpsc::Sender<()>,
+    snd_ev: mpsc::Sender<Event>,
+    snd_abort: mpsc::Sender<()>,
 ) {
     let mut input = Input::new();
 

@@ -1,21 +1,17 @@
-use mio::unix::EventedFd;
-use mio::Events;
-use mio::Poll;
-use mio::PollOpt;
-use mio::Ready;
-use mio::Token;
+use mio::unix::SourceFd;
+use mio::{Events, Interest, Poll, Token};
 
 use termbox_simple::*;
 
 fn main() {
-    let poll = Poll::new().unwrap();
-    poll.register(
-        &EventedFd(&libc::STDIN_FILENO),
-        Token(libc::STDIN_FILENO as usize),
-        Ready::readable(),
-        PollOpt::level(),
-    )
-    .unwrap();
+    let mut poll = Poll::new().unwrap();
+    poll.registry()
+        .register(
+            &mut SourceFd(&libc::STDIN_FILENO),
+            Token(libc::STDIN_FILENO as usize),
+            Interest::READABLE,
+        )
+        .unwrap();
 
     let mut termbox = Termbox::init().unwrap();
     let mut events = Events::with_capacity(10);
