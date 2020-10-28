@@ -3,6 +3,22 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  Check_formatting:
+    name: 'Check formatting'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            components: rustfmt
+            override: true
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
   Linux_default:
     name: '[Linux, default] Build and test'
     runs-on: ubuntu-latest
@@ -13,7 +29,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
-            components: rustfmt
             override: true
 
       - name: Build
@@ -21,9 +36,6 @@ jobs:
 
       - name: Run tests
         run: cargo test --all --verbose
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
 
   Linux_native_tls_notif:
     name: '[Linux, native TLS + notifications] Build'
@@ -40,7 +52,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
-            components: rustfmt
             override: true
 
       - name: Build with rustls and dbus
@@ -59,7 +70,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
-            components: rustfmt
             override: true
 
       - name: Build
@@ -78,7 +88,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
-            components: rustfmt
             override: true
 
       - name: Build
