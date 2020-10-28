@@ -35,7 +35,6 @@ jobs:
         with:
             toolchain: stable
             target: x86_64-unknown-linux-musl
-            components: rustfmt
             override: true
 
       - name: Make release tarball (default)
