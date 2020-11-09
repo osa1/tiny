@@ -191,12 +191,10 @@ impl Stream for Input {
         // Otherwise read stdin and loop if successful
         match self_.stdin.poll_read_ready(cx) {
             Poll::Ready(Ok(mut ready)) => {
-                if read_stdin(&mut self_.buf) {
-                    Input::poll_next(self, cx)
-                } else {
+                if !read_stdin(&mut self_.buf) {
                     ready.clear_ready();
-                    Poll::Pending
                 }
+                self.poll_next(cx)
             }
             Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
             Poll::Pending => Poll::Pending,
