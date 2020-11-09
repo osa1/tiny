@@ -239,6 +239,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                 if ui.user_tab_exists(serv, nick) {
                     ui.add_nick(nick, ts, &MsgTarget::User { serv, nick });
                 }
+                ui.set_tab_style(TabStyle::JoinOrPart, &MsgTarget::Chan { serv, chan: &chan })
             }
         }
 
@@ -260,6 +261,7 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                     Some(time::now()),
                     &MsgTarget::Chan { serv, chan: &chan },
                 );
+                ui.set_tab_style(TabStyle::JoinOrPart, &MsgTarget::Chan { serv, chan: &chan })
             }
         }
 

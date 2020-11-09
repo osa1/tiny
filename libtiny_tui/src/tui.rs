@@ -755,6 +755,7 @@ fn arrow_style(tabs: &[Tab], colors: &Colors) -> Style {
         .unwrap_or(TabStyle::Normal);
     match tab_style {
         TabStyle::Normal => colors.tab_normal,
+        TabStyle::JoinOrPart => colors.tab_joinpart,
         TabStyle::NewMsg => colors.tab_new_msg,
         TabStyle::Highlight => colors.tab_highlight,
     }
