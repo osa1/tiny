@@ -191,10 +191,16 @@ impl Stream for Input {
         // Otherwise read stdin and loop if successful
         match self_.stdin.poll_read_ready(cx) {
             Poll::Ready(Ok(mut ready)) => {
-                if !read_stdin(&mut self_.buf) {
-                    ready.clear_ready();
+                ready.clear_ready();
+                if read_stdin(&mut self_.buf) {
+                    // Loop to parse stdin contents, yield events, poll readiness again
+                    self.poll_next(cx)
+                } else {
+                    // stdin was empty, just poll readiness
+                    let ret = self_.stdin.poll_read_ready(cx);
+                    debug_assert!(ret.is_pending());
+                    Poll::Pending
                 }
-                self.poll_next(cx)
             }
             Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
             Poll::Pending => Poll::Pending,
@@ -318,8 +324,8 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
     char::from_u32(codepoint).unwrap()
 }
 
-/// Read stdin contents if it's ready for reading. Returns true when it was able to read. Buffer is
-/// not modified when return value is 0.
+/// Read stdin contents if it's ready for reading. Returns `true` when it was able to read. Buffer
+/// is not modified when return value is `false`.
 pub fn read_stdin(buf: &mut Vec<u8>) -> bool {
     let mut bytes_available: i32 = 0; // this really needs to be a 32-bit value
     let ioctl_ret =
