@@ -147,6 +147,33 @@ impl Input {
             stdin: AsyncFd::new(RawFd_(libc::STDIN_FILENO)).unwrap(),
         }
     }
+
+    fn parse_buffer(&mut self) {
+        let mut buf_slice: &[u8] = &self.buf;
+
+        while !buf_slice.is_empty() {
+            // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD)
+            let fst = buf_slice[0];
+            let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
+                parse_key_comb
+            } else {
+                parse_chars
+            };
+
+            match parse_fn(buf_slice) {
+                Some((ev, used)) => {
+                    buf_slice = &buf_slice[used..];
+                    self.evs.push_back(ev);
+                }
+                None => {
+                    self.evs.push_back(Event::Unknown(buf_slice.to_owned()));
+                    break;
+                }
+            }
+        }
+
+        self.buf.clear();
+    }
 }
 
 impl Stream for Input {
@@ -155,55 +182,36 @@ impl Stream for Input {
     fn poll_next(mut self: Pin<&mut Input>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         let self_: &mut Input = &mut *self;
 
-        // Try to parse any bytes in the input buffer from the last poll
-        {
-            let mut buf_slice: &[u8] = &self_.buf;
+        'main: loop {
+            // Try to parse any bytes in the input buffer from the last poll
+            self_.parse_buffer();
 
-            while !buf_slice.is_empty() {
-                // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD)
-                let fst = buf_slice[0];
-                let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
-                    parse_key_comb
-                } else {
-                    parse_chars
-                };
+            // Yield pending events
+            if let Some(ev) = self_.evs.pop_front() {
+                return Poll::Ready(Some(Ok(ev)));
+            }
 
-                match parse_fn(buf_slice) {
-                    Some((ev, used)) => {
-                        buf_slice = &buf_slice[used..];
-                        self_.evs.push_back(ev);
+            // Otherwise read stdin and loop if successful
+            let mut poll_ret = self_.stdin.poll_read_ready(cx);
+            loop {
+                match poll_ret {
+                    Poll::Ready(Ok(mut ready)) => {
+                        ready.clear_ready();
+                        if read_stdin(&mut self_.buf) {
+                            continue 'main;
+                        } else {
+                            poll_ret = self_.stdin.poll_read_ready(cx);
+                            continue;
+                        }
                     }
-                    None => {
-                        self_.evs.push_back(Event::Unknown(buf_slice.to_owned()));
-                        break;
+                    Poll::Ready(Err(err)) => {
+                        return Poll::Ready(Some(Err(err)));
+                    }
+                    Poll::Pending => {
+                        return Poll::Pending;
                     }
                 }
             }
-        }
-
-        self_.buf.clear();
-
-        // Yield pending events
-        if let Some(ev) = self_.evs.pop_front() {
-            return Poll::Ready(Some(Ok(ev)));
-        }
-
-        // Otherwise read stdin and loop if successful
-        match self_.stdin.poll_read_ready(cx) {
-            Poll::Ready(Ok(mut ready)) => {
-                ready.clear_ready();
-                if read_stdin(&mut self_.buf) {
-                    // Loop to parse stdin contents, yield events, poll readiness again
-                    self.poll_next(cx)
-                } else {
-                    // stdin was empty, just poll readiness
-                    let ret = self_.stdin.poll_read_ready(cx);
-                    debug_assert!(ret.is_pending());
-                    Poll::Pending
-                }
-            }
-            Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
-            Poll::Pending => Poll::Pending,
         }
     }
 }
