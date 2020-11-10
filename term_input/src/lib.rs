@@ -152,7 +152,7 @@ impl Input {
     /// Create a new input handler. Requires a `tokio` reactor to be running. Make sure to either
     /// set `stdin` to non-blocking mode or enable non-canonical input, otherwise the `Stream`
     /// implementation will not work. If you are using this with `termbox` it does the latter so no
-    /// need to do anything. See module documentation for link on how to enable non-canonical
+    /// need to do anything. See module documentation for links on how to enable non-canonical
     /// input.
     pub fn new() -> Input {
         Input {
