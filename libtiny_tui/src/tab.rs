@@ -23,6 +23,7 @@ pub(crate) struct Tab {
 fn tab_style(style: TabStyle, colors: &Colors) -> Style {
     match style {
         TabStyle::Normal => colors.tab_normal,
+        TabStyle::JoinOrPart => colors.tab_joinpart,
         TabStyle::NewMsg => colors.tab_new_msg,
         TabStyle::Highlight => colors.tab_highlight,
     }
