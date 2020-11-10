@@ -1,6 +1,6 @@
-use futures::stream::StreamExt;
 use std::io;
 use std::io::Write;
+use tokio::stream::StreamExt;
 
 use term_input::{Event, Input, Key};
 
@@ -21,6 +21,8 @@ fn main() {
         | libc::ICRNL
         | libc::IXON);
     new_term.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG | libc::IEXTEN);
+    new_term.c_cc[libc::VMIN] = 0;
+    new_term.c_cc[libc::VTIME] = 0;
     unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &new_term) };
 
     // enable focus events

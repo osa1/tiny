@@ -495,6 +495,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85db2feff6bf70ebc3a4793191517d5f0331100a2f10f9bf93b5e5214f32b7b7"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "notify-rust"
 version = "3.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -986,9 +998,9 @@ dependencies = [
 name = "term_input"
 version = "0.2.0"
 dependencies = [
- "futures",
  "libc",
  "mio",
+ "nix",
  "term_input_macros",
  "tokio",
 ]

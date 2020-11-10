@@ -4,7 +4,6 @@ use tokio::stream::StreamExt;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();
-    tui.set_clear_attributes(0, 0);
 
     let mut fg = true;
     draw(&mut tui, fg);

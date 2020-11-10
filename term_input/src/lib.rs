@@ -2,8 +2,14 @@
 
 //! Interprets the terminal events we care about (keyboard input).
 //!
-//! Keyboard events are read from stdin. We look for byte strings of key combinations that we care
-//! about. E.g. Alt-arrow keys, C-w etc.
+//! Keyboard events are read from `stdin`. We look for byte strings of key combinations that we
+//! care about. E.g. Alt-arrow keys, C-w etc.
+//!
+//! NOTE: Make sure to either set `stdin` to non-blocking mode or enable canonical input. For the
+//! latter, see:
+//!
+//! - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
+//! - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
 
 #[cfg(test)]
 mod tests;
@@ -14,8 +20,8 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::stream::Stream;
 use tokio::io::unix::AsyncFd;
+use tokio::stream::Stream;
 
 use term_input_macros::byte_seq_parser;
 
@@ -140,6 +146,11 @@ pub struct Input {
 }
 
 impl Input {
+    /// Create a new input handler. Requires a `tokio` reactor to be running. Make sure to either
+    /// set `stdin` to non-blocking mode or enable non-canonical input, otherwise the `Stream`
+    /// implementation will not work. If you are using this with `termbox` it does the latter so no
+    /// need to do anything. See module documentation for link on how to enable non-canonical
+    /// input.
     pub fn new() -> Input {
         Input {
             evs: VecDeque::new(),
@@ -196,12 +207,26 @@ impl Stream for Input {
             loop {
                 match poll_ret {
                     Poll::Ready(Ok(mut ready)) => {
+                        let read_ret = read_stdin(&mut self_.buf);
+
+                        // read_stdin reads until stdin is empty, poll again for readiness
                         ready.clear_ready();
-                        if read_stdin(&mut self_.buf) {
-                            continue 'main;
-                        } else {
-                            poll_ret = self_.stdin.poll_read_ready(cx);
+                        poll_ret = self_.stdin.poll_read_ready(cx);
+
+                        match read_ret {
+                            Ok(()) => {}
+                            Err(err) => {
+                                // NOTE: `poll_ret` is ignored here but I think that's OK?
+                                let err =
+                                    std::io::Error::from(err.as_errno().expect("Weird nix error"));
+                                return Poll::Ready(Some(Err(err)));
+                            }
+                        }
+
+                        if self_.buf.is_empty() {
                             continue;
+                        } else {
+                            continue 'main;
                         }
                     }
                     Poll::Ready(Err(err)) => {
@@ -332,28 +357,41 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
     char::from_u32(codepoint).unwrap()
 }
 
-/// Read stdin contents if it's ready for reading. Returns `true` when it was able to read. Buffer
-/// is not modified when return value is `false`.
-pub fn read_stdin(buf: &mut Vec<u8>) -> bool {
-    let mut bytes_available: i32 = 0; // this really needs to be a 32-bit value
-    let ioctl_ret =
-        unsafe { libc::ioctl(libc::STDIN_FILENO, libc::FIONREAD, &mut bytes_available) };
-    // println!("ioctl_ret: {}", ioctl_ret);
-    // println!("bytes_available: {}", bytes_available);
-    if ioctl_ret < 0 || bytes_available == 0 {
-        false
-    } else {
-        buf.clear();
-        buf.reserve(bytes_available as usize);
-
-        let buf_ptr: *mut libc::c_void = buf.as_ptr() as *mut libc::c_void;
-        let bytes_read =
-            unsafe { libc::read(libc::STDIN_FILENO, buf_ptr, bytes_available as usize) };
-        debug_assert!(bytes_read == bytes_available as isize);
-
+/// Read `stdin` until `read` fails with `EWOULDBLOCK` (happens in canonical mode, when `stdin` is
+/// set to non-blocking mode) or returns 0 (happens in non-canonical mode). If you are using
+/// `term_input` with `termbox` then you don't need to set `stdin` to non-blocking mode as
+/// `termbox` enables non-canonical mode.
+///
+/// See also:
+///
+/// - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
+/// - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
+pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
+    loop {
+        let old_len = buf.len();
+        buf.reserve(100);
         unsafe {
-            buf.set_len(bytes_read as usize);
+            buf.set_len(old_len + 100);
         }
-        true
+
+        match nix::unistd::read(libc::STDIN_FILENO, &mut buf[old_len..]) {
+            Ok(n_read) => {
+                unsafe { buf.set_len(old_len + n_read) };
+                if n_read == 0 {
+                    return Ok(());
+                }
+            }
+            Err(err) => {
+                unsafe { buf.set_len(old_len) };
+                match err {
+                    nix::Error::Sys(nix::errno::EWOULDBLOCK) => {
+                        return Ok(());
+                    }
+                    _ => {
+                        return Err(err);
+                    }
+                }
+            }
+        }
     }
 }
