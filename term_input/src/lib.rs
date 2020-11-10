@@ -381,6 +381,8 @@ pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
             Ok(n_read) => {
                 unsafe { buf.set_len(old_len + n_read) };
                 if n_read == 0 {
+                    // We're in non-canonical mode, or stdin is closed. We can't distinguish the
+                    // two here but I think it's fine to return OK when stdin is closed.
                     return Ok(());
                 }
             }
