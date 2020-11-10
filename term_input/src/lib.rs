@@ -131,6 +131,7 @@ byte_seq_parser! {
 
 struct RawFd_(RawFd);
 
+// TODO: Remove this when `AsRawFd for RawFd` is stable.
 impl AsRawFd for RawFd_ {
     fn as_raw_fd(&self) -> RawFd {
         self.0
