@@ -210,16 +210,23 @@ impl Stream for Input {
             loop {
                 match poll_ret {
                     Poll::Ready(Ok(mut ready)) => {
+                        // We will read stdin until it's empty, clear the readiness state now
+                        // (before reading) to avoid a potential race that would occur if stdin
+                        // becomes available again between the last read and clear_ready.
+                        ready.clear_ready();
+
+                        // Read stdin until it fails with EWOULDBLOCK or returns 0
                         let read_ret = read_stdin(&mut self_.buf);
 
-                        // read_stdin reads until stdin is empty, poll again for readiness
-                        ready.clear_ready();
+                        // Poll again so that we will be notified when stdin becomes ready again
                         poll_ret = self_.stdin.poll_read_ready(cx);
 
                         match read_ret {
                             Ok(()) => {}
                             Err(err) => {
                                 // NOTE: `poll_ret` is ignored here but I think that's OK?
+                                // TODO: Contents of `buf` is ignored here until `poll_next` is
+                                // called again.
                                 let err =
                                     std::io::Error::from(err.as_errno().expect("Weird nix error"));
                                 return Poll::Ready(Some(Err(err)));
