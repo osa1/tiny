@@ -125,6 +125,8 @@ impl Termbox {
         new_term.c_lflag &= !(libc::ECHO | libc::ECHONL | libc::ICANON | libc::ISIG | libc::IEXTEN);
         new_term.c_cflag &= !(libc::CSIZE | libc::PARENB);
         new_term.c_cflag |= libc::CS8;
+        // Enabled non-canonical mode above. Also set VMIN and VTIME = 0 so that `read(stdin)`
+        // won't block.
         new_term.c_cc[libc::VMIN] = 0;
         new_term.c_cc[libc::VTIME] = 0;
 

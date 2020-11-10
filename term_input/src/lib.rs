@@ -10,6 +10,8 @@
 //!
 //! - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
 //! - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
+//!
+//! Also make sure to set `VMIN` and `VTIME` to zero in non-canonical mode.
 
 #[cfg(test)]
 mod tests;
@@ -358,9 +360,9 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
 }
 
 /// Read `stdin` until `read` fails with `EWOULDBLOCK` (happens in canonical mode, when `stdin` is
-/// set to non-blocking mode) or returns 0 (happens in non-canonical mode). If you are using
-/// `term_input` with `termbox` then you don't need to set `stdin` to non-blocking mode as
-/// `termbox` enables non-canonical mode.
+/// set to non-blocking mode) or returns 0 (happens in non-canonical mode when `VMIN` and `VTIME`
+/// are 0). If you are using `term_input` with `termbox` then you don't need to set `stdin` to
+/// non-blocking mode as `termbox` enables non-canonical mode.
 ///
 /// See also:
 ///
