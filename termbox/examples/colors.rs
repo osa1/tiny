@@ -4,19 +4,17 @@ use tokio::stream::StreamExt;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();
-    tui.set_clear_attributes(0, 0);
 
     let mut fg = true;
     draw(&mut tui, fg);
 
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
     let local = tokio::task::LocalSet::new();
 
-    local.block_on(&mut runtime, async move {
+    local.block_on(&runtime, async move {
         let mut input = Input::new();
         while let Some(mb_ev) = input.next().await {
             match mb_ev {

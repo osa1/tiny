@@ -1,14 +1,15 @@
-use futures::stream::StreamExt;
-use libtiny_tui::TUI;
-use libtiny_ui::*;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+
+use futures::stream::StreamExt;
 use tokio::sync::mpsc;
 
+use libtiny_tui::TUI;
+use libtiny_ui::*;
+
 fn main() {
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
@@ -17,7 +18,7 @@ fn main() {
 
     let tab = MsgTarget::Server { serv: "mentions" };
 
-    local.block_on(&mut runtime, async move {
+    local.block_on(&runtime, async move {
         let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));
 
         let mut text = String::new();

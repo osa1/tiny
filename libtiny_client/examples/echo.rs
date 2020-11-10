@@ -46,13 +46,12 @@ fn main() {
 
     println!("{:?}", server_info);
 
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
     let local = tokio::task::LocalSet::new();
-    local.block_on(&mut runtime, echo_bot_task(server_info));
+    local.block_on(&runtime, echo_bot_task(server_info));
 }
 
 fn show_usage() {

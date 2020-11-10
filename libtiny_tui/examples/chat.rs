@@ -1,11 +1,12 @@
 // In a chat window add dozens of nicks, each printing some random lines.
 
-use futures::future::FutureExt;
-use futures::select;
-use futures::stream::StreamExt;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+
+use futures::future::FutureExt;
+use futures::select;
+use futures::stream::StreamExt;
 use tokio::sync::mpsc;
 
 use libtiny_common::ChanNameRef;
@@ -21,15 +22,14 @@ fn main() {
         chan: ChanNameRef::new(CHAN),
     };
 
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
     let local = tokio::task::LocalSet::new();
 
-    local.block_on(&mut runtime, async move {
+    local.block_on(&runtime, async move {
         let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));
         tui.new_server_tab("debug", None);
         tui.new_chan_tab("debug", ChanNameRef::new("chan"));
@@ -65,7 +65,7 @@ fn main() {
             let mut nick_idx = 1;
             let mut rcv_abort_fused = rcv_abort.fuse();
             loop {
-                let mut timer = tokio::time::delay_for(std::time::Duration::from_secs(3)).fuse();
+                let mut timer = tokio::time::sleep(std::time::Duration::from_secs(3)).fuse();
                 select! {
                     _ = rcv_abort_fused.next() => {
                         break;
@@ -74,7 +74,7 @@ fn main() {
                         tui_clone.set_nick(SERV, nicks[nick_idx]);
                         tui_clone.draw();
                         nick_idx = (nick_idx + 1) % nicks.len();
-                        timer = tokio::time::delay_for(std::time::Duration::from_secs(3)).fuse();
+                        timer = tokio::time::sleep(std::time::Duration::from_secs(3)).fuse();
                     }
                 }
             }

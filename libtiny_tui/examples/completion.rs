@@ -6,15 +6,14 @@ use libtiny_tui::TUI;
 use libtiny_ui::*;
 
 fn main() {
-    let mut runtime = tokio::runtime::Builder::new()
-        .basic_scheduler()
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
     let local = tokio::task::LocalSet::new();
 
-    local.block_on(&mut runtime, async move {
+    local.block_on(&runtime, async move {
         let (tui, _) = TUI::run(PathBuf::from("../tiny/config.yml"));
         tui.new_server_tab("debug", None);
         let debug_tab = MsgTarget::Server { serv: "debug" };

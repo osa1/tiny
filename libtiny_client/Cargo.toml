@@ -7,7 +7,7 @@ edition = "2018"
 
 [features]
 default = ["tls-rustls"]
-tls-native = ["native-tls", "tokio-tls"]
+tls-native = ["native-tls", "tokio-native-tls"]
 tls-rustls = ["rustls-native-certs", "tokio-rustls"]
 
 [dependencies]
@@ -19,6 +19,6 @@ libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = { version = "0.2", optional = true }
 rustls-native-certs = { version = "0.4", optional = true }
-tokio = { version = "0.2.22", default-features = false, features = ["io-util", "io-driver", "signal", "sync", "stream", "rt-core", "time", "tcp", "rt-util", "blocking"] }
-tokio-rustls = { version = "0.14", optional = true }
-tokio-tls = { version = "0.3", optional = true }
+tokio = { version = "0.3.3", default-features = false, features = ["rt", "sync", "stream", "time", "io-util", "net"] }
+tokio-native-tls = { version = "0.2", optional = true }
+tokio-rustls = { version = "0.20", optional = true }

@@ -432,7 +432,7 @@ async fn main_loop(
         }
 
         // Spawn a task for outgoing messages.
-        let mut snd_ev_clone = snd_ev.clone();
+        let snd_ev_clone = snd_ev.clone();
         tokio::task::spawn_local(async move {
             while let Some(msg) = rcv_msg.next().await {
                 if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
@@ -544,7 +544,7 @@ enum TaskResult<A> {
 }
 
 async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
-    let delay = tokio::time::delay_for(Duration::from_secs(RECONNECT_SECS)).fuse();
+    let delay = tokio::time::sleep(Duration::from_secs(RECONNECT_SECS)).fuse();
     pin_mut!(delay);
 
     loop {

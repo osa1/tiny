@@ -5,19 +5,19 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::{
-    io::{AsyncRead, AsyncWrite},
+    io::{AsyncRead, AsyncWrite, ReadBuf},
     net::TcpStream,
 };
 
+#[cfg(feature = "tls-native")]
+use tokio_native_tls::TlsStream;
 #[cfg(feature = "tls-rustls")]
 use tokio_rustls::client::TlsStream;
-#[cfg(feature = "tls-native")]
-use tokio_tls::TlsStream;
 
 #[cfg(feature = "tls-native")]
 lazy_static! {
-    static ref TLS_CONNECTOR: tokio_tls::TlsConnector =
-        tokio_tls::TlsConnector::from(native_tls::TlsConnector::builder().build().unwrap());
+    static ref TLS_CONNECTOR: tokio_native_tls::TlsConnector =
+        tokio_native_tls::TlsConnector::from(native_tls::TlsConnector::builder().build().unwrap());
 }
 
 #[cfg(feature = "tls-rustls")]
@@ -90,8 +90,8 @@ impl AsyncRead for Stream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context,
-        buf: &mut [u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
+        buf: &mut ReadBuf,
+    ) -> Poll<Result<(), std::io::Error>> {
         match *self {
             Stream::TcpStream(ref mut tcp_stream) => Pin::new(tcp_stream).poll_read(cx, buf),
             Stream::TlsStream(ref mut tls_stream) => Pin::new(tls_stream).poll_read(cx, buf),

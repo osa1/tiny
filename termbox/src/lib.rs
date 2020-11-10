@@ -1,7 +1,11 @@
 //! Implements Termbox's "cell" abstraction in Rust.
 //!
-//! A note on wide characters: for characters that take N (N > 1) columns to render this library
-//! skips the next N-1 columns. So wide character support is left to users.
+//! A note on wide characters: if you put a character like `Ｈ` that takes more than one column to
+//! render (according to [Unicode Standard Annex #11](http://www.unicode.org/reports/tr11/)), the
+//! character takes more than one cell in termbox's internal grid and the character you put next to
+//! it gets shifted in the grid. The character above takes 2 columns to render so if you put it on
+//! column 0 and on column 1 you put `e`, this is what you get: `Ｈe` where the first character is
+//! on column 0 and second character is on column 2.
 
 use std::cmp::min;
 use std::fs::File;
@@ -121,6 +125,8 @@ impl Termbox {
         new_term.c_lflag &= !(libc::ECHO | libc::ECHONL | libc::ICANON | libc::ISIG | libc::IEXTEN);
         new_term.c_cflag &= !(libc::CSIZE | libc::PARENB);
         new_term.c_cflag |= libc::CS8;
+        // Enabled non-canonical mode above. Also set VMIN and VTIME = 0 so that `read(stdin)`
+        // won't block.
         new_term.c_cc[libc::VMIN] = 0;
         new_term.c_cc[libc::VTIME] = 0;
 

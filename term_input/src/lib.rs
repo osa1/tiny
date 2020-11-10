@@ -2,19 +2,28 @@
 
 //! Interprets the terminal events we care about (keyboard input).
 //!
-//! Keyboard events are read from stdin. We look for byte strings of key combinations that we care
-//! about. E.g. Alt-arrow keys, C-w etc.
+//! Keyboard events are read from `stdin`. We look for byte strings of key combinations that we
+//! care about. E.g. Alt-arrow keys, C-w etc.
+//!
+//! NOTE: Make sure to either set `stdin` to non-blocking mode or enable canonical input. For the
+//! latter, see:
+//!
+//! - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
+//! - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
+//!
+//! Also make sure to set `VMIN` and `VTIME` to zero in non-canonical mode.
 
 #[cfg(test)]
 mod tests;
 
 use std::char;
 use std::collections::VecDeque;
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::stream::Stream;
-use tokio::io::PollEvented;
+use tokio::io::unix::AsyncFd;
+use tokio::stream::Stream;
 
 use term_input_macros::byte_seq_parser;
 
@@ -120,6 +129,15 @@ byte_seq_parser! {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct RawFd_(RawFd);
+
+// TODO: Remove this when `AsRawFd for RawFd` is stable.
+impl AsRawFd for RawFd_ {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0
+    }
+}
+
 pub struct Input {
     /// Queue of events waiting to be polled.
     evs: VecDeque<Event>,
@@ -127,16 +145,48 @@ pub struct Input {
     /// Used when reading from stdin.
     buf: Vec<u8>,
 
-    stdin: PollEvented<mio::unix::EventedFd<'static>>,
+    stdin: AsyncFd<RawFd_>,
 }
 
 impl Input {
+    /// Create a new input handler. Requires a `tokio` reactor to be running. Make sure to either
+    /// set `stdin` to non-blocking mode or enable non-canonical input, otherwise the `Stream`
+    /// implementation will not work. If you are using this with `termbox` it does the latter so no
+    /// need to do anything. See module documentation for links on how to enable non-canonical
+    /// input.
     pub fn new() -> Input {
         Input {
             evs: VecDeque::new(),
             buf: Vec::with_capacity(100),
-            stdin: PollEvented::new(mio::unix::EventedFd(&libc::STDIN_FILENO)).unwrap(),
+            stdin: AsyncFd::new(RawFd_(libc::STDIN_FILENO)).unwrap(),
         }
+    }
+
+    fn parse_buffer(&mut self) {
+        let mut buf_slice: &[u8] = &self.buf;
+
+        while !buf_slice.is_empty() {
+            // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD)
+            let fst = buf_slice[0];
+            let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
+                parse_key_comb
+            } else {
+                parse_chars
+            };
+
+            match parse_fn(buf_slice) {
+                Some((ev, used)) => {
+                    buf_slice = &buf_slice[used..];
+                    self.evs.push_back(ev);
+                }
+                None => {
+                    self.evs.push_back(Event::Unknown(buf_slice.to_owned()));
+                    break;
+                }
+            }
+        }
+
+        self.buf.clear();
     }
 }
 
@@ -146,54 +196,50 @@ impl Stream for Input {
     fn poll_next(mut self: Pin<&mut Input>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         let self_: &mut Input = &mut *self;
 
-        // Try to parse any bytes in the input buffer from the last poll
-        {
-            let mut buf_slice: &[u8] = &self_.buf;
+        'main: loop {
+            // Try to parse any bytes in the input buffer from the last poll
+            self_.parse_buffer();
 
-            while !buf_slice.is_empty() {
-                // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD)
-                let fst = buf_slice[0];
-                let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
-                    parse_key_comb
-                } else {
-                    parse_chars
-                };
+            // Yield pending events
+            if let Some(ev) = self_.evs.pop_front() {
+                return Poll::Ready(Some(Ok(ev)));
+            }
 
-                match parse_fn(buf_slice) {
-                    Some((ev, used)) => {
-                        buf_slice = &buf_slice[used..];
-                        self_.evs.push_back(ev);
+            // Otherwise read stdin and loop if successful
+            let mut poll_ret = self_.stdin.poll_read_ready(cx);
+            loop {
+                match poll_ret {
+                    Poll::Ready(Ok(mut ready)) => {
+                        let read_ret = read_stdin(&mut self_.buf);
+
+                        // read_stdin reads until stdin is empty, poll again for readiness
+                        ready.clear_ready();
+                        poll_ret = self_.stdin.poll_read_ready(cx);
+
+                        match read_ret {
+                            Ok(()) => {}
+                            Err(err) => {
+                                // NOTE: `poll_ret` is ignored here but I think that's OK?
+                                let err =
+                                    std::io::Error::from(err.as_errno().expect("Weird nix error"));
+                                return Poll::Ready(Some(Err(err)));
+                            }
+                        }
+
+                        if self_.buf.is_empty() {
+                            continue;
+                        } else {
+                            continue 'main;
+                        }
                     }
-                    None => {
-                        self_.evs.push_back(Event::Unknown(buf_slice.to_owned()));
-                        break;
+                    Poll::Ready(Err(err)) => {
+                        return Poll::Ready(Some(Err(err)));
+                    }
+                    Poll::Pending => {
+                        return Poll::Pending;
                     }
                 }
             }
-        }
-
-        self_.buf.clear();
-
-        // Yield pending events
-        if let Some(ev) = self_.evs.pop_front() {
-            return Poll::Ready(Some(Ok(ev)));
-        }
-
-        // Otherwise read stdin and loop if successful
-        match self_.stdin.poll_read_ready(cx, mio::Ready::readable()) {
-            Poll::Ready(Ok(_)) => {
-                if read_stdin(&mut self_.buf) {
-                    Input::poll_next(self, cx)
-                } else {
-                    self_
-                        .stdin
-                        .clear_read_ready(cx, mio::Ready::readable())
-                        .unwrap();
-                    Poll::Pending
-                }
-            }
-            Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
-            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -314,28 +360,43 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
     char::from_u32(codepoint).unwrap()
 }
 
-/// Read stdin contents if it's ready for reading. Returns true when it was able to read. Buffer is
-/// not modified when return value is 0.
-pub fn read_stdin(buf: &mut Vec<u8>) -> bool {
-    let mut bytes_available: i32 = 0; // this really needs to be a 32-bit value
-    let ioctl_ret =
-        unsafe { libc::ioctl(libc::STDIN_FILENO, libc::FIONREAD, &mut bytes_available) };
-    // println!("ioctl_ret: {}", ioctl_ret);
-    // println!("bytes_available: {}", bytes_available);
-    if ioctl_ret < 0 || bytes_available == 0 {
-        false
-    } else {
-        buf.clear();
-        buf.reserve(bytes_available as usize);
-
-        let buf_ptr: *mut libc::c_void = buf.as_ptr() as *mut libc::c_void;
-        let bytes_read =
-            unsafe { libc::read(libc::STDIN_FILENO, buf_ptr, bytes_available as usize) };
-        debug_assert!(bytes_read == bytes_available as isize);
-
+/// Read `stdin` until `read` fails with `EWOULDBLOCK` (happens in canonical mode, when `stdin` is
+/// set to non-blocking mode) or returns 0 (happens in non-canonical mode when `VMIN` and `VTIME`
+/// are 0). If you are using `term_input` with `termbox` then you don't need to set `stdin` to
+/// non-blocking mode as `termbox` enables non-canonical mode.
+///
+/// See also:
+///
+/// - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
+/// - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
+pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
+    loop {
+        let old_len = buf.len();
+        buf.reserve(100);
         unsafe {
-            buf.set_len(bytes_read as usize);
+            buf.set_len(old_len + 100);
         }
-        true
+
+        match nix::unistd::read(libc::STDIN_FILENO, &mut buf[old_len..]) {
+            Ok(n_read) => {
+                unsafe { buf.set_len(old_len + n_read) };
+                if n_read == 0 {
+                    // We're in non-canonical mode, or stdin is closed. We can't distinguish the
+                    // two here but I think it's fine to return OK when stdin is closed.
+                    return Ok(());
+                }
+            }
+            Err(err) => {
+                unsafe { buf.set_len(old_len) };
+                match err {
+                    nix::Error::Sys(nix::errno::EWOULDBLOCK) => {
+                        return Ok(());
+                    }
+                    _ => {
+                        return Err(err);
+                    }
+                }
+            }
+        }
     }
 }
