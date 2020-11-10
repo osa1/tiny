@@ -2,6 +2,8 @@
 
 - It's now possible to build tiny with stable Rust 1.47.0 or newer. Previously
   tiny required nightly toolchain. (#241)
+- Channels with join/leave events are now highlighted with a yellow-ish color.
+  Default color can be overridden in the config file. (#262)
 
 # 2020/09/20: 0.7.0
 
