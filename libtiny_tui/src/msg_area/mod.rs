@@ -160,9 +160,12 @@ impl MsgArea {
     pub(crate) fn flush_line(&mut self) -> usize {
         let line_height = self.line_buf.rendered_height(self.width);
         // Check if we're about to overflow
+        let mut removed_line_height = 0;
         if self.lines.len() == self.scrollback {
             // Remove oldest line
-            self.lines.pop_front();
+            if let Some(mut removed) = self.lines.pop_front() {
+                removed_line_height = removed.rendered_height(self.width);
+            }
         }
         self.lines
             .push_back(mem::replace(&mut self.line_buf, Line::new()));
@@ -170,7 +173,7 @@ impl MsgArea {
             self.scroll += line_height;
         }
         if let Some(ref mut total_height) = self.lines_height {
-            *total_height += line_height;
+            *total_height += line_height - removed_line_height;
         }
         self.lines.len() - 1
     }
@@ -231,5 +234,6 @@ mod tests {
         // Will pop out "first" line
         msg_area.flush_line();
         assert_eq!(msg_area.lines.len(), 3);
+        assert_eq!(msg_area.lines_height(), 3);
     }
 }
