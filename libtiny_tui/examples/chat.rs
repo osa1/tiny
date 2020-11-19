@@ -74,7 +74,6 @@ fn main() {
                         tui_clone.set_nick(SERV, nicks[nick_idx]);
                         tui_clone.draw();
                         nick_idx = (nick_idx + 1) % nicks.len();
-                        timer = tokio::time::sleep(std::time::Duration::from_secs(3)).fuse();
                     }
                 }
             }
