@@ -174,6 +174,17 @@ impl TUI {
     }
 
     fn notify(&mut self, words: &mut SplitWhitespace, src: &MsgSource) {
+        if !cfg!(feature = "desktop-notifications") {
+            self.add_client_msg(
+                "Desktop notification support is disabled in this build. \
+                Please see https://github.com/osa1/tiny/#installation for \
+                instructions on enabling desktop notifications or get a \
+                pre-built binary with libdbus in https://github.com/osa1/tiny/releases.",
+                &MsgTarget::CurrentTab,
+            );
+            return;
+        }
+
         let words: Vec<&str> = words.collect();
 
         let mut show_usage = || self.add_client_err_msg(NOTIFY_CMD.usage, &MsgTarget::CurrentTab);
@@ -368,7 +379,11 @@ impl TUI {
                         serv: serv.to_owned(),
                     },
                     true,
-                    Notifier::Mentions,
+                    if cfg!(feature = "desktop-notifications") {
+                        Notifier::Mentions
+                    } else {
+                        Notifier::Off
+                    },
                     alias,
                 );
                 Some(tab_idx)
@@ -398,12 +413,12 @@ impl TUI {
                 }
                 Some(serv_tab_idx) => {
                     let mut status_val: bool = true;
-                    let mut notifier = Notifier::Mentions;
+                    let mut notifier: Option<Notifier> = None;
                     for tab in &self.tabs {
                         if let MsgSource::Serv { serv: ref serv_ } = tab.src {
                             if serv == serv_ {
                                 status_val = tab.widget.get_ignore_state();
-                                notifier = tab.notifier;
+                                notifier = Some(tab.notifier);
                                 break;
                             }
                         }
@@ -416,7 +431,7 @@ impl TUI {
                             chan: chan.to_owned(),
                         },
                         status_val,
-                        notifier,
+                        notifier.expect("Creating a channel tab, but the server tab doesn't exist"),
                         None,
                     );
                     if self.active_idx >= tab_idx {

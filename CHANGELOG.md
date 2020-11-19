@@ -5,6 +5,10 @@
 - Channels with join/leave events are now highlighted with a yellow-ish color.
   Default color can be overridden in the config file. (#262)
 - Fixed a TUI bug when `scrollback` is set. (#265)
+- In builds without desktop notification support, `/notify` commands now print a
+  helpful message on how to enable it. Previously `/notify` would behave as if
+  desktop notification support is enabled but notifications would not work.
+  (#270)
 
 # 2020/09/20: 0.7.0
 
