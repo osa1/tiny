@@ -186,30 +186,76 @@ fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
                     }
                 }
                 wire::MsgTarget::User(target) => {
-                    // Message is sent to the user. If the sender is a server we show the message
-                    // in the server tab, otherwise we show it in a private tab. In case of an
-                    // ambiguity we again show in a private tab, as some bouncers send PRIVMSGs
-                    // from users with ambiguous prefix without a `user@host` part. See #247.
-                    let msg_target = {
-                        match pfx {
-                            Server(_) => MsgTarget::Server { serv },
-                            User { ref nick, .. } | Ambiguous(ref nick) => {
-                                // Show NOTICE messages in server tabs if we don't have a tab for
-                                // the sender already (see #21)
-                                if is_notice && !ui.user_tab_exists(serv, nick) {
+                    // If the sender is a server we show the message in the server tab. Otherwise
+                    // we show it in a private tab.
+                    //
+                    // Some bouncers send PRIVMSGs from users with ambiguous prefix without a
+                    // `user@host` part so we treat ambiguity as nick. See #247.
+                    match pfx {
+                        Server(_) => {
+                            let msg_target = MsgTarget::Server { serv };
+                            ui.add_privmsg(serv, &msg, ts, &msg_target, false, is_action);
+                            if target == client.get_nick() {
+                                ui.set_tab_style(TabStyle::Highlight, &msg_target);
+                            } else {
+                                ui.set_tab_style(TabStyle::NewMsg, &msg_target);
+                            }
+                        }
+                        User { ref nick, .. } | Ambiguous(ref nick) => {
+                            if target == client.get_nick() {
+                                // Message is sent to us. Show NOTICE messages in server tabs if we
+                                // don't have a tab for the sender already (see #21).
+                                let msg_target = if is_notice && !ui.user_tab_exists(serv, nick) {
                                     MsgTarget::Server { serv }
                                 } else {
                                     MsgTarget::User { serv, nick }
+                                };
+                                ui.set_tab_style(TabStyle::Highlight, &msg_target);
+                                ui.add_privmsg(nick, &msg, ts, &msg_target, false, is_action);
+                            } else {
+                                // PRIVMSG not sent to us. This case can happen when using a
+                                // bouncer, see #271. When multiple clients connect to the same
+                                // bouncer and one of them sends a PRIVMSG, the message is relayed
+                                // to the other clients. E.g.
+                                //
+                                //     PRIVMSG <our_nick> <target> :...
+                                //
+                                if log_enabled!(log::Level::Warn) {
+                                    match pfx {
+                                        Server(_) => {
+                                            warn!(
+                                                "PRIVMSG target is not us, but prefix is server: {:?}",
+                                                msg
+                                            );
+                                        }
+                                        User { ref nick, .. } | Ambiguous(ref nick) => {
+                                            if *nick != client.get_nick() {
+                                                warn!(
+                                                    "PRIVMSG sender or target is not us: {:?}",
+                                                    msg
+                                                );
+                                            }
+                                        }
+                                    }
                                 }
+                                let msg_target = MsgTarget::User {
+                                    serv,
+                                    nick: &target,
+                                };
+                                ui.add_privmsg(
+                                    &client.get_nick(),
+                                    &msg,
+                                    ts,
+                                    &msg_target,
+                                    false,
+                                    is_action,
+                                );
+                                // Don't highlight the tab as `Highlight`: the message was sent by us so
+                                // the tab probably doesn't need that much attention. Highlight as `NewMsg`
+                                // instead.
+                                ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                             }
                         }
-                    };
-                    ui.add_privmsg(sender, &msg, ts, &msg_target, false, is_action);
-                    if target == client.get_nick() {
-                        ui.set_tab_style(TabStyle::Highlight, &msg_target);
-                    } else {
-                        // Not sure if this case can happen
-                        ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
                 }
             }
