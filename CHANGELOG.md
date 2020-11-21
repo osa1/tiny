@@ -9,7 +9,6 @@
   helpful message on how to enable it. Previously `/notify` would behave as if
   desktop notification support is enabled but notifications would not work.
   (#270)
-- Fixed a bug when showing messages relayed by bouncers. (#271)
 
 # 2020/09/20: 0.7.0
 
