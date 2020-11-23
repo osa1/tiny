@@ -7,5 +7,5 @@ edition = "2018"
 
 [dependencies]
 libtiny_common = { path = "../libtiny_common" }
-objekt = "0.1"
+dyn-clone = "1.0.3"
 time = "0.1"
