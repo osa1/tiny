@@ -1,4 +1,4 @@
-pub use objekt::clone_box;
+pub use dyn_clone::clone_box;
 use time::Tm;
 
 use std::borrow::Borrow;
@@ -99,7 +99,7 @@ pub enum Event {
     },
 }
 
-pub trait UI: objekt::Clone {
+pub trait UI: dyn_clone::DynClone {
     fn draw(&self);
 
     /// Create a new server tab.
