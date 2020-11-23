@@ -12,4 +12,4 @@ libc = "0.2"
 mio = "0.7"
 nix = "0.19"
 term_input_macros = { path = "../term_input_macros" }
-tokio = { version = "0.3.3", default-features = false, features = ["rt", "net", "stream"] }
+tokio = { version = "0.3.4", default-features = false, features = ["rt", "net", "stream"] }
