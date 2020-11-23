@@ -19,7 +19,7 @@ libtiny_ui = { path = "../libtiny_ui" }
 log = "0.4"
 notify-rust = { version = "3", optional = true }
 serde = { version = "1.0.8", features = ["derive"] }
-serde_yaml = "0.7.1"
+serde_yaml = "0.8.4"
 tempfile = "3.0.3"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
