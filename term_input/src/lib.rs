@@ -18,7 +18,7 @@ mod tests;
 
 use std::char;
 use std::collections::VecDeque;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::RawFd;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -129,15 +129,6 @@ byte_seq_parser! {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct RawFd_(RawFd);
-
-// TODO: Remove this when `AsRawFd for RawFd` is stable.
-impl AsRawFd for RawFd_ {
-    fn as_raw_fd(&self) -> RawFd {
-        self.0
-    }
-}
-
 pub struct Input {
     /// Queue of events waiting to be polled.
     evs: VecDeque<Event>,
@@ -145,7 +136,7 @@ pub struct Input {
     /// Used when reading from stdin.
     buf: Vec<u8>,
 
-    stdin: AsyncFd<RawFd_>,
+    stdin: AsyncFd<RawFd>,
 }
 
 impl Input {
@@ -158,7 +149,7 @@ impl Input {
         Input {
             evs: VecDeque::new(),
             buf: Vec::with_capacity(100),
-            stdin: AsyncFd::new(RawFd_(libc::STDIN_FILENO)).unwrap(),
+            stdin: AsyncFd::new(libc::STDIN_FILENO).unwrap(),
         }
     }
 
