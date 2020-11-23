@@ -27,7 +27,7 @@ libtiny_ui = { path = "../libtiny_ui" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 serde = { version = "1.0.8", features = ["derive"] }
-serde_yaml = "0.7.1"
+serde_yaml = "0.8.14"
 time = "0.1"
 tokio = { version = "0.3.4", default-features = false, features = [] }
 
