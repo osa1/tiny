@@ -20,7 +20,7 @@ log = "0.4"
 notify-rust = { version = "3", optional = true }
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.8.4"
-tempfile = "3.0.3"
+tempfile = "3.1.0"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
