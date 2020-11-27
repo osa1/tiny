@@ -4,14 +4,6 @@
 //!
 //! Keyboard events are read from `stdin`. We look for byte strings of key combinations that we
 //! care about. E.g. Alt-arrow keys, C-w etc.
-//!
-//! NOTE: Make sure to either set `stdin` to non-blocking mode or enable non-canonical input. For
-//! the latter, see:
-//!
-//! - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
-//! - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
-//!
-//! Also make sure to set `VMIN` and `VTIME` to zero in non-canonical mode.
 
 #[cfg(test)]
 mod tests;
@@ -22,10 +14,14 @@ use std::os::unix::io::RawFd;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use tokio::io::unix::AsyncFd;
 use tokio::stream::Stream;
 
 use term_input_macros::byte_seq_parser;
+
+#[macro_use]
+extern crate log;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public types
@@ -137,19 +133,41 @@ pub struct Input {
     buf: Vec<u8>,
 
     stdin: AsyncFd<RawFd>,
+
+    old_stdin_flags: Option<OFlag>,
+}
+
+impl Drop for Input {
+    fn drop(&mut self) {
+        if let Some(old_flags) = self.old_stdin_flags.take() {
+            match fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
+                Err(err) => {
+                    error!("Unable to restore stdin flags: {:?}", err);
+                }
+                Ok(_) => {}
+            }
+        }
+    }
 }
 
 impl Input {
-    /// Create a new input handler. Requires a `tokio` reactor to be running. Make sure to either
-    /// set `stdin` to non-blocking mode or enable non-canonical input, otherwise the `Stream`
-    /// implementation will not work. If you are using this with `termbox` it does the latter so no
-    /// need to do anything. See module documentation for links on how to enable non-canonical
-    /// input.
+    /// Create an input handler. Requires a `tokio` reactor to be running. Sets `stdin` to
+    /// non-blocking mode. `stdin` flags are restored when the returned `Input` is dropped.
+    ///
+    /// Uses `stdin` so make sure you don't call this when there's another `Input` instance in the
+    /// process.
+    ///
+    /// Note that if you're using this with a terminal library like termbox you probably already
+    /// enable non-canonical input, in which case stdin doesn't need to be in non-blocking mode on
+    /// Linux, but on WSL we still need non-blocking mode, so this just sets stdin to non-blocking
+    /// mode always. See #269 for details.
     pub fn new() -> Input {
+        let old_stdin_flags = set_stdin_nonblocking();
         Input {
             evs: VecDeque::new(),
             buf: Vec::with_capacity(100),
             stdin: AsyncFd::new(libc::STDIN_FILENO).unwrap(),
+            old_stdin_flags,
         }
     }
 
@@ -396,5 +414,36 @@ pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
                 }
             }
         }
+    }
+}
+
+/// Set `stdin` to non-blocking mode. Returns old `stdin` if we were able to change the flags. Does
+/// not panic; errors are logged.
+fn set_stdin_nonblocking() -> Option<OFlag> {
+    let current_stdin_flags: OFlag = match fcntl(libc::STDIN_FILENO, FcntlArg::F_GETFL) {
+        Err(err) => {
+            error!("Unable to read stdin flags: {:?}", err);
+            return None;
+        }
+        Ok(flags) => match OFlag::from_bits(flags) {
+            None => {
+                error!("Unable to parse stdin flags: {:x?}", flags);
+                return None;
+            }
+            Some(flags) => flags,
+        },
+    };
+
+    let mut new_stdin_flags = current_stdin_flags;
+    new_stdin_flags.set(OFlag::O_NONBLOCK, true);
+
+    match fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(new_stdin_flags)) {
+        Err(err) => {
+            // On Linux we don't really need to enable non-blocking mode so things should still
+            // work. On WSL things may or may not work.. see #269.
+            error!("Unable to set stdin flags: {:?}", err);
+            None
+        }
+        Ok(_) => Some(current_stdin_flags),
     }
 }

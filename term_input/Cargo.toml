@@ -9,6 +9,7 @@ edition = "2018"
 
 [dependencies]
 libc = "0.2"
+log = "0.4"
 mio = "0.7"
 nix = "0.19"
 term_input_macros = { path = "../term_input_macros" }
