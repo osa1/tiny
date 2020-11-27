@@ -5,8 +5,8 @@
 //! Keyboard events are read from `stdin`. We look for byte strings of key combinations that we
 //! care about. E.g. Alt-arrow keys, C-w etc.
 //!
-//! NOTE: Make sure to either set `stdin` to non-blocking mode or enable canonical input. For the
-//! latter, see:
+//! NOTE: Make sure to either set `stdin` to non-blocking mode or enable non-canonical input. For
+//! the latter, see:
 //!
 //! - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
 //! - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
