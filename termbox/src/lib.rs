@@ -126,7 +126,9 @@ impl Termbox {
         new_term.c_cflag &= !(libc::CSIZE | libc::PARENB);
         new_term.c_cflag |= libc::CS8;
         // Enabled non-canonical mode above. Also set VMIN and VTIME = 0 so that `read(stdin)`
-        // won't block.
+        // won't block. References:
+        // - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
+        // - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
         new_term.c_cc[libc::VMIN] = 0;
         new_term.c_cc[libc::VTIME] = 0;
 

@@ -1041,6 +1041,7 @@ name = "term_input"
 version = "0.2.0"
 dependencies = [
  "libc",
+ "log",
  "mio",
  "nix",
  "term_input_macros",
