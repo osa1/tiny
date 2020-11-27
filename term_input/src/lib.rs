@@ -160,7 +160,10 @@ impl Input {
     /// Note that if you're using this with a terminal library like termbox you probably already
     /// enable non-canonical input, in which case stdin doesn't need to be in non-blocking mode on
     /// Linux, but on WSL we still need non-blocking mode, so this just sets stdin to non-blocking
-    /// mode always. See #269 for details.
+    /// mode always. See [tiny#269][1] and [WSL#3507][2].
+    ///
+    /// [1]: https://github.com/osa1/tiny/issues/269
+    /// [2]: https://github.com/microsoft/WSL/issues/3507
     pub fn new() -> Input {
         let old_stdin_flags = set_stdin_nonblocking();
         Input {
