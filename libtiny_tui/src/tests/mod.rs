@@ -46,7 +46,7 @@ fn expect_screen(screen: &str, tui: &TUI, w: u16, h: u16, caller: &'static Locat
     }
     let _ = screen_filtered.pop(); // pop the last '\n'
 
-    let found = buffer_str(&tui.get_tb().get_front_buffer(), w, h);
+    let found = buffer_str(&tui.get_front_buffer(), w, h);
 
     let mut line = String::new();
     for _ in 0..w {

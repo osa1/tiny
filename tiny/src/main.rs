@@ -8,6 +8,9 @@ mod debug_logging;
 mod ui;
 mod utils;
 
+#[cfg(test)]
+mod tests;
+
 use libtiny_client::{Client, ServerInfo};
 use libtiny_common::ChanNameRef;
 use libtiny_logger::{Logger, LoggerInitError};

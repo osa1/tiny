@@ -15,7 +15,6 @@ mod tab;
 mod termbox;
 #[doc(hidden)]
 pub mod trie; // Public for benchmarks
-#[doc(hidden)]
 pub mod tui; // Public for benchmarks
 mod utils;
 mod widget;
@@ -64,6 +63,28 @@ impl TUI {
         spawn_local(input_handler(tui, snd_ev, snd_abort));
 
         (TUI { inner }, rcv_ev)
+    }
+
+    /// Create a test instance that doesn't render to the terminal, just updates the termbox
+    /// buffer. Useful for testing. See also [`get_front_buffer`](TUI::get_front_buffer).
+    pub fn run_test(width: u16, height: u16) -> (TUI, mpsc::Receiver<Event>) {
+        let tui = Rc::new(RefCell::new(tui::TUI::new_test(width, height)));
+        let inner = Rc::downgrade(&tui);
+
+        let (snd_ev, rcv_ev) = mpsc::channel(10);
+
+        // We don't need to handle SIGWINCH in testing so the receiver end is not used
+        let (snd_abort, _rcv_abort) = mpsc::channel::<()>(1);
+
+        // Spawn input handler task
+        spawn_local(input_handler(tui, snd_ev, snd_abort));
+
+        (TUI { inner }, rcv_ev)
+    }
+
+    /// Get termbox front buffer. Useful for testing rendering.
+    pub fn get_front_buffer(&self) -> termbox_simple::CellBuf {
+        self.inner.upgrade().unwrap().borrow().get_front_buffer()
     }
 }
 
