@@ -35,6 +35,7 @@ use std::rc::{Rc, Weak};
 use term_input::Input;
 use time::Tm;
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::stream::Stream;
 use tokio::sync::mpsc;
 use tokio::task::spawn_local;
 
@@ -60,14 +61,18 @@ impl TUI {
         spawn_local(sigwinch_handler(inner.clone(), rcv_abort));
 
         // Spawn input handler task
-        spawn_local(input_handler(tui, snd_ev, snd_abort));
+        let input = Input::new();
+        spawn_local(input_handler(input, tui, snd_ev, snd_abort));
 
         (TUI { inner }, rcv_ev)
     }
 
     /// Create a test instance that doesn't render to the terminal, just updates the termbox
     /// buffer. Useful for testing. See also [`get_front_buffer`](TUI::get_front_buffer).
-    pub fn run_test(width: u16, height: u16) -> (TUI, mpsc::Receiver<Event>) {
+    pub fn run_test<S>(width: u16, height: u16, input_stream: S) -> (TUI, mpsc::Receiver<Event>)
+    where
+        S: Stream<Item = std::io::Result<term_input::Event>> + Unpin + 'static,
+    {
         let tui = Rc::new(RefCell::new(tui::TUI::new_test(width, height)));
         let inner = Rc::downgrade(&tui);
 
@@ -77,7 +82,7 @@ impl TUI {
         let (snd_abort, _rcv_abort) = mpsc::channel::<()>(1);
 
         // Spawn input handler task
-        spawn_local(input_handler(tui, snd_ev, snd_abort));
+        spawn_local(input_handler(input_stream, tui, snd_ev, snd_abort));
 
         (TUI { inner }, rcv_ev)
     }
@@ -119,13 +124,14 @@ async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receive
     }
 }
 
-async fn input_handler(
+async fn input_handler<S>(
+    mut input_stream: S,
     tui: Rc<RefCell<tui::TUI>>,
     snd_ev: mpsc::Sender<Event>,
     snd_abort: mpsc::Sender<()>,
-) {
-    let mut input = Input::new();
-
+) where
+    S: Stream<Item = std::io::Result<term_input::Event>> + Unpin,
+{
     // See module documentation of `editor` for how editor stuff works
     let mut rcv_editor_ret: Option<editor::ResultReceiver> = None;
 
@@ -153,7 +159,7 @@ async fn input_handler(
             tui.borrow_mut().draw();
         }
 
-        match input.next().await {
+        match input_stream.next().await {
             None => {
                 break;
             }

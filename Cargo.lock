@@ -1119,6 +1119,7 @@ dependencies = [
  "rustc_tools_util",
  "serde",
  "serde_yaml",
+ "term_input",
  "time",
  "tokio",
 ]
