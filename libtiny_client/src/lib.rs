@@ -95,7 +95,7 @@ pub enum Event {
     /// Client couldn't resolve host address. The client stops after sending this event.
     CantResolveAddr,
     /// Nick changed.
-    NickChange(String),
+    NickChange { new_nick: String },
     /// A message from the server
     Msg(wire::Msg),
     /// A wire-protocol error

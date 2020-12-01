@@ -488,7 +488,9 @@ impl StateInner {
             Reply { num: 001, .. } => {
                 snd_ev.try_send(Event::Connected).unwrap();
                 snd_ev
-                    .try_send(Event::NickChange(self.current_nick.clone()))
+                    .try_send(Event::NickChange {
+                        new_nick: self.current_nick.clone(),
+                    })
                     .unwrap();
                 self.nick_accepted = true;
                 if let Some(ref pwd) = self.nickserv_ident {
@@ -521,7 +523,9 @@ impl StateInner {
                     let new_nick = self.get_next_nick();
                     // debug!("new nick: {}", new_nick);
                     snd_ev
-                        .try_send(Event::NickChange(new_nick.to_owned()))
+                        .try_send(Event::NickChange {
+                            new_nick: new_nick.to_owned(),
+                        })
                         .unwrap();
                     snd_irc_msg.try_send(wire::nick(new_nick)).unwrap();
                 }
@@ -536,7 +540,9 @@ impl StateInner {
                     Some(Pfx::User { nick: old_nick, .. }) | Some(Pfx::Ambiguous(old_nick)) => {
                         if old_nick == &self.current_nick {
                             snd_ev
-                                .try_send(Event::NickChange(new_nick.to_owned()))
+                                .try_send(Event::NickChange {
+                                    new_nick: new_nick.to_owned(),
+                                })
                                 .unwrap();
 
                             match utils::find_idx(&self.nicks, |nick| nick == new_nick) {

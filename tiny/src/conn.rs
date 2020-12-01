@@ -98,7 +98,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) {
                 },
             );
         }
-        NickChange(new_nick) => {
+        NickChange { new_nick } => {
             ui.set_nick(client.get_serv_name(), &new_nick);
         }
         Msg(msg) => {
