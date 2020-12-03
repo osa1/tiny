@@ -29,7 +29,7 @@ log = "0.4"
 serde = { version = "1.0.8", features = ["derive"] }
 serde_yaml = "0.8.14"
 time = "0.1"
-tokio = { version = "0.3.4", default-features = false, features = [] }
+tokio = { version = "0.3.5", default-features = false, features = [] }
 
 [dev-dependencies]
 term_input = { path = "../term_input" }

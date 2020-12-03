@@ -60,6 +60,24 @@ jobs:
           cargo build --verbose --no-default-features \
             --features "tls-native desktop-notifications"
 
+  Linux_examples:
+    name: '[Linux] Build examples'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+
+      - name: Install cargo-build-examples
+        run: cargo install --git https://github.com/osa1/cargo-build-examples --branch main
+
+      - name: Build examples
+        run: cargo build-examples
+
   OSX_default:
     name: '[OSX, default] Build and test'
     runs-on: macos-latest
@@ -95,3 +113,21 @@ jobs:
           cd tiny
           cargo build --verbose --no-default-features \
             --features "tls-native desktop-notifications"
+
+  OSX_examples:
+    name: '[OSX] Build examples'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+
+      - name: Install cargo-build-examples
+        run: cargo install --git https://github.com/osa1/cargo-build-examples --branch main
+
+      - name: Build examples
+        run: cargo build-examples
