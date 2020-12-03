@@ -16,6 +16,7 @@ use std::task::{Context, Poll};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use tokio::io::unix::AsyncFd;
+use tokio::io::Interest;
 use tokio::stream::Stream;
 
 use term_input_macros::byte_seq_parser;
@@ -169,7 +170,7 @@ impl Input {
         Input {
             evs: VecDeque::new(),
             buf: Vec::with_capacity(100),
-            stdin: AsyncFd::new(libc::STDIN_FILENO).unwrap(),
+            stdin: AsyncFd::with_interest(libc::STDIN_FILENO, Interest::READABLE).unwrap(),
             old_stdin_flags,
         }
     }
