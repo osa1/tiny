@@ -168,7 +168,7 @@ fn run(
             let client_clone = client.clone();
 
             // Spawn a task to handle connection events
-            tokio::task::spawn_local(conn::task(rcv_conn_ev, tui_clone, client_clone));
+            tokio::task::spawn_local(conn::task(rcv_conn_ev, tui_clone, Box::new(client_clone)));
 
             clients.push(client);
         }

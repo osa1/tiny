@@ -6,23 +6,44 @@
 use futures::stream::StreamExt;
 use tokio::sync::mpsc;
 
-use libtiny_client::Client;
 use libtiny_common::ChanNameRef;
 use libtiny_ui::{MsgTarget, TabStyle, UI};
 use libtiny_wire as wire;
 
+pub(crate) trait Client {
+    fn get_serv_name(&self) -> &str;
+
+    fn get_nick(&self) -> String;
+
+    fn is_nick_accepted(&self) -> bool;
+}
+
+impl Client for libtiny_client::Client {
+    fn get_serv_name(&self) -> &str {
+        self.get_serv_name()
+    }
+
+    fn get_nick(&self) -> String {
+        self.get_nick()
+    }
+
+    fn is_nick_accepted(&self) -> bool {
+        self.is_nick_accepted()
+    }
+}
+
 pub(crate) async fn task(
     mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
     ui: Box<dyn UI>,
-    client: Client,
+    client: Box<dyn Client>,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        handle_conn_ev(&*ui, &client, ev);
+        handle_conn_ev(&*ui, &*client, ev);
         ui.draw();
     }
 }
 
-fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) {
+fn handle_conn_ev(ui: &dyn UI, client: &dyn Client, ev: libtiny_client::Event) {
     use libtiny_client::Event::*;
     match ev {
         ResolvingHost => {
@@ -123,7 +144,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &Client, ev: libtiny_client::Event) {
     }
 }
 
-fn handle_irc_msg(ui: &dyn UI, client: &Client, msg: wire::Msg) {
+fn handle_irc_msg(ui: &dyn UI, client: &dyn Client, msg: wire::Msg) {
     use wire::Cmd::*;
     use wire::Pfx::*;
 
