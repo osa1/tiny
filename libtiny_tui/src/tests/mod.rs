@@ -17,7 +17,7 @@ fn buffer_str(buf: &CellBuf, w: u16, h: u16) -> String {
 
     for y in 0..h {
         for x in 0..w {
-            let ch = buf.cells[(y * usize::from(w)) + x].ch;
+            let ch = buf.cells[(y * w) + x].ch;
             ret.push(ch);
         }
         if y != h - 1 {
