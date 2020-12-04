@@ -72,8 +72,19 @@ fn test_setup() {
             .unwrap();
 
         tokio::task::yield_now().await;
+        tokio::task::yield_now().await;
+        tokio::task::yield_now().await;
+
+        snd_input_ev
+            .send(term_input::Event::Key(term_input::Key::Ctrl('n')))
+            .await
+            .unwrap();
 
         tui.draw();
+
+        tokio::task::yield_now().await;
+        tokio::task::yield_now().await;
+        tokio::task::yield_now().await;
 
         let tui_buf = tui.get_front_buffer();
         println!("{}", buffer_str(&tui_buf, 40, 20));
