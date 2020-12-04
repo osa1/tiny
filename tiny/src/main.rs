@@ -133,8 +133,8 @@ fn run(
             });
 
         let tui: Box<dyn UI> = match logger {
-            None => Box::new(tui) as Box<dyn UI>,
-            Some(logger) => Box::new(libtiny_ui::combine(tui, logger)) as Box<dyn UI>,
+            None => Box::new(tui),
+            Some(logger) => Box::new(libtiny_ui::combine(tui, logger)),
         };
 
         let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
