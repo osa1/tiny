@@ -464,6 +464,10 @@ impl InputArea {
         self.move_cursor_to_end();
     }
 
+    pub(crate) fn set_cursor(&mut self, cursor: i32) {
+        self.cursor = std::cmp::min(std::cmp::max(0, cursor), self.current_buffer_len());
+    }
+
     fn consume_word_before_curs(&mut self) {
         // No modifications can happen if the scroll is at the beginning
         if self.cursor == 0 {

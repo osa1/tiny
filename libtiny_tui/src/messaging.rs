@@ -205,6 +205,11 @@ impl MessagingUI {
         self.input_field.set(str)
     }
 
+    /// Set cursor location in the input field.
+    pub(crate) fn set_cursor(&mut self, cursor: i32) {
+        self.input_field.set_cursor(cursor);
+    }
+
     fn toggle_exit_dialogue(&mut self) {
         let exit_dialogue = ::std::mem::replace(&mut self.exit_dialogue, None);
         if exit_dialogue.is_none() {

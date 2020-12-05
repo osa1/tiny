@@ -24,20 +24,42 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::process::Command;
 
 #[derive(Debug)]
-pub(crate) enum Error {
+pub(crate) struct Error {
+    /// Original contents of the text field passed to `editor::run`. This should be used to restore
+    /// text field contents in case of an error as otherwise the input will be lost.
+    pub(crate) text_field_contents: String,
+    /// Original location of the cursor in the text field. This should be used to restore the
+    /// cursor location on error.
+    pub(crate) cursor: i32,
+    /// The actual error
+    pub(crate) kind: ErrorKind,
+}
+
+#[derive(Debug)]
+pub(crate) enum ErrorKind {
     Io(::std::io::Error),
     Var(::std::env::VarError),
 }
 
-impl From<::std::io::Error> for Error {
-    fn from(err: ::std::io::Error) -> Error {
-        Error::Io(err)
+impl Error {
+    fn new(text_field_contents: String, cursor: i32, kind: ErrorKind) -> Error {
+        Error {
+            text_field_contents,
+            cursor,
+            kind,
+        }
     }
 }
 
-impl From<::std::env::VarError> for Error {
-    fn from(err: ::std::env::VarError) -> Error {
-        Error::Var(err)
+impl From<::std::io::Error> for ErrorKind {
+    fn from(err: ::std::io::Error) -> ErrorKind {
+        ErrorKind::Io(err)
+    }
+}
+
+impl From<::std::env::VarError> for ErrorKind {
+    fn from(err: ::std::env::VarError) -> ErrorKind {
+        ErrorKind::Var(err)
     }
 }
 
@@ -48,23 +70,47 @@ pub(crate) type ResultReceiver = oneshot::Receiver<Result<Vec<String>>>;
 /// `cursor` is the cursor location in `text_field_contents`.
 pub(crate) fn run(
     tb: &mut Termbox,
-    text_field_contents: &str,
+    text_field_contents: String,
     cursor: i32, // location of cursor in `text_field_contents`
     pasted_text: &str,
     rcv_editor_ret: &mut Option<ResultReceiver>,
 ) -> Result<()> {
-    let editor = ::std::env::var("EDITOR")?;
-    let mut tmp_file = ::tempfile::NamedTempFile::new()?;
+    let editor = match std::env::var("EDITOR") {
+        Ok(editor) => editor,
+        Err(err) => {
+            return Err(Error::new(text_field_contents, cursor, err.into()));
+        }
+    };
 
-    writeln!(
+    let mut tmp_file = match tempfile::NamedTempFile::new() {
+        Ok(tmp_file) => tmp_file,
+        Err(err) => {
+            return Err(Error::new(text_field_contents, cursor, err.into()));
+        }
+    };
+
+    // We'll be inserting the pasted text at `cursor`, find the split point (byte offset)
+    let split_byte_idx = match text_field_contents.char_indices().nth(cursor as usize) {
+        Some((byte_idx, _)) => byte_idx,
+        None => text_field_contents.len(),
+    };
+
+    let (before_paste, after_paste) = text_field_contents.split_at(split_byte_idx);
+
+    let write_ret = write!(
         tmp_file,
-        "\
-         # You pasted a multi-line message. When you close the editor final version of\n\
+        "# You pasted a multi-line message. When you close the editor final version of\n\
          # this file will be sent (ignoring these lines). Delete contents to abort the\n\
-         # paste."
-    )?;
-    write!(tmp_file, "{}", text_field_contents)?;
-    write!(tmp_file, "{}", pasted_text.replace('\r', "\n"))?;
+         # paste.\n\
+         {}{}{}",
+        before_paste,
+        pasted_text.replace('\r', "\n"),
+        after_paste,
+    );
+
+    if let Err(err) = write_ret {
+        return Err(Error::new(text_field_contents, cursor, err.into()));
+    }
 
     let (snd_editor_ret, rcv_editor_ret_) = oneshot::channel();
     *rcv_editor_ret = Some(rcv_editor_ret_);
@@ -97,7 +143,9 @@ pub(crate) fn run(
         let ret = cmd.arg(tmp_file.path()).status();
         let ret = match ret {
             Err(io_err) => {
-                snd_editor_ret.send(Err(io_err.into())).unwrap();
+                snd_editor_ret
+                    .send(Err(Error::new(text_field_contents, cursor, io_err.into())))
+                    .unwrap();
                 return;
             }
             Ok(ret) => ret,
@@ -111,13 +159,17 @@ pub(crate) fn run(
 
         let mut tmp_file = tmp_file.into_file();
         if let Err(io_err) = tmp_file.seek(SeekFrom::Start(0)) {
-            snd_editor_ret.send(Err(io_err.into())).unwrap();
+            snd_editor_ret
+                .send(Err(Error::new(text_field_contents, cursor, io_err.into())))
+                .unwrap();
             return;
         }
 
         let mut file_contents = String::new();
         if let Err(io_err) = tmp_file.read_to_string(&mut file_contents) {
-            snd_editor_ret.send(Err(io_err.into())).unwrap();
+            snd_editor_ret
+                .send(Err(Error::new(text_field_contents, cursor, io_err.into())))
+                .unwrap();
             return;
         }
 
