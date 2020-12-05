@@ -32,13 +32,13 @@ jobs:
             override: true
 
       - name: Build
-        run: cargo build --verbose
+        run: cargo build
 
       - name: Run tests
-        run: cargo test --all --verbose
+        run: cargo test --all
 
       - name: Build examples and benches
-        run: cargo build --verbose --examples --benches
+        run: cargo build --examples --benches
 
   Linux_native_tls_notif:
     name: '[Linux, native TLS + notifications] Build'
@@ -60,7 +60,7 @@ jobs:
       - name: Build with rustls and dbus
         run: |
           cd tiny
-          cargo build --verbose --no-default-features \
+          cargo build --no-default-features \
             --features "tls-native desktop-notifications"
 
   OSX_default:
@@ -76,13 +76,13 @@ jobs:
             override: true
 
       - name: Build tiny
-        run: cargo build --verbose
+        run: cargo build
 
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test
 
       - name: Build examples and benches
-        run: cargo build --verbose --examples --benches
+        run: cargo build --examples --benches
 
   OSX_native_tls_notif:
     name: '[OSX, native TLS + notifications] Build'
@@ -99,5 +99,5 @@ jobs:
       - name: Build
         run: |
           cd tiny
-          cargo build --verbose --no-default-features \
+          cargo build --no-default-features \
             --features "tls-native desktop-notifications"
