@@ -89,14 +89,23 @@ pub(crate) fn run(
         }
     };
 
+    // We'll be inserting the pasted text at `cursor`, find the split point (byte offset)
+    let split_byte_idx = match text_field_contents.char_indices().nth(cursor as usize) {
+        Some((byte_idx, _)) => byte_idx,
+        None => text_field_contents.len(),
+    };
+
+    let (before_paste, after_paste) = text_field_contents.split_at(split_byte_idx);
+
     let write_ret = write!(
         tmp_file,
         "# You pasted a multi-line message. When you close the editor final version of\n\
          # this file will be sent (ignoring these lines). Delete contents to abort the\n\
          # paste.\n\
-         {}{}",
-        text_field_contents,
+         {}{}{}",
+        before_paste,
         pasted_text.replace('\r', "\n"),
+        after_paste,
     );
 
     if let Err(err) = write_ret {
