@@ -32,10 +32,13 @@ jobs:
             override: true
 
       - name: Build
-        run: cargo build --verbose
+        run: cargo build
 
       - name: Run tests
-        run: cargo test --all --verbose
+        run: cargo test --all
+
+      - name: Build examples and benches
+        run: cargo build --examples --benches
 
   Linux_native_tls_notif:
     name: '[Linux, native TLS + notifications] Build'
@@ -57,26 +60,8 @@ jobs:
       - name: Build with rustls and dbus
         run: |
           cd tiny
-          cargo build --verbose --no-default-features \
+          cargo build --no-default-features \
             --features "tls-native desktop-notifications"
-
-  Linux_examples:
-    name: '[Linux] Build examples'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
-
-      - name: Install cargo-build-examples
-        run: cargo install --git https://github.com/osa1/cargo-build-examples --branch main
-
-      - name: Build examples
-        run: cargo build-examples
 
   OSX_default:
     name: '[OSX, default] Build and test'
@@ -90,11 +75,14 @@ jobs:
             toolchain: stable
             override: true
 
-      - name: Build
-        run: cargo build --verbose
+      - name: Build tiny
+        run: cargo build
 
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test
+
+      - name: Build examples and benches
+        run: cargo build --examples --benches
 
   OSX_native_tls_notif:
     name: '[OSX, native TLS + notifications] Build'
@@ -111,23 +99,5 @@ jobs:
       - name: Build
         run: |
           cd tiny
-          cargo build --verbose --no-default-features \
+          cargo build --no-default-features \
             --features "tls-native desktop-notifications"
-
-  OSX_examples:
-    name: '[OSX] Build examples'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
-
-      - name: Install cargo-build-examples
-        run: cargo install --git https://github.com/osa1/cargo-build-examples --branch main
-
-      - name: Build examples
-        run: cargo build-examples
