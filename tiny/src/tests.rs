@@ -1,18 +1,23 @@
 use crate::conn;
-use libtiny_client::Event;
-use libtiny_tui::tui::CellBuf;
+use libtiny_tui::test_utils::{buffer_str, expect_screen};
 use libtiny_tui::{TUI, UI};
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 use term_input;
 
+use libtiny_client as client;
+use term_input as input;
+
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
+
+use std::future::Future;
+use std::panic::Location;
 
 struct TestClient;
 
 impl conn::Client for TestClient {
     fn get_serv_name(&self) -> &str {
-        "chat.myserver.net"
+        SERV_NAME
     }
 
     fn get_nick(&self) -> String {
@@ -24,8 +29,24 @@ impl conn::Client for TestClient {
     }
 }
 
-#[test]
-fn test_setup() {
+static SERV_NAME: &str = "x.y.z";
+const DEFAULT_TUI_WIDTH: u16 = 40;
+const DEFAULT_TUI_HEIGHT: u16 = 5;
+
+struct TestSetup {
+    /// TUI test instance
+    tui: Box<TUI>,
+    /// Send input events to the TUI using this channel
+    snd_input_ev: mpsc::Sender<input::Event>,
+    /// Send connection events to connection handler (`conn::task`) using this channel
+    snd_conn_ev: mpsc::Sender<client::Event>,
+}
+
+fn run_test<F, Fut>(test: F)
+where
+    F: Fn(TestSetup) -> Fut,
+    Fut: Future<Output = ()>,
+{
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -35,78 +56,138 @@ fn test_setup() {
     local.block_on(&runtime, async move {
         // Create test TUI
         let (snd_input_ev, rcv_input_ev) = mpsc::channel::<term_input::Event>(100);
-        let (tui, _rcv_tui_ev) = TUI::run_test(40, 20, rcv_input_ev.map(|ev| Ok(ev)));
+        let (tui, _rcv_tui_ev) = TUI::run_test(
+            DEFAULT_TUI_WIDTH,
+            DEFAULT_TUI_HEIGHT,
+            rcv_input_ev.map(|ev| Ok(ev)),
+        );
 
         let tui = Box::new(tui);
 
         // Create test connection event channel
-        let (snd_conn_ev, rcv_conn_ev) = mpsc::channel::<Event>(100);
+        let (snd_conn_ev, rcv_conn_ev) = mpsc::channel::<client::Event>(100);
 
         // Spawn connection event handler task
         tokio::task::spawn_local(conn::task(rcv_conn_ev, tui.clone(), Box::new(TestClient)));
 
-        tui.new_server_tab("chat.myserver.net", None);
+        tui.new_server_tab(SERV_NAME, None);
         tui.draw();
 
-        snd_input_ev
-            .send(term_input::Event::Key(term_input::Key::Ctrl('n')))
-            .await
-            .unwrap();
-
-        snd_conn_ev.send(Event::Connected).await.unwrap();
-
-        snd_conn_ev
-            .send(Event::Msg(Msg {
-                pfx: Some(Pfx::User {
-                    nick: "e".to_owned(),
-                    user: "e@a/b/c.d".to_owned(),
-                }),
-                cmd: Cmd::PRIVMSG {
-                    target: MsgTarget::User("$$*".to_owned()),
-                    msg: "blah blah blah".to_owned(),
-                    is_notice: true,
-                    ctcp: None,
-                },
-            }))
-            .await
-            .unwrap();
-
-        tokio::task::yield_now().await;
-        tokio::task::yield_now().await;
-        tokio::task::yield_now().await;
-
-        snd_input_ev
-            .send(term_input::Event::Key(term_input::Key::Ctrl('n')))
-            .await
-            .unwrap();
-
-        tui.draw();
-
-        tokio::task::yield_now().await;
-        tokio::task::yield_now().await;
-        tokio::task::yield_now().await;
-
-        let tui_buf = tui.get_front_buffer();
-        println!("{}", buffer_str(&tui_buf, 40, 20));
+        test(TestSetup {
+            tui,
+            snd_input_ev,
+            snd_conn_ev,
+        })
+        .await;
     });
 }
 
-// TODO: Copied from TUI tests
-fn buffer_str(buf: &CellBuf, w: u16, h: u16) -> String {
-    let w = usize::from(w);
-    let h = usize::from(h);
+#[test]
+fn test_bouncer_relay_issue_271() {
+    run_test(
+        |TestSetup {
+             tui,
+             snd_input_ev,
+             snd_conn_ev,
+         }| async move {
+            snd_conn_ev.send(client::Event::Connected).await.unwrap();
 
-    let mut ret = String::with_capacity(w * h);
+            let msg = Msg {
+                pfx: Some(Pfx::User {
+                    nick: "osa1-soju".to_owned(),
+                    user: "osa1-soju@127.0.0.1".to_owned(),
+                }),
+                cmd: Cmd::PRIVMSG {
+                    target: MsgTarget::User("osa1/oftc".to_owned()),
+                    msg: "blah blah".to_owned(),
+                    is_notice: false,
+                    ctcp: None,
+                },
+            };
 
-    for y in 0..h {
-        for x in 0..w {
-            let ch = buf.cells[(y * usize::from(w)) + x].ch;
-            ret.push(ch);
-        }
-        if y != h - 1 {
-            ret.push('\n');
-        }
+            snd_conn_ev.send(client::Event::Msg(msg)).await.unwrap();
+
+            yield_(5).await;
+            tui.draw();
+
+            next_tab(&snd_input_ev).await; // server tab
+            next_tab(&snd_input_ev).await; // privmsg tab
+            yield_(5).await;
+
+            tui.draw();
+
+            #[rustfmt::skip]
+            let screen =
+            "|                                        |
+             |                                        |
+             |00:00 osa1: blah blah                   |
+             |                                        |
+             |mentions x.y.z osa1/oftc                |";
+
+            expect_screen(
+                screen,
+                &tui.get_front_buffer(),
+                DEFAULT_TUI_WIDTH,
+                DEFAULT_TUI_HEIGHT,
+                Location::caller(),
+            );
+        },
+    );
+}
+
+#[test]
+fn test_privmsg_targetmask_issue_278() {
+    run_test(
+        |TestSetup {
+             tui,
+             snd_input_ev,
+             snd_conn_ev,
+         }| async move {
+            next_tab(&snd_input_ev).await;
+            snd_conn_ev.send(client::Event::Connected).await.unwrap();
+
+            snd_conn_ev
+                .send(client::Event::Msg(Msg {
+                    pfx: Some(Pfx::User {
+                        nick: "e".to_owned(),
+                        user: "e@a/b/c.d".to_owned(),
+                    }),
+                    cmd: Cmd::PRIVMSG {
+                        target: MsgTarget::User("$$*".to_owned()),
+                        msg: "blah blah blah".to_owned(),
+                        is_notice: true,
+                        ctcp: None,
+                    },
+                }))
+                .await
+                .unwrap();
+
+            yield_(3).await;
+
+            next_tab(&snd_input_ev).await;
+
+            tui.draw();
+
+            yield_(3).await;
+
+            let tui_buf = tui.get_front_buffer();
+            println!(
+                "{}",
+                buffer_str(&tui_buf, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT)
+            );
+        },
+    );
+}
+
+async fn next_tab(snd_input_ev: &mpsc::Sender<input::Event>) {
+    snd_input_ev
+        .send(term_input::Event::Key(term_input::Key::Ctrl('n')))
+        .await
+        .unwrap();
+}
+
+async fn yield_(n: usize) {
+    for _ in 0..n {
+        tokio::task::yield_now().await;
     }
-
-    ret
 }

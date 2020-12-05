@@ -108,7 +108,7 @@ impl TUI {
 
     /// Create a test instance. Does not render to the screen, just updates the termbox buffer.
     /// Useful for testing rendering. See also [`get_front_buffer`](TUI::get_front_buffer).
-    pub(crate) fn new_test(w: u16, h: u16) -> TUI {
+    pub fn new_test(w: u16, h: u16) -> TUI {
         let tb = Termbox::init_test(w, h);
         TUI::new_tb(None, tb)
     }

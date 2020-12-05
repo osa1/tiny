@@ -13,6 +13,7 @@ mod notifier;
 mod statusline;
 mod tab;
 mod termbox;
+pub mod test_utils;
 #[doc(hidden)]
 pub mod trie; // Public for benchmarks
 pub mod tui; // Public for benchmarks
