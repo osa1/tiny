@@ -554,7 +554,7 @@ impl TUI {
     fn run_editor(&mut self, str: &str, rcv_editor_ret: &mut Option<editor::ResultReceiver>) {
         let tab = &mut self.tabs[self.active_idx].widget;
         let (msg, cursor) = tab.flush_input_field();
-        match editor::run(&mut self.tb, &msg, cursor, str, rcv_editor_ret) {
+        match editor::run(&mut self.tb, msg, cursor, str, rcv_editor_ret) {
             Ok(()) => {}
             Err(err) => self.handle_editor_err(err),
         }
@@ -562,21 +562,28 @@ impl TUI {
 
     fn handle_editor_err(&mut self, err: editor::Error) {
         use std::env::VarError;
-        match err {
-            editor::Error::Io(err) => {
+
+        let editor::Error {
+            text_field_contents,
+            cursor,
+            kind,
+        } = err;
+
+        match kind {
+            editor::ErrorKind::Io(err) => {
                 self.add_client_err_msg(
                     &format!("Error while running $EDITOR: {:?}", err),
                     &MsgTarget::CurrentTab,
                 );
             }
-            editor::Error::Var(VarError::NotPresent) => {
+            editor::ErrorKind::Var(VarError::NotPresent) => {
                 self.add_client_err_msg(
                     "Can't paste multi-line string: \
                              make sure your $EDITOR is set",
                     &MsgTarget::CurrentTab,
                 );
             }
-            editor::Error::Var(VarError::NotUnicode(_)) => {
+            editor::ErrorKind::Var(VarError::NotUnicode(_)) => {
                 self.add_client_err_msg(
                     "Can't paste multi-line string: \
                              can't parse $EDITOR (not unicode)",
@@ -584,6 +591,11 @@ impl TUI {
                 );
             }
         }
+
+        // Restore text field contents
+        let tab = &mut self.tabs[self.active_idx].widget;
+        tab.set_input_field(&text_field_contents);
+        tab.set_cursor(cursor);
     }
 
     fn keypressed(

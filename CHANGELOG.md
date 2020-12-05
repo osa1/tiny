@@ -10,6 +10,8 @@
   desktop notification support is enabled but notifications would not work.
   (#270)
 - Fixed a bug when showing messages relayed by bouncers. (#271)
+- Fixed losing input field contents when pasting a multi-line text and `$EDITOR`
+  is not set. (#280)
 
 # 2020/09/20: 0.7.0
 
