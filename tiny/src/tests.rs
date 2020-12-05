@@ -3,6 +3,7 @@ use libtiny_tui::test_utils::{buffer_str, expect_screen};
 use libtiny_tui::{TUI, UI};
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 use term_input;
+use termbox_simple::CellBuf;
 
 use libtiny_client as client;
 use term_input as input;
@@ -124,9 +125,11 @@ fn test_bouncer_relay_issue_271() {
              |                                        |
              |mentions x.y.z osa1/oftc                |";
 
+            let mut front_buffer = tui.get_front_buffer();
+            normalize_timestamps(&mut front_buffer, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
             expect_screen(
                 screen,
-                &tui.get_front_buffer(),
+                &front_buffer,
                 DEFAULT_TUI_WIDTH,
                 DEFAULT_TUI_HEIGHT,
                 Location::caller(),
@@ -189,5 +192,25 @@ async fn next_tab(snd_input_ev: &mpsc::Sender<input::Event>) {
 async fn yield_(n: usize) {
     for _ in 0..n {
         tokio::task::yield_now().await;
+    }
+}
+
+/// Makes all timestamps 00:00
+fn normalize_timestamps(cells: &mut CellBuf, w: u16, h: u16) {
+    let cells = &mut cells.cells;
+    for y in 0..h {
+        let x = (w * y) as usize;
+        if cells[x].ch.is_ascii_digit()
+            && cells[x + 1].ch.is_ascii_digit()
+            && cells[x + 2].ch == ':'
+            && cells[x + 3].ch.is_ascii_digit()
+            && cells[x + 4].ch.is_ascii_digit()
+        {
+            cells[x].ch = '0';
+            cells[x + 1].ch = '0';
+            cells[x + 2].ch = ':';
+            cells[x + 3].ch = '0';
+            cells[x + 4].ch = '0';
+        }
     }
 }
