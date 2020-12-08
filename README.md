@@ -1,4 +1,4 @@
-# tiny - Yet another console IRC client
+# tiny - Yet another terminal IRC client
 
 tiny is an IRC client written in Rust.
 
@@ -47,6 +47,9 @@ tiny is an IRC client written in Rust.
 - TLS support
 
 ## Installation
+
+tiny works on Linux and OSX. Windows users can run it under Windows Subsystem
+for Linux.
 
 For pre-built binaries see [releases]. To build from source make sure you have
 Rust 1.47.0 or newer. By default tiny uses [rustls] for TLS support, and desktop
@@ -207,9 +210,7 @@ the server tab will send the message directly to the server.
 - `RULES` will display server rules
 - etc...
 
-## Contributing
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+## Community
 
 Join us at #tiny in [irc.oftc.net][oftc] to chat about anything related to tiny!
 
