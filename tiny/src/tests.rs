@@ -1,5 +1,5 @@
 use crate::conn;
-use libtiny_tui::test_utils::{buffer_str, expect_screen};
+use libtiny_tui::test_utils::expect_screen;
 use libtiny_tui::{TUI, UI};
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 use term_input;
@@ -14,7 +14,9 @@ use tokio::sync::mpsc;
 use std::future::Future;
 use std::panic::Location;
 
-struct TestClient;
+struct TestClient {
+    nick: String,
+}
 
 impl conn::Client for TestClient {
     fn get_serv_name(&self) -> &str {
@@ -22,7 +24,7 @@ impl conn::Client for TestClient {
     }
 
     fn get_nick(&self) -> String {
-        "osa1".to_owned()
+        self.nick.clone()
     }
 
     fn is_nick_accepted(&self) -> bool {
@@ -43,7 +45,7 @@ struct TestSetup {
     snd_conn_ev: mpsc::Sender<client::Event>,
 }
 
-fn run_test<F, Fut>(test: F)
+fn run_test<F, Fut>(nick: String, test: F)
 where
     F: Fn(TestSetup) -> Fut,
     Fut: Future<Output = ()>,
@@ -69,7 +71,11 @@ where
         let (snd_conn_ev, rcv_conn_ev) = mpsc::channel::<client::Event>(100);
 
         // Spawn connection event handler task
-        tokio::task::spawn_local(conn::task(rcv_conn_ev, tui.clone(), Box::new(TestClient)));
+        tokio::task::spawn_local(conn::task(
+            rcv_conn_ev,
+            tui.clone(),
+            Box::new(TestClient { nick }),
+        ));
 
         tui.new_server_tab(SERV_NAME, None);
         tui.draw();
@@ -86,6 +92,7 @@ where
 #[test]
 fn test_bouncer_relay_issue_271() {
     run_test(
+        "osa1-soju".to_owned(),
         |TestSetup {
              tui,
              snd_input_ev,
@@ -121,7 +128,7 @@ fn test_bouncer_relay_issue_271() {
             let screen =
             "|                                        |
              |                                        |
-             |00:00 osa1: blah blah                   |
+             |00:00 osa1-soju: blah blah              |
              |                                        |
              |mentions x.y.z osa1/oftc                |";
 
@@ -141,6 +148,7 @@ fn test_bouncer_relay_issue_271() {
 #[test]
 fn test_privmsg_targetmask_issue_278() {
     run_test(
+        "osa1".to_owned(),
         |TestSetup {
              tui,
              snd_input_ev,
@@ -173,10 +181,22 @@ fn test_privmsg_targetmask_issue_278() {
 
             yield_(3).await;
 
-            let tui_buf = tui.get_front_buffer();
-            println!(
-                "{}",
-                buffer_str(&tui_buf, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT)
+            #[rustfmt::skip]
+            let screen =
+            "|                                        |
+             |                                        |
+             |00:00 e: blah blah blah                 |
+             |                                        |
+             |mentions x.y.z e                        |";
+
+            let mut front_buffer = tui.get_front_buffer();
+            normalize_timestamps(&mut front_buffer, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
+            expect_screen(
+                screen,
+                &front_buffer,
+                DEFAULT_TUI_WIDTH,
+                DEFAULT_TUI_HEIGHT,
+                Location::caller(),
             );
         },
     );
