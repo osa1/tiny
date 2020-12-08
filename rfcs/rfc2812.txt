@@ -458,8 +458,8 @@ RFC 2812          Internet Relay Chat: Client Protocol        April 2000
    The Augmented BNF syntax for this is:
 
     mask       =  *( nowild / noesc wildone / noesc wildmany )
-    wildone    =  %x3F
-    wildmany   =  %x2A
+    wildone    =  %x3F ; (osa): "?"
+    wildmany   =  %x2A ; (osa): "*"
     nowild     =  %x01-29 / %x2B-3E / %x40-FF
                     ; any octet except NUL, "*", "?"
     noesc      =  %x01-5B / %x5D-FF
