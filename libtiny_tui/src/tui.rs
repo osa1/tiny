@@ -19,7 +19,7 @@ use crate::{MsgSource, MsgTarget};
 
 use libtiny_common::ChanNameRef;
 use term_input::{Arrow, Event, Key};
-use termbox_simple::Termbox;
+pub use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
@@ -106,14 +106,16 @@ impl TUI {
         TUI::new_tb(Some(config_path), tb)
     }
 
+    /// Create a test instance. Does not render to the screen, just updates the termbox buffer.
+    /// Useful for testing rendering. See also [`get_front_buffer`](TUI::get_front_buffer).
     pub fn new_test(w: u16, h: u16) -> TUI {
         let tb = Termbox::init_test(w, h);
         TUI::new_tb(None, tb)
     }
 
-    #[cfg(test)]
-    pub(crate) fn get_tb(&self) -> &Termbox {
-        &self.tb
+    /// Get termbox front buffer. Useful for testing rendering.
+    pub(crate) fn get_front_buffer(&self) -> CellBuf {
+        self.tb.get_front_buffer()
     }
 
     pub(crate) fn activate(&mut self) {

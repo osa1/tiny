@@ -8,6 +8,9 @@ mod debug_logging;
 mod ui;
 mod utils;
 
+#[cfg(test)]
+mod tests;
+
 use libtiny_client::{Client, ServerInfo};
 use libtiny_common::ChanNameRef;
 use libtiny_logger::{Logger, LoggerInitError};
@@ -165,7 +168,7 @@ fn run(
             let client_clone = client.clone();
 
             // Spawn a task to handle connection events
-            tokio::task::spawn_local(conn::task(rcv_conn_ev, tui_clone, client_clone));
+            tokio::task::spawn_local(conn::task(rcv_conn_ev, tui_clone, Box::new(client_clone)));
 
             clients.push(client);
         }

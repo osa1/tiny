@@ -275,7 +275,7 @@ fn connect_(
     // Spawn UI task
     let ui_clone = libtiny_ui::clone_box(&**ui);
     let client_clone = client.clone();
-    tokio::task::spawn_local(crate::conn::task(rcv_ev, ui_clone, client_clone));
+    tokio::task::spawn_local(crate::conn::task(rcv_ev, ui_clone, Box::new(client_clone)));
 
     clients.push(client);
 }

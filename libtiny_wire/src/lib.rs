@@ -1,6 +1,9 @@
 #![allow(clippy::write_with_newline)]
 
 //! IRC wire protocol message parsers and generators. Incomplete; new messages are added as needed.
+//!
+//! This library is for implementing clients rather than servers or services, and does not support
+//! the IRC message format in full generality.
 
 use std::str;
 
@@ -165,6 +168,12 @@ fn parse_pfx(pfx: &str) -> Pfx {
 }
 
 /// Target of a message
+///
+/// Masks are not parsed, as rules for masks are not clear in RFC 2818 (for example, `#x.y` can be
+/// a channel name or a host mask, there is no way to disambiguate), and in practice servers use
+/// masks that are not valid according to the RFC (for example, I've observed Freenode sending
+/// PRIVMSGs to `$$*`). The rules we follow is: if a target starts with `#` it's a `Chan`,
+/// otherwise it's a `User`.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MsgTarget {
     Chan(ChanName),
