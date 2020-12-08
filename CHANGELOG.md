@@ -14,6 +14,7 @@
   is not set. (#280)
 - Multi-line pastes now inserted into the cursor location. Previously the text
   would be inserted at the end of the current line.
+- Fixed a bug when showing messages with host mask as message target. (#278)
 
 # 2020/09/20: 0.7.0
 
