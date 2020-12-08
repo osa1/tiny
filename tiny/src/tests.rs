@@ -99,6 +99,12 @@ fn test_bouncer_relay_issue_271() {
              snd_conn_ev,
          }| async move {
             snd_conn_ev.send(client::Event::Connected).await.unwrap();
+            snd_conn_ev
+                .send(client::Event::NickChange {
+                    new_nick: "osa1-soju".to_owned(),
+                })
+                .await
+                .unwrap();
 
             let msg = Msg {
                 pfx: Some(Pfx::User {
@@ -129,7 +135,7 @@ fn test_bouncer_relay_issue_271() {
             "|                                        |
              |                                        |
              |00:00 osa1-soju: blah blah              |
-             |                                        |
+             |osa1-soju:                              |
              |mentions x.y.z osa1/oftc                |";
 
             let mut front_buffer = tui.get_front_buffer();
@@ -156,6 +162,12 @@ fn test_privmsg_targetmask_issue_278() {
          }| async move {
             next_tab(&snd_input_ev).await;
             snd_conn_ev.send(client::Event::Connected).await.unwrap();
+            snd_conn_ev
+                .send(client::Event::NickChange {
+                    new_nick: "osa1".to_owned(),
+                })
+                .await
+                .unwrap();
 
             snd_conn_ev
                 .send(client::Event::Msg(Msg {
@@ -186,7 +198,7 @@ fn test_privmsg_targetmask_issue_278() {
             "|                                        |
              |                                        |
              |00:00 e: blah blah blah                 |
-             |                                        |
+             |osa1:                                   |
              |mentions x.y.z e                        |";
 
             let mut front_buffer = tui.get_front_buffer();
