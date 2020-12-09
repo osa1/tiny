@@ -1,4 +1,5 @@
 use crate::conn;
+use libtiny_common::ChanName;
 use libtiny_tui::test_utils::expect_screen;
 use libtiny_tui::{TUI, UI};
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
@@ -90,6 +91,116 @@ where
 }
 
 #[test]
+fn test_privmsg_from_user_without_user_or_host_part_issue_247() {
+    run_test(
+        "osa1".to_owned(),
+        |TestSetup {
+             tui,
+             snd_input_ev,
+             snd_conn_ev,
+         }| async move {
+            snd_conn_ev.send(client::Event::Connected).await.unwrap();
+            snd_conn_ev
+                .send(client::Event::NickChange {
+                    new_nick: "osa1".to_owned(),
+                })
+                .await
+                .unwrap();
+            yield_(5).await;
+
+            // Join a channel to test msg sent to channel
+            let join = Msg {
+                pfx: Some(Pfx::User {
+                    nick: "osa1".to_owned(),
+                    user: "a@b".to_owned(),
+                }),
+                cmd: Cmd::JOIN {
+                    chan: ChanName::new("#chan".to_owned()),
+                },
+            };
+            snd_conn_ev.send(client::Event::Msg(join)).await.unwrap();
+            yield_(5).await;
+
+            // Send a PRIVMSG to the channel
+            let chan_msg = Msg {
+                pfx: Some(Pfx::Ambiguous("blah".to_owned())),
+                cmd: Cmd::PRIVMSG {
+                    target: MsgTarget::Chan(ChanName::new("#chan".to_owned())),
+                    msg: "msg to chan".to_owned(),
+                    is_notice: false,
+                    ctcp: None,
+                },
+            };
+            snd_conn_ev
+                .send(client::Event::Msg(chan_msg))
+                .await
+                .unwrap();
+            yield_(5).await;
+
+            // Send a PRIVMSG to current nick
+            let msg = Msg {
+                pfx: Some(Pfx::Ambiguous("blah".to_owned())),
+                cmd: Cmd::PRIVMSG {
+                    target: MsgTarget::User("osa1".to_owned()),
+                    msg: "msg to user".to_owned(),
+                    is_notice: false,
+                    ctcp: None,
+                },
+            };
+            snd_conn_ev.send(client::Event::Msg(msg)).await.unwrap();
+            yield_(5).await;
+
+            // Check channel tab
+            next_tab(&snd_input_ev).await; // server tab
+            next_tab(&snd_input_ev).await; // channel tab
+            yield_(5).await;
+            tui.draw();
+
+            #[rustfmt::skip]
+            let screen =
+            "|                                        |
+             |                                        |
+             |00:00 blah: msg to chan                 |
+             |osa1:                                   |
+             |mentions x.y.z #chan blah               |";
+
+            let mut front_buffer = tui.get_front_buffer();
+            normalize_timestamps(&mut front_buffer, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
+            expect_screen(
+                screen,
+                &front_buffer,
+                DEFAULT_TUI_WIDTH,
+                DEFAULT_TUI_HEIGHT,
+                Location::caller(),
+            );
+
+            // Check privmsg tab
+            next_tab(&snd_input_ev).await; // privmsg tab
+            yield_(5).await;
+            tui.draw();
+
+            #[rustfmt::skip]
+            let screen =
+            "|                                        |
+             |                                        |
+             |00:00 blah: msg to user                 |
+             |osa1:                                   |
+             |mentions x.y.z #chan blah               |";
+
+            let mut front_buffer = tui.get_front_buffer();
+            normalize_timestamps(&mut front_buffer, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
+            expect_screen(
+                screen,
+                &front_buffer,
+                DEFAULT_TUI_WIDTH,
+                DEFAULT_TUI_HEIGHT,
+                Location::caller(),
+            );
+        },
+    )
+}
+
+#[test]
 fn test_bouncer_relay_issue_271() {
     run_test(
         "osa1-soju".to_owned(),
@@ -148,7 +259,7 @@ fn test_bouncer_relay_issue_271() {
                 Location::caller(),
             );
         },
-    );
+    )
 }
 
 #[test]
@@ -211,7 +322,7 @@ fn test_privmsg_targetmask_issue_278() {
                 Location::caller(),
             );
         },
-    );
+    )
 }
 
 async fn next_tab(snd_input_ev: &mpsc::Sender<input::Event>) {
