@@ -1,9 +1,16 @@
-# Unreleased
+# 2020/12/10: 0.8.0
 
-- It's now possible to build tiny with stable Rust 1.47.0 or newer. Previously
-  tiny required nightly toolchain. (#241)
+Thanks to @trevarj and @shumvgolove for contributing to this release.
+
+## New features
+
 - Channels with join/leave events are now highlighted with a yellow-ish color.
   Default color can be overridden in the config file. (#262)
+
+## Bug fixes and other improvements
+
+- It's now possible to build tiny with stable Rust 1.48 or newer. Previously
+  tiny required nightly toolchain. (#241)
 - Fixed a TUI bug when `scrollback` is set. (#265)
 - In builds without desktop notification support, `/notify` commands now print a
   helpful message on how to enable it. Previously `/notify` would behave as if

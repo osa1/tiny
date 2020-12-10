@@ -52,7 +52,7 @@ tiny works on Linux and OSX. Windows users can run it under Windows Subsystem
 for Linux.
 
 For pre-built binaries see [releases]. To build from source make sure you have
-Rust 1.47.0 or newer. By default tiny uses [rustls] for TLS support, and desktop
+Rust 1.48 or newer. By default tiny uses [rustls] for TLS support, and desktop
 notifications are disabled.
 
 [releases]: https://github.com/osa1/tiny/releases
