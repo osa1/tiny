@@ -1,7 +1,7 @@
 use crate::tui::TUI;
 
 use crate::test_utils::expect_screen;
-use libtiny_common::{ChanNameRef, MsgTarget};
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
 use term_input::{Event, Key};
 
 use std::fs::File;
@@ -378,6 +378,110 @@ fn test_text_field_wrap() {
 
     // TODO: Test changing nick (osa: I don't understand how nick length is taken into account when
     // falling back to scrolling)
+}
+
+/// Tests tab panel
+#[test]
+fn test_tab_panel() {
+    // Setup
+    let mut tui = TUI::new_test(40, 6);
+    let server = "chat.freenode.net";
+    tui.new_server_tab(server, None);
+    tui.set_nick(server, "x");
+
+    // switch to tab panel (tab line is default)
+    tui.try_handle_cmd(
+        "tabui",
+        &MsgSource::Serv {
+            serv: server.to_string(),
+        },
+    );
+
+    let chan_names = [
+        "#chan1", "#chan2", "#chan3", "#chan4", "#chan5", "#chan6", "#chan7",
+    ];
+    for name in chan_names.iter() {
+        tui.new_chan_tab(server, ChanNameRef::new(name));
+    }
+    tui.set_nick(server, "x");
+    // Triggers resize
+    tui.set_size(40, 6);
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+    "|mentions  │                             | 
+     |chat.free…│                             | 
+     | #chan1   │                             | 
+     | #chan2   │Any mentions to you will be  | 
+     | #chan3   │listed here.                 | 
+     | #chan4   ↓                             |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 6, Location::caller());
+
+    // Change tabs
+    let event = term_input::Event::Key(Key::AltChar('3'));
+    tui.handle_input_event(event, &mut None);
+
+    let target = MsgTarget::CurrentTab;
+    let ts = time::empty_tm();
+    tui.add_msg("#chan1 tab", ts, &target);
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+    "|mentions  │                             | 
+     |chat.free…│                             | 
+     | #chan1   │                             | 
+     | #chan2   │                             | 
+     | #chan3   │00:00 #chan1 tab             | 
+     | #chan4   ↓x:                           |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 6, Location::caller());
+
+    // Change to off screen tab
+    let event = term_input::Event::Key(Key::AltChar('9'));
+    tui.handle_input_event(event, &mut None);
+
+    let target = MsgTarget::CurrentTab;
+    let ts = time::empty_tm();
+    tui.add_msg("#chan7 tab", ts, &target);
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+    "| #chan5   ↑                             | 
+     | #chan6   │                             | 
+     | #chan7   │                             | 
+     |          │                             | 
+     |          │00:00 #chan7 tab             | 
+     |          │x:                           |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 6, Location::caller());
+
+    // Hop around channels to test panel paging
+    let event = term_input::Event::Key(Key::AltChar('3'));
+    tui.handle_input_event(event, &mut None);
+    let event = term_input::Event::Key(Key::AltChar('7'));
+    tui.handle_input_event(event, &mut None);
+    let event = term_input::Event::Key(Key::AltChar('1'));
+    tui.handle_input_event(event, &mut None);
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+    "|mentions  │                             | 
+     |chat.free…│                             | 
+     | #chan1   │                             | 
+     | #chan2   │Any mentions to you will be  | 
+     | #chan3   │listed here.                 | 
+     | #chan4   ↓                             |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 6, Location::caller());
 }
 
 #[test]

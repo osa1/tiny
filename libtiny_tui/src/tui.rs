@@ -8,12 +8,13 @@ use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
 
-use crate::config::{parse_config, Colors, Config, Style};
+use crate::config::{parse_config, Colors, Config, TabUiType};
 use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
 use crate::statusline::{draw_statusline, statusline_visible};
 use crate::tab::Tab;
+use crate::tab_area::TabArea;
 use crate::widget::WidgetRet;
 
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
@@ -35,9 +36,6 @@ pub(crate) enum TUIRet {
         from: MsgSource,
     },
 }
-
-const LEFT_ARROW: char = '<';
-const RIGHT_ARROW: char = '>';
 
 struct CmdUsage {
     name: &'static str,
@@ -65,14 +63,16 @@ const NOTIFY_CMD: CmdUsage = CmdUsage::new(
 const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
 const STATUSLINE_CMD: CmdUsage = CmdUsage::new("statusline", "Toggles statusline", "/statusline");
 const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
+const TAB_UI_CMD: CmdUsage = CmdUsage::new("tabui", "Toggle the tab ui style", "/tabui");
 
-const TUI_COMMANDS: [CmdUsage; 6] = [
+const TUI_COMMANDS: [CmdUsage; 7] = [
     CLEAR_CMD,
     IGNORE_CMD,
     NOTIFY_CMD,
     SWITCH_CMD,
     STATUSLINE_CMD,
     RELOAD_CMD,
+    TAB_UI_CMD,
 ];
 
 pub struct TUI {
@@ -86,10 +86,9 @@ pub struct TUI {
     scrollback: usize,
 
     tabs: Vec<Tab>,
-    active_idx: usize,
+    tab_area: TabArea,
     width: i32,
     height: i32,
-    h_scroll: i32,
 
     /// Do we want to show statusline?
     show_statusline: bool,
@@ -133,10 +132,9 @@ impl TUI {
             colors: Colors::default(),
             scrollback: usize::MAX,
             tabs: Vec::new(),
-            active_idx: 0,
+            tab_area: TabArea::new(width),
             width,
             height,
-            h_scroll: 0,
             show_statusline: false,
             statusline_visible: statusline_visible(width, height),
             config_path,
@@ -248,7 +246,7 @@ impl TUI {
             }
             Some("switch") => {
                 match words.next() {
-                    Some(s) => self.switch(s),
+                    Some(s) => self.tab_area.switch(s, &self.tabs),
                     None => self.add_client_err_msg(SWITCH_CMD.usage, &MsgTarget::CurrentTab),
                 }
                 true
@@ -259,6 +257,10 @@ impl TUI {
             }
             Some("reload") => {
                 self.reload_config();
+                true
+            }
+            Some("tabui") => {
+                self.toggle_tab_ui();
                 true
             }
             Some("help") => {
@@ -288,12 +290,38 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                Ok(Config { colors, scrollback }) => {
+                Ok(Config {
+                    colors,
+                    scrollback,
+                    tab_ui,
+                }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
+
+                    if let Some(tab_ui) = tab_ui {
+                        self.tab_area = match (self.tab_area, tab_ui) {
+                            (TabArea::TabLine(line), TabUiType::Panel) => {
+                                TabArea::TabPanel(line.into())
+                            }
+                            (TabArea::TabPanel(panel), TabUiType::Line) => {
+                                TabArea::TabLine(panel.into())
+                            }
+                            _ => self.tab_area,
+                        };
+                        // resize to fix the tab area
+                        self.resize_();
+                    }
                 }
             }
         }
+    }
+
+    fn toggle_tab_ui(&mut self) {
+        self.tab_area = match self.tab_area {
+            TabArea::TabLine(line) => TabArea::TabPanel(line.into()),
+            TabArea::TabPanel(panel) => TabArea::TabLine(panel.into()),
+        };
+        self.resize_();
     }
 
     fn set_colors(&mut self, colors: Colors) {
@@ -351,13 +379,16 @@ impl TUI {
         } else {
             0
         };
+
+        let tab_area_offset = self.tab_area.calculate_x_offset(self.width);
+        let message_ui_height = if tab_area_offset != 0 { 0 } else { 1 };
         self.tabs.insert(
             idx,
             Tab {
                 alias,
                 widget: MessagingUI::new(
-                    self.width,
-                    self.height - 1 - statusline_height,
+                    self.width - tab_area_offset,
+                    self.height - message_ui_height - statusline_height,
                     status,
                     self.scrollback,
                 ),
@@ -371,7 +402,7 @@ impl TUI {
 
     /// Returns index of the new tab if a new tab is created.
     pub fn new_server_tab(&mut self, serv: &str, alias: Option<String>) -> Option<usize> {
-        match self.find_serv_tab_idx(serv) {
+        match self.tab_area.find_serv_tab_idx(serv, &self.tabs) {
             None => {
                 let tab_idx = self.tabs.len();
                 self.new_tab(
@@ -395,19 +426,19 @@ impl TUI {
 
     /// Closes a server tab and all associated channel tabs.
     pub(crate) fn close_server_tab(&mut self, serv: &str) {
-        if let Some(tab_idx) = self.find_serv_tab_idx(serv) {
+        if let Some(tab_idx) = self.tab_area.find_serv_tab_idx(serv, &self.tabs) {
             self.tabs.retain(|tab: &Tab| tab.src.serv_name() != serv);
-            if self.active_idx == tab_idx {
+            if self.tab_area.active_idx() == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
-        self.fix_scroll_after_close();
+        self.tab_area.fix_scroll_after_close(&self.tabs);
     }
 
     /// Returns index of the new tab if a new tab is created.
     pub(crate) fn new_chan_tab(&mut self, serv: &str, chan: &ChanNameRef) -> Option<usize> {
-        match self.find_chan_tab_idx(serv, chan) {
-            None => match self.find_last_serv_tab_idx(serv) {
+        match self.tab_area.find_chan_tab_idx(serv, chan, &self.tabs) {
+            None => match self.tab_area.find_last_serv_tab_idx(serv, &self.tabs) {
                 None => {
                     self.new_server_tab(serv, None);
                     self.new_chan_tab(serv, chan)
@@ -435,7 +466,7 @@ impl TUI {
                         notifier.expect("Creating a channel tab, but the server tab doesn't exist"),
                         None,
                     );
-                    if self.active_idx >= tab_idx {
+                    if self.tab_area.active_idx() >= tab_idx {
                         self.next_tab();
                     }
                     if let Some(nick) = self.tabs[serv_tab_idx].widget.get_nick() {
@@ -449,19 +480,19 @@ impl TUI {
     }
 
     pub(crate) fn close_chan_tab(&mut self, serv: &str, chan: &ChanNameRef) {
-        if let Some(tab_idx) = self.find_chan_tab_idx(serv, chan) {
+        if let Some(tab_idx) = self.tab_area.find_chan_tab_idx(serv, chan, &self.tabs) {
             self.tabs.remove(tab_idx);
-            if self.active_idx == tab_idx {
+            if self.tab_area.active_idx() == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
-        self.fix_scroll_after_close();
+        self.tab_area.fix_scroll_after_close(&self.tabs);
     }
 
     /// Returns index of the new tab if a new tab is created.
     pub(crate) fn new_user_tab(&mut self, serv: &str, nick: &str) -> Option<usize> {
-        match self.find_user_tab_idx(serv, nick) {
-            None => match self.find_last_serv_tab_idx(serv) {
+        match self.tab_area.find_user_tab_idx(serv, nick, &self.tabs) {
+            None => match self.tab_area.find_last_serv_tab_idx(serv, &self.tabs) {
                 None => {
                     self.new_server_tab(serv, None);
                     self.new_user_tab(serv, nick)
@@ -489,13 +520,13 @@ impl TUI {
     }
 
     pub(crate) fn close_user_tab(&mut self, serv: &str, nick: &str) {
-        if let Some(tab_idx) = self.find_user_tab_idx(serv, nick) {
+        if let Some(tab_idx) = self.tab_area.find_user_tab_idx(serv, nick, &self.tabs) {
             self.tabs.remove(tab_idx);
-            if self.active_idx == tab_idx {
+            if self.tab_area.active_idx() == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
         }
-        self.fix_scroll_after_close();
+        self.tab_area.fix_scroll_after_close(&self.tabs);
     }
 
     pub(crate) fn handle_input_event(
@@ -535,7 +566,7 @@ impl TUI {
                 None
             }
             Ok(lines) => {
-                let tab = &mut self.tabs[self.active_idx].widget;
+                let tab = &mut self.tabs[self.tab_area.active_idx()].widget;
                 // If there's only one line just add it to the input field, do not send it
                 if lines.len() == 1 {
                     tab.set_input_field(&lines[0]);
@@ -545,7 +576,7 @@ impl TUI {
                     for line in &lines {
                         tab.add_input_field_history(line);
                     }
-                    Some((lines, self.tabs[self.active_idx].src.clone()))
+                    Some((lines, self.tabs[self.tab_area.active_idx()].src.clone()))
                 }
             }
         }
@@ -553,7 +584,7 @@ impl TUI {
 
     /// Edit current input + `str` before sending.
     fn run_editor(&mut self, str: &str, rcv_editor_ret: &mut Option<editor::ResultReceiver>) {
-        let tab = &mut self.tabs[self.active_idx].widget;
+        let tab = &mut self.tabs[self.tab_area.active_idx()].widget;
         let (msg, cursor) = tab.flush_input_field();
         match editor::run(&mut self.tb, msg, cursor, str, rcv_editor_ret) {
             Ok(()) => {}
@@ -594,7 +625,7 @@ impl TUI {
         }
 
         // Restore text field contents
-        let tab = &mut self.tabs[self.active_idx].widget;
+        let tab = &mut self.tabs[self.tab_area.active_idx()].widget;
         tab.set_input_field(&text_field_contents);
         tab.set_cursor(cursor);
     }
@@ -604,12 +635,12 @@ impl TUI {
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        match self.tabs[self.active_idx].widget.keypressed(key) {
+        match self.tabs[self.tab_area.active_idx()].widget.keypressed(key) {
             WidgetRet::KeyHandled => TUIRet::KeyHandled,
             WidgetRet::KeyIgnored => self.handle_keypress(key, rcv_editor_ret),
             WidgetRet::Input(input) => TUIRet::Input {
                 msg: input,
-                from: self.tabs[self.active_idx].src.clone(),
+                from: self.tabs[self.tab_area.active_idx()].src.clone(),
             },
             WidgetRet::Remove => unimplemented!(),
             WidgetRet::Abort => TUIRet::Abort,
@@ -644,27 +675,27 @@ impl TUI {
                     } else {
                         i as usize - 1
                     };
-                    match new_tab_idx.cmp(&self.active_idx) {
+                    match new_tab_idx.cmp(&self.tab_area.active_idx()) {
                         Ordering::Greater => {
-                            for _ in 0..new_tab_idx - self.active_idx {
-                                self.next_tab_();
+                            for _ in 0..new_tab_idx - self.tab_area.active_idx() {
+                                self.tab_area.next_tab_(&self.tabs);
                             }
                         }
                         Ordering::Less => {
-                            for _ in 0..self.active_idx - new_tab_idx {
-                                self.prev_tab_();
+                            for _ in 0..self.tab_area.active_idx() - new_tab_idx {
+                                self.tab_area.prev_tab_(&self.tabs);
                             }
                         }
                         Ordering::Equal => {}
                     }
-                    self.tabs[self.active_idx].set_style(TabStyle::Normal);
+                    self.tabs[self.tab_area.active_idx()].set_style(TabStyle::Normal);
                     TUIRet::KeyHandled
                 }
                 None => {
                     // multiple tabs can have same switch character so scan
                     // forwards instead of starting from the first tab
                     for i in 1..=self.tabs.len() {
-                        let idx = (self.active_idx + i) % self.tabs.len();
+                        let idx = (self.tab_area.active_idx() + i) % self.tabs.len();
                         if self.tabs[idx].switch == Some(c) {
                             self.select_tab(idx);
                             break;
@@ -675,13 +706,31 @@ impl TUI {
             },
 
             Key::AltArrow(Arrow::Left) => {
-                self.move_tab_left();
+                self.tab_area.move_tab_left(&mut self.tabs);
                 TUIRet::KeyHandled
             }
 
             Key::AltArrow(Arrow::Right) => {
-                self.move_tab_right();
+                self.tab_area.move_tab_right(&mut self.tabs);
                 TUIRet::KeyHandled
+            }
+
+            Key::AltPgDn => {
+                if let TabArea::TabPanel(panel) = &mut self.tab_area {
+                    panel.next_page(self.tabs.len());
+                    TUIRet::KeyHandled
+                } else {
+                    TUIRet::KeyIgnored(Key::AltPgDn)
+                }
+            }
+
+            Key::AltPgUp => {
+                if let TabArea::TabPanel(panel) = &mut self.tab_area {
+                    panel.prev_page(self.tabs.len());
+                    TUIRet::KeyHandled
+                } else {
+                    TUIRet::KeyIgnored(Key::AltPgDn)
+                }
             }
 
             key => TUIRet::KeyIgnored(key),
@@ -718,54 +767,8 @@ impl TUI {
                 0
             };
 
-        for tab in &mut self.tabs {
-            tab.widget
-                .resize(self.width, self.height - 1 - statusline_height);
-        }
-        // scroll the tab bar so that currently active tab is still visible
-        let (mut tab_left, mut tab_right) = self.rendered_tabs();
-        if tab_left == tab_right {
-            // nothing to show
-            return;
-        }
-        while self.active_idx < tab_left || self.active_idx >= tab_right {
-            if self.active_idx >= tab_right {
-                // scroll right
-                self.h_scroll += self.tabs[tab_left].width() + 1;
-            } else if self.active_idx < tab_left {
-                // scroll left
-                self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
-            }
-            let (tab_left_, tab_right_) = self.rendered_tabs();
-            tab_left = tab_left_;
-            tab_right = tab_right_;
-        }
-        // the selected tab is visible. scroll to the left as much as possible
-        // to make more tabs visible.
-        let mut num_visible = tab_right - tab_left;
-        loop {
-            if tab_left == 0 {
-                break;
-            }
-            // save current scroll value
-            let scroll_orig = self.h_scroll;
-            // scoll to the left
-            self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
-            // get new bounds
-            let (tab_left_, tab_right_) = self.rendered_tabs();
-            // commit if these two conditions hold
-            let num_visible_ = tab_right_ - tab_left_;
-            let more_tabs_visible = num_visible_ > num_visible;
-            let selected_tab_visible = self.active_idx >= tab_left_ && self.active_idx < tab_right_;
-            if !(more_tabs_visible && selected_tab_visible) {
-                // revert scroll value and abort
-                self.h_scroll = scroll_orig;
-                break;
-            }
-            // otherwise commit
-            tab_left = tab_left_;
-            num_visible = num_visible_;
-        }
+        self.tab_area
+            .resize(&mut self.tabs, self.width, self.height, statusline_height);
 
         // redraw after resize
         self.draw()
@@ -775,90 +778,7 @@ impl TUI {
 ////////////////////////////////////////////////////////////////////////////////
 // Rendering
 
-fn arrow_style(tabs: &[Tab], colors: &Colors) -> Style {
-    let tab_style = tabs
-        .iter()
-        .map(|tab| tab.style)
-        .max()
-        .unwrap_or(TabStyle::Normal);
-    match tab_style {
-        TabStyle::Normal => colors.tab_normal,
-        TabStyle::JoinOrPart => colors.tab_joinpart,
-        TabStyle::NewMsg => colors.tab_new_msg,
-        TabStyle::Highlight => colors.tab_highlight,
-    }
-}
-
 impl TUI {
-    fn draw_left_arrow(&self) -> bool {
-        self.h_scroll > 0
-    }
-
-    fn draw_right_arrow(&self) -> bool {
-        let w1 = self.h_scroll + self.width;
-        let w2 = {
-            let mut w = if self.draw_left_arrow() { 2 } else { 0 };
-            let last_tab_idx = self.tabs.len() - 1;
-            for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                w += tab.width();
-                if tab_idx != last_tab_idx {
-                    w += 1;
-                }
-            }
-            w
-        };
-
-        w2 > w1
-    }
-
-    // right one is exclusive
-    fn rendered_tabs(&self) -> (usize, usize) {
-        if self.tabs.is_empty() {
-            return (0, 0);
-        }
-
-        let mut i = 0;
-
-        {
-            let mut skip = self.h_scroll;
-            while skip > 0 && i < self.tabs.len() - 1 {
-                skip -= self.tabs[i].width() + 1;
-                i += 1;
-            }
-        }
-
-        // drop tabs overflow on the right side
-        let mut j = i;
-        {
-            // how much space left on screen
-            let mut width_left = self.width;
-            if self.draw_left_arrow() {
-                width_left -= 2;
-            }
-            if self.draw_right_arrow() {
-                width_left -= 2;
-            }
-            // drop any tabs that overflows from the screen
-            for (tab_idx, tab) in (&self.tabs[i..]).iter().enumerate() {
-                if tab.width() > width_left {
-                    break;
-                } else {
-                    j += 1;
-                    width_left -= tab.width();
-                    if tab_idx != self.tabs.len() - i {
-                        width_left -= 1;
-                    }
-                }
-            }
-        }
-
-        debug_assert!(i < self.tabs.len());
-        debug_assert!(j <= self.tabs.len());
-        debug_assert!(i <= j);
-
-        (i, j)
-    }
-
     pub fn draw(&mut self) {
         self.tb.clear();
 
@@ -872,250 +792,36 @@ impl TUI {
             0
         };
 
+        let tab_area_offset = self.tab_area.calculate_x_offset(self.width);
+
+        let active_tab = &mut self.tabs[self.tab_area.active_idx()];
         if self.show_statusline && self.statusline_visible {
             draw_statusline(
                 &mut self.tb,
                 self.width,
                 &self.colors,
-                &self.tabs[self.active_idx].visible_name(),
-                self.tabs[self.active_idx].notifier,
-                self.tabs[self.active_idx].widget.get_ignore_state(),
+                &active_tab.visible_name(),
+                active_tab.notifier,
+                active_tab.widget.get_ignore_state(),
             );
         }
 
-        self.tabs[self.active_idx]
-            .widget
-            .draw(&mut self.tb, &self.colors, 0, statusline_height);
+        active_tab.widget.draw(
+            &mut self.tb,
+            &self.colors,
+            tab_area_offset,
+            statusline_height,
+        );
 
-        // decide whether we need to draw left/right arrows in tab bar
-        let left_arr = self.draw_left_arrow();
-        let right_arr = self.draw_right_arrow();
-
-        let (tab_left, tab_right) = self.rendered_tabs();
-
-        let mut pos_x: i32 = 0;
-        if left_arr {
-            let style = arrow_style(&self.tabs[0..tab_left], &self.colors);
-            self.tb
-                .change_cell(pos_x, self.height - 1, LEFT_ARROW, style.fg, style.bg);
-            pos_x += 2;
-        }
-
-        // Debugging
-        // debug!("number of tabs to draw: {}", tab_right - tab_left);
-        // debug!("left_arr: {}, right_arr: {}", left_arr, right_arr);
-
-        // finally draw the tabs
-        for (tab_idx, tab) in (&self.tabs[tab_left..tab_right]).iter().enumerate() {
-            tab.draw(
-                &mut self.tb,
-                &self.colors,
-                pos_x,
-                self.height - 1,
-                self.active_idx == tab_idx + tab_left,
-            );
-            pos_x += tab.width() as i32 + 1; // +1 for margin
-        }
-
-        if right_arr {
-            let style = arrow_style(&self.tabs[tab_right..], &self.colors);
-            self.tb
-                .change_cell(pos_x, self.height - 1, RIGHT_ARROW, style.fg, style.bg);
-        }
+        self.tab_area.draw(
+            &mut self.tb,
+            &self.tabs,
+            self.height,
+            &self.colors,
+            statusline_height,
+        );
 
         self.tb.present();
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Moving between tabs, horizontal scroll updates
-
-    fn select_tab(&mut self, tab_idx: usize) {
-        if tab_idx < self.active_idx {
-            while tab_idx < self.active_idx {
-                self.prev_tab_();
-            }
-        } else {
-            while tab_idx > self.active_idx {
-                self.next_tab_();
-            }
-        }
-        self.tabs[self.active_idx].set_style(TabStyle::Normal);
-    }
-
-    pub(crate) fn next_tab(&mut self) {
-        self.next_tab_();
-        self.tabs[self.active_idx].set_style(TabStyle::Normal);
-    }
-
-    pub(crate) fn prev_tab(&mut self) {
-        self.prev_tab_();
-        self.tabs[self.active_idx].set_style(TabStyle::Normal);
-    }
-
-    /// After closing a tab scroll left if there is space on the right and we can fit more tabs
-    /// from the left into the visible part of the tab bar.
-    fn fix_scroll_after_close(&mut self) {
-        let (tab_left, tab_right) = self.rendered_tabs();
-
-        if tab_left == 0 {
-            self.h_scroll = 0;
-            return;
-        }
-
-        // Size of shown part of the tab bar. DOES NOT include LEFT_ARROW.
-        let mut shown_width = 0;
-        for (tab_idx, tab) in self.tabs[tab_left..tab_right].iter().enumerate() {
-            shown_width += tab.width();
-            if tab_idx != tab_right - 1 {
-                shown_width += 1; // space between tabs
-            }
-        }
-
-        // How much space left in tab bar. Not accounting for LEFT_ARROW here!
-        let mut space_left = self.width - shown_width;
-
-        // How much to scroll left
-        let mut scroll_left = 0;
-
-        // Start iterating tabs on the left, add the tab size to `scroll_left` as long as scrolling
-        // doesn't make the right-most tab go out of bounds
-        for left_tab_idx in (0..tab_left).rev() {
-            let tab_width = self.tabs[left_tab_idx].width() + 1; // 1 for space
-            let draw_arrow = left_tab_idx != 0;
-            let tab_with_arrow_w = tab_width + if draw_arrow { 2 } else { 0 };
-
-            if tab_with_arrow_w <= space_left {
-                scroll_left += tab_width;
-                space_left -= tab_width;
-            } else {
-                break;
-            }
-        }
-
-        self.h_scroll -= scroll_left;
-    }
-
-    pub(crate) fn switch(&mut self, string: &str) {
-        let mut next_idx = self.active_idx;
-        for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            match tab.src {
-                MsgSource::Serv { ref serv } => {
-                    if serv.contains(string) {
-                        next_idx = tab_idx;
-                        break;
-                    }
-                }
-                MsgSource::Chan { ref chan, .. } => {
-                    // TODO: Case sensitive matching here is not ideal
-                    if chan.display().contains(string) {
-                        next_idx = tab_idx;
-                        break;
-                    }
-                }
-                MsgSource::User { ref nick, .. } => {
-                    if nick.contains(string) {
-                        next_idx = tab_idx;
-                        break;
-                    }
-                }
-            }
-        }
-        if next_idx != self.active_idx {
-            self.select_tab(next_idx);
-        }
-    }
-
-    fn next_tab_(&mut self) {
-        if self.active_idx == self.tabs.len() - 1 {
-            self.active_idx = 0;
-            self.h_scroll = 0;
-        } else {
-            // either the next tab is visible, or we should scroll so that the
-            // next tab becomes visible
-            let next_active = self.active_idx + 1;
-            loop {
-                let (tab_left, tab_right) = self.rendered_tabs();
-                if (next_active >= tab_left && next_active < tab_right)
-                    || (next_active == tab_left && tab_left == tab_right)
-                {
-                    break;
-                }
-                self.h_scroll += self.tabs[tab_left].width() + 1;
-            }
-            self.active_idx = next_active;
-        }
-    }
-
-    fn prev_tab_(&mut self) {
-        if self.active_idx == 0 {
-            let next_active = self.tabs.len() - 1;
-            while self.active_idx != next_active {
-                self.next_tab_();
-            }
-        } else {
-            let next_active = self.active_idx - 1;
-            loop {
-                let (tab_left, tab_right) = self.rendered_tabs();
-                if (next_active >= tab_left && next_active < tab_right)
-                    || (next_active == tab_left && tab_left == tab_right)
-                {
-                    break;
-                }
-                self.h_scroll -= self.tabs[tab_left - 1].width() + 1;
-            }
-            if self.h_scroll < 0 {
-                self.h_scroll = 0
-            };
-            self.active_idx = next_active;
-        }
-    }
-
-    fn move_tab_left(&mut self) {
-        if self.active_idx == 0 {
-            return;
-        }
-        if self.is_server_tab(self.active_idx) {
-            // move all server tabs
-            let (left, right) = self.server_tab_range(self.active_idx);
-            if left > 0 {
-                let mut insert_idx = left - 1;
-                while insert_idx > 0 && !self.is_server_tab(insert_idx) {
-                    insert_idx -= 1;
-                }
-                let to_move: Vec<Tab> = self.tabs.drain(left..right).collect();
-                self.tabs
-                    .splice(insert_idx..insert_idx, to_move.into_iter());
-                self.select_tab(insert_idx);
-            }
-        } else if !self.is_server_tab(self.active_idx - 1) {
-            let tab = self.tabs.remove(self.active_idx);
-            self.tabs.insert(self.active_idx - 1, tab);
-            let active_idx = self.active_idx - 1;
-            self.select_tab(active_idx);
-        }
-    }
-
-    fn move_tab_right(&mut self) {
-        if self.active_idx == self.tabs.len() - 1 {
-            return;
-        }
-        if self.is_server_tab(self.active_idx) {
-            // move all server tabs
-            let (left, right) = self.server_tab_range(self.active_idx);
-            if right < self.tabs.len() {
-                let right_next = self.server_tab_range(right).1;
-                let insert_idx = right_next - (right - left);
-                let to_move: Vec<Tab> = self.tabs.drain(left..right).collect();
-                self.tabs
-                    .splice(insert_idx..insert_idx, to_move.into_iter());
-                self.select_tab(insert_idx);
-            }
-        } else if !self.is_server_tab(self.active_idx + 1) {
-            let tab = self.tabs.remove(self.active_idx);
-            self.tabs.insert(self.active_idx + 1, tab);
-            let active_idx = self.active_idx + 1;
-            self.select_tab(active_idx);
-        }
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -1181,7 +887,7 @@ impl TUI {
             }
 
             MsgTarget::CurrentTab => {
-                target_idxs.push(self.active_idx);
+                target_idxs.push(self.tab_area.active_idx());
             }
         }
 
@@ -1193,7 +899,8 @@ impl TUI {
         }
 
         for tab_idx in target_idxs {
-            f(&mut self.tabs[tab_idx], self.active_idx == tab_idx);
+            let is_active = self.tab_area.active_idx() == tab_idx;
+            f(&mut self.tabs[tab_idx], is_active);
         }
     }
 
@@ -1217,6 +924,24 @@ impl TUI {
                 tab.set_style(style);
             }
         });
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Moving between tabs, horizontal scroll updates
+
+    pub fn select_tab(&mut self, tab_idx: usize) {
+        self.tab_area.select_tab(tab_idx, &self.tabs);
+        self.tabs[self.tab_area.active_idx()].set_style(TabStyle::Normal);
+    }
+
+    pub(crate) fn next_tab(&mut self) {
+        self.tab_area.next_tab_(&self.tabs);
+        self.tabs[self.tab_area.active_idx()].set_style(TabStyle::Normal);
+    }
+
+    pub(crate) fn prev_tab(&mut self) {
+        self.tab_area.prev_tab_(&self.tabs);
+        self.tabs[self.tab_area.active_idx()].set_style(TabStyle::Normal);
     }
 
     /// An error message coming from Tiny, probably because of a command error
@@ -1390,72 +1115,5 @@ impl TUI {
             };
             tab.widget.add_client_notify_msg(msg);
         });
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Helpers
-
-    fn find_serv_tab_idx(&self, serv_: &str) -> Option<usize> {
-        for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Serv { ref serv } = tab.src {
-                if serv_ == serv {
-                    return Some(tab_idx);
-                }
-            }
-        }
-        None
-    }
-
-    fn find_chan_tab_idx(&self, serv_: &str, chan_: &ChanNameRef) -> Option<usize> {
-        for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Chan { ref serv, ref chan } = tab.src {
-                if serv_ == serv && chan_ == chan {
-                    return Some(tab_idx);
-                }
-            }
-        }
-        None
-    }
-
-    fn find_user_tab_idx(&self, serv_: &str, nick_: &str) -> Option<usize> {
-        for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::User { ref serv, ref nick } = tab.src {
-                if serv_ == serv && nick_ == nick {
-                    return Some(tab_idx);
-                }
-            }
-        }
-        None
-    }
-
-    /// Index of the last tab with the given server name.
-    fn find_last_serv_tab_idx(&self, serv: &str) -> Option<usize> {
-        for (tab_idx, tab) in self.tabs.iter().enumerate().rev() {
-            if tab.src.serv_name() == serv {
-                return Some(tab_idx);
-            }
-        }
-        None
-    }
-
-    fn is_server_tab(&self, idx: usize) -> bool {
-        match self.tabs[idx].src {
-            MsgSource::Serv { .. } => true,
-            MsgSource::Chan { .. } | MsgSource::User { .. } => false,
-        }
-    }
-
-    /// Given a tab index return range of tabs for the server of this tab.
-    fn server_tab_range(&self, idx: usize) -> (usize, usize) {
-        debug_assert!(idx < self.tabs.len());
-        let mut left = idx;
-        while !self.is_server_tab(left) {
-            left -= 1;
-        }
-        let mut right = idx + 1;
-        while right < self.tabs.len() && !self.is_server_tab(right) {
-            right += 1;
-        }
-        (left, right)
     }
 }

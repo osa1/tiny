@@ -113,6 +113,23 @@ impl Nickname {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct XOffset {
+    pos_x: i32,
+    nick_length: i32,
+    pos_x_with_nick: i32,
+}
+
+impl XOffset {
+    pub fn new(pos_x: i32, nick_length: i32) -> XOffset {
+        XOffset {
+            pos_x,
+            nick_length,
+            pos_x_with_nick: pos_x + nick_length,
+        }
+    }
+}
+
 impl InputArea {
     pub(crate) fn new(width: i32, max_lines: i32) -> InputArea {
         InputArea {
@@ -167,13 +184,14 @@ impl InputArea {
             nick.draw(tb, colors, pos_x, pos_y, self.width);
             nick_length = nick.len(self.width) as i32;
         }
+        let x_offsets = XOffset::new(pos_x, nick_length);
         match self.mode {
             Mode::Edit => {
                 draw_line(
                     tb,
                     colors,
                     &self.buffer,
-                    pos_x + nick_length,
+                    x_offsets,
                     pos_y,
                     self.width,
                     self.cursor,
@@ -187,7 +205,7 @@ impl InputArea {
                     tb,
                     colors,
                     &self.history[hist_curs as usize],
-                    pos_x + nick_length,
+                    x_offsets,
                     pos_y,
                     self.width,
                     self.cursor,
@@ -210,7 +228,7 @@ impl InputArea {
                 current_completion,
                 tb,
                 colors,
-                pos_x + nick_length,
+                x_offsets,
                 pos_y,
                 self.width,
                 self.cursor,

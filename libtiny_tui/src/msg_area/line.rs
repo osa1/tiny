@@ -200,7 +200,7 @@ impl Line {
                             break;
                         }
                         // Reset column
-                        col = 0;
+                        col = pos_x;
                         // Move to the next line start index
                         split_indices_iter.next();
                         // Don't draw whitespaces

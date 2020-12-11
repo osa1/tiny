@@ -58,6 +58,7 @@ impl Tab {
         mut pos_x: i32,
         pos_y: i32,
         active: bool,
+        max_width: Option<i32>,
     ) {
         let style: Style = if active {
             colors.tab_active
@@ -66,7 +67,13 @@ impl Tab {
         };
 
         let mut switch_drawn = false;
-        for ch in self.visible_name().chars() {
+        let max_width = max_width.unwrap_or_else(|| self.width() + 1);
+
+        for (idx, ch) in self.visible_name().chars().enumerate() {
+            if idx as i32 == max_width {
+                tb.change_cell(pos_x, pos_y, '…', style.fg, style.bg);
+                break;
+            }
             if Some(ch) == self.switch && !switch_drawn {
                 tb.change_cell(pos_x, pos_y, ch, style.fg | TB_UNDERLINE, style.bg);
                 switch_drawn = true;

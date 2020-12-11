@@ -1,3 +1,4 @@
+use crate::input_area::XOffset;
 use crate::{config::Colors, line_split::LineDataCache, termbox, utils};
 use std::{cmp::min, ops::RangeBounds, vec::Drain};
 use termbox_simple::Termbox;
@@ -97,14 +98,18 @@ fn draw_line_scroll(
     tb: &mut Termbox,
     colors: &Colors,
     line: &[char],
-    pos_x: i32,
+    x_offset: XOffset,
     pos_y: i32,
     width: i32,
     cursor: i32,
     scroll: i32,
 ) {
-    let slice: &[char] =
-        &line[scroll as usize..min(line.len(), (scroll + (width - pos_x)) as usize)];
+    let pos_x = x_offset.pos_x_with_nick;
+    let slice: &[char] = &line[scroll as usize
+        ..min(
+            line.len(),
+            (scroll + (width - x_offset.nick_length)) as usize,
+        )];
     termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().copied());
     // On my terminal the cursor is only shown when there's a character
     // under it.
@@ -129,14 +134,14 @@ pub(crate) struct CompletionRange {
 fn draw_line_wrapped(
     tb: &mut Termbox,
     colors: &Colors,
-    pos_x: i32,
+    x_offset: XOffset,
     pos_y: i32,
     width: i32,
     cursor: i32,
     line: &InputLine,
     completion_range: &Option<CompletionRange>,
 ) {
-    let mut col = pos_x;
+    let mut col = x_offset.pos_x_with_nick;
     let mut line_num = 0;
 
     let mut cursor_xychar = (0, 0, ' ');
@@ -161,7 +166,7 @@ fn draw_line_wrapped(
                 // move to next line
                 line_num += 1;
                 // reset column
-                col = 0;
+                col = x_offset.pos_x;
                 // move to the next line start index
                 split_indices_iter.next();
             }
@@ -174,10 +179,10 @@ fn draw_line_wrapped(
     }
 
     // Cursor may be (probably) after all text
-    if col == width {
+    if col - x_offset.pos_x == width {
         // render cursor on next line
         line_num += 1;
-        col = 0;
+        col = x_offset.pos_x;
     }
     check_cursor(line.buffer.len(), cursor, col, pos_y + line_num, ' ');
 
@@ -200,7 +205,7 @@ pub(crate) fn draw_line_autocomplete(
     current_completion: usize,
     tb: &mut Termbox,
     colors: &Colors,
-    pos_x: i32,
+    x_offset: XOffset,
     pos_y: i32,
     width: i32,
     cursor: i32,
@@ -211,7 +216,7 @@ pub(crate) fn draw_line_autocomplete(
 
     let mut orig_buf_iter = original_buffer.get_buffer().iter().copied();
     let mut completion_iter = completion.chars();
-
+    let pos_x = x_offset.pos_x_with_nick;
     if should_scroll {
         let cursor_x_off = cursor - scroll.unwrap();
         let cursor_y_off = 0;
@@ -276,7 +281,7 @@ pub(crate) fn draw_line_autocomplete(
             utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
 
         let mut line = InputLine::from_buffer(iter.collect());
-        line.calculate_height(width, pos_x as usize);
+        line.calculate_height(width, x_offset.nick_length as usize);
         let completion_range = CompletionRange {
             start_idx: word_starts,
             end_idx: (insertion_point + completion.len()),
@@ -284,7 +289,7 @@ pub(crate) fn draw_line_autocomplete(
         draw_line_wrapped(
             tb,
             colors,
-            pos_x,
+            x_offset,
             pos_y,
             width,
             cursor,
@@ -298,7 +303,7 @@ pub(crate) fn draw_line(
     tb: &mut Termbox,
     colors: &Colors,
     line: &InputLine,
-    pos_x: i32,
+    x_offset: XOffset,
     pos_y: i32,
     width: i32,
     cursor: i32,
@@ -306,12 +311,12 @@ pub(crate) fn draw_line(
     scroll: Option<i32>,
     completion_range: Option<CompletionRange>,
 ) {
-    if should_scroll || (line.len() as i32) < width - pos_x {
+    if should_scroll || (line.len() as i32) < width - x_offset.nick_length {
         draw_line_scroll(
             tb,
             colors,
             &line.buffer,
-            pos_x,
+            x_offset,
             pos_y,
             width,
             cursor,
@@ -321,7 +326,7 @@ pub(crate) fn draw_line(
         draw_line_wrapped(
             tb,
             colors,
-            pos_x,
+            x_offset,
             pos_y,
             width,
             cursor,

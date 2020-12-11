@@ -42,6 +42,13 @@ log_dir: '{}'
 # (Optional) Limits the maximum number of messages stored for each UI tab. Defaults to unlimited.
 # scrollback: 512
 
+# (Optional) Change the layout of the tab UI.
+# `line` : a one row bar on the bottom of the window with tabs listed horizontally.
+# `panel`: a panel on the left side of the screen with pagination and tabs listed vertically.
+# Defaults to `line`
+
+# tab_ui : line
+
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
 #

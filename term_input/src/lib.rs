@@ -32,6 +32,8 @@ extern crate log;
 pub enum Key {
     AltArrow(Arrow),
     AltChar(char),
+    AltPgDn,
+    AltPgUp,
     Arrow(Arrow),
     Backspace,
     Char(char),
@@ -84,6 +86,8 @@ byte_seq_parser! {
     [27, 91, 49, 59, 51, 68] => Key::AltArrow(Arrow::Left),
     [27, 91, 49, 59, 51, 67] => Key::AltArrow(Arrow::Right),
     [27, 91, 49, 59, 51, 65] => Key::AltArrow(Arrow::Up),
+    [27, 91, 54, 59, 51, 126] => Key::AltPgDn,
+    [27, 91, 53, 59, 51, 126] => Key::AltPgUp,
     [27, 91, 66] => Key::Arrow(Arrow::Down),
     [27, 79, 66] => Key::Arrow(Arrow::Down),
     [27, 91, 68] => Key::Arrow(Arrow::Left),
