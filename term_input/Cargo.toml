@@ -13,4 +13,4 @@ log = "0.4"
 mio = "0.7"
 nix = "0.19"
 term_input_macros = { path = "../term_input_macros" }
-tokio = { version = "0.3.5", default-features = false, features = ["rt", "net", "stream"] }
+tokio = { version = "0.3.6", default-features = false, features = ["rt", "net", "stream"] }

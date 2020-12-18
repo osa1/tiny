@@ -24,7 +24,7 @@ tempfile = "3.1.0"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
-tokio = { version = "0.3.5", default-features = false, features = ["sync", "signal", "stream", "time"] }
+tokio = { version = "0.3.6", default-features = false, features = ["sync", "signal", "stream", "time"] }
 unicode-width = "0.1"
 
 [dev-dependencies]
