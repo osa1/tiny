@@ -13,11 +13,10 @@ use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
 use crate::statusline::{draw_statusline, statusline_visible};
-use crate::tab::{Tab, TabStyle};
+use crate::tab::Tab;
 use crate::widget::WidgetRet;
-use crate::{MsgSource, MsgTarget};
 
-use libtiny_common::ChanNameRef;
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use term_input::{Arrow, Event, Key};
 pub use termbox_simple::{CellBuf, Termbox};
 
@@ -145,7 +144,7 @@ impl TUI {
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
         // show any errors in TUI.
-        tui.new_server_tab("mentions", None);
+        tui.new_server_tab("mentions", &None);
         tui.add_client_msg(
             "Any mentions to you will be listed here.",
             &MsgTarget::Server { serv: "mentions" },
@@ -371,7 +370,7 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_server_tab(&mut self, serv: &str, alias: Option<String>) -> Option<usize> {
+    pub fn new_server_tab(&mut self, serv: &str, alias: &Option<String>) -> Option<usize> {
         match self.find_serv_tab_idx(serv) {
             None => {
                 let tab_idx = self.tabs.len();
@@ -386,7 +385,7 @@ impl TUI {
                     } else {
                         Notifier::Off
                     },
-                    alias,
+                    alias.clone(),
                 );
                 Some(tab_idx)
             }
@@ -410,7 +409,7 @@ impl TUI {
         match self.find_chan_tab_idx(serv, chan) {
             None => match self.find_last_serv_tab_idx(serv) {
                 None => {
-                    self.new_server_tab(serv, None);
+                    self.new_server_tab(serv, &None);
                     self.new_chan_tab(serv, chan)
                 }
                 Some(serv_tab_idx) => {
@@ -464,7 +463,7 @@ impl TUI {
         match self.find_user_tab_idx(serv, nick) {
             None => match self.find_last_serv_tab_idx(serv) {
                 None => {
-                    self.new_server_tab(serv, None);
+                    self.new_server_tab(serv, &None);
                     self.new_user_tab(serv, nick)
                 }
                 Some(tab_idx) => {
@@ -1201,7 +1200,7 @@ impl TUI {
     fn maybe_create_tab(&mut self, target: &MsgTarget) -> Option<usize> {
         match *target {
             MsgTarget::Server { serv } | MsgTarget::AllServTabs { serv } => {
-                self.new_server_tab(serv, None)
+                self.new_server_tab(serv, &None)
             }
 
             MsgTarget::Chan { serv, chan } => self.new_chan_tab(serv, chan),

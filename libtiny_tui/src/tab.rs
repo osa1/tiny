@@ -1,4 +1,4 @@
-pub use libtiny_ui::TabStyle;
+use libtiny_common::{MsgSource, TabStyle};
 use termbox_simple::{Termbox, TB_UNDERLINE};
 
 use unicode_width::UnicodeWidthStr;
@@ -7,7 +7,6 @@ use crate::{
     config::{Colors, Style},
     messaging::MessagingUI,
     notifier::Notifier,
-    MsgSource,
 };
 
 pub(crate) struct Tab {

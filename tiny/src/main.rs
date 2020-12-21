@@ -12,10 +12,10 @@ mod utils;
 mod tests;
 
 use libtiny_client::{Client, ServerInfo};
-use libtiny_common::ChanNameRef;
+use libtiny_common::{ChanNameRef, MsgTarget};
 use libtiny_logger::{Logger, LoggerInitError};
-use libtiny_tui::{MsgTarget, TUI};
-use libtiny_ui::UI;
+use libtiny_tui::TUI;
+use ui::TinyUI;
 
 use std::path::PathBuf;
 use std::process::exit;
@@ -127,20 +127,26 @@ fn run(
                 Ok(logger) => {
                     // Create "mentions" log file manually -- the tab is already created in the TUI so
                     // we won't be creating a "mentions" file in the logger without this.
-                    logger.new_server_tab("mentions", None);
+                    logger.new_server_tab("mentions", &None);
                     Some(logger)
                 }
             });
 
-        let tui: Box<dyn UI> = match logger {
-            None => Box::new(tui),
-            Some(logger) => Box::new(libtiny_ui::combine(tui, logger)),
+        let tui = match logger {
+            None => TinyUI {
+                ui: tui,
+                logger: None,
+            },
+            Some(logger) => TinyUI {
+                ui: tui,
+                logger: Some(logger),
+            },
         };
 
         let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
         for server in servers.iter().cloned() {
-            tui.new_server_tab(&server.addr, server.alias);
+            tui.new_server_tab(&server.addr, &server.alias);
 
             let server_info = ServerInfo {
                 addr: server.addr,
@@ -162,9 +168,8 @@ fn run(
             };
 
             let (client, rcv_conn_ev) = Client::new(server_info);
-            // TODO: Somehow it's quite hard to expose this objekt call with a different name and less
-            // polymorphic type in libtiny_ui ...
-            let tui_clone = libtiny_ui::clone_box(&*tui);
+
+            let tui_clone = tui.clone();
             let client_clone = client.clone();
 
             // Spawn a task to handle connection events

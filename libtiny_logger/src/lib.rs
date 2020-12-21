@@ -8,8 +8,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use time::Tm;
 
-use libtiny_common::{ChanName, ChanNameRef};
-use libtiny_ui::*;
+use libtiny_common::{ChanName, ChanNameRef, MsgTarget, TabStyle};
 
 #[macro_use]
 extern crate log;
@@ -37,15 +36,15 @@ impl Logger {
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
-        fn $name(&self, $($x: $t,)*) {
+        pub fn $name(&self, $($x: $t,)*) {
             self.inner.borrow_mut().$name( $( $x, )* )
         }
     }
 }
 
-impl UI for Logger {
-    fn draw(&self) {}
-    delegate!(new_server_tab(serv: &str, alias: Option<String>,));
+impl Logger {
+    pub fn draw(&self) {}
+    delegate!(new_server_tab(serv: &str, alias: &Option<String>,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
@@ -81,7 +80,7 @@ impl UI for Logger {
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
 
     // TODO: Maybe just return true?
-    fn user_tab_exists(&self, _serv: &str, _nick: &str) -> bool {
+    pub fn user_tab_exists(&self, _serv: &str, _nick: &str) -> bool {
         false
     }
 }
@@ -165,7 +164,7 @@ impl LoggerInner {
         })
     }
 
-    fn new_server_tab(&mut self, serv: &str, _alias: Option<String>) {
+    fn new_server_tab(&mut self, serv: &str, _alias: &Option<String>) {
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {

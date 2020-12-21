@@ -3,10 +3,10 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use futures::stream::StreamExt;
+use libtiny_common::{Event, MsgTarget};
 use tokio::sync::mpsc;
 
 use libtiny_tui::TUI;
-use libtiny_ui::*;
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()

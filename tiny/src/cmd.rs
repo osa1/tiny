@@ -2,10 +2,10 @@
 #![allow(clippy::borrowed_box)]
 
 use crate::config;
+use crate::ui::TinyUI;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
-use libtiny_common::ChanNameRef;
-use libtiny_ui::{MsgSource, MsgTarget, UI};
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
 
 use std::borrow::Borrow;
 use std::path::Path;
@@ -14,7 +14,7 @@ pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
     pub config_path: &'a Path,
     pub defaults: &'a config::Defaults,
-    pub ui: &'a Box<dyn UI>,
+    pub ui: &'a TinyUI,
     pub clients: &'a mut Vec<Client>,
     pub src: MsgSource,
 }
@@ -199,7 +199,7 @@ fn connect(args: CmdArgs) {
     }
 }
 
-fn reconnect(ui: &Box<dyn UI>, clients: &mut Vec<Client>, src: MsgSource) {
+fn reconnect(ui: &TinyUI, clients: &mut Vec<Client>, src: MsgSource) {
     if let Some(client) = find_client(clients, src.serv_name()) {
         ui.add_client_msg(
             "Reconnecting...",
@@ -215,7 +215,7 @@ fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
     defaults: &config::Defaults,
-    ui: &Box<dyn UI>,
+    ui: &TinyUI,
     clients: &mut Vec<Client>,
 ) {
     fn split_port(s: &str) -> Option<(&str, &str)> {
@@ -252,7 +252,7 @@ fn connect_(
     // can't move the rest to an else branch because of borrowchk
 
     // otherwise create a new Conn, tab etc.
-    ui.new_server_tab(serv_name, None);
+    ui.new_server_tab(serv_name, &None);
     let msg_target = MsgTarget::Server { serv: serv_name };
     ui.add_client_msg("Connecting...", &msg_target);
 
@@ -273,7 +273,7 @@ fn connect_(
     });
 
     // Spawn UI task
-    let ui_clone = libtiny_ui::clone_box(&**ui);
+    let ui_clone = ui.clone();
     let client_clone = client.clone();
     tokio::task::spawn_local(crate::conn::task(rcv_ev, ui_clone, Box::new(client_clone)));
 
@@ -334,7 +334,7 @@ fn me(args: CmdArgs) {
     if args.is_empty() {
         return ui.add_client_err_msg(ME_CMD.usage, &MsgTarget::CurrentTab);
     }
-    crate::ui::send_msg(&**ui, clients, &src, args.to_string(), true);
+    crate::ui::send_msg(ui, clients, &src, args.to_string(), true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -410,7 +410,7 @@ fn msg(args: CmdArgs) {
         }
     };
 
-    crate::ui::send_msg(&**ui, clients, &src, msg.to_owned(), false);
+    crate::ui::send_msg(ui, clients, &src, msg.to_owned(), false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

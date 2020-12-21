@@ -2,12 +2,12 @@
 extern crate bencher;
 
 use bencher::Bencher;
+use libtiny_common::MsgTarget;
+use libtiny_tui::tui::TUI;
 use std::{fs::File, io::BufRead, io::BufReader, io::Read};
 use time::Tm;
 
 use libtiny_tui::trie::Trie;
-use libtiny_tui::tui::TUI;
-use libtiny_tui::MsgTarget;
 
 static DICT_FILE: &str = "/usr/share/dict/american-english";
 
@@ -127,7 +127,7 @@ fn tui_resize(b: &mut Bencher) {
     let mut tui = TUI::new_test(80, 50);
 
     let server = "<server>";
-    tui.new_server_tab(server, None);
+    tui.new_server_tab(server, &None);
 
     let ts: Tm = time::empty_tm();
     let target = MsgTarget::CurrentTab;

@@ -212,12 +212,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 
 [[package]]
-name = "dyn-clone"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d55796afa1b20c2945ca8eabfc421839f2b766619209f1ede813cf2484f31804"
-
-[[package]]
 name = "env_logger"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -400,7 +394,6 @@ name = "libtiny_logger"
 version = "0.1.0"
 dependencies = [
  "libtiny_common",
- "libtiny_ui",
  "log",
  "time",
 ]
@@ -413,7 +406,6 @@ dependencies = [
  "futures",
  "libc",
  "libtiny_common",
- "libtiny_ui",
  "log",
  "mio",
  "notify-rust",
@@ -425,15 +417,6 @@ dependencies = [
  "time",
  "tokio",
  "unicode-width",
-]
-
-[[package]]
-name = "libtiny_ui"
-version = "0.1.0"
-dependencies = [
- "dyn-clone",
- "libtiny_common",
- "time",
 ]
 
 [[package]]
@@ -1073,7 +1056,6 @@ dependencies = [
  "libtiny_common",
  "libtiny_logger",
  "libtiny_tui",
- "libtiny_ui",
  "libtiny_wire",
  "log",
  "rustc_tools_util",

@@ -6,9 +6,10 @@
 use futures::stream::StreamExt;
 use tokio::sync::mpsc;
 
-use libtiny_common::ChanNameRef;
-use libtiny_ui::{MsgTarget, TabStyle, UI};
+use libtiny_common::{ChanNameRef, MsgTarget, TabStyle};
 use libtiny_wire as wire;
+
+use crate::ui::TinyUI;
 
 pub(crate) trait Client {
     fn get_serv_name(&self) -> &str;
@@ -34,16 +35,16 @@ impl Client for libtiny_client::Client {
 
 pub(crate) async fn task(
     mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
-    ui: Box<dyn UI>,
+    ui: TinyUI,
     client: Box<dyn Client>,
 ) {
     while let Some(ev) = rcv_ev.next().await {
-        handle_conn_ev(&*ui, &*client, ev);
+        handle_conn_ev(&ui, &*client, ev);
         ui.draw();
     }
 }
 
-fn handle_conn_ev(ui: &dyn UI, client: &dyn Client, ev: libtiny_client::Event) {
+fn handle_conn_ev(ui: &TinyUI, client: &dyn Client, ev: libtiny_client::Event) {
     use libtiny_client::Event::*;
     match ev {
         ResolvingHost => {
@@ -144,7 +145,7 @@ fn handle_conn_ev(ui: &dyn UI, client: &dyn Client, ev: libtiny_client::Event) {
     }
 }
 
-fn handle_irc_msg(ui: &dyn UI, client: &dyn Client, msg: wire::Msg) {
+fn handle_irc_msg(ui: &TinyUI, client: &dyn Client, msg: wire::Msg) {
     use wire::Cmd::*;
     use wire::Pfx::*;
 

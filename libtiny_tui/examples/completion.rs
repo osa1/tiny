@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
+use libtiny_common::MsgTarget;
 use libtiny_tui::TUI;
-use libtiny_ui::*;
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -15,7 +15,7 @@ fn main() {
 
     local.block_on(&runtime, async move {
         let (tui, _) = TUI::run(PathBuf::from("../tiny/config.yml"));
-        tui.new_server_tab("debug", None);
+        tui.new_server_tab("debug", &None);
         let debug_tab = MsgTarget::Server { serv: "debug" };
 
         tui.add_msg(

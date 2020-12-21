@@ -9,9 +9,8 @@ use futures::select;
 use futures::stream::StreamExt;
 use tokio::sync::mpsc;
 
-use libtiny_common::ChanNameRef;
+use libtiny_common::{ChanNameRef, Event, MsgTarget};
 use libtiny_tui::TUI;
-use libtiny_ui::*;
 
 static SERV: &str = "debug";
 static CHAN: &str = "chan";
@@ -31,7 +30,7 @@ fn main() {
 
     local.block_on(&runtime, async move {
         let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));
-        tui.new_server_tab("debug", None);
+        tui.new_server_tab("debug", &None);
         tui.new_chan_tab("debug", ChanNameRef::new("chan"));
         tui.set_topic(
             "This is channel topic",
@@ -93,7 +92,7 @@ async fn ui_task(ui: TUI, mut rcv_ev: mpsc::Receiver<Event>, mut abort: mpsc::Se
 }
 
 fn handle_input_ev(ui: &TUI, ev: Event, abort: &mut mpsc::Sender<()>) {
-    use libtiny_ui::Event::*;
+    use libtiny_common::Event::*;
     match ev {
         Cmd { cmd, .. } => {
             let words: Vec<&str> = cmd.split_whitespace().collect();
