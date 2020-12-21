@@ -2,7 +2,7 @@
 #![allow(clippy::borrowed_box)]
 
 use crate::config;
-use crate::ui::TinyUI;
+use crate::ui::UI;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
@@ -14,7 +14,7 @@ pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
     pub config_path: &'a Path,
     pub defaults: &'a config::Defaults,
-    pub ui: &'a TinyUI,
+    pub ui: &'a UI,
     pub clients: &'a mut Vec<Client>,
     pub src: MsgSource,
 }
@@ -199,7 +199,7 @@ fn connect(args: CmdArgs) {
     }
 }
 
-fn reconnect(ui: &TinyUI, clients: &mut Vec<Client>, src: MsgSource) {
+fn reconnect(ui: &UI, clients: &mut Vec<Client>, src: MsgSource) {
     if let Some(client) = find_client(clients, src.serv_name()) {
         ui.add_client_msg(
             "Reconnecting...",
@@ -215,7 +215,7 @@ fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
     defaults: &config::Defaults,
-    ui: &TinyUI,
+    ui: &UI,
     clients: &mut Vec<Client>,
 ) {
     fn split_port(s: &str) -> Option<(&str, &str)> {

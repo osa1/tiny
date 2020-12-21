@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use libtiny_common::{ChanNameRef, MsgTarget, TabStyle};
 use libtiny_wire as wire;
 
-use crate::ui::TinyUI;
+use crate::ui::UI;
 
 pub(crate) trait Client {
     fn get_serv_name(&self) -> &str;
@@ -35,7 +35,7 @@ impl Client for libtiny_client::Client {
 
 pub(crate) async fn task(
     mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
-    ui: TinyUI,
+    ui: UI,
     client: Box<dyn Client>,
 ) {
     while let Some(ev) = rcv_ev.next().await {
@@ -44,7 +44,7 @@ pub(crate) async fn task(
     }
 }
 
-fn handle_conn_ev(ui: &TinyUI, client: &dyn Client, ev: libtiny_client::Event) {
+fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
     use libtiny_client::Event::*;
     match ev {
         ResolvingHost => {
@@ -145,7 +145,7 @@ fn handle_conn_ev(ui: &TinyUI, client: &dyn Client, ev: libtiny_client::Event) {
     }
 }
 
-fn handle_irc_msg(ui: &TinyUI, client: &dyn Client, msg: wire::Msg) {
+fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
     use wire::Cmd::*;
     use wire::Pfx::*;
 

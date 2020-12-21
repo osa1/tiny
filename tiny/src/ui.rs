@@ -26,12 +26,12 @@ macro_rules! delegate {
 }
 
 #[derive(Clone)]
-pub(crate) struct TinyUI {
+pub(crate) struct UI {
     pub(crate) ui: TUI,
     pub(crate) logger: Option<Logger>,
 }
 
-impl TinyUI {
+impl UI {
     delegate!(draw());
     delegate!(new_server_tab(serv: &str, alias: &Option<String>,));
     delegate!(close_server_tab(serv: &str,));
@@ -76,7 +76,7 @@ impl TinyUI {
 pub(crate) async fn task(
     config_path: PathBuf,
     defaults: config::Defaults,
-    ui: TinyUI,
+    ui: UI,
     mut clients: Vec<Client>,
     mut rcv_ev: mpsc::Receiver<libtiny_common::Event>,
 ) {
@@ -89,7 +89,7 @@ pub(crate) async fn task(
 fn handle_input_ev(
     config_path: &Path,
     defaults: &config::Defaults,
-    ui: &TinyUI,
+    ui: &UI,
     clients: &mut Vec<Client>,
     ev: libtiny_common::Event,
 ) {
@@ -115,7 +115,7 @@ fn handle_input_ev(
 fn handle_cmd(
     config_path: &Path,
     defaults: &config::Defaults,
-    ui: &TinyUI,
+    ui: &UI,
     clients: &mut Vec<Client>,
     src: MsgSource,
     cmd: &str,
@@ -151,7 +151,7 @@ fn handle_cmd(
 
 // TODO: move this somewhere else
 pub(crate) fn send_msg(
-    ui: &TinyUI,
+    ui: &UI,
     clients: &mut Vec<Client>,
     src: &MsgSource,
     msg: String,

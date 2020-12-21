@@ -1,5 +1,5 @@
 use crate::conn;
-use crate::ui::TinyUI;
+use crate::ui::UI;
 use libtiny_common::ChanName;
 use libtiny_tui::test_utils::expect_screen;
 use libtiny_tui::TUI;
@@ -67,7 +67,7 @@ where
             rcv_input_ev.map(|ev| Ok(ev)),
         );
 
-        let tiny_ui = TinyUI {
+        let tiny_ui = UI {
             ui: tui.clone(),
             logger: None,
         };

@@ -15,7 +15,7 @@ use libtiny_client::{Client, ServerInfo};
 use libtiny_common::{ChanNameRef, MsgTarget};
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
-use ui::TinyUI;
+use ui::UI;
 
 use std::path::PathBuf;
 use std::process::exit;
@@ -133,11 +133,11 @@ fn run(
             });
 
         let tui = match logger {
-            None => TinyUI {
+            None => UI {
                 ui: tui,
                 logger: None,
             },
-            Some(logger) => TinyUI {
+            Some(logger) => UI {
                 ui: tui,
                 logger: Some(logger),
             },
