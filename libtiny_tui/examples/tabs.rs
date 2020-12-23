@@ -5,9 +5,8 @@ use std::path::PathBuf;
 use futures::stream::StreamExt;
 use tokio::sync::mpsc;
 
-use libtiny_common::ChanNameRef;
+use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
 use libtiny_tui::TUI;
-use libtiny_ui::*;
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -61,7 +60,7 @@ async fn ui_task(ui: TUI, mut rcv_ev: mpsc::Receiver<Event>) {
 }
 
 fn handle_input_ev(ui: &TUI, ev: Event) {
-    use libtiny_ui::Event::*;
+    use libtiny_common::Event::*;
     match ev {
         Cmd { cmd, source } => {
             if cmd == "close" {

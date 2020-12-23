@@ -1,8 +1,7 @@
 use crate::tui::TUI;
 
 use crate::test_utils::expect_screen;
-use libtiny_common::ChanNameRef;
-use libtiny_ui::*;
+use libtiny_common::{ChanNameRef, MsgTarget};
 use term_input::{Event, Key};
 
 use std::fs::File;

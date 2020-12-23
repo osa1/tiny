@@ -1,7 +1,8 @@
 use crate::conn;
+use crate::ui::UI;
 use libtiny_common::ChanName;
 use libtiny_tui::test_utils::expect_screen;
-use libtiny_tui::{TUI, UI};
+use libtiny_tui::TUI;
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 use term_input;
 use termbox_simple::CellBuf;
@@ -39,7 +40,7 @@ const DEFAULT_TUI_HEIGHT: u16 = 5;
 
 struct TestSetup {
     /// TUI test instance
-    tui: Box<TUI>,
+    tui: TUI,
     /// Send input events to the TUI using this channel
     snd_input_ev: mpsc::Sender<input::Event>,
     /// Send connection events to connection handler (`conn::task`) using this channel
@@ -66,7 +67,7 @@ where
             rcv_input_ev.map(|ev| Ok(ev)),
         );
 
-        let tui = Box::new(tui);
+        let tiny_ui = UI::new(tui.clone(), None);
 
         // Create test connection event channel
         let (snd_conn_ev, rcv_conn_ev) = mpsc::channel::<client::Event>(100);
@@ -74,7 +75,7 @@ where
         // Spawn connection event handler task
         tokio::task::spawn_local(conn::task(
             rcv_conn_ev,
-            tui.clone(),
+            tiny_ui,
             Box::new(TestClient { nick }),
         ));
 
