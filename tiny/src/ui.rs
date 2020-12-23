@@ -51,7 +51,6 @@ impl UI {
         }
     }
 
-    delegate!(draw());
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
@@ -81,6 +80,7 @@ impl UI {
         chan: &ChanNameRef,
     ));
 
+    delegate_ui!(draw());
     delegate_ui!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
     delegate_ui!(add_client_err_msg(msg: &str, target: &MsgTarget,));
     delegate_ui!(clear_nicks(serv: &str,));

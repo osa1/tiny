@@ -43,7 +43,6 @@ macro_rules! delegate {
 }
 
 impl Logger {
-    pub fn draw(&self) {}
     delegate!(new_server_tab(serv: &str,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
