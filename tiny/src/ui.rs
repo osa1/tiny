@@ -25,6 +25,14 @@ macro_rules! delegate {
     }
 }
 
+macro_rules! delegate_ui {
+    ( $name:ident ( $( $x:ident: $t:ty, )* ) $(->$ret:ty )? ) => {
+        pub(crate) fn $name(&self, $($x: $t,)*) $(-> $ret)? {
+            self.ui.$name( $( $x, )* )
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct UI {
     ui: TUI,
@@ -32,22 +40,24 @@ pub(crate) struct UI {
 }
 
 impl UI {
-    pub fn new(ui: TUI, logger: Option<Logger>) -> UI {
+    pub(crate) fn new(ui: TUI, logger: Option<Logger>) -> UI {
         UI { ui, logger }
     }
 
+    pub(crate) fn new_server_tab(&self, serv_name: &str, alias: Option<String>) {
+        self.ui.new_server_tab(serv_name, alias);
+        if let Some(logger) = &self.logger {
+            logger.new_server_tab(serv_name);
+        }
+    }
+
     delegate!(draw());
-    delegate!(new_server_tab(serv: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_user_tab(serv: &str, nick: &str,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
     delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_client_err_msg(msg: &str, target: &MsgTarget,));
-    delegate!(clear_nicks(serv: &str,));
-    delegate!(set_nick(serv: &str, nick: &str,));
     delegate!(add_privmsg(
         sender: &str,
         msg: &str,
@@ -70,11 +80,13 @@ impl UI {
         serv: &str,
         chan: &ChanNameRef,
     ));
-    delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
 
-    pub(crate) fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
-        self.ui.user_tab_exists(serv_name, nick)
-    }
+    delegate_ui!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
+    delegate_ui!(add_client_err_msg(msg: &str, target: &MsgTarget,));
+    delegate_ui!(clear_nicks(serv: &str,));
+    delegate_ui!(set_nick(serv: &str, nick: &str,));
+    delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
+    delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
 }
 
 pub(crate) async fn task(

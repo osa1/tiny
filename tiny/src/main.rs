@@ -127,7 +127,7 @@ fn run(
                 Ok(logger) => {
                     // Create "mentions" log file manually -- the tab is already created in the TUI so
                     // we won't be creating a "mentions" file in the logger without this.
-                    logger.new_server_tab("mentions", None);
+                    logger.new_server_tab("mentions");
                     Some(logger)
                 }
             });

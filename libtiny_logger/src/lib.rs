@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use time::Tm;
 
-use libtiny_common::{ChanName, ChanNameRef, MsgTarget, TabStyle};
+use libtiny_common::{ChanName, ChanNameRef, MsgTarget};
 
 #[macro_use]
 extern crate log;
@@ -44,17 +44,13 @@ macro_rules! delegate {
 
 impl Logger {
     pub fn draw(&self) {}
-    delegate!(new_server_tab(serv: &str, alias: Option<String>,));
+    delegate!(new_server_tab(serv: &str,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_user_tab(serv: &str, nick: &str,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
     delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_client_err_msg(msg: &str, target: &MsgTarget,));
-    delegate!(clear_nicks(serv: &str,));
-    delegate!(set_nick(serv: &str, nick: &str,));
     delegate!(add_privmsg(
         sender: &str,
         msg: &str,
@@ -77,12 +73,6 @@ impl Logger {
         serv: &str,
         chan: &ChanNameRef,
     ));
-    delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
-
-    // TODO: Maybe just return true?
-    pub fn user_tab_exists(&self, _serv: &str, _nick: &str) -> bool {
-        false
-    }
 }
 
 struct LoggerInner {
@@ -164,7 +154,7 @@ impl LoggerInner {
         })
     }
 
-    fn new_server_tab(&mut self, serv: &str, _alias: Option<String>) {
+    fn new_server_tab(&mut self, serv: &str) {
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
@@ -240,22 +230,6 @@ impl LoggerInner {
         });
     }
 
-    fn add_err_msg(&self, _msg: &str, _ts: Tm, _target: &MsgTarget) {
-        // IRC error messages are ignored
-    }
-
-    fn add_client_err_msg(&self, _msg: &str, _target: &MsgTarget) {
-        // Ditto with client error messages
-    }
-
-    fn clear_nicks(&self, _serv: &str) {
-        // Nothing to do here
-    }
-
-    fn set_nick(&self, _serv: &str, _nick: &str) {
-        // Ditto
-    }
-
     fn add_privmsg(
         &mut self,
         sender: &str,
@@ -319,10 +293,6 @@ impl LoggerInner {
                 writeln!(fd, "[{}] Channel topic: {}.", strf(&ts), topic)
             );
         });
-    }
-
-    fn set_tab_style(&self, _: TabStyle, _: &MsgTarget) {
-        // Nothing to do here
     }
 
     fn apply_to_target(&mut self, target: &MsgTarget, f: impl Fn(&mut File, &dyn Fn(String))) {

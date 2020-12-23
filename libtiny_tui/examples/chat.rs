@@ -30,7 +30,7 @@ fn main() {
 
     local.block_on(&runtime, async move {
         let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));
-        tui.new_server_tab("debug", &None);
+        tui.new_server_tab("debug", None);
         tui.new_chan_tab("debug", ChanNameRef::new("chan"));
         tui.set_topic(
             "This is channel topic",
