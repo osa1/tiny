@@ -12,11 +12,10 @@ use crate::config::{parse_config, Colors, Config, Style};
 use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
-use crate::tab::{Tab, TabStyle};
+use crate::tab::Tab;
 use crate::widget::WidgetRet;
-use crate::{MsgSource, MsgTarget};
 
-use libtiny_common::ChanNameRef;
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use term_input::{Arrow, Event, Key};
 pub use termbox_simple::{CellBuf, Termbox};
 

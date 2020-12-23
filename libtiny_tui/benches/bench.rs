@@ -2,12 +2,12 @@
 extern crate bencher;
 
 use bencher::Bencher;
+use libtiny_common::MsgTarget;
+use libtiny_tui::tui::TUI;
 use std::{fs::File, io::BufRead, io::BufReader, io::Read};
 use time::Tm;
 
 use libtiny_tui::trie::Trie;
-use libtiny_tui::tui::TUI;
-use libtiny_tui::MsgTarget;
 
 static DICT_FILE: &str = "/usr/share/dict/american-english";
 

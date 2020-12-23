@@ -22,10 +22,8 @@ mod widget;
 #[cfg(test)]
 mod tests;
 
-pub use crate::tab::TabStyle;
 use crate::tui::TUIRet;
-use libtiny_common::ChanNameRef;
-pub use libtiny_ui::*;
+use libtiny_common::{ChanNameRef, Event, MsgTarget, TabStyle};
 
 use futures::select;
 use futures::stream::StreamExt;
@@ -203,7 +201,7 @@ async fn input_handler<S>(
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
-        fn $name(&self, $($x: $t,)*) {
+        pub fn $name(&self, $($x: $t,)*) {
             if let Some(inner) = self.inner.upgrade() {
                 inner.borrow_mut().$name( $( $x, )* );
             }
@@ -211,7 +209,7 @@ macro_rules! delegate {
     }
 }
 
-impl UI for TUI {
+impl TUI {
     delegate!(draw());
     delegate!(new_server_tab(serv_name: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv_name: &str,));
@@ -248,7 +246,7 @@ impl UI for TUI {
     ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
 
-    fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
+    pub fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
         match self.inner.upgrade() {
             Some(tui) => tui.borrow().user_tab_exists(serv_name, nick),
             None => false,

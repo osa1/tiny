@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
+use libtiny_common::MsgTarget;
 use libtiny_tui::TUI;
-use libtiny_ui::*;
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()

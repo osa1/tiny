@@ -9,8 +9,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
+use libtiny_common::MsgTarget;
 use libtiny_tui::TUI;
-use libtiny_ui::*;
 
 fn main() {
     run_bench();
