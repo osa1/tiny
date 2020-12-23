@@ -37,7 +37,7 @@ impl UI {
     }
 
     delegate!(draw());
-    delegate!(new_server_tab(serv: &str, alias: &Option<String>,));
+    delegate!(new_server_tab(serv: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));

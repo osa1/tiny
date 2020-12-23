@@ -67,10 +67,7 @@ where
             rcv_input_ev.map(|ev| Ok(ev)),
         );
 
-        let tiny_ui = UI {
-            ui: tui.clone(),
-            logger: None,
-        };
+        let tiny_ui = UI::new(tui.clone(), None);
 
         // Create test connection event channel
         let (snd_conn_ev, rcv_conn_ev) = mpsc::channel::<client::Event>(100);
@@ -82,7 +79,7 @@ where
             Box::new(TestClient { nick }),
         ));
 
-        tui.new_server_tab(SERV_NAME, &None);
+        tui.new_server_tab(SERV_NAME, None);
         tui.draw();
 
         test(TestSetup {

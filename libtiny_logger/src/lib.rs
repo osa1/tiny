@@ -44,7 +44,7 @@ macro_rules! delegate {
 
 impl Logger {
     pub fn draw(&self) {}
-    delegate!(new_server_tab(serv: &str, alias: &Option<String>,));
+    delegate!(new_server_tab(serv: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
@@ -164,7 +164,7 @@ impl LoggerInner {
         })
     }
 
-    fn new_server_tab(&mut self, serv: &str, _alias: &Option<String>) {
+    fn new_server_tab(&mut self, serv: &str, _alias: Option<String>) {
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {

@@ -127,7 +127,7 @@ fn run(
                 Ok(logger) => {
                     // Create "mentions" log file manually -- the tab is already created in the TUI so
                     // we won't be creating a "mentions" file in the logger without this.
-                    logger.new_server_tab("mentions", &None);
+                    logger.new_server_tab("mentions", None);
                     Some(logger)
                 }
             });
@@ -137,7 +137,7 @@ fn run(
         let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
         for server in servers.iter().cloned() {
-            tui.new_server_tab(&server.addr, &server.alias);
+            tui.new_server_tab(&server.addr, server.alias);
 
             let server_info = ServerInfo {
                 addr: server.addr,
