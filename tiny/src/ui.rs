@@ -27,11 +27,15 @@ macro_rules! delegate {
 
 #[derive(Clone)]
 pub(crate) struct UI {
-    pub(crate) ui: TUI,
-    pub(crate) logger: Option<Logger>,
+    ui: TUI,
+    logger: Option<Logger>,
 }
 
 impl UI {
+    pub fn new(ui: TUI, logger: Option<Logger>) -> UI {
+        UI { ui, logger }
+    }
+
     delegate!(draw());
     delegate!(new_server_tab(serv: &str, alias: &Option<String>,));
     delegate!(close_server_tab(serv: &str,));

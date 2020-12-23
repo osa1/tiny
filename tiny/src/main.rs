@@ -132,16 +132,7 @@ fn run(
                 }
             });
 
-        let tui = match logger {
-            None => UI {
-                ui: tui,
-                logger: None,
-            },
-            Some(logger) => UI {
-                ui: tui,
-                logger: Some(logger),
-            },
-        };
+        let tui = UI::new(tui, logger);
 
         let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
