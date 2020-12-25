@@ -52,20 +52,15 @@ fn main() {
                 }
 
                 let config::Config {
-                    servers,
+                    mut servers,
                     defaults,
                     log_dir,
                 } = config;
 
-                let servers = if !server_args.is_empty() {
+                if !server_args.is_empty() {
                     // Connect only to servers that match at least one of the given patterns
-                    servers
-                        .into_iter()
-                        .filter(|s| server_args.iter().any(|arg| s.addr.contains(arg)))
-                        .collect()
-                } else {
-                    servers
-                };
+                    servers.retain(|s| server_args.iter().any(|arg| s.addr.contains(arg)))
+                }
                 run(servers, defaults, config_path, log_dir)
             }
         }
@@ -114,8 +109,8 @@ fn run(
                 )
             })
         };
-        let logger: Option<Logger> =
-            log_dir.and_then(|log_dir| match Logger::new(log_dir, report_logger_error) {
+        let logger: Option<Logger> = log_dir.and_then(|log_dir| {
+            match Logger::new(log_dir, report_logger_error) {
                 Err(LoggerInitError::CouldNotCreateDir { dir_path, err }) => {
                     tui.add_client_err_msg(
                         &format!("Could not create log directory {:?}: {}", dir_path, err),
@@ -125,12 +120,30 @@ fn run(
                     None
                 }
                 Ok(logger) => {
+                    // set logger configs
+                    for server in &servers {
+                        let logs_enabled = Some(server.logs_enabled.unwrap_or(true));
+                        logger.add_server_config(
+                            &server.addr,
+                            logs_enabled,
+                            server.chan_logs_enabled.or(logs_enabled),
+                            server.user_logs_enabled.or(logs_enabled),
+                        );
+                        for chan in &server.join {
+                            logger.add_chan_config(
+                                &server.addr,
+                                &chan.name,
+                                chan.logs_enabled.or(logs_enabled),
+                            );
+                        }
+                    }
                     // Create "mentions" log file manually -- the tab is already created in the TUI so
                     // we won't be creating a "mentions" file in the logger without this.
                     logger.new_server_tab("mentions");
                     Some(logger)
                 }
-            });
+            }
+        });
 
         let tui = UI::new(tui, logger);
 
@@ -149,7 +162,7 @@ fn run(
                 auto_join: server
                     .join
                     .iter()
-                    .map(|c| ChanNameRef::new(c).to_owned())
+                    .map(|c| ChanNameRef::new(&c.name).to_owned())
                     .collect(),
                 nickserv_ident: server.nickserv_ident,
                 sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {

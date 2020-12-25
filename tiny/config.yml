@@ -11,7 +11,8 @@ servers:
 
       # Channels to automatically join
       join:
-          - '#tiny'
+          - name: "#tiny"
+            logs_enabled: true
 
       # Three authentication methods: pass, sasl, and nickserv_ident
       # These are optional and you probably only need one of these, delete
@@ -29,6 +30,15 @@ servers:
       # (useful when `pass` or `sasl` fields above are not used)
       # nickserv_ident: 'hunter2'
 
+      # Optional logging configuration
+      #
+      # Log file for the server
+      # logs_enabled: false
+      # Default setting for channels
+      # chan_logs_enabled: true
+      # Default setting for user messages
+      # user_logs_enabled: true
+
 # Defaults used when connecting to servers via the /connect command
 defaults:
     nicks: [tiny_user]
@@ -37,7 +47,7 @@ defaults:
     tls: false
 
 # Where to put log files
-log_dir: '{}'
+log_dir: "{}"
 
 # (Optional) Limits the maximum number of messages stored for each UI tab. Defaults to unlimited.
 # scrollback: 512
@@ -56,7 +66,7 @@ log_dir: '{}'
 # Attributes can be combined (e.g [bold, underline]), and valid values are bold
 # and underline.
 colors:
-    nick: [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ]
+    nick: [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14]
 
     clear:
         fg: default

@@ -185,17 +185,46 @@ fn connect(args: CmdArgs) {
         src,
         ..
     } = args;
-    let words: Vec<&str> = args.split_whitespace().collect();
+    let mut logging: Option<bool> = None;
+    let mut chan_logging: Option<bool> = None;
+    let mut user_logging: Option<bool> = None;
+
+    let words: Vec<&str> = args
+        .split_whitespace()
+        .filter_map(|s| match s {
+            "--logging=on" => {
+                logging = Some(true);
+                None
+            }
+            "--logging=off" => {
+                logging = Some(false);
+                None
+            }
+            "--chan-logging=on" => {
+                chan_logging = Some(true);
+                None
+            }
+            "--chan-logging=off" => {
+                chan_logging = Some(false);
+                None
+            }
+            "--user_logging=on" => {
+                user_logging = Some(true);
+                None
+            }
+            "--user_logging=off" => {
+                user_logging = Some(false);
+                None
+            }
+            s => Some(s),
+        })
+        .collect();
 
     match words.len() {
         0 => reconnect(ui, clients, src),
         1 => connect_(words[0], None, defaults, ui, clients),
         2 => connect_(words[0], Some(words[1]), defaults, ui, clients),
-        _ =>
-        // wat
-        {
-            ui.add_client_err_msg(CONNECT_CMD.usage, &MsgTarget::CurrentTab)
-        }
+        _ => ui.add_client_err_msg(CONNECT_CMD.usage, &MsgTarget::CurrentTab),
     }
 }
 
@@ -286,7 +315,7 @@ static JOIN_CMD: Cmd = Cmd {
     name: "join",
     cmd_fn: join,
     description: "Joins a channel",
-    usage: "/join chan1[,chan2...]",
+    usage: "/join [--logging=on|off] chan1[,chan2...]",
 };
 
 fn join(args: CmdArgs) {
@@ -297,10 +326,29 @@ fn join(args: CmdArgs) {
         src,
         ..
     } = args;
+    // logging will be defaulted to the config file
+    let mut logging: Option<bool> = None;
     let words = args
         .split_whitespace()
-        .map(|c| ChanNameRef::new(c))
+        .filter_map(|c| match c {
+            "--logging=on" => {
+                logging = Some(true);
+                None
+            }
+            "--logging=off" => {
+                logging = Some(false);
+                None
+            }
+            c => Some(ChanNameRef::new(c)),
+        })
         .collect::<Vec<_>>();
+
+    if let Some(logger) = &ui.logger {
+        for chan in &words {
+            logger.add_chan_config(src.serv_name(), chan.display(), logging)
+        }
+    }
+
     if words.is_empty() {
         return ui.add_client_err_msg(JOIN_CMD.usage, &MsgTarget::CurrentTab);
     }

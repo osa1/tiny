@@ -39,7 +39,7 @@ pub(crate) struct Server {
 
     /// Channels to automatically join.
     #[serde(default)]
-    pub(crate) join: Vec<String>,
+    pub(crate) join: Vec<Chan>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
     pub(crate) nickserv_ident: Option<String>,
@@ -47,6 +47,16 @@ pub(crate) struct Server {
     /// Authenication method
     #[serde(rename = "sasl")]
     pub(crate) sasl_auth: Option<SASLAuth>,
+
+    pub(crate) logs_enabled: Option<bool>,
+    pub(crate) chan_logs_enabled: Option<bool>,
+    pub(crate) user_logs_enabled: Option<bool>,
+}
+
+#[derive(Clone, Deserialize)]
+pub(crate) struct Chan {
+    pub(crate) name: String,
+    pub(crate) logs_enabled: Option<bool>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
@@ -174,7 +184,7 @@ mod tests {
                 panic!();
             }
             Ok(Config { servers, .. }) => {
-                assert_eq!(servers[0].join, vec!["#tiny".to_owned()]);
+                assert_eq!(servers[0].join[0].name, "#tiny".to_string());
                 assert_eq!(servers[0].tls, true);
             }
         }

@@ -43,6 +43,17 @@ macro_rules! delegate {
 }
 
 impl Logger {
+    delegate!(add_server_config(
+        serv: &str,
+        enabled: Option<bool>,
+        chans_enabled: Option<bool>,
+        users_enabled: Option<bool>,
+    ));
+    delegate!(add_chan_config(
+        serv: &str,
+        chan: &str,
+        enabled: Option<bool>,
+    ));
     delegate!(new_server_tab(serv: &str,));
     delegate!(close_server_tab(serv: &str,));
     delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
@@ -77,18 +88,35 @@ impl Logger {
 struct LoggerInner {
     /// Log file directory
     log_dir: PathBuf,
-
     /// Maps server names to their fds
     servers: HashMap<String, ServerLogs>,
-
     /// Callback used when reporting errors
     report_err: Box<dyn Fn(String)>,
 }
 
+#[derive(Debug)]
 struct ServerLogs {
-    fd: File,
-    chans: HashMap<ChanName, File>,
-    users: HashMap<String, File>,
+    // Is this server enabled?
+    enabled: bool,
+    // Server's log file
+    fd: Option<File>,
+    // Are channels logged by default?
+    chans_enabled: bool,
+    // Are users logged by default?
+    users_enabled: bool,
+    // Channel configs
+    chans: HashMap<ChanName, TabConfig>,
+    // User configs
+    users: HashMap<String, TabConfig>,
+}
+
+/// Channel or user tab config
+#[derive(Debug)]
+struct TabConfig {
+    // Is this tab enabled
+    enabled: bool,
+    // Tab's file
+    file: Option<File>,
 }
 
 fn print_header(fd: &mut File) -> io::Result<()> {
@@ -153,7 +181,59 @@ impl LoggerInner {
         })
     }
 
+    fn add_server_config(
+        &mut self,
+        serv: &str,
+        enabled: Option<bool>,
+        chans_enabled: Option<bool>,
+        users_enabled: Option<bool>,
+    ) {
+        let enabled = enabled.unwrap_or(true);
+        let config = ServerLogs {
+            enabled,
+            fd: None,
+            chans_enabled: chans_enabled.unwrap_or(enabled),
+            users_enabled: users_enabled.unwrap_or(enabled),
+            chans: HashMap::new(),
+            users: HashMap::new(),
+        };
+        self.servers.insert(serv.to_string(), config);
+    }
+
+    fn add_chan_config(&mut self, serv: &str, chan: &str, enabled: Option<bool>) {
+        // assuming someone already called add_server_config() first
+        let server = self.servers.get_mut(serv).unwrap();
+        let chans_enabled = server.chans_enabled;
+        let config = TabConfig {
+            enabled: enabled.unwrap_or_else(|| chans_enabled),
+            file: None,
+        };
+        let chan = ChanName::new(chan.to_string());
+        if let Some(chan_conf) = server.chans.get_mut(&chan) {
+            chan_conf.enabled = enabled.unwrap_or(chans_enabled);
+        } else {
+            server
+                .chans
+                .insert(ChanName::new(chan.normalized()), config);
+        }
+    }
+
     fn new_server_tab(&mut self, serv: &str) {
+        if let Some(server) = self.servers.get_mut(serv) {
+            if server.enabled {
+                let mut path = self.log_dir.clone();
+                path.push(&format!("{}.txt", serv));
+                if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
+                    report_io_err!(self.report_err, print_header(&mut fd));
+                    server.fd = Some(fd);
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        // no config was made so use default (true)
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
@@ -161,7 +241,10 @@ impl LoggerInner {
             self.servers.insert(
                 serv.to_string(),
                 ServerLogs {
-                    fd,
+                    enabled: true,
+                    fd: Some(fd),
+                    chans_enabled: true,
+                    users_enabled: true,
                     chans: HashMap::new(),
                     users: HashMap::new(),
                 },
@@ -170,7 +253,7 @@ impl LoggerInner {
     }
 
     fn close_server_tab(&mut self, serv: &str) {
-        self.servers.remove(serv);
+        self.servers.get_mut(serv).unwrap().fd = None;
     }
 
     fn new_chan_tab(&mut self, serv: &str, chan: &ChanNameRef) {
@@ -179,17 +262,42 @@ impl LoggerInner {
                 info!("new_chan_tab: can't find server: {}", serv);
             }
             Some(server) => {
-                let mut path = self.log_dir.clone();
                 let chan_name_normalized = chan.normalized();
-                path.push(&format!(
-                    "{}_{}.txt",
-                    serv,
-                    replace_forward_slash(&chan_name_normalized)
-                ));
-                if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
-                    report_io_err!(self.report_err, print_header(&mut fd));
-                    server.chans.insert(ChanName::new(chan_name_normalized), fd);
-                }
+                let chan_conf = server.chans.get_mut(chan);
+
+                let try_open = |path: &mut PathBuf,
+                                chan_fd: &mut Option<File>,
+                                report_err: &dyn Fn(String)| {
+                    build_tab_path(path, serv, &chan_name_normalized);
+                    if let Some(mut fd) = try_open_log_file(&path, report_err) {
+                        report_io_err!(report_err, print_header(&mut fd));
+                        *chan_fd = Some(fd);
+                    } else {
+                        *chan_fd = None
+                    }
+                };
+
+                // file should always be None if the TabConfig is found before new_chan_tab() is called
+                if let Some(chan) = chan_conf {
+                    if chan.enabled {
+                        // create the file
+                        let mut path = self.log_dir.clone();
+                        try_open(&mut path, &mut chan.file, &self.report_err)
+                    }
+                } else {
+                    // create a config entry even if we aren't going to log now
+                    let mut tab_conf = TabConfig {
+                        enabled: server.chans_enabled,
+                        file: None,
+                    };
+                    if server.chans_enabled {
+                        let mut path = self.log_dir.clone();
+                        try_open(&mut path, &mut tab_conf.file, &self.report_err)
+                    }
+                    server
+                        .chans
+                        .insert(ChanName::new(chan_name_normalized), tab_conf);
+                };
             }
         }
     }
@@ -200,7 +308,9 @@ impl LoggerInner {
                 info!("close_chan_tab: can't find server: {}", serv);
             }
             Some(server) => {
-                server.chans.remove(chan);
+                if let Some(tab_conf) = server.chans.get_mut(chan) {
+                    tab_conf.file = None;
+                }
             }
         }
     }
@@ -301,32 +411,43 @@ impl LoggerInner {
                     info!("Can't find server: {}", serv);
                 }
                 Some(ServerLogs { ref mut fd, .. }) => {
-                    f(fd, &*self.report_err);
+                    if let Some(fd) = fd {
+                        f(fd, &*self.report_err);
+                    }
                 }
             },
             MsgTarget::Chan { serv, chan } => match self.servers.get_mut(serv) {
                 None => {
                     info!("Can't find server: {}", serv);
                 }
-                Some(ServerLogs { ref mut chans, .. }) => match chans.get_mut(chan) {
+                Some(ServerLogs {
+                    ref mut chans,
+                    ref chans_enabled,
+                    ..
+                }) => match chans.get_mut(chan) {
                     None => {
-                        // Create a file for the channel. FIXME Code copied from new_chan_tab:
-                        // can't reuse it because of borrowchk issues.
-                        let mut path = self.log_dir.clone();
+                        let mut tab_conf = TabConfig {
+                            enabled: *chans_enabled,
+                            file: None,
+                        };
                         let chan_name_normalized = chan.normalized();
-                        path.push(&format!(
-                            "{}_{}.txt",
-                            serv,
-                            replace_forward_slash(&chan_name_normalized)
-                        ));
-                        if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
-                            report_io_err!(self.report_err, print_header(&mut fd));
-                            f(&mut fd, &*self.report_err);
-                            chans.insert(ChanName::new(chan_name_normalized), fd);
+                        if *chans_enabled {
+                            // Create a file for the channel. FIXME Code copied from new_chan_tab:
+                            // can't reuse it because of borrowchk issues.
+                            let mut path = self.log_dir.clone();
+                            build_tab_path(&mut path, serv, &chan_name_normalized);
+                            if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
+                                report_io_err!(self.report_err, print_header(&mut fd));
+                                f(&mut fd, &*self.report_err);
+                                tab_conf.file = Some(fd);
+                            }
                         }
+                        chans.insert(ChanName::new(chan_name_normalized), tab_conf);
                     }
-                    Some(fd) => {
-                        f(fd, &*self.report_err);
+                    Some(tab_conf) => {
+                        if let Some(ref mut fd) = tab_conf.file {
+                            f(fd, &*self.report_err);
+                        }
                     }
                 },
             },
@@ -335,21 +456,36 @@ impl LoggerInner {
                     None => {
                         info!("Can't find server: {}", serv);
                     }
-                    Some(ServerLogs { ref mut users, .. }) => {
+                    Some(ServerLogs {
+                        ref mut users,
+                        ref users_enabled,
+                        ..
+                    }) => {
                         match users.get_mut(nick) {
-                            Some(fd) => {
-                                f(fd, &*self.report_err);
+                            Some(tab_conf) => {
+                                if let Some(ref mut fd) = tab_conf.file {
+                                    f(fd, &*self.report_err);
+                                }
                             }
                             None => {
-                                // We don't have a `new_user_tab` trait method so user log files
-                                // are created here
-                                let mut path = self.log_dir.clone();
-                                path.push(&format!("{}_{}.txt", serv, replace_forward_slash(nick)));
-                                if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
-                                    report_io_err!(self.report_err, print_header(&mut fd));
-                                    f(&mut fd, &*self.report_err);
-                                    users.insert(nick.to_owned(), fd);
+                                let mut tab_conf = TabConfig {
+                                    enabled: *users_enabled,
+                                    file: None,
+                                };
+                                if *users_enabled {
+                                    // We don't have a `new_user_tab` trait method so user log files
+                                    // are created here
+                                    let mut path = self.log_dir.clone();
+                                    build_tab_path(&mut path, serv, nick);
+                                    if let Some(mut fd) =
+                                        try_open_log_file(&path, &*self.report_err)
+                                    {
+                                        report_io_err!(self.report_err, print_header(&mut fd));
+                                        f(&mut fd, &*self.report_err);
+                                        tab_conf.file = Some(fd);
+                                    }
                                 }
+                                users.insert(nick.to_owned(), tab_conf);
                             }
                         }
                     }
@@ -365,12 +501,18 @@ impl LoggerInner {
                     ref mut users,
                     ..
                 }) => {
-                    f(fd, &*self.report_err);
-                    for (_, fd) in chans.iter_mut() {
+                    if let Some(fd) = fd {
                         f(fd, &*self.report_err);
                     }
-                    for (_, fd) in users.iter_mut() {
-                        f(fd, &*self.report_err);
+                    for tab_conf in chans.values_mut() {
+                        if let Some(ref mut fd) = tab_conf.file {
+                            f(fd, &*self.report_err);
+                        }
+                    }
+                    for tab_conf in users.values_mut() {
+                        if let Some(ref mut fd) = tab_conf.file {
+                            f(fd, &*self.report_err);
+                        }
                     }
                 }
             },
@@ -379,6 +521,14 @@ impl LoggerInner {
             }
         }
     }
+}
+
+fn build_tab_path(path: &mut PathBuf, serv: &str, tab_name: &str) {
+    path.push(&format!(
+        "{}_{}.txt",
+        serv,
+        replace_forward_slash(&tab_name)
+    ));
 }
 
 fn now() -> String {

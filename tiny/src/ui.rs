@@ -36,7 +36,7 @@ macro_rules! delegate_ui {
 #[derive(Clone)]
 pub(crate) struct UI {
     ui: TUI,
-    logger: Option<Logger>,
+    pub(crate) logger: Option<Logger>,
 }
 
 impl UI {
