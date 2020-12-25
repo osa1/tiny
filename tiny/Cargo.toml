@@ -16,17 +16,17 @@ desktop-notifications = ["libtiny_tui/desktop-notifications"]
 
 [dependencies]
 clap = "2.33"
-dirs = "3.0.1"
+dirs = "3.0"
 env_logger = { version = "0.8", default-features = false }
-futures = { version = "0.3.1", default-features = false }
+futures = { version = "0.3", default-features = false }
 libtiny_client = { path = "../libtiny_client", default-features = false }
 libtiny_common = { path = "../libtiny_common" }
 libtiny_logger = { path = "../libtiny_logger" }
 libtiny_tui = { path = "../libtiny_tui", default-features = false }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
-serde = { version = "1.0.8", features = ["derive"] }
-serde_yaml = "0.8.14"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
 time = "0.1"
 tokio = { version = "0.3.6", default-features = false, features = [] }
 
@@ -35,4 +35,4 @@ term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 
 [build-dependencies]
-rustc_tools_util = "0.2.0"
+rustc_tools_util = "0.2"
