@@ -176,6 +176,12 @@ static CONNECT_CMD: Cmd = Cmd {
     usage: "/connect <host>:<port> or /connect (to reconnect)",
 };
 
+struct ConnectLogArgs {
+    logging: Option<bool>,
+    chan_logging: Option<bool>,
+    user_logging: Option<bool>,
+}
+
 fn connect(args: CmdArgs) {
     let CmdArgs {
         args,
@@ -185,35 +191,38 @@ fn connect(args: CmdArgs) {
         src,
         ..
     } = args;
-    let mut logging: Option<bool> = None;
-    let mut chan_logging: Option<bool> = None;
-    let mut user_logging: Option<bool> = None;
+
+    let mut log_args = ConnectLogArgs {
+        logging: None,
+        chan_logging: None,
+        user_logging: None,
+    };
 
     let words: Vec<&str> = args
         .split_whitespace()
         .filter_map(|s| match s {
             "--logging=on" => {
-                logging = Some(true);
+                log_args.logging = Some(true);
                 None
             }
             "--logging=off" => {
-                logging = Some(false);
+                log_args.logging = Some(false);
                 None
             }
             "--chan-logging=on" => {
-                chan_logging = Some(true);
+                log_args.chan_logging = Some(true);
                 None
             }
             "--chan-logging=off" => {
-                chan_logging = Some(false);
+                log_args.chan_logging = Some(false);
                 None
             }
             "--user_logging=on" => {
-                user_logging = Some(true);
+                log_args.user_logging = Some(true);
                 None
             }
             "--user_logging=off" => {
-                user_logging = Some(false);
+                log_args.user_logging = Some(false);
                 None
             }
             s => Some(s),
@@ -222,8 +231,8 @@ fn connect(args: CmdArgs) {
 
     match words.len() {
         0 => reconnect(ui, clients, src),
-        1 => connect_(words[0], None, defaults, ui, clients),
-        2 => connect_(words[0], Some(words[1]), defaults, ui, clients),
+        1 => connect_(words[0], None, defaults, ui, clients, log_args),
+        2 => connect_(words[0], Some(words[1]), defaults, ui, clients, log_args),
         _ => ui.add_client_err_msg(CONNECT_CMD.usage, &MsgTarget::CurrentTab),
     }
 }
@@ -246,6 +255,7 @@ fn connect_(
     defaults: &config::Defaults,
     ui: &UI,
     clients: &mut Vec<Client>,
+    log_args: ConnectLogArgs,
 ) {
     fn split_port(s: &str) -> Option<(&str, &str)> {
         s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
@@ -269,6 +279,15 @@ fn connect_(
             },
         }
     };
+
+    if let Some(logger) = &ui.logger {
+        logger.add_server_config(
+            serv_addr,
+            log_args.logging,
+            log_args.chan_logging,
+            log_args.user_logging,
+        );
+    }
 
     // if we already connected to this server reconnect using new port
     if let Some(client) = find_client(clients, serv_name) {
