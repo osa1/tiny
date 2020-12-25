@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fixed highlighting tabs when `/ignore` is set. (#291)
+
 # 2020/12/10: 0.8.0
 
 Thanks to @trevarj and @shumvgolove for contributing to this release.
