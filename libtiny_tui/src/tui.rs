@@ -389,7 +389,7 @@ impl TUI {
                     for tab in &self.tabs {
                         if let MsgSource::Serv { serv: ref serv_ } = tab.src {
                             if serv == serv_ {
-                                status_val = tab.widget.get_ignore_state();
+                                status_val = tab.widget.is_showing_status();
                                 notifier = Some(tab.notifier);
                                 break;
                             }
@@ -1158,7 +1158,10 @@ impl TUI {
 
     pub(crate) fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, is_active: bool| {
-            if !is_active && tab.style < style {
+            if !is_active
+                && tab.style < style
+                && !(style == TabStyle::JoinOrPart && !tab.widget.is_showing_status())
+            {
                 tab.set_style(style);
             }
         });
@@ -1288,7 +1291,7 @@ impl TUI {
             for tab in &self.tabs {
                 if let MsgSource::Serv { serv: ref serv_ } = tab.src {
                     if serv == serv_ {
-                        status_val = tab.widget.get_ignore_state();
+                        status_val = tab.widget.is_showing_status();
                         break;
                     }
                 }

@@ -13,13 +13,13 @@ default = []
 desktop-notifications = ["notify-rust"]
 
 [dependencies]
-futures = { version = "0.3.1", default-features = false, features = ["std", "async-await"] }
+futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 libtiny_common = { path = "../libtiny_common" }
 log = "0.4"
 notify-rust = { version = "3", optional = true }
-serde = { version = "1.0.8", features = ["derive"] }
-serde_yaml = "0.8.4"
-tempfile = "3.1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+tempfile = "3.1"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"

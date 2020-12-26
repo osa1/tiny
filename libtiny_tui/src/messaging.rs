@@ -410,7 +410,7 @@ impl MessagingUI {
         }
     }
 
-    pub(crate) fn get_ignore_state(&self) -> bool {
+    pub(crate) fn is_showing_status(&self) -> bool {
         self.show_status
     }
 

@@ -12,8 +12,8 @@ tls-rustls = ["rustls-native-certs", "tokio-rustls"]
 
 [dependencies]
 base64 = "0.13"
-futures = { version = "0.3.1", default-features = false, features = ["std", "async-await"] }
-lazy_static = "1.4.0"
+futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+lazy_static = "1.4"
 libtiny_common = { path = "../libtiny_common" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
