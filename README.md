@@ -187,9 +187,6 @@ Commands start with `/` character.
 
 - `/switch <string>`: Switch to the first tab which has the given string in the name.
 
-- `/statusline`: Enable or disable status line on top which gives you info about
-  current settings of a tab.
-
 - `/ignore`: Ignore `join/quit` messages in a channel. Running this command in
   a server tab applies it to all channels of that server. You can check your
   ignore state in the status line.

@@ -56,9 +56,6 @@ pub struct Colors {
     pub tab_new_msg: Style,
     pub tab_highlight: Style,
     pub tab_joinpart: Style,
-    pub statusline_normal: Style,
-    pub statusline_left: Style,
-    pub statusline_right: Style,
 }
 
 impl Default for Colors {
@@ -125,9 +122,6 @@ impl Default for Colors {
                 fg: 11,
                 bg: TB_DEFAULT,
             },
-            statusline_normal: Style { fg: 15, bg: 8 },
-            statusline_left: Style { fg: 10, bg: 8 },
-            statusline_right: Style { fg: 7, bg: 8 },
         }
     }
 }

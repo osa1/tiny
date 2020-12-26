@@ -94,17 +94,10 @@ impl TabLine {
         }
     }
 
-    pub(crate) fn resize(
-        &mut self,
-        tabs: &mut [Tab],
-        width: i32,
-        height: i32,
-        statusline_height: i32,
-    ) {
+    pub(crate) fn resize(&mut self, tabs: &mut [Tab], width: i32, height: i32) {
         self.width = width;
         for tab in tabs.iter_mut() {
-            tab.widget
-                .resize(self.width, height - 1 - statusline_height);
+            tab.widget.resize(self.width, height - 1);
         }
         // scroll the tab bar so that currently active tab is still visible
         let (mut tab_left, mut tab_right) = self.rendered_tabs(tabs);

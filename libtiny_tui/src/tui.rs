@@ -12,7 +12,6 @@ use crate::config::{parse_config, Colors, Config, TabUiType};
 use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
-use crate::statusline::{draw_statusline, statusline_visible};
 use crate::tab::Tab;
 use crate::tab_area::TabArea;
 use crate::widget::WidgetRet;
@@ -61,18 +60,11 @@ const NOTIFY_CMD: CmdUsage = CmdUsage::new(
     "/notify [off|mentions|messages]",
 );
 const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
-const STATUSLINE_CMD: CmdUsage = CmdUsage::new("statusline", "Toggles statusline", "/statusline");
 const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
 const TAB_UI_CMD: CmdUsage = CmdUsage::new("tabui", "Toggle the tab ui style", "/tabui");
 
-const TUI_COMMANDS: [CmdUsage; 7] = [
-    CLEAR_CMD,
-    IGNORE_CMD,
-    NOTIFY_CMD,
-    SWITCH_CMD,
-    STATUSLINE_CMD,
-    RELOAD_CMD,
-    TAB_UI_CMD,
+const TUI_COMMANDS: [CmdUsage; 6] = [
+    CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD, TAB_UI_CMD,
 ];
 
 pub struct TUI {
@@ -90,10 +82,6 @@ pub struct TUI {
     width: i32,
     height: i32,
 
-    /// Do we want to show statusline?
-    show_statusline: bool,
-    /// Is there room for statusline?
-    statusline_visible: bool,
     /// Config file path
     config_path: Option<PathBuf>,
 }
@@ -135,8 +123,6 @@ impl TUI {
             tab_area: TabArea::new(width),
             width,
             height,
-            show_statusline: false,
-            statusline_visible: statusline_visible(width, height),
             config_path,
         };
 
@@ -249,10 +235,6 @@ impl TUI {
                     Some(s) => self.tab_area.switch(s, &self.tabs),
                     None => self.add_client_err_msg(SWITCH_CMD.usage, &MsgTarget::CurrentTab),
                 }
-                true
-            }
-            Some("statusline") => {
-                self.toggle_statusline();
                 true
             }
             Some("reload") => {
@@ -374,12 +356,6 @@ impl TUI {
             ret
         };
 
-        let statusline_height = if self.statusline_visible && self.show_statusline {
-            1
-        } else {
-            0
-        };
-
         let tab_area_offset = self.tab_area.calculate_x_offset(self.width);
         let message_ui_height = if tab_area_offset != 0 { 0 } else { 1 };
         self.tabs.insert(
@@ -388,7 +364,7 @@ impl TUI {
                 alias,
                 widget: MessagingUI::new(
                     self.width - tab_area_offset,
-                    self.height - message_ui_height - statusline_height,
+                    self.height - message_ui_height,
                     status,
                     self.scrollback,
                 ),
@@ -449,7 +425,7 @@ impl TUI {
                     for tab in &self.tabs {
                         if let MsgSource::Serv { serv: ref serv_ } = tab.src {
                             if serv == serv_ {
-                                status_val = tab.widget.get_ignore_state();
+                                status_val = tab.widget.is_showing_status();
                                 notifier = Some(tab.notifier);
                                 break;
                             }
@@ -759,16 +735,8 @@ impl TUI {
     }
 
     fn resize_(&mut self) {
-        // self.statusline_visible = statusline_visible(self.width, self.height);
-        let statusline_height =
-            if statusline_visible(self.width, self.height) && self.show_statusline {
-                1
-            } else {
-                0
-            };
-
         self.tab_area
-            .resize(&mut self.tabs, self.width, self.height, statusline_height);
+            .resize(&mut self.tabs, self.width, self.height);
 
         // redraw after resize
         self.draw()
@@ -786,40 +754,16 @@ impl TUI {
             return;
         }
 
-        let statusline_height = if self.statusline_visible && self.show_statusline {
-            1
-        } else {
-            0
-        };
-
         let tab_area_offset = self.tab_area.calculate_x_offset(self.width);
 
         let active_tab = &mut self.tabs[self.tab_area.active_idx()];
-        if self.show_statusline && self.statusline_visible {
-            draw_statusline(
-                &mut self.tb,
-                self.width,
-                &self.colors,
-                &active_tab.visible_name(),
-                active_tab.notifier,
-                active_tab.widget.get_ignore_state(),
-            );
-        }
 
-        active_tab.widget.draw(
-            &mut self.tb,
-            &self.colors,
-            tab_area_offset,
-            statusline_height,
-        );
+        active_tab
+            .widget
+            .draw(&mut self.tb, &self.colors, tab_area_offset, 0);
 
-        self.tab_area.draw(
-            &mut self.tb,
-            &self.tabs,
-            self.height,
-            &self.colors,
-            statusline_height,
-        );
+        self.tab_area
+            .draw(&mut self.tb, &self.tabs, self.height, &self.colors);
 
         self.tb.present();
     }
@@ -920,7 +864,10 @@ impl TUI {
 
     pub(crate) fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, is_active: bool| {
-            if !is_active && tab.style < style {
+            if !is_active
+                && tab.style < style
+                && !(style == TabStyle::JoinOrPart && !tab.widget.is_showing_status())
+            {
                 tab.set_style(style);
             }
         });
@@ -1062,18 +1009,13 @@ impl TUI {
         self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.clear());
     }
 
-    pub(crate) fn toggle_statusline(&mut self) {
-        self.show_statusline = !self.show_statusline;
-        self.resize();
-    }
-
     pub(crate) fn toggle_ignore(&mut self, target: &MsgTarget) {
         if let MsgTarget::AllServTabs { serv } = *target {
             let mut status_val: bool = false;
             for tab in &self.tabs {
                 if let MsgSource::Serv { serv: ref serv_ } = tab.src {
                     if serv == serv_ {
-                        status_val = tab.widget.get_ignore_state();
+                        status_val = tab.widget.is_showing_status();
                         break;
                     }
                 }

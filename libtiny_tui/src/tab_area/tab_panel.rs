@@ -31,15 +31,8 @@ impl From<TabLine> for TabPanel {
 }
 
 impl TabPanel {
-    pub(crate) fn draw(
-        &self,
-        tb: &mut Termbox,
-        tabs: &[Tab],
-        height: i32,
-        colors: &Colors,
-        statusline_height: i32,
-    ) {
-        let mut pos_y = statusline_height;
+    pub(crate) fn draw(&self, tb: &mut Termbox, tabs: &[Tab], height: i32, colors: &Colors) {
+        let mut pos_y = 0;
         let skipped = height as usize * (self.page.saturating_sub(1));
         let mut tabs_iter = tabs.iter().enumerate().skip(skipped).peekable();
         for idx in pos_y..height {
@@ -55,7 +48,7 @@ impl TabPanel {
                     Some(self.width - 1 - x_offset),
                 );
             }
-            if idx == statusline_height && self.page > 1 {
+            if idx == 0 && self.page > 1 {
                 // top arrow
                 let arrow_style = arrow_style(&tabs[..skipped], colors);
                 tb.change_cell(self.width, pos_y, UP_ARROW, arrow_style.fg, arrow_style.bg);
@@ -82,21 +75,14 @@ impl TabPanel {
         }
     }
 
-    pub(crate) fn resize(
-        &mut self,
-        tabs: &mut [Tab],
-        tui_width: i32,
-        height: i32,
-        statusline_height: i32,
-    ) {
+    pub(crate) fn resize(&mut self, tabs: &mut [Tab], tui_width: i32, height: i32) {
         self.width = calculate_panel_width(tui_width);
-        self.height = height - statusline_height;
+        self.height = height;
         self.page = 1;
         let tab_area_offset = calculate_panel_width(tui_width) + 1;
         // resize all the tabs
         for tab in tabs {
-            tab.widget
-                .resize(tui_width - tab_area_offset, height - statusline_height);
+            tab.widget.resize(tui_width - tab_area_offset, height);
         }
     }
 

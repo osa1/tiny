@@ -24,31 +24,18 @@ impl TabArea {
         TabArea::TabLine(TabLine::new(width))
     }
 
-    pub(crate) fn draw(
-        &self,
-        tb: &mut Termbox,
-        tabs: &[Tab],
-        height: i32,
-        colors: &Colors,
-        statusline_height: i32,
-    ) {
+    pub(crate) fn draw(&self, tb: &mut Termbox, tabs: &[Tab], height: i32, colors: &Colors) {
         match self {
             TabArea::TabLine(line) => line.draw(tb, tabs, height, colors),
-            TabArea::TabPanel(panel) => panel.draw(tb, tabs, height, colors, statusline_height),
+            TabArea::TabPanel(panel) => panel.draw(tb, tabs, height, colors),
         }
     }
 
-    pub(crate) fn resize(
-        &mut self,
-        tabs: &mut [Tab],
-        width: i32,
-        height: i32,
-        statusline_height: i32,
-    ) {
+    pub(crate) fn resize(&mut self, tabs: &mut [Tab], width: i32, height: i32) {
         match self {
-            TabArea::TabLine(line) => line.resize(tabs, width, height, statusline_height),
+            TabArea::TabLine(line) => line.resize(tabs, width, height),
             TabArea::TabPanel(panel) => {
-                panel.resize(tabs, width, height, statusline_height);
+                panel.resize(tabs, width, height);
                 let active_idx = panel.active_idx;
                 self.select_tab(active_idx, tabs);
             }
