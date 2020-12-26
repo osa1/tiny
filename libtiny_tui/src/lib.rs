@@ -10,7 +10,6 @@ mod messaging;
 #[doc(hidden)]
 pub mod msg_area; // Public to be able to use in an example
 mod notifier;
-mod statusline;
 mod tab;
 mod termbox;
 pub mod test_utils;

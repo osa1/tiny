@@ -12,7 +12,6 @@ use crate::config::{parse_config, Colors, Config, Style};
 use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
-use crate::statusline::{draw_statusline, statusline_visible};
 use crate::tab::Tab;
 use crate::widget::WidgetRet;
 
@@ -63,17 +62,9 @@ const NOTIFY_CMD: CmdUsage = CmdUsage::new(
     "/notify [off|mentions|messages]",
 );
 const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
-const STATUSLINE_CMD: CmdUsage = CmdUsage::new("statusline", "Toggles statusline", "/statusline");
 const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
 
-const TUI_COMMANDS: [CmdUsage; 6] = [
-    CLEAR_CMD,
-    IGNORE_CMD,
-    NOTIFY_CMD,
-    SWITCH_CMD,
-    STATUSLINE_CMD,
-    RELOAD_CMD,
-];
+const TUI_COMMANDS: [CmdUsage; 5] = [CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD];
 
 pub struct TUI {
     /// Termbox instance
@@ -91,10 +82,6 @@ pub struct TUI {
     height: i32,
     h_scroll: i32,
 
-    /// Do we want to show statusline?
-    show_statusline: bool,
-    /// Is there room for statusline?
-    statusline_visible: bool,
     /// Config file path
     config_path: Option<PathBuf>,
 }
@@ -137,8 +124,6 @@ impl TUI {
             width,
             height,
             h_scroll: 0,
-            show_statusline: false,
-            statusline_visible: statusline_visible(width, height),
             config_path,
         };
 
@@ -253,10 +238,6 @@ impl TUI {
                 }
                 true
             }
-            Some("statusline") => {
-                self.toggle_statusline();
-                true
-            }
             Some("reload") => {
                 self.reload_config();
                 true
@@ -346,21 +327,11 @@ impl TUI {
             ret
         };
 
-        let statusline_height = if self.statusline_visible && self.show_statusline {
-            1
-        } else {
-            0
-        };
         self.tabs.insert(
             idx,
             Tab {
                 alias,
-                widget: MessagingUI::new(
-                    self.width,
-                    self.height - 1 - statusline_height,
-                    status,
-                    self.scrollback,
-                ),
+                widget: MessagingUI::new(self.width, self.height - 1, status, self.scrollback),
                 src,
                 style: TabStyle::Normal,
                 switch,
@@ -710,17 +681,8 @@ impl TUI {
     }
 
     fn resize_(&mut self) {
-        // self.statusline_visible = statusline_visible(self.width, self.height);
-        let statusline_height =
-            if statusline_visible(self.width, self.height) && self.show_statusline {
-                1
-            } else {
-                0
-            };
-
         for tab in &mut self.tabs {
-            tab.widget
-                .resize(self.width, self.height - 1 - statusline_height);
+            tab.widget.resize(self.width, self.height - 1);
         }
         // scroll the tab bar so that currently active tab is still visible
         let (mut tab_left, mut tab_right) = self.rendered_tabs();
@@ -866,26 +828,9 @@ impl TUI {
             return;
         }
 
-        let statusline_height = if self.statusline_visible && self.show_statusline {
-            1
-        } else {
-            0
-        };
-
-        if self.show_statusline && self.statusline_visible {
-            draw_statusline(
-                &mut self.tb,
-                self.width,
-                &self.colors,
-                &self.tabs[self.active_idx].visible_name(),
-                self.tabs[self.active_idx].notifier,
-                self.tabs[self.active_idx].widget.is_showing_status(),
-            );
-        }
-
         self.tabs[self.active_idx]
             .widget
-            .draw(&mut self.tb, &self.colors, 0, statusline_height);
+            .draw(&mut self.tb, &self.colors, 0, 0);
 
         // decide whether we need to draw left/right arrows in tab bar
         let left_arr = self.draw_left_arrow();
@@ -1338,11 +1283,6 @@ impl TUI {
 
     pub(crate) fn clear(&mut self, target: &MsgTarget) {
         self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.clear());
-    }
-
-    pub(crate) fn toggle_statusline(&mut self) {
-        self.show_statusline = !self.show_statusline;
-        self.resize();
     }
 
     pub(crate) fn toggle_ignore(&mut self, target: &MsgTarget) {
