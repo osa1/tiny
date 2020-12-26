@@ -1,6 +1,7 @@
 # Unreleased
 
 - Fixed highlighting tabs when `/ignore` is set. (#291)
+- `/statusline` removed. See 6abc671 commit message for the motivation.
 
 # 2020/12/10: 0.8.0
 
