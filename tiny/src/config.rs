@@ -75,6 +75,7 @@ pub(crate) struct Config {
     pub(crate) servers: Vec<Server>,
     pub(crate) defaults: Defaults,
     pub(crate) log_dir: Option<PathBuf>,
+    pub(crate) logs_enabled: Option<bool>,
 }
 
 /// Returns error descriptions.

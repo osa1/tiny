@@ -48,6 +48,8 @@ defaults:
 
 # Where to put log files
 log_dir: "{}"
+# (Optional) global logging setting (defaults to true)
+# logs_enabled: true
 
 # (Optional) Limits the maximum number of messages stored for each UI tab. Defaults to unlimited.
 # scrollback: 512

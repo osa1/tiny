@@ -10,6 +10,9 @@ use time::Tm;
 
 use libtiny_common::{ChanName, ChanNameRef, MsgTarget};
 
+#[cfg(test)]
+mod tests;
+
 #[macro_use]
 extern crate log;
 

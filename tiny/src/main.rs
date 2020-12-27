@@ -55,13 +55,14 @@ fn main() {
                     mut servers,
                     defaults,
                     log_dir,
+                    logs_enabled,
                 } = config;
 
                 if !server_args.is_empty() {
                     // Connect only to servers that match at least one of the given patterns
                     servers.retain(|s| server_args.iter().any(|arg| s.addr.contains(arg)))
                 }
-                run(servers, defaults, config_path, log_dir)
+                run(servers, defaults, config_path, log_dir, logs_enabled)
             }
         }
     }
@@ -74,6 +75,7 @@ fn run(
     defaults: config::Defaults,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
+    logs_enabled: Option<bool>,
 ) {
     let debug_log_file = match log_dir.as_ref() {
         Some(log_dir) => {
@@ -122,7 +124,9 @@ fn run(
                 Ok(logger) => {
                     // set logger configs
                     for server in &servers {
-                        let logs_enabled = Some(server.logs_enabled.unwrap_or(true));
+                        // ultimately default to true if no global logging setting was set
+                        let logs_enabled =
+                            Some(server.logs_enabled.unwrap_or(logs_enabled.unwrap_or(true)));
                         logger.add_server_config(
                             &server.addr,
                             logs_enabled,
