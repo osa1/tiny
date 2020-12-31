@@ -107,6 +107,7 @@ byte_seq_parser! {
     [27, 79, 70] => Key::End,
     [27, 91, 52, 126] => Key::End,
     [9] => Key::Tab,
+    [8] => Key::Backspace,
     [127] => Key::Backspace,
     [1] => Key::Ctrl('a'),
     [5] => Key::Ctrl('e'),
