@@ -2,6 +2,7 @@
 
 - Fixed highlighting tabs when `/ignore` is set. (#291)
 - `/statusline` removed. See 6abc671 commit message for the motivation.
+- Backspace handling in newer xterms fixed. (#295)
 
 # 2020/12/10: 0.8.0
 
