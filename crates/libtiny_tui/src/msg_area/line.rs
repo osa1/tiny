@@ -1,5 +1,8 @@
+use crate::line_split::LineType;
 use crate::{
-    config, config::Colors, line_split::LineDataCache, utils::translate_irc_control_chars,
+    config::{Colors, Style},
+    line_split::LineDataCache,
+    utils::translate_irc_control_chars,
 };
 use std::mem;
 use termbox_simple::{self, Termbox};
@@ -9,13 +12,9 @@ use termbox_simple::{self, Termbox};
 #[derive(Debug)]
 pub(crate) struct Line {
     /// Line segments.
-    string_segments: Vec<StyledString>,
-
+    segments: Vec<StyledString>,
     /// The segment we're currently extending.
     current_seg: StyledString,
-
-    /// Number of characters in the line (includes all segments).
-    len_chars: i32,
 
     line_data: LineDataCache,
 }
@@ -30,18 +29,13 @@ struct StyledString {
 pub(crate) enum SegStyle {
     /// A specific style. Useful when rendering IRC colors (which should look
     /// the same across color schemes).
-    Fixed(config::Style),
+    Fixed(Style),
 
     /// An index to nick colors. Note that the index should be larger than size
     /// of the color list, so make sure to use mod.
-    Index(usize),
+    NickColor(usize),
 
     /// A style from the current color scheme.
-    SchemeStyle(SchemeStyle),
-}
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum SchemeStyle {
     UserMsg,
     ErrMsg,
     Topic,
@@ -54,27 +48,32 @@ pub(crate) enum SchemeStyle {
 }
 
 impl StyledString {
-    pub(crate) fn style(&self, colors: &Colors) -> config::Style {
+    pub(crate) fn style(&self, colors: &Colors) -> Style {
+        use SegStyle::*;
         match self.style {
-            SegStyle::Fixed(style) => style,
-            SegStyle::Index(idx) => config::Style {
+            Fixed(style) => style,
+            NickColor(idx) => Style {
                 fg: u16::from(colors.nick[idx % colors.nick.len()]),
                 bg: colors.user_msg.bg,
             },
-            SegStyle::SchemeStyle(sty) => {
-                use self::SchemeStyle::*;
-                match sty {
-                    UserMsg => colors.user_msg,
-                    ErrMsg => colors.err_msg,
-                    Topic => colors.topic,
-                    Join => colors.join,
-                    Part => colors.part,
-                    Nick => colors.nick_change,
-                    Faded => colors.faded,
-                    Highlight => colors.highlight,
-                    Timestamp => colors.timestamp,
-                }
-            }
+            UserMsg => colors.user_msg,
+            ErrMsg => colors.err_msg,
+            Topic => colors.topic,
+            Join => colors.join,
+            Part => colors.part,
+            Nick => colors.nick_change,
+            Faded => colors.faded,
+            Highlight => colors.highlight,
+            Timestamp => colors.timestamp,
+        }
+    }
+}
+
+impl Default for StyledString {
+    fn default() -> Self {
+        StyledString {
+            string: String::new(),
+            style: SegStyle::UserMsg,
         }
     }
 }
@@ -85,17 +84,21 @@ const TERMBOX_COLOR_PREFIX: char = '\x00';
 impl Line {
     pub(crate) fn new() -> Line {
         Line {
-            string_segments: vec![],
-            current_seg: StyledString {
-                string: String::new(),
-                style: SegStyle::SchemeStyle(SchemeStyle::UserMsg),
-            },
-            len_chars: 0,
-            line_data: LineDataCache::new(false),
+            segments: vec![],
+            current_seg: StyledString::default(),
+            line_data: LineDataCache::msg_line(0, None),
         }
     }
 
-    pub(crate) fn set_style(&mut self, style: SegStyle) {
+    pub(crate) fn set_type(&mut self, line_type: LineType) {
+        self.line_data.set_line_type(line_type)
+    }
+
+    pub(crate) fn line_type(&self) -> LineType {
+        self.line_data.line_type()
+    }
+
+    fn set_message_style(&mut self, style: SegStyle) {
         // Just update the last segment if it's empty
         if self.current_seg.string.is_empty() {
             self.current_seg.style = style;
@@ -107,11 +110,11 @@ impl Line {
                     style,
                 },
             );
-            self.string_segments.push(seg);
+            self.segments.push(seg);
         }
     }
 
-    pub(crate) fn add_text(&mut self, str: &str) {
+    fn add_text_inner(&mut self, str: &str) {
         fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
             ret.push(TERMBOX_COLOR_PREFIX);
             ret.push(0 as char); // style
@@ -133,20 +136,23 @@ impl Line {
                 let bg = iter.next().unwrap() as u8;
                 let fg = (u16::from(st) << 8) | u16::from(fg);
                 let bg = u16::from(bg);
-                let style = config::Style { fg, bg };
-                self.set_style(SegStyle::Fixed(style));
+                let style = Style { fg, bg };
+                self.set_message_style(SegStyle::Fixed(style));
             } else if char > '\x08' {
                 self.current_seg.string.push(char);
-                self.len_chars += 1;
             }
         }
     }
 
-    pub(crate) fn add_char(&mut self, char: char) {
-        assert_ne!(char, TERMBOX_COLOR_PREFIX);
+    pub(crate) fn add_text(&mut self, str: &str, style: SegStyle) {
+        self.set_message_style(style);
+        self.add_text_inner(str)
+    }
 
+    pub(crate) fn add_char(&mut self, char: char, style: SegStyle) {
+        assert_ne!(char, TERMBOX_COLOR_PREFIX);
+        self.set_message_style(style);
         self.current_seg.string.push(char);
-        self.len_chars += 1;
     }
 
     pub(crate) fn force_recalculation(&mut self) {
@@ -156,11 +162,11 @@ impl Line {
     /// Calculates the number of lines that this line will be.
     /// The calculation is only done if the line_data is dirty or the window is resized.
     pub(crate) fn rendered_height(&mut self, width: i32) -> i32 {
-        if self.line_data.is_dirty() || self.line_data.needs_resize(width, 0) {
-            self.line_data.reset(width, 0);
-            // Get all segs together
+        let msg_padding = self.line_type().msg_padding();
+        if self.line_data.is_dirty() || self.line_data.needs_resize(width, 0, msg_padding) {
+            self.line_data = LineDataCache::msg_line(width, msg_padding);
             let mut full_line = self
-                .string_segments
+                .segments
                 .iter()
                 .flat_map(|s| s.string.chars())
                 .chain(self.current_seg.string.chars());
@@ -184,7 +190,7 @@ impl Line {
         let mut split_indices_iter = self.line_data.get_splits().iter().copied().peekable();
 
         for seg in self
-            .string_segments
+            .segments
             .iter()
             .chain(std::iter::once(&self.current_seg))
         {
@@ -200,7 +206,8 @@ impl Line {
                             break;
                         }
                         // Reset column
-                        col = 0;
+                        col = pos_x + self.line_data.new_line_offset();
+
                         // Move to the next line start index
                         split_indices_iter.next();
                         // Don't draw whitespaces
@@ -259,7 +266,7 @@ mod tests {
     #[test]
     fn height_test_1() {
         let mut line = Line::new();
-        line.add_text("a b c d e");
+        line.add_text("a b c d e", SegStyle::UserMsg);
         assert_eq!(line.rendered_height(1), 9);
         assert_eq!(line.rendered_height(2), 5);
         assert_eq!(line.rendered_height(3), 3);
@@ -274,7 +281,7 @@ mod tests {
     #[test]
     fn height_test_2() {
         let mut line = Line::new();
-        line.add_text("ab c d e");
+        line.add_text("ab c d e", SegStyle::UserMsg);
         assert_eq!(line.rendered_height(1), 8);
         assert_eq!(line.rendered_height(2), 4);
         assert_eq!(line.rendered_height(3), 3);
@@ -288,7 +295,7 @@ mod tests {
     #[test]
     fn height_test_3() {
         let mut line = Line::new();
-        line.add_text("ab cd e");
+        line.add_text("ab cd e", SegStyle::UserMsg);
         assert_eq!(line.rendered_height(1), 7);
         assert_eq!(line.rendered_height(2), 4);
         assert_eq!(line.rendered_height(3), 3);
@@ -301,7 +308,7 @@ mod tests {
     #[test]
     fn height_test_4() {
         let mut line = Line::new();
-        line.add_text("ab cde");
+        line.add_text("ab cde", SegStyle::UserMsg);
         assert_eq!(line.rendered_height(1), 6);
         assert_eq!(line.rendered_height(2), 4);
         assert_eq!(line.rendered_height(3), 2);
@@ -329,9 +336,24 @@ mod tests {
         };
 
         let mut line = Line::new();
-        line.add_text(&text);
+        line.add_text(&text, SegStyle::UserMsg);
         // lipsum.txt has 1160 words in it. each line should contain at most one
         // word so we should have 1160 lines.
         assert_eq!(line.rendered_height(80), 102);
+    }
+
+    #[test]
+    fn align_test() {
+        let mut line = Line::new();
+        line.set_type(LineType::AlignedMsg { msg_padding: 1 });
+        /*
+        123
+         45
+         67
+         8
+        */
+        line.add_text_inner("12345678");
+
+        assert_eq!(line.rendered_height(3), 4);
     }
 } // mod tests

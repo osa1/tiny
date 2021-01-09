@@ -11,6 +11,7 @@ use time::Tm;
 use crate::config::{parse_config, Colors, Config, Style};
 use crate::editor;
 use crate::messaging::{MessagingUI, Timestamp};
+use crate::msg_area::Layout;
 use crate::notifier::Notifier;
 use crate::tab::Tab;
 use crate::widget::WidgetRet;
@@ -76,6 +77,9 @@ pub struct TUI {
     /// Max number of message lines
     scrollback: usize,
 
+    /// Messaging layout
+    msg_layout: Layout,
+
     tabs: Vec<Tab>,
     active_idx: usize,
     width: i32,
@@ -108,6 +112,10 @@ impl TUI {
         self.tb.activate()
     }
 
+    pub(crate) fn set_layout(&mut self, layout: Layout) {
+        self.msg_layout = layout
+    }
+
     fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
         // This is now done in reload_config() below
         // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
@@ -119,6 +127,7 @@ impl TUI {
             tb,
             colors: Colors::default(),
             scrollback: usize::MAX,
+            msg_layout: Layout::Compact,
             tabs: Vec::new(),
             active_idx: 0,
             width,
@@ -269,9 +278,16 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                Ok(Config { colors, scrollback }) => {
+                Ok(Config {
+                    colors,
+                    scrollback,
+                    ui_style,
+                }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
+                    if let Some(ui_style) = ui_style {
+                        self.msg_layout = ui_style.into()
+                    }
                 }
             }
         }
@@ -331,7 +347,13 @@ impl TUI {
             idx,
             Tab {
                 alias,
-                widget: MessagingUI::new(self.width, self.height - 1, status, self.scrollback),
+                widget: MessagingUI::new(
+                    self.width,
+                    self.height - 1,
+                    status,
+                    self.scrollback,
+                    self.msg_layout,
+                ),
                 src,
                 style: TabStyle::Normal,
                 switch,

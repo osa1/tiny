@@ -17,7 +17,7 @@ impl InputLine {
     pub(crate) fn new() -> InputLine {
         InputLine {
             buffer: Vec::with_capacity(512),
-            line_data: LineDataCache::new(true),
+            line_data: LineDataCache::input_line(0, 0),
         }
     }
 
@@ -25,7 +25,7 @@ impl InputLine {
     pub(crate) fn from_buffer(buffer: Vec<char>) -> InputLine {
         InputLine {
             buffer,
-            line_data: LineDataCache::new(true),
+            line_data: LineDataCache::input_line(0, 0),
         }
     }
 
@@ -84,8 +84,8 @@ impl InputLine {
     /// Calculate hedight of the widget, taking nickname length into account. Only needed when
     /// buffer is wider than width and scrolling is off.
     pub(crate) fn calculate_height(&mut self, width: i32, nick_length: usize) -> usize {
-        if self.line_data.is_dirty() || self.line_data.needs_resize(width, nick_length) {
-            self.line_data.reset(width, nick_length);
+        if self.line_data.is_dirty() || self.line_data.needs_resize(width, nick_length, None) {
+            self.line_data = LineDataCache::input_line(width, nick_length);
             self.line_data
                 .calculate_height(&mut self.buffer.iter().copied(), 0);
         }

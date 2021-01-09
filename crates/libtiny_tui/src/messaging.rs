@@ -8,8 +8,8 @@ use time::{self, Tm};
 use crate::config::Colors;
 use crate::exit_dialogue::ExitDialogue;
 use crate::input_area::InputArea;
-use crate::msg_area::line::{SchemeStyle, SegStyle};
-use crate::msg_area::MsgArea;
+use crate::msg_area::line::SegStyle;
+use crate::msg_area::{Layout, MsgArea};
 use crate::trie::Trie;
 use crate::widget::WidgetRet;
 
@@ -46,9 +46,21 @@ pub(crate) struct Timestamp {
 }
 
 impl Timestamp {
+    /// The width of the timestamp plus a space
+    pub(crate) const WIDTH: usize = 6;
     fn stamp(self, msg_area: &mut MsgArea) {
-        msg_area.set_style(SegStyle::SchemeStyle(SchemeStyle::Timestamp));
-        msg_area.add_text(&format!("{:02}:{:02} ", self.hour, self.min));
+        msg_area.add_text(
+            &format!("{:02}:{:02} ", self.hour, self.min),
+            SegStyle::Timestamp,
+        );
+    }
+
+    /// Inserts a blank space that is the size of a timestamp
+    fn blank(msg_area: &mut MsgArea) {
+        msg_area.add_text(
+            &format!("{:^width$}", ' ', width = Timestamp::WIDTH),
+            SegStyle::Timestamp,
+        );
     }
 }
 
@@ -70,9 +82,15 @@ struct ActivityLine {
 }
 
 impl MessagingUI {
-    pub(crate) fn new(width: i32, height: i32, status: bool, scrollback: usize) -> MessagingUI {
+    pub(crate) fn new(
+        width: i32,
+        height: i32,
+        status: bool,
+        scrollback: usize,
+        msg_layout: Layout,
+    ) -> MessagingUI {
         MessagingUI {
-            msg_area: MsgArea::new(width, height - 1, scrollback),
+            msg_area: MsgArea::new(width, height - 1, scrollback, msg_layout),
             input_field: InputArea::new(width, get_input_field_max_height(height)),
             exit_dialogue: None,
             width,
@@ -230,8 +248,11 @@ fn get_input_field_max_height(window_height: i32) -> i32 {
 impl MessagingUI {
     fn add_timestamp(&mut self, ts: Timestamp) {
         if let Some(ts_) = self.last_activity_ts {
+            let alignment = matches!(self.msg_area.layout(), Layout::Aligned { .. }); // for now
             if ts_ != ts {
                 ts.stamp(&mut self.msg_area);
+            } else if alignment {
+                Timestamp::blank(&mut self.msg_area)
             }
         } else {
             ts.stamp(&mut self.msg_area);
@@ -242,9 +263,7 @@ impl MessagingUI {
     pub(crate) fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::Topic));
-        self.msg_area.add_text(topic);
+        self.msg_area.add_text(topic, SegStyle::Topic);
 
         self.msg_area.flush_line();
     }
@@ -252,18 +271,14 @@ impl MessagingUI {
     pub(crate) fn add_client_err_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
-        self.msg_area.add_text(msg);
+        self.msg_area.add_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_client_notify_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-        self.msg_area.add_text(msg);
+        self.msg_area.add_text(msg, SegStyle::Faded);
         self.msg_area.flush_line();
         self.reset_activity_line();
     }
@@ -271,9 +286,7 @@ impl MessagingUI {
     pub(crate) fn add_client_msg(&mut self, msg: &str) {
         self.reset_activity_line();
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
-        self.msg_area.add_text(msg);
+        self.msg_area.add_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
         self.reset_activity_line();
     }
@@ -295,33 +308,40 @@ impl MessagingUI {
         self.reset_activity_line();
         self.add_timestamp(ts);
 
+        let nick_color = self.get_nick_color(sender);
+        let nick_col_style = SegStyle::NickColor(nick_color);
+
+        // actions are /me msgs so they don't show the nick in the nick column, but in the msg
+        let layout = self.msg_area.layout();
+        let format_nick = |s: &str| -> String {
+            if let Layout::Aligned { max_nick_len, .. } = layout {
+                format!("{:>padding$.padding$}", s, padding = max_nick_len)
+            } else {
+                s.to_string()
+            }
+        };
         if is_action {
             self.msg_area
-                .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
-            self.msg_area.add_text("** ");
+                .add_text(&format_nick("**"), SegStyle::UserMsg);
+            // separator between nick and msg
+            self.msg_area.add_text("  ", SegStyle::Faded);
+            self.msg_area.add_text(sender, nick_col_style);
+            // a space replacing the :
+            self.msg_area.add_text(" ", SegStyle::UserMsg);
+        } else {
+            self.msg_area.add_text(&format_nick(sender), nick_col_style);
+            // separator between nick and msg
+            self.msg_area.add_text(": ", SegStyle::Faded);
         }
 
-        {
-            let nick_color = self.get_nick_color(sender);
-            let style = SegStyle::Index(nick_color);
-            self.msg_area.set_style(style);
-            self.msg_area.add_text(sender);
-        }
+        let msg_style = if highlight {
+            SegStyle::Highlight
+        } else {
+            SegStyle::UserMsg
+        };
 
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
-
-        if !is_action {
-            self.msg_area.add_char(':');
-        }
-        self.msg_area.add_char(' ');
-
-        if highlight {
-            self.msg_area
-                .set_style(SegStyle::SchemeStyle(SchemeStyle::Highlight));
-        }
-
-        self.msg_area.add_text(msg);
+        self.msg_area.add_text(msg, msg_style);
+        self.msg_area.set_current_line_alignment();
         self.msg_area.flush_line();
     }
 
@@ -329,9 +349,7 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::UserMsg));
-        self.msg_area.add_text(msg);
+        self.msg_area.add_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
     }
 
@@ -339,9 +357,7 @@ impl MessagingUI {
         self.reset_activity_line();
 
         self.add_timestamp(ts);
-        self.msg_area
-            .set_style(SegStyle::SchemeStyle(SchemeStyle::ErrMsg));
-        self.msg_area.add_text(msg);
+        self.msg_area.add_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
     }
 
@@ -372,10 +388,8 @@ impl MessagingUI {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
                 self.msg_area.modify_line(line_idx, |line| {
-                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Join));
-                    line.add_char('+');
-                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-                    line.add_text(nick);
+                    line.add_char('+', SegStyle::Join);
+                    line.add_text(nick, SegStyle::Faded);
                 });
             }
         }
@@ -390,10 +404,8 @@ impl MessagingUI {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
                 self.msg_area.modify_line(line_idx, |line| {
-                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Part));
-                    line.add_char('-');
-                    line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-                    line.add_text(nick);
+                    line.add_char('-', SegStyle::Part);
+                    line.add_text(nick, SegStyle::Faded);
                 });
             }
         }
@@ -420,12 +432,9 @@ impl MessagingUI {
 
         let line_idx = self.get_activity_line_idx(ts);
         self.msg_area.modify_line(line_idx, |line| {
-            line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-            line.add_text(old_nick);
-            line.set_style(SegStyle::SchemeStyle(SchemeStyle::Nick));
-            line.add_char('>');
-            line.set_style(SegStyle::SchemeStyle(SchemeStyle::Faded));
-            line.add_text(new_nick);
+            line.add_text(old_nick, SegStyle::Faded);
+            line.add_char('>', SegStyle::Nick);
+            line.add_text(new_nick, SegStyle::Faded);
         });
     }
 
@@ -443,7 +452,7 @@ impl MessagingUI {
                 // to avoid adding redundant spaces. The test `small_screen_1` breaks if we don't
                 // get this right.
                 self.msg_area
-                    .modify_line(line_idx, |line| line.add_char(' '));
+                    .modify_line(line_idx, |line| line.add_char(' ', SegStyle::UserMsg));
                 line_idx
             }
             _ => {
