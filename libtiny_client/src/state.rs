@@ -556,6 +556,15 @@ impl StateInner {
                             }
 
                             self.current_nick = new_nick.to_owned();
+
+                            if let Some(ref pwd) = self.nickserv_ident {
+                                snd_irc_msg
+                                    .try_send(wire::privmsg(
+                                        "NickServ",
+                                        &format!("identify {}", pwd),
+                                    ))
+                                    .unwrap();
+                            }
                         }
 
                         // Rename the nick in channel states, also populate the chan list
