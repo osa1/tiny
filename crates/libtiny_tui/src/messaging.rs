@@ -315,7 +315,12 @@ impl MessagingUI {
         let layout = self.msg_area.layout();
         let format_nick = |s: &str| -> String {
             if let Layout::Aligned { max_nick_len, .. } = layout {
-                format!("{:>padding$.padding$}", s, padding = max_nick_len)
+                let mut aligned = format!("{:>padding$}", s, padding = max_nick_len);
+                if aligned.len() > max_nick_len {
+                    aligned.truncate(max_nick_len - 1);
+                    aligned.push('…');
+                }
+                aligned
             } else {
                 s.to_string()
             }
@@ -457,6 +462,18 @@ impl MessagingUI {
             }
             _ => {
                 self.add_timestamp(ts);
+                if let Layout::Aligned {
+                    max_nick_len,
+                    msg_nick_sep_len,
+                    ..
+                } = self.msg_area.layout()
+                {
+                    self.msg_area.add_text(
+                        &format!("{:^max$}", "", max = max_nick_len + msg_nick_sep_len),
+                        SegStyle::UserMsg,
+                    )
+                }
+                self.msg_area.set_current_line_alignment();
                 let line_idx = self.msg_area.flush_line();
                 self.last_activity_line = Some(ActivityLine { ts, line_idx });
                 line_idx

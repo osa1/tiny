@@ -112,6 +112,7 @@ impl TUI {
         self.tb.activate()
     }
 
+    #[cfg(test)]
     pub(crate) fn set_layout(&mut self, layout: Layout) {
         self.msg_layout = layout
     }
