@@ -15,6 +15,7 @@ pub(crate) struct LineDataCache {
     /// The length of the current line that is being added to.
     /// Used to determine when to wrap to the next line in calculate_height()
     current_line_length: i32,
+    /// The type of line we're trying to calculate height for
     line_type: LineType,
 }
 
@@ -28,6 +29,7 @@ pub(crate) enum LineType {
         /// The offset of timestamp + nick on multiline messages
         msg_padding: usize,
     },
+    /// A regular line
     Msg,
 }
 
@@ -118,6 +120,7 @@ impl LineDataCache {
         }
     }
 
+    /// Returns the width of lines that are not the first line
     fn multi_line_width(&self) -> i32 {
         match self.line_type {
             // expand to full width

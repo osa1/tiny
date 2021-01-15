@@ -58,7 +58,7 @@ impl Timestamp {
     /// Inserts a blank space that is the size of a timestamp
     fn blank(msg_area: &mut MsgArea) {
         msg_area.add_text(
-            &format!("{:^width$}", ' ', width = Timestamp::WIDTH),
+            &format!("{:^width$}", "", width = Timestamp::WIDTH),
             SegStyle::Timestamp,
         );
     }
@@ -248,10 +248,9 @@ fn get_input_field_max_height(window_height: i32) -> i32 {
 impl MessagingUI {
     fn add_timestamp(&mut self, ts: Timestamp) {
         if let Some(ts_) = self.last_activity_ts {
-            let alignment = matches!(self.msg_area.layout(), Layout::Aligned { .. }); // for now
             if ts_ != ts {
                 ts.stamp(&mut self.msg_area);
-            } else if alignment {
+            } else if matches!(self.msg_area.layout(), Layout::Aligned { .. }) {
                 Timestamp::blank(&mut self.msg_area)
             }
         } else {
@@ -331,7 +330,7 @@ impl MessagingUI {
             // separator between nick and msg
             self.msg_area.add_text("  ", SegStyle::Faded);
             self.msg_area.add_text(sender, nick_col_style);
-            // a space replacing the :
+            // a space replacing the usual ':'
             self.msg_area.add_text(" ", SegStyle::UserMsg);
         } else {
             self.msg_area.add_text(&format_nick(sender), nick_col_style);
