@@ -1066,7 +1066,7 @@ impl TUI {
     ////////////////////////////////////////////////////////////////////////////
     // Interfacing with tabs
 
-    fn apply_to_target<F>(&mut self, target: &MsgTarget, should_create_tab: bool, f: &F)
+    fn apply_to_target<F>(&mut self, target: &MsgTarget, can_create_tab: bool, f: &F)
     where
         F: Fn(&mut Tab, bool),
     {
@@ -1131,7 +1131,7 @@ impl TUI {
         }
 
         // Create server/chan/user tab when necessary
-        if target_idxs.is_empty() && should_create_tab {
+        if target_idxs.is_empty() && can_create_tab {
             if let Some(idx) = self.maybe_create_tab(target) {
                 target_idxs.push(idx);
             }
