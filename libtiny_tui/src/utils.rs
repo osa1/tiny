@@ -89,7 +89,8 @@ fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Translate IRC color codes using the callback, and remove ASCII control chars from the input.
+/// Translate IRC color codes using the callback, replace tabs with 8 spaces, and remove other
+/// ASCII control characters from the input.
 pub(crate) fn translate_irc_control_chars(
     str: &str,
     push_color: fn(ret: &mut String, fg: u8, bg: Option<u8>),
@@ -126,6 +127,8 @@ pub(crate) fn translate_irc_control_chars(
                     }
                 }
             }
+        } else if char == '\t' {
+            ret.push_str("        ");
         } else if !char.is_ascii_control() {
             ret.push(char);
         }

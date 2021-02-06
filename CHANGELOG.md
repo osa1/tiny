@@ -5,6 +5,9 @@
 - Backspace handling in newer xterms fixed. (#295)
 - When NickServ identification is used tiny now send identify messages when
   changing nicks. (#252)
+- Tab characters in incoming messages are now rendered as 8 spaces. Previously
+  tab characters would be removed, so the message "\thi" would be rendered as
+  "hi" instead of "        hi". (#305)
 
 # 2020/12/10: 0.8.0
 
