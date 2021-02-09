@@ -1,5 +1,7 @@
 digraph mygraph {
+
     node [shape=box, fontname="Jetbrains Mono Medium"];
+
     "tiny"
     "libtiny_client"
     "libtiny_common"
