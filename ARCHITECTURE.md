@@ -200,6 +200,8 @@ fn my_parser(buf: &[u8]) -> Option<(&'static str, usize)> {
 }
 ```
 
+Second return value is the number of bytes consumed.
+
 `term_input_macros` does not depend on other tiny crates.
 
 ### termbox_simple
@@ -229,3 +231,5 @@ buffer to front buffer.
 tiny, where when the user types `C-x` (or pastes a multi-line text) and tiny
 runs `$EDITOR` (if the variable is set) with the contents of the input field as
 the editor's buffer contents. On exit `activate` called to show tiny again.
+
+`termbox_simple` does not depend on other tiny crates.
