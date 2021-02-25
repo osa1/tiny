@@ -1,0 +1,36 @@
+// Describes dependencies between tiny crates. Used in ARCHITECTURE.md.
+
+digraph mygraph {
+
+    node [shape=box, fontname="Jetbrains Mono Medium"];
+
+    "tiny"
+    "libtiny_client"
+    "libtiny_common"
+    "libtiny_logger"
+    "libtiny_tui"
+    "libtiny_wire"
+    "term_input"
+    "term_input_macros"
+    "termbox_simple"
+
+    "tiny" -> "libtiny_client"
+    "tiny" -> "libtiny_common"
+    "tiny" -> "libtiny_logger"
+    "tiny" -> "libtiny_tui"
+    "tiny" -> "libtiny_wire"
+
+    "libtiny_client" -> "libtiny_common"
+    "libtiny_client" -> "libtiny_wire"
+
+    "libtiny_logger" -> "libtiny_common"
+
+    "libtiny_tui" -> "libtiny_common"
+    "libtiny_tui" -> "term_input"
+    "libtiny_tui" -> "termbox_simple"
+
+    "libtiny_wire" -> "libtiny_common"
+
+    "term_input" -> "term_input_macros"
+
+}
