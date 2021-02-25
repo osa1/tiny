@@ -147,6 +147,29 @@ generates a parser from hard-coded xterm byte sequences using
 | -------------- | ------------- |
 | term_input_macros | Generating parser for xterm byte sequences |
 
+### libtiny_common
+
+This crate currently has just one type: `ChanName`, which is the type for
+channel names.
+
+RFC 2812 has two rules related to character names:
+
+- Channel names are case insensitive
+- The characters "{}|^" are considered lowercase, and their uppercase
+  equivalents are "[]\~".
+
+Finally, not specified in RFC 2812, but as implemented by servers in practice,
+is for non-ASCII characters comparison is *case sensitive*.
+
+The `ChanName` type takes all these into account and provides channel name
+comparison that follows RFC 2812 rules and server implementations.
+
+Because channel names are widely used in implementation of the client, all
+other tiny crates need this `ChanName` type, and to avoid introducing
+dependencies between large crates just for one type, we have this crate.
+
+`libtiny_common` does not depend on other tiny crates.
+
 ### term_input_macros
 
 Provides a single procedural macro called `byte_seq_parser`. Given a list of
