@@ -35,7 +35,7 @@ everything together.
 
 - Implements command-line interface (CLI) and command-line argument parsing.
 - Implements config file parsing.
-- Initializes loggers (both debugging logging and message logging).
+- Initializes loggers (both debug logging and message logging).
 - Initializes tokio runtime and creates clients
 - Initializes TUI
 - Implements updating the TUI on client events (e.g. to show an incoming
@@ -125,7 +125,7 @@ This crate does not depend on other tiny crates.
 ### term_input
 
 Parses stdin contents to key events. On initialization sets stdin to
-non-blocking mode, to work around a WSL bugs (#269). The main type is `Input`,
+non-blocking mode, to work around a WSL bug (#269). The main type is `Input`,
 which implements `Stream` (from `futures`) to allow asynchronously reading
 input events.
 
@@ -137,15 +137,15 @@ for xterm key events. Most terminals I tried use xterm byte sequences so this
 is mostly fine. However we've seen one case where a recent version of xterm
 updated one of its byte sequences, causing tiny to not work properly, see #295.
 
-For efficiently mapping bytes read from stdin to key events `term_info`
+For efficiently mapping bytes read from stdin to key events `term_input`
 generates a parser from hard-coded xterm byte sequences using
 `term_input_macros`.
 
 #### Dependencies of `term_input`:
 
-| Dependency     | Used for      |
-| -------------- | ------------- |
-| term_input_macros | Generating parser for xterm byte sequences |
+| Dependency        | Used for      |
+| ----------------- | ------------- |
+| term_input_macros | Used for generating parser for xterm byte sequences |
 
 ### libtiny_common
 
