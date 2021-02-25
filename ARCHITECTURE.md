@@ -1,7 +1,7 @@
 # Architecture
 
 This document describes tiny's high-level architecture, the parts that are
-unlikely to change too often, with the rationale behind some of the design
+unlikely to change often, with the rationale behind some of the design
 decisions. If you are interested in contributing to tiny, this is the best
 place to start.
 
@@ -23,7 +23,7 @@ Separation of smaller crates was mainly motivated by two things:
   to crates makes separating concerns easier and dependencies between
   modules/crates and crate interfaces become clear.
 
-Unfortunately this made it difficult to publish tiny on crates.io (#257). We
+Unfortunately this makes it difficult to publish tiny on crates.io (#257). We
 currently *do not* publish tiny on crates.io.
 
 Below are the crates in more detail:
@@ -33,9 +33,9 @@ Below are the crates in more detail:
 `tiny` is the main crate that provides the `tiny` executable. It brings
 everything together.
 
-- Implements command-line interface (CLI) and command-line argument parsing.
-- Implements config file parsing.
-- Initializes loggers (both debug logging and message logging).
+- Implements command-line interface (CLI) and command-line argument parsing
+- Implements config file parsing
+- Initializes loggers (both debug logging and message logging)
 - Initializes tokio runtime and creates clients
 - Initializes TUI
 - Implements updating the TUI on client events (e.g. to show an incoming
@@ -61,16 +61,16 @@ Provides three key types to create and maintain an IRC connection:
   maintain the connection (server address/port, NickServ/SASL/etc.
   credentials, nicks, ...).
 
-- `Event`: an enum type of all possible IRC events that `Client` can return
-  ("connected", "message received" etc.).
+- `Event`: an enum type of all possible IRC events ("connected", "message
+  received" etc.)
 
 - `Client`: the connection handle type. Users create a `Client` by providing a
   `ServerInfo`. `Client` then maintains the connection (handles timeouts,
   disconnects, nick selection and identification etc. everything needed to keep
   the connection alive).
 
-  Note that a client maintains only one connection. If you want to connect to 5
-  servers you need 5 `Client`s.
+  Note that a client maintains one connection. If you want to connect to N
+  servers you need N `Client`s.
 
   `Client::new()` also returns a tokio channel receiver for `Event`s. IRC
   events are passed to users via this channel. `tiny`'s `conn` module
@@ -89,7 +89,7 @@ Provides three key types to create and maintain an IRC connection:
 
 Handles user input and drawing the terminal UI (TUI). At a high-level the API
 is very similar to `libtiny_client`: on initialization the user passes a config
-(file path for the tiny config file), `libtiny_tui` returns two a tokio channel
+(file path for the tiny config file), `libtiny_tui` returns two tokio channel
 for user input events and a TUI handle to update the TUI. The types are:
 
 - `Event`: Enum for TUI events like a message submitted by the user, or an exit
@@ -113,8 +113,6 @@ messages.
 
 For message generation, we only have a few functions like `privmsg`, `join`
 etc. for the messages we need in tiny.
-
-This crate does not depend on other tiny crates.
 
 #### Dependencies of `libtiny_wire`:
 
