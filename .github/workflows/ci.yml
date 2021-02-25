@@ -59,7 +59,7 @@ jobs:
 
       - name: Build with rustls and dbus
         run: |
-          cd tiny
+          cd crates/tiny
           cargo build --no-default-features \
             --features "tls-native desktop-notifications"
 
@@ -98,6 +98,6 @@ jobs:
 
       - name: Build
         run: |
-          cd tiny
+          cd crates/tiny
           cargo build --no-default-features \
             --features "tls-native desktop-notifications"
