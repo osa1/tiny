@@ -1,3 +1,5 @@
+// Describes dependencies between tiny crates. Used in ARCHITECTURE.md.
+
 digraph mygraph {
 
     node [shape=box, fontname="Jetbrains Mono Medium"];
@@ -30,4 +32,5 @@ digraph mygraph {
     "libtiny_wire" -> "libtiny_common"
 
     "term_input" -> "term_input_macros"
+
 }
