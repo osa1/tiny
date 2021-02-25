@@ -12,7 +12,7 @@ follows:
 
 ![crate dependencies](crate_deps.png)
 
-Separation of smaller crates was mainly motivated by two things:
+Separation to smaller crates was mainly motivated by two things:
 
 - The crates `libtiny_client`, `term_input`, and `termbox_simple` are reusable
   outside of tiny. More details are in the individual sections of the crates
@@ -24,7 +24,7 @@ Separation of smaller crates was mainly motivated by two things:
   modules/crates and crate interfaces become clear.
 
 Unfortunately this makes it difficult to publish tiny on crates.io (#257). We
-currently *do not* publish tiny on crates.io.
+currently do not publish tiny on crates.io.
 
 Below are the crates in more detail:
 
@@ -61,8 +61,7 @@ Provides three key types to create and maintain an IRC connection:
   maintain the connection (server address/port, NickServ/SASL/etc.
   credentials, nicks, ...).
 
-- `Event`: an enum type of all possible IRC events ("connected", "message
-  received" etc.)
+- `Event`: an enum type for IRC events ("connected", "message received" etc.)
 
 - `Client`: the connection handle type. Users create a `Client` by providing a
   `ServerInfo`. `Client` then maintains the connection (handles timeouts,
@@ -120,6 +119,30 @@ etc. for the messages we need in tiny.
 | -------------- | ------------- |
 | libtiny_common | The "channel name" type |
 
+### libtiny_common
+
+This crate currently has just one type: `ChanName`, which is the type for
+channel names.
+
+RFC 2812 has two rules related to character names:
+
+- Channel names are case insensitive
+- The characters "{}|^" are considered lowercase, and their uppercase
+  equivalents are "[]\~".
+
+There's also a rule implemented by servers:
+
+- For non-ASCII characters the comparison is *case sensitive*.
+
+The `ChanName` type provides a newtype with comparison implementation that
+follows these rules.
+
+Because channel names are widely used in the implementation of tiny, all other
+tiny crates need the `ChanName` type. To avoid introducing dependencies between
+large crates just for one type, we have this crate.
+
+`libtiny_common` does not depend on other tiny crates.
+
 ### term_input
 
 Parses stdin contents to key events. On initialization sets stdin to
@@ -132,7 +155,7 @@ a time.
 
 `term_input` does not use `terminfo`. Instead it has hard-coded byte sequences
 for xterm key events. Most terminals I tried use xterm byte sequences so this
-is mostly fine. However we've seen one case where a recent version of xterm
+is mostly fine. However we've seen a case where a recent version of xterm
 updated one of its byte sequences, causing tiny to not work properly, see #295.
 
 For efficiently mapping bytes read from stdin to key events `term_input`
@@ -143,30 +166,7 @@ generates a parser from hard-coded xterm byte sequences using
 
 | Dependency        | Used for      |
 | ----------------- | ------------- |
-| term_input_macros | Used for generating parser for xterm byte sequences |
-
-### libtiny_common
-
-This crate currently has just one type: `ChanName`, which is the type for
-channel names.
-
-RFC 2812 has two rules related to character names:
-
-- Channel names are case insensitive
-- The characters "{}|^" are considered lowercase, and their uppercase
-  equivalents are "[]\~".
-
-Finally, not specified in RFC 2812, but as implemented by servers in practice,
-is for non-ASCII characters comparison is *case sensitive*.
-
-The `ChanName` type takes all these into account and provides channel name
-comparison that follows RFC 2812 rules and server implementations.
-
-Because channel names are widely used in implementation of the client, all
-other tiny crates need this `ChanName` type, and to avoid introducing
-dependencies between large crates just for one type, we have this crate.
-
-`libtiny_common` does not depend on other tiny crates.
+| term_input_macros | Generating parser for xterm byte sequences |
 
 ### term_input_macros
 
@@ -238,7 +238,7 @@ Character attributes like "underline" or "bold" are applied to the foreground
 color.
 
 After manipulating the internal buffer with `change_cell`, updates are rendered
-with `present`. When `Termbox` is suspended with `suspect`, `present` doesn't
+with `present`. When `Termbox` is suspended with `suspend`, `present` doesn't
 do anything. `change_cell` calls still update the internal buffer so after
 `activate` the most recent changes are shown.
 
