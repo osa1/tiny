@@ -10,8 +10,9 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use futures::{select, FutureExt, StreamExt};
+use futures::StreamExt;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::time::{timeout, Duration};
 
 #[derive(Clone)]
 pub struct State {
@@ -715,20 +716,17 @@ async fn retry_channel_join(
 ) {
     debug!("Attempting to re-join channel {}", channel.display());
 
-    use tokio::time::{sleep, Duration};
-
-    let mut delay = sleep(Duration::from_secs(10)).fuse();
     let mut rcv_abort = rcv_abort.fuse();
 
-    select! {
-        () = delay => {
+    match timeout(Duration::from_secs(10), rcv_abort.next()).await {
+        Err(_) => {
             // Send join message
             snd_irc_msg.try_send(wire::join(&[&channel])).unwrap();
-        },
-        _ = rcv_abort.next() => {
+        }
+        Ok(_) => {
             // Channel tab was closed
-        },
-    };
+        }
+    }
 }
 
 const SERVERNAME_PREFIX: &str = "Your host is ";

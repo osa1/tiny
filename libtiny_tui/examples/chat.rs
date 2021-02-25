@@ -4,10 +4,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-use futures::future::FutureExt;
-use futures::select;
-use futures::stream::StreamExt;
+use futures::StreamExt;
 use tokio::sync::mpsc;
+use tokio::time::timeout;
 
 use libtiny_common::{ChanNameRef, Event, MsgTarget};
 use libtiny_tui::TUI;
@@ -64,15 +63,14 @@ fn main() {
             let mut nick_idx = 1;
             let mut rcv_abort_fused = rcv_abort.fuse();
             loop {
-                let mut timer = tokio::time::sleep(std::time::Duration::from_secs(3)).fuse();
-                select! {
-                    _ = rcv_abort_fused.next() => {
-                        break;
-                    },
-                    () = timer => {
+                match timeout(std::time::Duration::from_secs(3), rcv_abort_fused.next()).await {
+                    Err(_) => {
                         tui_clone.set_nick(SERV, nicks[nick_idx]);
                         tui_clone.draw();
                         nick_idx = (nick_idx + 1) % nicks.len();
+                    }
+                    Ok(_) => {
+                        break;
                     }
                 }
             }

@@ -1,11 +1,10 @@
 //! Implements two-state "pinger" task that drives sending pings to the server to check liveness of
 //! the connection.
 
-use futures::FutureExt;
-use futures::{pin_mut, select, stream::StreamExt};
+use futures::StreamExt;
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio::time::sleep;
+use tokio::time::timeout;
 
 pub(crate) struct Pinger {
     snd_rst: mpsc::Sender<()>,
@@ -28,38 +27,25 @@ async fn pinger_task(rcv_rst: mpsc::Receiver<()>, snd_ev: mpsc::Sender<Event>) {
     let mut rcv_rst_fused = rcv_rst.fuse();
     let mut state = PingerState::SendPing;
     loop {
-        // NOTE: The code about does not work:
-        // let mut delay = sleep(Duration::from_secs(30));
-        // Instead I need this weird code below. Not sure if this is a bug or not.
-        let delay = async {
-            sleep(Duration::from_secs(60)).await;
-        }
-        .fuse();
-        pin_mut!(delay);
-
-        select! {
-            () = delay => {
-                match state {
-                    PingerState::SendPing => {
-                        state = PingerState::ExpectPong;
-                        snd_ev.try_send(Event::SendPing).unwrap();
-                    }
-                    PingerState::ExpectPong => {
-                        snd_ev.try_send(Event::Disconnect).unwrap();
-                        return;
-                    }
+        match timeout(Duration::from_secs(60), rcv_rst_fused.next()).await {
+            Err(_) => match state {
+                PingerState::SendPing => {
+                    state = PingerState::ExpectPong;
+                    snd_ev.try_send(Event::SendPing).unwrap();
                 }
-            }
-            cmd = rcv_rst_fused.next() => {
-                match cmd {
-                    None => {
-                        return;
-                    }
-                    Some(()) => {
-                        state = PingerState::SendPing;
-                    }
+                PingerState::ExpectPong => {
+                    snd_ev.try_send(Event::Disconnect).unwrap();
+                    return;
                 }
-            }
+            },
+            Ok(cmd) => match cmd {
+                None => {
+                    return;
+                }
+                Some(()) => {
+                    state = PingerState::SendPing;
+                }
+            },
         }
     }
 }
