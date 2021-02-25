@@ -10,7 +10,7 @@ place to start.
 tiny consists of 9 crates. The dependencies between these crates are as
 follows:
 
-![crate dependencies](crate_deps.png)
+![crate dependencies](/assets/crate_deps.png)
 
 Separation to smaller crates was mainly motivated by two things:
 
