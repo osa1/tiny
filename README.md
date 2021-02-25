@@ -68,7 +68,7 @@ notifications are disabled.
 To install in a clone:
 
 ```
-cargo install --path tiny
+cargo install --path crates/tiny
 ```
 
 If you don't want to clone the repo, you can use

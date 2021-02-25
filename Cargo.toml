@@ -1,14 +1,14 @@
 [workspace]
 members = [
-    "libtiny_client",
-    "libtiny_common",
-    "libtiny_logger",
-    "libtiny_tui",
-    "libtiny_wire",
-    "term_input",
-    "term_input_macros",
-    "termbox",
-    "tiny",
+    "crates/libtiny_client",
+    "crates/libtiny_common",
+    "crates/libtiny_logger",
+    "crates/libtiny_tui",
+    "crates/libtiny_wire",
+    "crates/term_input",
+    "crates/term_input_macros",
+    "crates/termbox",
+    "crates/tiny",
 ]
 
 [profile.release]
