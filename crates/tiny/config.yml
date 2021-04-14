@@ -11,7 +11,7 @@ servers:
 
       # Channels to automatically join
       join:
-          - '#tiny'
+          - "#tiny"
 
       # Three authentication methods: pass, sasl, and nickserv_ident
       # These are optional and you probably only need one of these, delete
@@ -37,10 +37,17 @@ defaults:
     tls: false
 
 # Where to put log files
-log_dir: '{}'
+log_dir: "{}"
 
 # (Optional) Limits the maximum number of messages stored for each UI tab. Defaults to unlimited.
 # scrollback: 512
+
+# (Optional) UI Message Layout Style. Defaults to 'compact'
+# ui_style: compact
+# ui_style:
+#   aligned:
+#     # Nicks greater than this value will be truncated
+#     max_nick_length: 12
 
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
@@ -56,7 +63,7 @@ log_dir: '{}'
 # Attributes can be combined (e.g [bold, underline]), and valid values are bold
 # and underline.
 colors:
-    nick: [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 ]
+    nick: [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14]
 
     clear:
         fg: default
