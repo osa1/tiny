@@ -8,6 +8,9 @@
 - Tab characters in incoming messages are now rendered as 8 spaces. Previously
   tab characters would be removed, so the message "\thi" would be rendered as
   "hi" instead of "        hi". (#305)
+- Fixed a bug when getting `RPL_NAMREPLY` from a server for channels we haven't
+  joined. Previously we would create a channel in the TUI for each channel in
+  the response. (#302)
 
 # 2020/12/10: 0.8.0
 
