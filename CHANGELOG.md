@@ -11,6 +11,8 @@
 - Fixed a bug when getting `RPL_NAMREPLY` from a server for channels we haven't
   joined. Previously we would create a channel in the TUI for each channel in
   the response. (#302)
+- tiny now checks nick lists and realnames to make sure they are not empty.
+  (#314)
 
 # 2020/12/10: 0.8.0
 
