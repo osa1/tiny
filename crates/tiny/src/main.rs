@@ -42,7 +42,7 @@ fn main() {
                 exit(1);
             }
             Ok(config) => {
-                let config_errors = config::validate_config(&config);
+                let config_errors = config.validate();
                 if !config_errors.is_empty() {
                     println!("Config file error(s):");
                     for error in config_errors {
@@ -50,6 +50,11 @@ fn main() {
                     }
                     exit(1);
                 }
+
+                let config = match config.read_passwords() {
+                    None => exit(1),
+                    Some(config) => config,
+                };
 
                 let config::Config {
                     servers,
@@ -75,7 +80,7 @@ fn main() {
 const DEBUG_LOG_FILE: &str = "tiny_debug_logs.txt";
 
 fn run(
-    servers: Vec<config::Server>,
+    servers: Vec<config::Server<String>>,
     defaults: config::Defaults,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
