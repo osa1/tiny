@@ -232,8 +232,8 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                                 } else {
                                     MsgTarget::User { serv, nick }
                                 };
-                                ui.set_tab_style(TabStyle::Highlight, &msg_target);
                                 ui.add_privmsg(nick, &msg, ts, &msg_target, false, is_action);
+                                ui.set_tab_style(TabStyle::Highlight, &msg_target);
                             } else {
                                 // PRIVMSG not sent to us. This case can happen in a few cases:
                                 //

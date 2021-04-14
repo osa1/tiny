@@ -1066,7 +1066,7 @@ impl TUI {
     ////////////////////////////////////////////////////////////////////////////
     // Interfacing with tabs
 
-    fn apply_to_target<F>(&mut self, target: &MsgTarget, f: &F)
+    fn apply_to_target<F>(&mut self, target: &MsgTarget, can_create_tab: bool, f: &F)
     where
         F: Fn(&mut Tab, bool),
     {
@@ -1131,7 +1131,7 @@ impl TUI {
         }
 
         // Create server/chan/user tab when necessary
-        if target_idxs.is_empty() {
+        if target_idxs.is_empty() && can_create_tab {
             if let Some(idx) = self.maybe_create_tab(target) {
                 target_idxs.push(idx);
             }
@@ -1157,7 +1157,7 @@ impl TUI {
     }
 
     pub(crate) fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, is_active: bool| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, is_active: bool| {
             if !is_active
                 && tab.style < style
                 && !(style == TabStyle::JoinOrPart && !tab.widget.is_showing_status())
@@ -1170,7 +1170,7 @@ impl TUI {
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
     pub(crate) fn add_client_err_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.add_client_err_msg(msg);
         });
     }
@@ -1178,7 +1178,7 @@ impl TUI {
     /// A notify message coming from tiny, usually shows a response of a command
     /// e.g. "Notifications enabled".
     pub(crate) fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.add_client_notify_msg(msg);
         });
     }
@@ -1186,7 +1186,7 @@ impl TUI {
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
     pub(crate) fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.add_client_msg(msg);
         });
     }
@@ -1202,7 +1202,7 @@ impl TUI {
         highlight: bool,
         is_action: bool,
     ) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget
                 .add_privmsg(sender, msg, Timestamp::from(ts), highlight, is_action);
             let nick = tab.widget.get_nick();
@@ -1216,7 +1216,7 @@ impl TUI {
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
     pub fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget.add_msg(msg, Timestamp::from(ts));
         });
     }
@@ -1224,33 +1224,33 @@ impl TUI {
     /// Error messages related with the protocol - e.g. can't join a channel,
     /// nickname is in use etc. Timestamped and logged.
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget.add_err_msg(msg, Timestamp::from(ts));
         });
     }
 
     pub(crate) fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &ChanNameRef) {
         let target = MsgTarget::Chan { serv, chan };
-        self.apply_to_target(&target, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
             tab.widget.show_topic(title, Timestamp::from(ts));
         });
     }
 
     pub(crate) fn clear_nicks(&mut self, serv: &str) {
         let target = MsgTarget::AllServTabs { serv };
-        self.apply_to_target(&target, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
             tab.widget.clear_nicks();
         });
     }
 
     pub(crate) fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.join(nick, ts.map(Timestamp::from));
         });
     }
 
     pub(crate) fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.part(nick, ts.map(Timestamp::from));
         });
     }
@@ -1262,7 +1262,7 @@ impl TUI {
         ts: Tm,
         target: &MsgTarget,
     ) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, Timestamp::from(ts));
             // TODO: Does this actually rename the tab?
             tab.update_source(&|src: &mut MsgSource| {
@@ -1276,13 +1276,13 @@ impl TUI {
 
     pub(crate) fn set_nick(&mut self, serv: &str, new_nick: &str) {
         let target = MsgTarget::AllServTabs { serv };
-        self.apply_to_target(&target, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
             tab.widget.set_nick(new_nick.to_owned())
         });
     }
 
     pub(crate) fn clear(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.clear());
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| tab.widget.clear());
     }
 
     pub(crate) fn toggle_ignore(&mut self, target: &MsgTarget) {
@@ -1296,11 +1296,11 @@ impl TUI {
                     }
                 }
             }
-            self.apply_to_target(target, &|tab: &mut Tab, _| {
+            self.apply_to_target(target, false, &|tab: &mut Tab, _| {
                 tab.widget.set_or_toggle_ignore(Some(!status_val));
             });
         } else {
-            self.apply_to_target(target, &|tab: &mut Tab, _| {
+            self.apply_to_target(target, false, &|tab: &mut Tab, _| {
                 tab.widget.set_or_toggle_ignore(None);
             });
         }
@@ -1319,13 +1319,13 @@ impl TUI {
     }
 
     pub(crate) fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.notifier = notifier;
         });
     }
 
     pub(crate) fn show_notify_mode(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             let msg = match tab.notifier {
                 Notifier::Off => "Notifications are off",
                 Notifier::Mentions => "Notifications enabled for mentions",
