@@ -39,7 +39,7 @@ Thanks to @trevarj and @shumvgolove for contributing to this release.
 
 # 2020/09/20: 0.7.0
 
-Thanks to @trevarj, @kennylevinsen and @LordMZTE for contributing to this
+Thanks to @trevarj, @kennylevinsen, and @LordMZTE for contributing to this
 release.
 
 ## New features
