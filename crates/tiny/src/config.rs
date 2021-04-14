@@ -67,27 +67,29 @@ pub(crate) struct Config {
     pub(crate) log_dir: Option<PathBuf>,
 }
 
-/// Returns error descriptions.
-pub(crate) fn validate_config(config: &Config) -> Vec<String> {
-    let mut errors = vec![];
+impl Config {
+    /// Returns error descriptions
+    pub(crate) fn validate(&self) -> Vec<String> {
+        let mut errors = vec![];
 
-    // Check that nick lists are not empty
-    if config.defaults.nicks.is_empty() {
-        errors.push(
-            "Default nick list can't be empty, please add at least one defaut nick".to_string(),
-        );
-    }
-
-    for server in &config.servers {
-        if server.nicks.is_empty() {
-            errors.push(format!(
-                "Nick list for server '{}' is empty, please add at least one nick",
-                server.addr
-            ));
+        // Check that nick lists are not empty
+        if self.defaults.nicks.is_empty() {
+            errors.push(
+                "Default nick list can't be empty, please add at least one defaut nick".to_string(),
+            );
         }
-    }
 
-    errors
+        for server in &self.servers {
+            if server.nicks.is_empty() {
+                errors.push(format!(
+                    "Nick list for server '{}' is empty, please add at least one nick",
+                    server.addr
+                ));
+            }
+        }
+
+        errors
+    }
 }
 
 /// Returns tiny config file path. File may or may not exist.

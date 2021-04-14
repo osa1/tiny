@@ -42,7 +42,7 @@ fn main() {
                 exit(1);
             }
             Ok(config) => {
-                let config_errors = config::validate_config(&config);
+                let config_errors = config.validate();
                 if !config_errors.is_empty() {
                     println!("Config file error(s):");
                     for error in config_errors {
