@@ -95,20 +95,15 @@ impl Nickname {
         }
     }
 
-    fn draw(&self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32, width: i32) {
+    fn draw(&self, tb: &mut Termbox, colors: &Colors, mut pos_x: i32, pos_y: i32, width: i32) {
         if self.len(width) > 0 {
             let nick_color = colors.nick[self.color % colors.nick.len()];
             let style = Style {
                 fg: u16::from(nick_color),
                 bg: colors.user_msg.bg,
             };
-            termbox::print_chars(
-                tb,
-                pos_x,
-                pos_y,
-                style,
-                self.value.chars().chain(NICKNAME_SUFFIX.chars()),
-            );
+            pos_x = termbox::print_chars(tb, pos_x, pos_y, style, self.value.chars());
+            termbox::print_chars(tb, pos_x, pos_y, colors.faded, NICKNAME_SUFFIX.chars());
         }
     }
 }
