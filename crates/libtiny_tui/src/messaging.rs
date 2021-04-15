@@ -38,6 +38,9 @@ pub(crate) struct MessagingUI {
     last_activity_ts: Option<Timestamp>,
 }
 
+/// Length of ": " suffix of nicks in messages
+pub(crate) const MSG_NICK_SUFFIX_LEN: usize = 2;
+
 /// Like `time::Tm`, but we only care about hour and minute parts.
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub(crate) struct Timestamp {
@@ -463,14 +466,9 @@ impl MessagingUI {
             }
             _ => {
                 self.add_timestamp(ts);
-                if let Layout::Aligned {
-                    max_nick_len,
-                    msg_nick_sep_len,
-                    ..
-                } = self.msg_area.layout()
-                {
+                if let Layout::Aligned { max_nick_len, .. } = self.msg_area.layout() {
                     self.msg_area.add_text(
-                        &WHITESPACE[..max_nick_len + msg_nick_sep_len],
+                        &WHITESPACE[..max_nick_len + MSG_NICK_SUFFIX_LEN],
                         SegStyle::UserMsg,
                     )
                 }

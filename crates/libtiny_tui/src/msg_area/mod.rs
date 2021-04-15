@@ -7,7 +7,7 @@ use termbox_simple::Termbox;
 pub(crate) use self::line::{Line, SegStyle};
 use crate::config::{self, Colors};
 use crate::line_split::LineType;
-use crate::messaging::Timestamp;
+use crate::messaging::{Timestamp, MSG_NICK_SUFFIX_LEN};
 
 pub(crate) struct MsgArea {
     lines: VecDeque<Line>,
@@ -38,7 +38,6 @@ pub(crate) enum Layout {
         /// length of timestamp + a space
         timestamp_len: usize,
         max_nick_len: usize,
-        msg_nick_sep_len: usize,
     },
 }
 
@@ -49,8 +48,7 @@ impl Layout {
             Layout::Aligned {
                 timestamp_len,
                 max_nick_len,
-                msg_nick_sep_len,
-            } => timestamp_len + max_nick_len + msg_nick_sep_len,
+            } => timestamp_len + max_nick_len + MSG_NICK_SUFFIX_LEN,
         }
     }
 }
@@ -62,7 +60,6 @@ impl From<config::Layout> for Layout {
             config::Layout::Aligned { max_nick_length } => Layout::Aligned {
                 timestamp_len: Timestamp::WIDTH,
                 max_nick_len: max_nick_length,
-                msg_nick_sep_len: 2,
             },
         }
     }

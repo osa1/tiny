@@ -415,7 +415,6 @@ fn test_alignment_long_string() {
     tui.set_layout(Layout::Aligned {
         timestamp_len: 6,
         max_nick_len: 12,
-        msg_nick_sep_len: 2,
     });
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
