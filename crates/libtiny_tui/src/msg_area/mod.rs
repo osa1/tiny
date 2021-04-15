@@ -5,7 +5,7 @@ use std::{cmp::max, mem, str};
 use termbox_simple::Termbox;
 
 pub(crate) use self::line::{Line, SegStyle};
-use crate::config::{self, Colors};
+use crate::config::Colors;
 use crate::line_split::LineType;
 use crate::messaging::{Timestamp, MSG_NICK_SUFFIX_LEN};
 
@@ -34,33 +34,16 @@ pub(crate) struct MsgArea {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Layout {
     Compact,
-    Aligned {
-        /// length of timestamp + a space
-        timestamp_len: usize,
-        max_nick_len: usize,
-    },
+    Aligned { max_nick_len: usize },
 }
 
 impl Layout {
     fn msg_padding(&self) -> usize {
         match self {
             Layout::Compact => 0,
-            Layout::Aligned {
-                timestamp_len,
-                max_nick_len,
-            } => timestamp_len + max_nick_len + MSG_NICK_SUFFIX_LEN,
-        }
-    }
-}
-
-impl From<config::Layout> for Layout {
-    fn from(ui_style: config::Layout) -> Self {
-        match ui_style {
-            config::Layout::Compact => Layout::Compact,
-            config::Layout::Aligned { max_nick_length } => Layout::Aligned {
-                timestamp_len: Timestamp::WIDTH,
-                max_nick_len: max_nick_length,
-            },
+            Layout::Aligned { max_nick_len } => {
+                Timestamp::WIDTH + max_nick_len + MSG_NICK_SUFFIX_LEN
+            }
         }
     }
 }

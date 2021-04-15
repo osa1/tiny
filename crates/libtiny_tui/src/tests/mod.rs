@@ -412,10 +412,7 @@ fn test_join_part_overflow() {
 #[test]
 fn test_alignment_long_string() {
     let mut tui = TUI::new_test(40, 5);
-    tui.set_layout(Layout::Aligned {
-        timestamp_len: 6,
-        max_nick_len: 12,
-    });
+    tui.set_layout(Layout::Aligned { max_nick_len: 12 });
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
     tui.new_server_tab(serv, None);

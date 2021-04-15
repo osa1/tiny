@@ -56,6 +56,7 @@ static WHITESPACE: &str =
 impl Timestamp {
     /// The width of the timestamp plus a space
     pub(crate) const WIDTH: usize = 6;
+
     fn stamp(self, msg_area: &mut MsgArea) {
         msg_area.add_text(
             &format!("{:02}:{:02} ", self.hour, self.min),

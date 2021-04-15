@@ -13,9 +13,18 @@ pub use termbox_simple::*;
 pub(crate) struct Config {
     #[serde(default)]
     pub(crate) colors: Colors,
+
     #[serde(default = "usize::max_value")]
     pub(crate) scrollback: usize,
+
     pub(crate) layout: Option<Layout>,
+
+    #[serde(default = "default_max_nick_length")]
+    pub(crate) max_nick_length: usize,
+}
+
+fn default_max_nick_length() -> usize {
+    12
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,7 +40,7 @@ pub struct Style {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Layout {
     Compact,
-    Aligned { max_nick_length: usize },
+    Aligned,
 }
 
 #[derive(Debug, Deserialize)]

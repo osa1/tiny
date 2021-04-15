@@ -77,7 +77,7 @@ pub struct TUI {
     /// Max number of message lines
     scrollback: usize,
 
-    /// Messaging layout
+    /// Messaging area layout: aligned or compact
     msg_layout: Layout,
 
     tabs: Vec<Tab>,
@@ -283,11 +283,19 @@ impl TUI {
                     colors,
                     scrollback,
                     layout,
+                    max_nick_length,
                 }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
                     if let Some(layout) = layout {
-                        self.msg_layout = layout.into()
+                        match layout {
+                            crate::config::Layout::Compact => self.msg_layout = Layout::Compact,
+                            crate::config::Layout::Aligned => {
+                                self.msg_layout = Layout::Aligned {
+                                    max_nick_len: max_nick_length,
+                                }
+                            }
+                        }
                     }
                 }
             }
