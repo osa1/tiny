@@ -42,12 +42,11 @@ log_dir: "{}"
 # (Optional) Limits the maximum number of messages stored for each UI tab. Defaults to unlimited.
 # scrollback: 512
 
-# (Optional) UI Message Layout Style. Defaults to 'compact'
-# ui_style: compact
-# ui_style:
-#   aligned:
-#     # Nicks greater than this value will be truncated
-#     max_nick_length: 12
+# (Optional) UI layout: 'compact' or 'aligned'. Defaults to 'compact'.
+# layout: compact
+
+# (Optional) Nick length in 'aligned' layout. Default is 12.
+# max_nick_length: 12
 
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
