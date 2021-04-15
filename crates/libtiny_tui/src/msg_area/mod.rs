@@ -5,7 +5,7 @@ use std::{cmp::max, mem, str};
 use termbox_simple::Termbox;
 
 pub(crate) use self::line::{Line, SegStyle};
-use crate::config::{Colors, UiStyle};
+use crate::config::{self, Colors};
 use crate::line_split::LineType;
 use crate::messaging::Timestamp;
 
@@ -55,11 +55,11 @@ impl Layout {
     }
 }
 
-impl From<UiStyle> for Layout {
-    fn from(ui_style: UiStyle) -> Self {
+impl From<config::Layout> for Layout {
+    fn from(ui_style: config::Layout) -> Self {
         match ui_style {
-            UiStyle::Compact => Layout::Compact,
-            UiStyle::Aligned { max_nick_length } => Layout::Aligned {
+            config::Layout::Compact => Layout::Compact,
+            config::Layout::Aligned { max_nick_length } => Layout::Aligned {
                 timestamp_len: Timestamp::WIDTH,
                 max_nick_len: max_nick_length,
                 msg_nick_sep_len: 2,

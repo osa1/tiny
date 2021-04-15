@@ -282,12 +282,12 @@ impl TUI {
                 Ok(Config {
                     colors,
                     scrollback,
-                    ui_style,
+                    layout,
                 }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
-                    if let Some(ui_style) = ui_style {
-                        self.msg_layout = ui_style.into()
+                    if let Some(layout) = layout {
+                        self.msg_layout = layout.into()
                     }
                 }
             }

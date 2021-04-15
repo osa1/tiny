@@ -15,7 +15,7 @@ pub(crate) struct Config {
     pub(crate) colors: Colors,
     #[serde(default = "usize::max_value")]
     pub(crate) scrollback: usize,
-    pub(crate) ui_style: Option<UiStyle>,
+    pub(crate) layout: Option<Layout>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,7 +29,7 @@ pub struct Style {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum UiStyle {
+pub(crate) enum Layout {
     Compact,
     Aligned { max_nick_length: usize },
 }
