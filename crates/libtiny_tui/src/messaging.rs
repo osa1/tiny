@@ -45,6 +45,11 @@ pub(crate) struct Timestamp {
     min: i32,
 }
 
+// 80 characters. TODO: We need to make sure we don't need more whitespace than that. We should
+// probably add an upper bound to max_nick_length config field?
+static WHITESPACE: &str =
+    "                                                                                ";
+
 impl Timestamp {
     /// The width of the timestamp plus a space
     pub(crate) const WIDTH: usize = 6;
@@ -55,12 +60,9 @@ impl Timestamp {
         );
     }
 
-    /// Inserts a blank space that is the size of a timestamp
+    /// Inserts spaces for a timestamp slot. Used in aligned layout.
     fn blank(msg_area: &mut MsgArea) {
-        msg_area.add_text(
-            &format!("{:^width$}", "", width = Timestamp::WIDTH),
-            SegStyle::Timestamp,
-        );
+        msg_area.add_text(&WHITESPACE[..Timestamp::WIDTH], SegStyle::Timestamp);
     }
 }
 
@@ -468,7 +470,7 @@ impl MessagingUI {
                 } = self.msg_area.layout()
                 {
                     self.msg_area.add_text(
-                        &format!("{:^max$}", "", max = max_nick_len + msg_nick_sep_len),
+                        &WHITESPACE[..max_nick_len + msg_nick_sep_len],
                         SegStyle::UserMsg,
                     )
                 }
