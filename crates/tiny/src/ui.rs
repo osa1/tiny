@@ -87,6 +87,7 @@ impl UI {
     delegate_ui!(set_nick(serv: &str, nick: &str,));
     delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
+    delegate_ui!(has_mentions_tab() -> bool);
 }
 
 pub(crate) async fn task(

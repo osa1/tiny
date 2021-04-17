@@ -252,4 +252,12 @@ impl TUI {
             None => false,
         }
     }
+
+    pub fn has_mentions_tab(&self) -> bool {
+        if let Some(tui) = self.inner.upgrade() {
+            tui.borrow().has_mentions_tab()
+        } else {
+            false
+        }
+    }
 }

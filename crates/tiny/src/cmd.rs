@@ -146,7 +146,7 @@ fn close(args: CmdArgs) {
         ui, clients, src, ..
     } = args;
     match src {
-        MsgSource::Serv { ref serv } if serv == "mentions" => {
+        MsgSource::Serv { ref serv } if serv == "mentions" || serv == "logger" => {
             // ignore
         }
         MsgSource::Serv { serv } => {

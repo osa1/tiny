@@ -195,13 +195,15 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                     if msg.find(&client.get_nick()).is_some() {
                         ui.add_privmsg(sender, &msg, ts, &ui_msg_target, true, is_action);
                         ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
-                        let mentions_target = MsgTarget::Server { serv: "mentions" };
-                        ui.add_msg(
-                            &format!("{} in {}:{}: {}", sender, serv, chan.display(), msg),
-                            ts,
-                            &mentions_target,
-                        );
-                        ui.set_tab_style(TabStyle::Highlight, &mentions_target);
+                        if ui.has_mentions_tab() {
+                            let mentions_target = MsgTarget::Server { serv: "mentions" };
+                            ui.add_msg(
+                                &format!("{} in {}:{}: {}", sender, serv, chan.display(), msg),
+                                ts,
+                                &mentions_target,
+                            );
+                            ui.set_tab_style(TabStyle::Highlight, &mentions_target);
+                        }
                     } else {
                         ui.add_privmsg(sender, &msg, ts, &ui_msg_target, false, is_action);
                         ui.set_tab_style(TabStyle::NewMsg, &ui_msg_target);

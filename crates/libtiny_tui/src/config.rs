@@ -21,6 +21,9 @@ pub(crate) struct Config {
 
     #[serde(default = "default_max_nick_length")]
     pub(crate) max_nick_length: usize,
+
+    #[serde(default)]
+    pub(crate) hide_mentions: bool,
 }
 
 fn default_max_nick_length() -> usize {

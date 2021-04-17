@@ -80,6 +80,9 @@ pub struct TUI {
     /// Messaging area layout: aligned or compact
     msg_layout: Layout,
 
+    /// Disables mentions tab
+    hide_mentions: bool,
+
     tabs: Vec<Tab>,
     active_idx: usize,
     width: i32,
@@ -129,6 +132,7 @@ impl TUI {
             colors: Colors::default(),
             scrollback: usize::MAX,
             msg_layout: Layout::Compact,
+            hide_mentions: false,
             tabs: Vec::new(),
             active_idx: 0,
             width,
@@ -137,15 +141,18 @@ impl TUI {
             config_path,
         };
 
+        tui.reload_config();
+
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
         // show any errors in TUI.
-        tui.new_server_tab("mentions", None);
-        tui.add_client_msg(
-            "Any mentions to you will be listed here.",
-            &MsgTarget::Server { serv: "mentions" },
-        );
+        if !tui.hide_mentions {
+            tui.new_server_tab("mentions", None);
+            tui.add_client_msg(
+                "Any mentions to you will be listed here.",
+                &MsgTarget::Server { serv: "mentions" },
+            );
+        }
 
-        tui.reload_config();
         tui
     }
 
@@ -284,9 +291,11 @@ impl TUI {
                     scrollback,
                     layout,
                     max_nick_length,
+                    hide_mentions,
                 }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
+                    self.hide_mentions = hide_mentions;
                     if let Some(layout) = layout {
                         match layout {
                             crate::config::Layout::Compact => self.msg_layout = Layout::Compact,
@@ -1364,6 +1373,10 @@ impl TUI {
             };
             tab.widget.add_client_notify_msg(msg);
         });
+    }
+
+    pub(crate) fn has_mentions_tab(&self) -> bool {
+        !self.hide_mentions
     }
 
     ////////////////////////////////////////////////////////////////////////////

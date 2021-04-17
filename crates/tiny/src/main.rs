@@ -104,25 +104,25 @@ fn run(
     local.block_on(&runtime, async move {
         // Create TUI task
         let (tui, rcv_tui_ev) = TUI::run(config_path.clone());
-        tui.draw();
 
         // Create logger
         let report_logger_error = {
             let tui_clone = tui.clone();
             Box::new(move |err: String| {
-                // Somehwat hacky -- only tab we have is "mentions" so we show the error there
+                tui_clone.new_server_tab("logger", None);
                 tui_clone.add_client_err_msg(
                     &format!("Logger error: {}", err),
-                    &MsgTarget::Server { serv: "mentions" },
+                    &MsgTarget::Server { serv: "logger" },
                 )
             })
         };
         let logger: Option<Logger> =
             log_dir.and_then(|log_dir| match Logger::new(log_dir, report_logger_error) {
                 Err(LoggerInitError::CouldNotCreateDir { dir_path, err }) => {
+                    tui.new_server_tab("logger", None);
                     tui.add_client_err_msg(
                         &format!("Could not create log directory {:?}: {}", dir_path, err),
-                        &MsgTarget::Server { serv: "mentions" },
+                        &MsgTarget::Server { serv: "logger" },
                     );
                     tui.draw();
                     None
@@ -130,6 +130,7 @@ fn run(
                 Ok(logger) => {
                     // Create "mentions" log file manually -- the tab is already created in the TUI so
                     // we won't be creating a "mentions" file in the logger without this.
+                    // If the mentions tab is hidden, we will still log mentions to a file
                     logger.new_server_tab("mentions");
                     Some(logger)
                 }
@@ -160,6 +161,9 @@ fn run(
                     password: auth.password,
                 }),
             };
+
+            // draw tui after server tab is added
+            tui.draw();
 
             let (client, rcv_conn_ev) = Client::new(server_info);
 
