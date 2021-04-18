@@ -67,6 +67,20 @@ const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/re
 
 const TUI_COMMANDS: [CmdUsage; 5] = [CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD];
 
+const WELCOME_MSG: &str = r#"
+ ______   _              
+/_  __/  (_)  ___   __ __
+ / /    / /  / _ \ / // /
+/_/    /_/  /_//_/ \_  / 
+                /___/
+
+Basic commands:
+/connect <server> - connect to a server
+/join <channel> - join a channel
+/close - close current tab
+/help - list all commands
+"#;
+
 pub struct TUI {
     /// Termbox instance
     tb: Termbox,
@@ -147,10 +161,18 @@ impl TUI {
         // show any errors in TUI.
         if !tui.hide_mentions {
             tui.new_server_tab("mentions", None);
-            tui.add_client_msg(
-                "Any mentions to you will be listed here.",
-                &MsgTarget::Server { serv: "mentions" },
-            );
+            let msg_target = &MsgTarget::Server { serv: "mentions" };
+            let width = tui.width as usize;
+            if width >= 40 {
+                WELCOME_MSG
+                    .lines()
+                    .chain(std::iter::repeat_with(|| "\n").take(3))
+                    .for_each(|line| {
+                        tui.add_client_msg(&format!("{:^1$}", line, width), msg_target)
+                    });
+            }
+
+            tui.add_client_msg("Any mentions to you will be listed here.", msg_target);
         }
 
         tui
