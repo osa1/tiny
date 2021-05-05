@@ -17,10 +17,8 @@ pub(crate) struct MsgArea {
     width: i32,
     height: i32,
 
-    /// Vertical scroll: An offset from the last visible line.
-    /// E.g. when this is 0, `self.lines[self.lines.len() - 1]` is drawn at the
-    /// bottom of screen.
-    scroll: i32,
+    /// Vertical scroll
+    scroll: Scroll,
 
     line_buf: Line,
 
@@ -48,6 +46,17 @@ impl Layout {
     }
 }
 
+#[derive(Debug, Default)]
+struct Scroll {
+    /// An offset from the last visible line.
+    /// E.g. when this is 0, `self.lines[self.lines.len() - 1]` is drawn at the
+    /// bottom of screen.
+    scroll: i32,
+    /// Current index of line drawn at the top of the screen
+    /// Used to recalculate `scroll` on resizing of window
+    line_idx: usize,
+}
+
 impl MsgArea {
     pub(crate) fn new(width: i32, height: i32, scrollback: usize, layout: Layout) -> MsgArea {
         MsgArea {
@@ -55,7 +64,7 @@ impl MsgArea {
             scrollback,
             width,
             height,
-            scroll: 0,
+            scroll: Scroll::default(),
             line_buf: Line::new(),
             lines_height: Some(0),
             layout,
@@ -67,9 +76,12 @@ impl MsgArea {
     }
 
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
+        eprintln!("before {:?}", self.scroll);
         self.width = width;
         self.height = height;
         self.lines_height = None;
+        self.lines_height();
+        eprintln!("after {:?}", self.scroll);
     }
 
     pub(crate) fn layout(&self) -> Layout {
@@ -87,7 +99,7 @@ impl MsgArea {
         let mut row = pos_y + self.height - 1;
 
         // How many visible lines to skip
-        let mut skip = self.scroll;
+        let mut skip = self.scroll.scroll;
 
         // Draw lines in reverse order
         let mut line_idx = (self.lines.len() as i32) - 1;
@@ -121,6 +133,9 @@ impl MsgArea {
                 break;
             }
         }
+
+        // Set index of the current top-most line, +1 since last loop subtracted
+        self.scroll.line_idx = (line_idx + 1) as usize;
     }
 }
 
@@ -133,8 +148,14 @@ impl MsgArea {
             Some(height) => height,
             None => {
                 let mut total_height = 0;
-                for line in &mut self.lines {
-                    total_height += line.rendered_height(self.width);
+                let recalculate_scroll = self.recalculate_scroll();
+                for (idx, line) in &mut self.lines.iter_mut().enumerate() {
+                    let height = line.rendered_height(self.width);
+                    // If we need to recalculate, keep adding line heights until we get to line_idx
+                    if recalculate_scroll && idx >= self.scroll.line_idx {
+                        self.scroll.scroll += height;
+                    }
+                    total_height += height;
                 }
                 self.lines_height = Some(total_height);
                 total_height
@@ -143,23 +164,23 @@ impl MsgArea {
     }
 
     pub(crate) fn scroll_up(&mut self) {
-        if self.scroll < max(0, self.lines_height() - self.height) {
-            self.scroll += 1;
+        if self.scroll.scroll < max(0, self.lines_height() - self.height) {
+            self.scroll.scroll += 1;
         }
     }
 
     pub(crate) fn scroll_down(&mut self) {
-        if self.scroll > 0 {
-            self.scroll -= 1;
+        if self.scroll.scroll > 0 {
+            self.scroll.scroll -= 1;
         }
     }
 
     pub(crate) fn scroll_top(&mut self) {
-        self.scroll = max(0, self.lines_height() - self.height);
+        self.scroll.scroll = max(0, self.lines_height() - self.height);
     }
 
     pub(crate) fn scroll_bottom(&mut self) {
-        self.scroll = 0;
+        self.scroll.scroll = 0;
     }
 
     pub(crate) fn page_up(&mut self) {
@@ -169,7 +190,19 @@ impl MsgArea {
     }
 
     pub(crate) fn page_down(&mut self) {
-        self.scroll = max(0, self.scroll - 10);
+        self.scroll.scroll = max(0, self.scroll.scroll - 10);
+    }
+
+    /// Determines if we need to recalculate the scroll offset due to resizing of the window
+    fn recalculate_scroll(&mut self) -> bool {
+        if self.scroll.scroll > 0 {
+            // Subtract current height since our self.scroll.line_idx is the top of the window,
+            // but self.scroll.scroll is the offset from the bottom
+            self.scroll.scroll = -self.height;
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -192,8 +225,8 @@ impl MsgArea {
         }
         self.lines
             .push_back(mem::replace(&mut self.line_buf, Line::new()));
-        if self.scroll != 0 {
-            self.scroll += line_height;
+        if self.scroll.scroll != 0 {
+            self.scroll.scroll += line_height;
         }
         if let Some(ref mut total_height) = self.lines_height {
             *total_height += line_height - removed_line_height;
@@ -212,7 +245,7 @@ impl MsgArea {
 
     pub(crate) fn clear(&mut self) {
         self.lines.clear();
-        self.scroll = 0;
+        self.scroll.scroll = 0;
         self.lines_height = None;
     }
 }
@@ -226,20 +259,20 @@ mod tests {
     fn newline_scrolling() {
         let mut msg_area = MsgArea::new(100, 1, usize::MAX, Layout::Compact);
         // Adding a new line when scroll is 0 should not change it
-        assert_eq!(msg_area.scroll, 0);
+        assert_eq!(msg_area.scroll.scroll, 0);
         msg_area.add_text("line1", SegStyle::UserMsg);
         msg_area.flush_line();
-        assert_eq!(msg_area.scroll, 0);
+        assert_eq!(msg_area.scroll.scroll, 0);
 
         msg_area.add_text("line2", SegStyle::UserMsg);
         msg_area.flush_line();
-        assert_eq!(msg_area.scroll, 0);
+        assert_eq!(msg_area.scroll.scroll, 0);
 
         msg_area.scroll_up();
-        assert_eq!(msg_area.scroll, 1);
+        assert_eq!(msg_area.scroll.scroll, 1);
         msg_area.add_text("line3", SegStyle::UserMsg);
         msg_area.flush_line();
-        assert_eq!(msg_area.scroll, 2);
+        assert_eq!(msg_area.scroll.scroll, 2);
     }
 
     #[test]
