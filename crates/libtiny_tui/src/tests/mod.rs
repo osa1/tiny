@@ -443,6 +443,50 @@ fn test_alignment_long_string() {
 
     expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
 }
+
+#[test]
+fn test_resize_recalc_scroll() {
+    let mut tui = TUI::new_test(15, 5);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+    tui.add_privmsg(
+        "osa1",
+        "1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111",
+        ts,
+        &target,
+        false,
+        false,
+    );
+
+    tui.draw();
+
+    let home = term_input::Event::Key(Key::Home);
+    tui.handle_input_event(home, &mut None);
+    tui.set_size(16, 7);
+    tui.draw();
+
+    // Should be at the top of message after resize
+    #[rustfmt::skip]
+    let screen =
+        "|00:00 osa1: 1111|
+         |1111 1111 1111  |
+         |1111 1111 1111  |
+         |1111 1111 1111  |
+         |1111 1111 1111  |
+         |                |
+         |< #chan         |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 16, 7, Location::caller());
+}
+
 #[test]
 fn test_resize() {
     let mut tui = TUI::new_test(80, 50);

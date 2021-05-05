@@ -76,12 +76,10 @@ impl MsgArea {
     }
 
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
-        eprintln!("before {:?}", self.scroll);
         self.width = width;
         self.height = height;
         self.lines_height = None;
         self.lines_height();
-        eprintln!("after {:?}", self.scroll);
     }
 
     pub(crate) fn layout(&self) -> Layout {
