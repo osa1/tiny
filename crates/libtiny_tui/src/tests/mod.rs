@@ -442,6 +442,19 @@ fn test_alignment_long_string() {
          |mentions irc.server_1.org #chan         |";
 
     expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+
+    tui.add_privmsg("veryverylongnickname", "hi", ts, &target, false, false);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|00:00         osa1: 12345678901234567890|
+         |                    1234567890          |
+         |      veryverylon…: hi                  |
+         |osa1:                                   |
+         |mentions irc.server_1.org #chan         |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
 }
 #[test]
 fn test_resize() {

@@ -48,11 +48,6 @@ pub(crate) struct Timestamp {
     min: i32,
 }
 
-// 80 characters. TODO: We need to make sure we don't need more whitespace than that. We should
-// probably add an upper bound to max_nick_length config field?
-static WHITESPACE: &str =
-    "                                                                                ";
-
 impl Timestamp {
     /// The width of the timestamp plus a space
     pub(crate) const WIDTH: usize = 6;
@@ -62,11 +57,6 @@ impl Timestamp {
             &format!("{:02}:{:02} ", self.hour, self.min),
             SegStyle::Timestamp,
         );
-    }
-
-    /// Inserts spaces for a timestamp slot. Used in aligned layout.
-    fn blank(msg_area: &mut MsgArea) {
-        msg_area.add_text(&WHITESPACE[..Timestamp::WIDTH], SegStyle::Timestamp);
     }
 }
 
@@ -256,8 +246,6 @@ impl MessagingUI {
         if let Some(ts_) = self.last_activity_ts {
             if ts_ != ts {
                 ts.stamp(&mut self.msg_area);
-            } else if matches!(self.msg_area.layout(), Layout::Aligned { .. }) {
-                Timestamp::blank(&mut self.msg_area)
             }
         } else {
             ts.stamp(&mut self.msg_area);
@@ -316,30 +304,15 @@ impl MessagingUI {
         let nick_color = self.get_nick_color(sender);
         let nick_col_style = SegStyle::NickColor(nick_color);
 
-        // actions are /me msgs so they don't show the nick in the nick column, but in the msg
-        let layout = self.msg_area.layout();
-        let format_nick = |s: &str| -> String {
-            if let Layout::Aligned { max_nick_len, .. } = layout {
-                let mut aligned = format!("{:>padding$.padding$}", s, padding = max_nick_len);
-                if s.len() > max_nick_len {
-                    aligned.pop();
-                    aligned.push('…');
-                }
-                aligned
-            } else {
-                s.to_string()
-            }
-        };
         if is_action {
-            self.msg_area
-                .add_text(&format_nick("**"), SegStyle::UserMsg);
+            self.msg_area.add_text("**", SegStyle::UserAction);
             // separator between nick and msg
             self.msg_area.add_text("  ", SegStyle::Faded);
             self.msg_area.add_text(sender, nick_col_style);
             // a space replacing the usual ':'
             self.msg_area.add_text(" ", SegStyle::UserMsg);
         } else {
-            self.msg_area.add_text(&format_nick(sender), nick_col_style);
+            self.msg_area.add_text(sender, nick_col_style);
             // separator between nick and msg
             self.msg_area.add_text(": ", SegStyle::Faded);
         }
@@ -443,7 +416,7 @@ impl MessagingUI {
         let line_idx = self.get_activity_line_idx(ts);
         self.msg_area.modify_line(line_idx, |line| {
             line.add_text(old_nick, SegStyle::Faded);
-            line.add_char('>', SegStyle::Nick);
+            line.add_char('>', SegStyle::NickChange);
             line.add_text(new_nick, SegStyle::Faded);
         });
     }
@@ -467,12 +440,6 @@ impl MessagingUI {
             }
             _ => {
                 self.add_timestamp(ts);
-                if let Layout::Aligned { max_nick_len, .. } = self.msg_area.layout() {
-                    self.msg_area.add_text(
-                        &WHITESPACE[..max_nick_len + MSG_NICK_SUFFIX_LEN],
-                        SegStyle::UserMsg,
-                    )
-                }
                 self.msg_area.set_current_line_alignment();
                 let line_idx = self.msg_area.flush_line();
                 self.last_activity_line = Some(ActivityLine { ts, line_idx });

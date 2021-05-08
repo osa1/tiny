@@ -1,3 +1,5 @@
+use crate::msg_area::Layout;
+
 /// Cache that stores the state of a line's height calculation.
 /// `line_count` is used as the dirty bit to invalidate the cache.
 #[derive(Clone, Debug)]
@@ -39,6 +41,17 @@ impl LineType {
             Some(*msg_padding)
         } else {
             None
+        }
+    }
+}
+
+impl From<Layout> for LineType {
+    fn from(layout: Layout) -> Self {
+        match layout {
+            Layout::Compact => LineType::Msg,
+            Layout::Aligned { .. } => LineType::AlignedMsg {
+                msg_padding: layout.msg_padding(),
+            },
         }
     }
 }

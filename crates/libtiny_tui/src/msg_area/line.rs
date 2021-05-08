@@ -1,9 +1,11 @@
 use crate::line_split::LineType;
+use crate::messaging::{Timestamp, MSG_NICK_SUFFIX_LEN};
 use crate::{
     config::{Colors, Style},
     line_split::LineDataCache,
     utils::translate_irc_control_chars,
 };
+
 use std::mem;
 use termbox_simple::{self, Termbox};
 
@@ -19,7 +21,7 @@ pub(crate) struct Line {
     line_data: LineDataCache,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StyledString {
     string: String,
     style: SegStyle,
@@ -37,11 +39,12 @@ pub(crate) enum SegStyle {
 
     /// A style from the current color scheme.
     UserMsg,
+    UserAction,
     ErrMsg,
     Topic,
     Join,
     Part,
-    Nick,
+    NickChange,
     Faded,
     Highlight,
     Timestamp,
@@ -56,12 +59,12 @@ impl StyledString {
                 fg: u16::from(colors.nick[idx % colors.nick.len()]),
                 bg: colors.user_msg.bg,
             },
-            UserMsg => colors.user_msg,
+            UserMsg | UserAction => colors.user_msg,
             ErrMsg => colors.err_msg,
             Topic => colors.topic,
             Join => colors.join,
             Part => colors.part,
-            Nick => colors.nick_change,
+            NickChange => colors.nick_change,
             Faded => colors.faded,
             Highlight => colors.highlight,
             Timestamp => colors.timestamp,
@@ -165,11 +168,15 @@ impl Line {
         let msg_padding = self.line_type().msg_padding();
         if self.line_data.is_dirty() || self.line_data.needs_resize(width, 0, msg_padding) {
             self.line_data = LineDataCache::msg_line(width, msg_padding);
-            let mut full_line = self
-                .segments
+
+            let padsegs = self.padding();
+            let skip = padsegs.len();
+
+            let mut full_line = padsegs
                 .iter()
-                .flat_map(|s| s.string.chars())
-                .chain(self.current_seg.string.chars());
+                .chain(self.segments.iter().skip(skip))
+                .chain(std::iter::once(&self.current_seg))
+                .flat_map(|s| s.string.chars());
             self.line_data.calculate_height(&mut full_line, 0);
         }
         self.line_data.get_line_count().unwrap() as i32
@@ -189,9 +196,12 @@ impl Line {
         let mut char_idx = 0;
         let mut split_indices_iter = self.line_data.get_splits().iter().copied().peekable();
 
-        for seg in self
-            .segments
+        let padsegs = self.padding();
+        let skip = padsegs.len();
+
+        for seg in padsegs
             .iter()
+            .chain(self.segments.iter().skip(skip))
             .chain(std::iter::once(&self.current_seg))
         {
             let sty = seg.style(colors);
@@ -226,6 +236,58 @@ impl Line {
             }
         }
     }
+
+    /// Checks if padding is needed to align first few segments.
+    /// Returns Vec of modified segments or extra padding segments
+    fn padding(&self) -> Vec<StyledString> {
+        if let Some(msg_padding) = self.line_type().msg_padding() {
+            match self.segments.get(..2) {
+                Some([first, second]) => {
+                    match (first.style, second.style) {
+                        (SegStyle::Timestamp, SegStyle::NickColor(_))
+                        | (SegStyle::Timestamp, SegStyle::UserAction) => {
+                            // timestamp followed by nick/me
+                            let padded_nick = align_seg(second, msg_padding);
+                            return vec![first.clone(), padded_nick];
+                        }
+                        (SegStyle::NickColor(_), _) | (SegStyle::UserAction, _) => {
+                            // no timestamp, nick/me followed by message
+                            let mut blank_ts = StyledString::default();
+                            blank_ts.string = " ".repeat(6);
+                            let padded_nick = align_seg(first, msg_padding);
+                            return vec![blank_ts, padded_nick, second.clone()];
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {
+                    match self.segments.get(0) {
+                        Some(first) => {
+                            // full padding needed on things like Join or Nickchange
+                            let mut pad = StyledString::default();
+                            pad.string = " ".repeat(msg_padding);
+                            return vec![pad, first.clone()];
+                        }
+                        None => {}
+                    }
+                }
+            }
+        }
+        // padding ignored
+        vec![]
+    }
+}
+
+fn align_seg(seg: &StyledString, padding: usize) -> StyledString {
+    let padding = padding - Timestamp::WIDTH - MSG_NICK_SUFFIX_LEN;
+    let mut s = seg.clone();
+    let mut aligned = format!("{:>padding$.padding$}", s.string, padding = padding);
+    if s.string.len() > padding {
+        aligned.pop();
+        aligned.push('…');
+    }
+    s.string = aligned;
+    s
 }
 
 ////////////////////////////////////////////////////////////////////////////////
