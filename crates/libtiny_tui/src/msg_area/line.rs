@@ -415,6 +415,7 @@ mod tests {
     #[test]
     fn align_test() {
         let mut line = Line::new();
+        line.set_can_align(true);
         line.set_type(LineType::AlignedMsg { msg_padding: 1 });
         /*
         123
