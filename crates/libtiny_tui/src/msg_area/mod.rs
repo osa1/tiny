@@ -73,7 +73,15 @@ impl MsgArea {
 
     /// Used to force a line to be aligned.
     pub(crate) fn set_current_line_alignment(&mut self) {
+        self.line_buf.set_can_align(true);
         self.line_buf.set_type(self.layout.into());
+    }
+
+    pub(crate) fn set_layout(&mut self, layout: Layout) {
+        self.layout = layout;
+        self.lines
+            .iter_mut()
+            .for_each(|line| line.set_type(layout.into()));
     }
 
     pub(crate) fn draw(&mut self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {

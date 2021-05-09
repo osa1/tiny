@@ -91,6 +91,7 @@ impl LineDataCache {
     }
 
     pub(crate) fn set_line_type(&mut self, line_type: LineType) {
+        self.set_dirty();
         self.line_type = line_type
     }
 

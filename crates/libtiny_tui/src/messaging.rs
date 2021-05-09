@@ -107,6 +107,10 @@ impl MessagingUI {
         self.resize(w, h);
     }
 
+    pub(crate) fn set_layout(&mut self, msg_layout: Layout) {
+        self.msg_area.set_layout(msg_layout)
+    }
+
     pub(crate) fn get_nick(&self) -> Option<String> {
         self.input_field.get_nick()
     }

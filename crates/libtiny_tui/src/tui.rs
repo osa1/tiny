@@ -288,14 +288,16 @@ impl TUI {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
                     if let Some(layout) = layout {
-                        match layout {
-                            crate::config::Layout::Compact => self.msg_layout = Layout::Compact,
-                            crate::config::Layout::Aligned => {
-                                self.msg_layout = Layout::Aligned {
-                                    max_nick_len: max_nick_length,
-                                }
-                            }
-                        }
+                        let layout = match layout {
+                            crate::config::Layout::Compact => Layout::Compact,
+                            crate::config::Layout::Aligned => Layout::Aligned {
+                                max_nick_len: max_nick_length,
+                            },
+                        };
+                        self.msg_layout = layout;
+                        self.tabs
+                            .iter_mut()
+                            .for_each(|t| t.widget.set_layout(layout));
                     }
                 }
             }

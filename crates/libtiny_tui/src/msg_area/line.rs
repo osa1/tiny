@@ -19,6 +19,7 @@ pub(crate) struct Line {
     current_seg: StyledString,
 
     line_data: LineDataCache,
+    can_align: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -90,11 +91,18 @@ impl Line {
             segments: vec![],
             current_seg: StyledString::default(),
             line_data: LineDataCache::msg_line(0, None),
+            can_align: false,
         }
     }
 
     pub(crate) fn set_type(&mut self, line_type: LineType) {
-        self.line_data.set_line_type(line_type)
+        if !matches!(line_type, LineType::AlignedMsg { .. }) || self.can_align {
+            self.line_data.set_line_type(line_type)
+        }
+    }
+
+    pub(crate) fn set_can_align(&mut self, can_align: bool) {
+        self.can_align = can_align
     }
 
     pub(crate) fn line_type(&self) -> LineType {
