@@ -1,4 +1,7 @@
-# Unreleased
+# 2021/05/12: 0.9.0
+
+Starting with this release, tarballs on GitHub are now built on Ubuntu 20.04
+(instead of 18.04).
 
 - Fixed highlighting tabs when `/ignore` is set. (#291)
 - `/statusline` removed. See 6abc671 commit message for the motivation.
