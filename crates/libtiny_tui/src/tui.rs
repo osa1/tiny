@@ -55,6 +55,7 @@ impl CmdUsage {
     }
 }
 
+const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "/quit");
 const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "/clear");
 const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "/ignore");
 const NOTIFY_CMD: CmdUsage = CmdUsage::new(
@@ -65,7 +66,9 @@ const NOTIFY_CMD: CmdUsage = CmdUsage::new(
 const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
 const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
 
-const TUI_COMMANDS: [CmdUsage; 5] = [CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD];
+const TUI_COMMANDS: [CmdUsage; 6] = [
+    QUIT_CMD, CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD,
+];
 
 pub struct TUI {
     /// Termbox instance
@@ -265,6 +268,10 @@ impl TUI {
                 }
                 // false to fall through to print help for cmd.rs commands
                 false
+            }
+            Some("quit") => {
+                self.tabs[self.active_idx].widget.toggle_exit_dialogue();
+                true
             }
             _ => false,
         }

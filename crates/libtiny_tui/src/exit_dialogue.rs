@@ -13,7 +13,7 @@ impl ExitDialogue {
     }
 }
 
-static MSG: &str = "Really quit?";
+static MSG: &str = "Really quit? (Enter for yes, Esc to cancel)";
 
 impl ExitDialogue {
     pub(crate) fn resize(&mut self, width: i32) {
