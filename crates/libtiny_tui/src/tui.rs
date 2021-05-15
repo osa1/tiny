@@ -94,8 +94,11 @@ pub struct TUI {
 }
 
 pub(crate) enum CmdResult {
+    /// Command executed successfully
     Ok,
-    Skip,
+    /// Pass through from tui to cmd.rs
+    Continue,
+    /// Quit command was executed
     Quit,
 }
 
@@ -272,8 +275,8 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                // false to fall through to print help for cmd.rs commands
-                CmdResult::Skip
+                // Fall through to print help for cmd.rs commands
+                CmdResult::Continue
             }
             Some("quit") => CmdResult::Quit,
             _ => CmdResult::Ok,

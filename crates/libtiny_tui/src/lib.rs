@@ -181,7 +181,7 @@ async fn input_handler<S>(
                             let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
                             match result {
                                 CmdResult::Ok => {}
-                                CmdResult::Skip => {
+                                CmdResult::Continue => {
                                     snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap()
                                 }
                                 CmdResult::Quit => {
