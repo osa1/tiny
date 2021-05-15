@@ -3,6 +3,7 @@ use termbox_simple::Termbox;
 
 use crate::{config::Colors, widget::WidgetRet};
 
+#[derive(Debug)]
 pub(crate) struct ExitDialogue {
     width: i32,
 }

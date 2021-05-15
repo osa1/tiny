@@ -93,6 +93,12 @@ pub struct TUI {
     config_path: Option<PathBuf>,
 }
 
+pub(crate) enum CmdResult {
+    Ok,
+    Skip,
+    Quit,
+}
+
 impl TUI {
     pub(crate) fn new(config_path: PathBuf) -> TUI {
         let tb = Termbox::init().unwrap(); // TODO: check errors
@@ -229,31 +235,31 @@ impl TUI {
         }
     }
 
-    pub(crate) fn try_handle_cmd(&mut self, cmd: &str, src: &MsgSource) -> bool {
+    pub(crate) fn try_handle_cmd(&mut self, cmd: &str, src: &MsgSource) -> CmdResult {
         let mut words = cmd.split_whitespace();
         match words.next() {
             Some("clear") => {
                 self.clear(&src.to_target());
-                true
+                CmdResult::Ok
             }
             Some("ignore") => {
                 self.ignore(src);
-                true
+                CmdResult::Ok
             }
             Some("notify") => {
                 self.notify(&mut words, src);
-                true
+                CmdResult::Ok
             }
             Some("switch") => {
                 match words.next() {
                     Some(s) => self.switch(s),
                     None => self.add_client_err_msg(SWITCH_CMD.usage, &MsgTarget::CurrentTab),
                 }
-                true
+                CmdResult::Ok
             }
             Some("reload") => {
                 self.reload_config();
-                true
+                CmdResult::Ok
             }
             Some("help") => {
                 self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
@@ -267,13 +273,10 @@ impl TUI {
                     );
                 }
                 // false to fall through to print help for cmd.rs commands
-                false
+                CmdResult::Skip
             }
-            Some("quit") => {
-                self.tabs[self.active_idx].widget.toggle_exit_dialogue();
-                true
-            }
-            _ => false,
+            Some("quit") => CmdResult::Quit,
+            _ => CmdResult::Ok,
         }
     }
 
