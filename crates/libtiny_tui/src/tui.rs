@@ -55,6 +55,7 @@ impl CmdUsage {
     }
 }
 
+const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "/quit");
 const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "/clear");
 const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "/ignore");
 const NOTIFY_CMD: CmdUsage = CmdUsage::new(
@@ -65,7 +66,9 @@ const NOTIFY_CMD: CmdUsage = CmdUsage::new(
 const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
 const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
 
-const TUI_COMMANDS: [CmdUsage; 5] = [CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD];
+const TUI_COMMANDS: [CmdUsage; 6] = [
+    QUIT_CMD, CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD,
+];
 
 pub struct TUI {
     /// Termbox instance
@@ -88,6 +91,15 @@ pub struct TUI {
 
     /// Config file path
     config_path: Option<PathBuf>,
+}
+
+pub(crate) enum CmdResult {
+    /// Command executed successfully
+    Ok,
+    /// Pass command through to cmd.rs for further handling
+    Continue,
+    /// Quit command was executed
+    Quit,
 }
 
 impl TUI {
@@ -226,31 +238,31 @@ impl TUI {
         }
     }
 
-    pub(crate) fn try_handle_cmd(&mut self, cmd: &str, src: &MsgSource) -> bool {
+    pub(crate) fn try_handle_cmd(&mut self, cmd: &str, src: &MsgSource) -> CmdResult {
         let mut words = cmd.split_whitespace();
         match words.next() {
             Some("clear") => {
                 self.clear(&src.to_target());
-                true
+                CmdResult::Ok
             }
             Some("ignore") => {
                 self.ignore(src);
-                true
+                CmdResult::Ok
             }
             Some("notify") => {
                 self.notify(&mut words, src);
-                true
+                CmdResult::Ok
             }
             Some("switch") => {
                 match words.next() {
                     Some(s) => self.switch(s),
                     None => self.add_client_err_msg(SWITCH_CMD.usage, &MsgTarget::CurrentTab),
                 }
-                true
+                CmdResult::Ok
             }
             Some("reload") => {
                 self.reload_config();
-                true
+                CmdResult::Ok
             }
             Some("help") => {
                 self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
@@ -263,10 +275,11 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                // false to fall through to print help for cmd.rs commands
-                false
+                // Fall through to print help for cmd.rs commands
+                CmdResult::Continue
             }
-            _ => false,
+            Some("quit") => CmdResult::Quit,
+            _ => CmdResult::Ok,
         }
     }
 

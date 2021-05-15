@@ -22,7 +22,7 @@ mod widget;
 #[cfg(test)]
 mod tests;
 
-use crate::tui::TUIRet;
+use crate::tui::{CmdResult, TUIRet};
 use libtiny_common::{ChanNameRef, Event, MsgTarget, TabStyle};
 
 use futures::select;
@@ -178,9 +178,17 @@ async fn input_handler<S>(
                         if msg[0] == '/' {
                             // Handle TUI commands, send others to downstream
                             let cmd: String = (&msg[1..]).iter().collect();
-                            let handled = tui.borrow_mut().try_handle_cmd(&cmd, &from);
-                            if !handled {
-                                snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap();
+                            let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
+                            match result {
+                                CmdResult::Ok => {}
+                                CmdResult::Continue => {
+                                    snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap()
+                                }
+                                CmdResult::Quit => {
+                                    snd_ev.try_send(Event::Abort).unwrap();
+                                    let _ = snd_abort.try_send(());
+                                    return;
+                                }
                             }
                         } else {
                             snd_ev
