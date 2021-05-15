@@ -1,3 +1,8 @@
+# Unreleased
+
+- New command `/quit` added for quitting. Key binding for quitting (`C-c
+  enter`) works as before.
+
 # 2021/05/12: 0.9.0
 
 Starting with this release, tarballs on GitHub are now built on Ubuntu 20.04
