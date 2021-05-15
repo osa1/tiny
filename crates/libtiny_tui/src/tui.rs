@@ -96,7 +96,7 @@ pub struct TUI {
 pub(crate) enum CmdResult {
     /// Command executed successfully
     Ok,
-    /// Pass through from tui to cmd.rs
+    /// Pass command through to cmd.rs for further handling
     Continue,
     /// Quit command was executed
     Quit,
