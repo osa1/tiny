@@ -31,10 +31,10 @@ pub(crate) fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
 // letter     =  %x41-5A / %x61-7A ; A-Z / a-z
 // special    =  %x5B-60 / %x7B-7D ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
 //
-// we use a simpler check here (allows strictly more nicks)
-
+// We use a simpler check here (allows strictly more nicks)
+// Only check to see if the nick does not begin with '#', https://github.com/osa1/tiny/issues/324
 pub(crate) fn is_nick_first_char(c: char) -> bool {
-    c.is_alphabetic() || "[]\\`_^{|}".contains(c)
+    c != '#'
 }
 
 /*
