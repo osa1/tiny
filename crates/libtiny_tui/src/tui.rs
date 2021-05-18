@@ -279,7 +279,7 @@ impl TUI {
                 CmdResult::Continue
             }
             Some("quit") => CmdResult::Quit,
-            _ => CmdResult::Ok,
+            _ => CmdResult::Continue,
         }
     }
 
