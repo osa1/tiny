@@ -2,6 +2,8 @@
 
 - New command `/quit` added for quitting. Key binding for quitting (`C-c
   enter`) works as before.
+- `/msg <nick> <message>` command now accepts anything as `<nick>` as long as
+  it doesn't start with `#`. (#324)
 
 # 2021/05/12: 0.9.0
 
