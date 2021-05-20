@@ -1,13 +1,13 @@
-use crate::msg_area::Layout;
-use crate::tui::TUI;
+use std::panic::Location;
 
-use crate::test_utils::expect_screen;
 use libtiny_common::{ChanNameRef, MsgTarget};
 use term_input::{Event, Key};
 
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::panic::Location;
+use crate::test_utils::expect_screen;
+use crate::tui::TUI;
+
+mod layout;
+mod resize;
 
 fn enter_string(tui: &mut TUI, s: &str) {
     for c in s.chars() {
@@ -379,157 +379,4 @@ fn test_text_field_wrap() {
 
     // TODO: Test changing nick (osa: I don't understand how nick length is taken into account when
     // falling back to scrolling)
-}
-
-#[test]
-fn test_join_part_overflow() {
-    let mut tui = TUI::new_test(21, 4);
-    let serv = "irc.server_1.org";
-    let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
-    tui.next_tab();
-    tui.next_tab();
-
-    let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.add_nick("123456", Some(ts), &target);
-    tui.add_nick("abcdef", Some(ts), &target);
-    tui.add_nick("hijklm", Some(ts), &target);
-    tui.draw();
-
-    #[rustfmt::skip]
-    let screen =
-        "|00:00 +123456 +abcdef|
-         |+hijklm              |
-         |osa1:                |
-         |< #chan              |";
-
-    expect_screen(screen, &tui.get_front_buffer(), 21, 4, Location::caller());
-}
-
-#[test]
-fn test_alignment_long_string() {
-    let mut tui = TUI::new_test(40, 5);
-    tui.set_layout(Layout::Aligned { max_nick_len: 12 });
-    let serv = "irc.server_1.org";
-    let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
-    tui.next_tab();
-    tui.next_tab();
-
-    let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.add_privmsg(
-        "osa1",
-        "123456789012345678901234567890",
-        ts,
-        &target,
-        false,
-        false,
-    );
-    tui.draw();
-
-    #[rustfmt::skip]
-    let screen =
-        "|                                        |
-         |00:00         osa1: 12345678901234567890|
-         |                    1234567890          |
-         |osa1:                                   |
-         |mentions irc.server_1.org #chan         |";
-
-    expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
-}
-
-#[test]
-fn test_resize_recalc_scroll() {
-    let mut tui = TUI::new_test(15, 5);
-    let serv = "irc.server_1.org";
-    let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
-    tui.next_tab();
-    tui.next_tab();
-
-    let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.add_privmsg(
-        "osa1",
-        "1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111",
-        ts,
-        &target,
-        false,
-        false,
-    );
-
-    tui.draw();
-
-    let home = term_input::Event::Key(Key::Home);
-    tui.handle_input_event(home, &mut None);
-    tui.set_size(16, 7);
-    tui.draw();
-
-    // Should be at the top of message after resize
-    #[rustfmt::skip]
-    let screen =
-        "|00:00 osa1: 1111|
-         |1111 1111 1111  |
-         |1111 1111 1111  |
-         |1111 1111 1111  |
-         |1111 1111 1111  |
-         |                |
-         |< #chan         |";
-
-    expect_screen(screen, &tui.get_front_buffer(), 16, 7, Location::caller());
-}
-
-#[test]
-fn test_resize() {
-    let mut tui = TUI::new_test(80, 50);
-
-    let server = "<server>";
-    tui.new_server_tab(server, None);
-
-    let ts = time::empty_tm();
-    let target = MsgTarget::CurrentTab;
-
-    let f = File::open("test/lipsum.txt").unwrap();
-    let f = BufReader::new(f);
-    for line in f.lines() {
-        let line = line.unwrap();
-        tui.add_msg(&line, ts, &target);
-    }
-
-    let mut w = 80;
-    let mut h = 50;
-
-    for _ in 0..50 {
-        w -= 1;
-        h -= 1;
-        tui.set_size(w, h);
-        tui.draw();
-    }
-
-    for _ in 0..30 {
-        w -= 1;
-        tui.set_size(w, h);
-        tui.draw();
-    }
-
-    for _ in 0..50 {
-        w += 1;
-        h += 1;
-        tui.set_size(w, h);
-        tui.draw();
-    }
-
-    for _ in 0..30 {
-        w += 1;
-        tui.set_size(w, h);
-        tui.draw();
-    }
 }
