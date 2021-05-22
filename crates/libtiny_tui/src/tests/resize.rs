@@ -219,6 +219,7 @@ fn test_resize_no_scroll_stay_on_bottom() {
     expect_screen(screen3, &tui.get_front_buffer(), 18, 11, Location::caller());
 }
 
+// Simulate resize from 50x50 -> 0x0 -> 50x50
 #[test]
 fn test_resize() {
     let mut tui = TUI::new_test(80, 50);
@@ -236,32 +237,8 @@ fn test_resize() {
         tui.add_msg(&line, ts, &target);
     }
 
-    let mut w = 80;
-    let mut h = 50;
-
-    for _ in 0..50 {
-        w -= 1;
-        h -= 1;
-        tui.set_size(w, h);
-        tui.draw();
-    }
-
-    for _ in 0..30 {
-        w -= 1;
-        tui.set_size(w, h);
-        tui.draw();
-    }
-
-    for _ in 0..50 {
-        w += 1;
-        h += 1;
-        tui.set_size(w, h);
-        tui.draw();
-    }
-
-    for _ in 0..30 {
-        w += 1;
-        tui.set_size(w, h);
+    for i in (0..=50).rev().chain(0..=50) {
+        tui.set_size(i, i);
         tui.draw();
     }
 }
