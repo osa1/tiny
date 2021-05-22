@@ -48,12 +48,12 @@ impl Layout {
 
 #[derive(Debug, Default)]
 struct Scroll {
-    /// An offset from the last visible line.
-    /// E.g. when this is 0, `self.lines[self.lines.len() - 1]` is drawn at the
-    /// bottom of screen.
+    /// An offset of visible lines from the last visible line of the most recent Line
+    /// E.g. when this is 0, `self.lines.last()` is drawn at the
+    /// bottom of screen. When it is not 0, it is N lines up in the message area.
     scroll: i32,
-    /// Current index of line drawn at the top of the screen
-    /// Used to recalculate `scroll` on resizing of window
+    /// Current index into `self.lines` of the Line drawn at the top of the screen.
+    /// Used to recalculate `scroll` on resizing of window and maintain scrolling in the correct place
     line_idx: usize,
 }
 
