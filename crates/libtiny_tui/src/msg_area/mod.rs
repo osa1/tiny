@@ -79,7 +79,7 @@ impl MsgArea {
         self.width = width;
         self.height = height;
         self.lines_height = None;
-        self.lines_height();
+        self.total_visible_lines();
     }
 
     pub(crate) fn layout(&self) -> Layout {
@@ -141,7 +141,8 @@ impl MsgArea {
 // Scrolling
 
 impl MsgArea {
-    fn lines_height(&mut self) -> i32 {
+    /// The total number of visible lines if each Line was rendered at the current screen width
+    fn total_visible_lines(&mut self) -> i32 {
         match self.lines_height {
             Some(height) => height,
             None => {
@@ -162,7 +163,7 @@ impl MsgArea {
     }
 
     pub(crate) fn scroll_up(&mut self) {
-        if self.scroll.scroll < max(0, self.lines_height() - self.height) {
+        if self.scroll.scroll < max(0, self.total_visible_lines() - self.height) {
             self.scroll.scroll += 1;
         }
     }
@@ -174,7 +175,7 @@ impl MsgArea {
     }
 
     pub(crate) fn scroll_top(&mut self) {
-        self.scroll.scroll = max(0, self.lines_height() - self.height);
+        self.scroll.scroll = max(0, self.total_visible_lines() - self.height);
     }
 
     pub(crate) fn scroll_bottom(&mut self) {
@@ -288,6 +289,6 @@ mod tests {
         // Will pop out "first" line
         msg_area.flush_line();
         assert_eq!(msg_area.lines.len(), 3);
-        assert_eq!(msg_area.lines_height(), 3);
+        assert_eq!(msg_area.total_visible_lines(), 3);
     }
 }
