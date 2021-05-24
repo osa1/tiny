@@ -5,6 +5,7 @@ mod config;
 mod editor;
 mod exit_dialogue;
 mod input_area;
+mod key_map;
 mod line_split;
 mod messaging;
 #[doc(hidden)]

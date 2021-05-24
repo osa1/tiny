@@ -28,7 +28,7 @@ extern crate log;
 // Public types
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
 pub enum Key {
     AltArrow(Arrow),
     AltChar(char),
@@ -48,7 +48,7 @@ pub enum Key {
     Tab,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
 pub enum Arrow {
     Left,
     Right,
@@ -76,6 +76,7 @@ pub enum Event {
 // Byte sequences of key presses we want to capture
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Note: `showkey -a` is an easy way to get these bytes
 byte_seq_parser! {
     parse_key_bytes -> Key, // Function name. Generation function type is
                             // fn(&[u8]) -> Option<(Key, usize)>.
@@ -110,16 +111,29 @@ byte_seq_parser! {
     [8] => Key::Backspace,
     [127] => Key::Backspace,
     [1] => Key::Ctrl('a'),
-    [5] => Key::Ctrl('e'),
-    [23] => Key::Ctrl('w'),
-    [11] => Key::Ctrl('k'),
-    [4] => Key::Ctrl('d'),
+    [2] => Key::Ctrl('b'),
     [3] => Key::Ctrl('c'),
-    [17] => Key::Ctrl('q'),
-    [16] => Key::Ctrl('p'),
+    [4] => Key::Ctrl('d'),
+    [5] => Key::Ctrl('e'),
+    [6] => Key::Ctrl('f'),
+    [7] => Key::Ctrl('g'),
+    [10] => Key::Ctrl('j'),
+    [11] => Key::Ctrl('k'),
+    [12] => Key::Ctrl('l'),
+    [13] => Key::Ctrl('m'),
     [14] => Key::Ctrl('n'),
+    [15] => Key::Ctrl('o'),
+    [16] => Key::Ctrl('p'),
+    [17] => Key::Ctrl('q'),
+    [18] => Key::Ctrl('r'),
+    [19] => Key::Ctrl('s'),
+    [20] => Key::Ctrl('t'),
     [21] => Key::Ctrl('u'),
+    [22] => Key::Ctrl('v'),
+    [23] => Key::Ctrl('w'),
     [24] => Key::Ctrl('x'),
+    [25] => Key::Ctrl('y'),
+    [26] => Key::Ctrl('z'),
 }
 
 // static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];

@@ -8,6 +8,7 @@ use time::{self, Tm};
 use crate::config::Colors;
 use crate::exit_dialogue::ExitDialogue;
 use crate::input_area::InputArea;
+use crate::key_map::KeyAction;
 use crate::msg_area::line::SegStyle;
 use crate::msg_area::{Layout, MsgArea};
 use crate::trie::Trie;
@@ -135,56 +136,48 @@ impl MessagingUI {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
     }
 
-    pub(crate) fn keypressed(&mut self, key: Key) -> WidgetRet {
-        match key {
-            Key::Ctrl('c') => {
+    pub(crate) fn keypressed(&mut self, key: Key, key_action: Option<KeyAction>) -> WidgetRet {
+        match key_action {
+            Some(KeyAction::Exit) => {
                 self.toggle_exit_dialogue();
                 WidgetRet::KeyHandled
             }
-
-            Key::Ctrl('u') | Key::PageUp => {
+            Some(KeyAction::MessagesPageUp) => {
                 self.msg_area.page_up();
                 WidgetRet::KeyHandled
             }
-
-            Key::Ctrl('d') | Key::PageDown => {
+            Some(KeyAction::MessagesPageDown) => {
                 self.msg_area.page_down();
                 WidgetRet::KeyHandled
             }
-
-            Key::ShiftUp => {
+            Some(KeyAction::MessagesScrollUp) => {
                 self.msg_area.scroll_up();
                 WidgetRet::KeyHandled
             }
-
-            Key::ShiftDown => {
+            Some(KeyAction::MessagesScrollDown) => {
                 self.msg_area.scroll_down();
                 WidgetRet::KeyHandled
             }
-
-            Key::Tab => {
+            Some(KeyAction::MessagesScrollTop) => {
+                self.msg_area.scroll_top();
+                WidgetRet::KeyHandled
+            }
+            Some(KeyAction::MessagesScrollBottom) => {
+                self.msg_area.scroll_bottom();
+                WidgetRet::KeyHandled
+            }
+            Some(KeyAction::InputAutoComplete) => {
                 if self.exit_dialogue.is_none() {
                     self.input_field.autocomplete(&self.nicks);
                 }
                 WidgetRet::KeyHandled
             }
-
-            Key::Home => {
-                self.msg_area.scroll_top();
-                WidgetRet::KeyHandled
-            }
-
-            Key::End => {
-                self.msg_area.scroll_bottom();
-                WidgetRet::KeyHandled
-            }
-
-            key => {
+            _ => {
                 let ret = {
                     if let Some(exit_dialogue) = self.exit_dialogue.as_ref() {
                         exit_dialogue.keypressed(key)
                     } else {
-                        self.input_field.keypressed(key)
+                        self.input_field.keypressed(key, key_action)
                     }
                 };
 

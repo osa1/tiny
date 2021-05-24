@@ -139,3 +139,72 @@ colors:
         fg: red
         bg: default
         attrs: [bold]
+
+# Custom key mappings (optional)
+# [key_name]: [key_action]
+# key_map:
+    ### Defaults ###
+    # ctrl_c: exit
+    # ctrl_x: run_editor
+
+    # alt_1: 
+    #     tab_goto: 1
+    # alt_2: 
+    #     tab_goto: 2
+    # alt_3: 
+    #     tab_goto: 3
+    # alt_4: 
+    #     tab_goto: 4
+    # alt_5: 
+    #     tab_goto: 5
+    # alt_6: 
+    #     tab_goto: 6
+    # alt_7: 
+    #     tab_goto: 7
+    # alt_8: 
+    #     tab_goto: 8
+    # alt_9: 
+    #     tab_goto: 9
+    # alt_0: 
+    #     tab_goto: 0
+    # ctrl_n:     tab_next
+    # ctrl_p:     tab_prev
+
+    # shift_up:   messages_scroll_up
+    # shift_down: messages_scroll_down
+    # ctrl_u:     messages_page_up
+    # ctrl_d:     messages_page_down
+    # pgup:       messages_page_up
+    # pgdown:     messages_page_down
+    # home:       messages_scroll_top
+    # end:        messages_scroll_bottom
+
+    # left:       input_move_curs_left
+    # right:      input_move_curs_right
+    # ctrl_a:     input_move_curs_start
+    # ctrl_e:     input_move_curs_end
+    # ctrl_left:  input_move_word_left
+    # ctrl_right: input_move_word_right
+    # ctrl_k:     input_delete_to_end
+    # ctrl_w:     input_delete_prev_word
+    # backspace:  input_delete_prev_char
+    # del:        input_delete_next_char
+    # tab:        input_auto_complete
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
