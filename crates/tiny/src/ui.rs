@@ -174,10 +174,17 @@ pub(crate) fn send_msg(
     is_action: bool,
 ) {
     if src.serv_name() == "mentions" {
-        ui.add_client_err_msg(
-            "Use `/connect <server>` to connect to a server",
-            &MsgTarget::CurrentTab,
-        );
+        if clients.len() == 0 {
+            ui.add_client_err_msg(
+                "No connected server found, please use `/connect <server>` to connect to a server",
+                &MsgTarget::CurrentTab,
+            );
+        } else {
+            ui.add_client_err_msg(
+                "You are on the mentions tab, please use `/switch <tab name>` to switch to a tab",
+                &MsgTarget::CurrentTab,
+            );
+        }
         return;
     }
 
