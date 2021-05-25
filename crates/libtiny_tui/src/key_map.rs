@@ -11,6 +11,7 @@ pub(crate) struct KeyMap(HashMap<Key, KeyAction>);
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum KeyAction {
+    Disable,
     Exit,
 
     RunEditor,
@@ -45,6 +46,7 @@ pub(crate) enum KeyAction {
 impl Display for KeyAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
+            KeyAction::Disable => "disable",
             KeyAction::Exit => "exit",
             KeyAction::RunEditor => "run_editor",
             KeyAction::TabNext => "tab_next",
@@ -186,7 +188,7 @@ impl<'de> Deserialize<'de> for MappedKey {
             type Value = MappedKey;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9]")?;
+                write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9]. ")?;
                 write!(
                     formatter,
                     "modifiers with arrow key or single characters:  alt, shift, ctrl"
@@ -197,10 +199,9 @@ impl<'de> Deserialize<'de> for MappedKey {
             where
                 E: serde::de::Error,
             {
-                let key_combo: Vec<&str> = v.split('_').collect();
-                let combo_len = key_combo.len();
-                let key = match combo_len {
-                    1 => match key_combo[0] {
+                let key_combo = v.split_once('_');
+                let key = match key_combo {
+                    None => match v {
                         "backspace" => Key::Backspace,
                         "del" => Key::Del,
                         "end" => Key::End,
@@ -213,34 +214,39 @@ impl<'de> Deserialize<'de> for MappedKey {
                         "down" => Key::Arrow(Arrow::Down),
                         "left" => Key::Arrow(Arrow::Left),
                         "right" => Key::Arrow(Arrow::Right),
-                        ch if ch.len() == 1 => Key::Char(ch.chars().next().unwrap()),
+                        ch if ch.chars().size_hint().0 == 1 => {
+                            Key::Char(ch.chars().next().unwrap())
+                        }
                         unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                     },
-                    2 => match key_combo[0] {
-                        "alt" => match key_combo[1] {
+                    Some((k1, k2)) => match k1 {
+                        "alt" => match k2 {
                             "up" => Key::AltArrow(Arrow::Up),
                             "down" => Key::AltArrow(Arrow::Down),
                             "left" => Key::AltArrow(Arrow::Left),
                             "right" => Key::AltArrow(Arrow::Right),
-                            ch if ch.len() == 1 => Key::AltChar(ch.chars().next().unwrap()),
+                            ch if ch.chars().size_hint().0 == 1 => {
+                                Key::AltChar(ch.chars().next().unwrap())
+                            }
                             unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                         },
-                        "ctrl" => match key_combo[1] {
+                        "ctrl" => match k2 {
                             "up" => Key::CtrlArrow(Arrow::Up),
                             "down" => Key::CtrlArrow(Arrow::Down),
                             "left" => Key::CtrlArrow(Arrow::Left),
                             "right" => Key::CtrlArrow(Arrow::Right),
-                            ch if ch.len() == 1 => Key::Ctrl(ch.chars().next().unwrap()),
+                            ch if ch.chars().size_hint().0 == 1 => {
+                                Key::Ctrl(ch.chars().next().unwrap())
+                            }
                             unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                         },
-                        "shift" => match key_combo[1] {
+                        "shift" => match k2 {
                             "up" => Key::ShiftUp,
                             "down" => Key::ShiftDown,
                             unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                         },
                         unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                     },
-                    len => return Err(E::invalid_length(len, &Self)),
                 };
                 Ok(MappedKey(key))
             }
@@ -255,6 +261,12 @@ fn deser_key() {
     let s = "alt_p";
     let key: MappedKey = serde_yaml::from_str(s).unwrap();
     assert_eq!(Key::AltChar('p'), key.0);
+    let s = "alt_è";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::AltChar('è'), key.0);
+    let s = "alt__";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::AltChar('_'), key.0);
 }
 
 #[test]

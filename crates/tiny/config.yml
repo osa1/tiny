@@ -142,6 +142,7 @@ colors:
 
 # Custom key mappings (optional)
 # [key_name]: [key_action]
+# Set a key to "disable" to disable it
 # key_map:
     ### Defaults ###
     # ctrl_c: exit
