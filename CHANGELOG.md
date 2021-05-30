@@ -5,6 +5,8 @@
 - `/msg <nick> <message>` command now accepts anything as `<nick>` as long as
   it doesn't start with `#`. (#324)
 - Error message when sending a message in the mentions tab improved. (#329)
+- Logger now prints "Logging ended at ..." lines when a tab is closed or you
+  exit tiny. (8061042)
 
 # 2021/05/12: 0.9.0
 
