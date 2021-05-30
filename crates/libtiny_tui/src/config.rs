@@ -19,7 +19,6 @@ pub(crate) struct Config {
     #[serde(default = "usize::max_value")]
     pub(crate) scrollback: usize,
 
-    #[serde(default)]
     pub(crate) layout: Option<Layout>,
 
     #[serde(default = "default_max_nick_length")]

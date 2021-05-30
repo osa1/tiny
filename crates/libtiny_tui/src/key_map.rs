@@ -248,7 +248,12 @@ impl<'de> Deserialize<'de> for MappedKey {
                         unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                     },
                 };
-                Ok(MappedKey(key))
+
+                if term_input::is_valid_key(key) {
+                    Ok(MappedKey(key))
+                } else {
+                    Err(E::invalid_value(Unexpected::Str(v), &Self))
+                }
             }
         }
 
