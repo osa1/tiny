@@ -10,11 +10,12 @@ use termbox_simple::CellBuf;
 use libtiny_client as client;
 use term_input as input;
 
-use tokio::stream::StreamExt;
-use tokio::sync::mpsc;
-
 use std::future::Future;
 use std::panic::Location;
+
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 struct TestClient {
     nick: String,
@@ -61,6 +62,7 @@ where
     local.block_on(&runtime, async move {
         // Create test TUI
         let (snd_input_ev, rcv_input_ev) = mpsc::channel::<term_input::Event>(100);
+        let rcv_input_ev = ReceiverStream::new(rcv_input_ev);
         let (tui, _rcv_tui_ev) = TUI::run_test(
             DEFAULT_TUI_WIDTH,
             DEFAULT_TUI_HEIGHT,

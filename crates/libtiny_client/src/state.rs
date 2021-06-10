@@ -10,9 +10,10 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use futures::StreamExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{timeout, Duration};
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 #[derive(Clone)]
 pub struct State {
@@ -716,7 +717,7 @@ async fn retry_channel_join(
 ) {
     debug!("Attempting to re-join channel {}", channel.display());
 
-    let mut rcv_abort = rcv_abort.fuse();
+    let mut rcv_abort = ReceiverStream::new(rcv_abort).fuse();
 
     match timeout(Duration::from_secs(10), rcv_abort.next()).await {
         Err(_) => {

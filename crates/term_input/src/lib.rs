@@ -8,6 +8,8 @@
 #[cfg(test)]
 mod tests;
 
+use term_input_macros::byte_seq_parser;
+
 use std::char;
 use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
@@ -17,9 +19,7 @@ use std::task::{Context, Poll};
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use tokio::io::unix::AsyncFd;
 use tokio::io::Interest;
-use tokio::stream::Stream;
-
-use term_input_macros::byte_seq_parser;
+use tokio_stream::Stream;
 
 #[macro_use]
 extern crate log;

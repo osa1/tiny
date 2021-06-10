@@ -1,15 +1,16 @@
 // In a chat window add dozens of nicks, each printing some random lines.
 
+use libtiny_common::{ChanNameRef, Event, MsgTarget};
+use libtiny_tui::TUI;
+
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-use futures::StreamExt;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
-
-use libtiny_common::{ChanNameRef, Event, MsgTarget};
-use libtiny_tui::TUI;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 static SERV: &str = "debug";
 static CHAN: &str = "chan";
@@ -61,7 +62,7 @@ fn main() {
         tokio::task::spawn_local(async move {
             let nicks = ["short", "some_long_nick_name____"];
             let mut nick_idx = 1;
-            let mut rcv_abort_fused = rcv_abort.fuse();
+            let mut rcv_abort_fused = ReceiverStream::new(rcv_abort).fuse();
             loop {
                 match timeout(std::time::Duration::from_secs(3), rcv_abort_fused.next()).await {
                     Err(_) => {
@@ -82,7 +83,8 @@ fn main() {
     runtime.block_on(local);
 }
 
-async fn ui_task(ui: TUI, mut rcv_ev: mpsc::Receiver<Event>, mut abort: mpsc::Sender<()>) {
+async fn ui_task(ui: TUI, rcv_ev: mpsc::Receiver<Event>, mut abort: mpsc::Sender<()>) {
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
         handle_input_ev(&ui, ev, &mut abort);
         ui.draw();

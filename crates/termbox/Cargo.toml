@@ -15,4 +15,5 @@ unicode-width = "0.1"
 [dev-dependencies]
 mio = "0.7"
 term_input = { path = "../term_input" }
-tokio = { version = "0.3.6", default-features = false, features = ["rt", "stream"] }
+tokio = { version = "1.6.1", default-features = false, features = [] }
+tokio-stream = "0.1.6"

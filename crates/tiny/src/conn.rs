@@ -3,13 +3,13 @@
 
 //! IRC event handling
 
-use futures::stream::StreamExt;
-use tokio::sync::mpsc;
-
+use crate::ui::UI;
 use libtiny_common::{ChanNameRef, MsgTarget, TabStyle};
 use libtiny_wire as wire;
 
-use crate::ui::UI;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 pub(crate) trait Client {
     fn get_serv_name(&self) -> &str;
@@ -34,10 +34,11 @@ impl Client for libtiny_client::Client {
 }
 
 pub(crate) async fn task(
-    mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
+    rcv_ev: mpsc::Receiver<libtiny_client::Event>,
     ui: UI,
     client: Box<dyn Client>,
 ) {
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
         handle_conn_ev(&ui, &*client, ev);
         ui.draw();
