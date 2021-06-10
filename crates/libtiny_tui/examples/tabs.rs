@@ -2,8 +2,9 @@
 
 use std::path::PathBuf;
 
-use futures::stream::StreamExt;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
 use libtiny_tui::TUI;
@@ -52,7 +53,8 @@ fn main() {
     runtime.block_on(local);
 }
 
-async fn ui_task(ui: TUI, mut rcv_ev: mpsc::Receiver<Event>) {
+async fn ui_task(ui: TUI, rcv_ev: mpsc::Receiver<Event>) {
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
         handle_input_ev(&ui, ev);
         ui.draw();

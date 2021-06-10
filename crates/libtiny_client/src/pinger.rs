@@ -1,10 +1,11 @@
 //! Implements two-state "pinger" task that drives sending pings to the server to check liveness of
 //! the connection.
 
-use futures::StreamExt;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 pub(crate) struct Pinger {
     snd_rst: mpsc::Sender<()>,
@@ -24,7 +25,7 @@ enum PingerState {
 }
 
 async fn pinger_task(rcv_rst: mpsc::Receiver<()>, snd_ev: mpsc::Sender<Event>) {
-    let mut rcv_rst_fused = rcv_rst.fuse();
+    let mut rcv_rst_fused = ReceiverStream::new(rcv_rst).fuse();
     let mut state = PingerState::SendPing;
     loop {
         match timeout(Duration::from_secs(60), rcv_rst_fused.next()).await {

@@ -1,12 +1,13 @@
+use libtiny_common::{Event, MsgTarget};
+use libtiny_tui::TUI;
+
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
-use futures::stream::StreamExt;
-use libtiny_common::{Event, MsgTarget};
 use tokio::sync::mpsc;
-
-use libtiny_tui::TUI;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -40,7 +41,8 @@ fn main() {
     runtime.block_on(local);
 }
 
-async fn ui_task(ui: TUI, mut rcv_ev: mpsc::Receiver<Event>) {
+async fn ui_task(ui: TUI, rcv_ev: mpsc::Receiver<Event>) {
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(_) = rcv_ev.next().await {
         ui.draw();
     }

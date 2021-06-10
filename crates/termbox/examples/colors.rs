@@ -1,6 +1,7 @@
 use term_input::{Event, Input, Key};
 use termbox_simple::*;
-use tokio::stream::StreamExt;
+
+use tokio_stream::StreamExt;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();

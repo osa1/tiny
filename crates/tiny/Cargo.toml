@@ -18,7 +18,6 @@ desktop-notifications = ["libtiny_tui/desktop-notifications"]
 clap = "2.33"
 dirs = "3.0"
 env_logger = { version = "0.8", default-features = false }
-futures = { version = "0.3", default-features = false }
 libtiny_client = { path = "../libtiny_client", default-features = false }
 libtiny_common = { path = "../libtiny_common" }
 libtiny_logger = { path = "../libtiny_logger" }
@@ -28,7 +27,8 @@ log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 time = "0.1"
-tokio = { version = "0.3.6", default-features = false, features = [] }
+tokio = { version = "1.6.1", default-features = false, features = [] }
+tokio-stream = { version = "0.1.6", features = [] }
 
 [dev-dependencies]
 term_input = { path = "../term_input" }

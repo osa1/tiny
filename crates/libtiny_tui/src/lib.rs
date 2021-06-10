@@ -24,18 +24,19 @@ mod tests;
 
 use crate::tui::{CmdResult, TUIRet};
 use libtiny_common::{ChanNameRef, Event, MsgTarget, TabStyle};
+use term_input::Input;
 
-use futures::select;
-use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
-use term_input::Input;
+
 use time::Tm;
+use tokio::select;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::stream::Stream;
 use tokio::sync::mpsc;
 use tokio::task::spawn_local;
+use tokio_stream::wrappers::{ReceiverStream, SignalStream};
+use tokio_stream::{Stream, StreamExt};
 
 #[macro_use]
 extern crate log;
@@ -100,8 +101,8 @@ async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receive
         Ok(stream) => stream,
     };
 
-    let mut stream_fused = stream.fuse();
-    let mut rcv_abort_fused = rcv_abort.fuse();
+    let mut stream_fused = SignalStream::new(stream).fuse();
+    let mut rcv_abort_fused = ReceiverStream::new(rcv_abort).fuse();
 
     loop {
         select! {

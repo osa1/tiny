@@ -1,8 +1,9 @@
+use term_input::{Event, Input, Key};
+
 use std::io;
 use std::io::Write;
-use tokio::stream::StreamExt;
 
-use term_input::{Event, Input, Key};
+use tokio_stream::StreamExt;
 
 fn main() {
     // put the terminal in non-buffering, no-enchoing mode

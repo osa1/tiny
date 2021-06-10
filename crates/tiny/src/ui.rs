@@ -5,14 +5,17 @@
 
 use crate::cmd::{parse_cmd, CmdArgs, ParseCmdResult};
 use crate::config;
-use futures::stream::StreamExt;
 use libtiny_client::Client;
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use libtiny_logger::Logger;
 use libtiny_tui::TUI;
+
 use std::path::{Path, PathBuf};
+
 use time::Tm;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* )) => {
@@ -94,8 +97,9 @@ pub(crate) async fn task(
     defaults: config::Defaults,
     ui: UI,
     mut clients: Vec<Client>,
-    mut rcv_ev: mpsc::Receiver<libtiny_common::Event>,
+    rcv_ev: mpsc::Receiver<libtiny_common::Event>,
 ) {
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
         handle_input_ev(&config_path, &defaults, &ui, &mut clients, ev);
         ui.draw();
