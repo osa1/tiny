@@ -16,7 +16,7 @@ use stream::{Stream, StreamError};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
 
-use futures::future::FutureExt;
+use futures_util::future::FutureExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tokio::{pin, select};
