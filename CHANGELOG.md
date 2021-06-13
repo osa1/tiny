@@ -7,6 +7,7 @@
 - Error message when sending a message in the mentions tab improved. (#329)
 - Logger now prints "Logging ended at ..." lines when you close a tab or exit
   tiny. (8061042)
+- Minor improvements in logging (d0505f2, bbb4b81)
 
 # 2021/05/12: 0.9.0
 
