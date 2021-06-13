@@ -37,8 +37,11 @@ pub fn pong(arg: &str) -> String {
     format!("PONG {}\r\n", arg)
 }
 
-pub fn join(chans: &[&ChanNameRef]) -> String {
-    let chans = chans.iter().map(|c| c.display()).collect::<Vec<_>>();
+pub fn join<'a, I>(chans: I) -> String
+where
+    I: Iterator<Item = &'a ChanNameRef> + 'a,
+{
+    let chans = chans.map(|c| c.display()).collect::<Vec<_>>();
     format!("JOIN {}\r\n", chans.join(","))
 }
 

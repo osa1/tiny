@@ -23,7 +23,7 @@ mod widget;
 mod tests;
 
 use crate::tui::{CmdResult, TUIRet};
-use libtiny_common::{ChanNameRef, Event, MsgTarget, TabStyle};
+use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
 use term_input::Input;
 
 use std::cell::RefCell;
@@ -260,5 +260,11 @@ impl TUI {
             Some(tui) => tui.borrow().user_tab_exists(serv_name, nick),
             None => false,
         }
+    }
+
+    pub fn current_tab(&self) -> Option<MsgSource> {
+        self.inner
+            .upgrade()
+            .map(|tui| tui.borrow().current_tab().clone())
     }
 }

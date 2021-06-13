@@ -55,21 +55,22 @@ impl CmdUsage {
     }
 }
 
-const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "/quit");
-const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "/clear");
-const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "/ignore");
+const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "`/quit`");
+const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "`/clear`");
+const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "`/ignore`");
 const NOTIFY_CMD: CmdUsage = CmdUsage::new(
     "notify",
     "Set channel notifications",
-    "/notify [off|mentions|messages]",
+    "`/notify [off|mentions|messages]`",
 );
-const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
-const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
+const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "`/switch <tab name>`");
+const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "`/reload`");
 
 const TUI_COMMANDS: [CmdUsage; 6] = [
     QUIT_CMD, CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD,
 ];
 
+// Public for benchmarks
 pub struct TUI {
     /// Termbox instance
     tb: Termbox,
@@ -127,6 +128,10 @@ impl TUI {
     #[cfg(test)]
     pub(crate) fn set_layout(&mut self, layout: Layout) {
         self.msg_layout = layout
+    }
+
+    pub(crate) fn current_tab(&self) -> &MsgSource {
+        &self.tabs[self.active_idx].src
     }
 
     fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
@@ -195,7 +200,12 @@ impl TUI {
 
         let words: Vec<&str> = words.collect();
 
-        let mut show_usage = || self.add_client_err_msg(NOTIFY_CMD.usage, &MsgTarget::CurrentTab);
+        let mut show_usage = || {
+            self.add_client_err_msg(
+                &format!("Usage: {}", NOTIFY_CMD.usage),
+                &MsgTarget::CurrentTab,
+            )
+        };
 
         if words.is_empty() {
             self.show_notify_mode(&MsgTarget::CurrentTab);
@@ -256,7 +266,10 @@ impl TUI {
             Some("switch") => {
                 match words.next() {
                     Some(s) => self.switch(s),
-                    None => self.add_client_err_msg(SWITCH_CMD.usage, &MsgTarget::CurrentTab),
+                    None => self.add_client_err_msg(
+                        &format!("Usage: {}", SWITCH_CMD.usage),
+                        &MsgTarget::CurrentTab,
+                    ),
                 }
                 CmdResult::Ok
             }

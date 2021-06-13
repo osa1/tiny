@@ -215,10 +215,11 @@ impl Client {
     }
 
     /// Join the given list of channels.
-    pub fn join(&mut self, chans: &[&ChanNameRef]) {
-        self.msg_chan
-            .try_send(Cmd::Msg(wire::join(&chans)))
-            .unwrap()
+    pub fn join<'a, I>(&mut self, chans: I)
+    where
+        I: Iterator<Item = &'a ChanNameRef> + 'a,
+    {
+        self.msg_chan.try_send(Cmd::Msg(wire::join(chans))).unwrap()
     }
 
     /// Leave a channel.

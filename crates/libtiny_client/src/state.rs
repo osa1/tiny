@@ -583,9 +583,9 @@ impl StateInner {
 
             // RPL_ENDOFMOTD: Join channels, set away status
             Reply { num: 376, .. } => {
-                let chans: Vec<&ChanNameRef> = self.chans.iter().map(|c| c.name.as_ref()).collect();
-                if !chans.is_empty() {
-                    snd_irc_msg.try_send(wire::join(&chans)).unwrap();
+                if !self.chans.is_empty() {
+                    let chans = self.chans.iter().map(|c| c.name.as_ref());
+                    snd_irc_msg.try_send(wire::join(chans)).unwrap();
                 }
                 if self.away_status.is_some() {
                     snd_irc_msg
@@ -722,7 +722,9 @@ async fn retry_channel_join(
     match timeout(Duration::from_secs(10), rcv_abort.next()).await {
         Err(_) => {
             // Send join message
-            snd_irc_msg.try_send(wire::join(&[&channel])).unwrap();
+            snd_irc_msg
+                .try_send(wire::join(std::iter::once(channel.as_ref())))
+                .unwrap();
         }
         Ok(_) => {
             // Channel tab was closed
