@@ -187,6 +187,10 @@ impl LoggerInner {
     }
 
     fn new_server_tab(&mut self, serv: &str) {
+        if self.servers.contains_key(serv) {
+            return;
+        }
+
         let mut path = self.log_dir.clone();
         path.push(&format!("{}.txt", serv));
         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
@@ -219,8 +223,15 @@ impl LoggerInner {
                 info!("new_chan_tab: can't find server: {:?}", serv);
             }
             Some(server) => {
-                let mut path = self.log_dir.clone();
                 let chan_name_normalized = chan.normalized();
+                if server
+                    .chans
+                    .contains_key(ChanNameRef::new(&chan_name_normalized))
+                {
+                    return;
+                }
+
+                let mut path = self.log_dir.clone();
                 path.push(&format!(
                     "{}_{}.txt",
                     serv,
