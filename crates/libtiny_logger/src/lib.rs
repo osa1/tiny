@@ -4,7 +4,7 @@ use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use time::Tm;
 
@@ -140,7 +140,7 @@ fn replace_forward_slash(path: &str) -> String {
     path.replace('/', "-")
 }
 
-fn try_open_log_file(path: &PathBuf, report_err: &dyn Fn(String)) -> Option<File> {
+fn try_open_log_file(path: &Path, report_err: &dyn Fn(String)) -> Option<File> {
     match OpenOptions::new().create(true).append(true).open(path) {
         Ok(fd) => Some(fd),
         Err(err) => {

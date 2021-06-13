@@ -1,6 +1,3 @@
-// I think borrowed boxing is necessary for objekt::clone_box to work
-#![allow(clippy::borrowed_box)]
-
 //! UI event handling
 
 use crate::cmd::{parse_cmd, CmdArgs, ParseCmdResult};

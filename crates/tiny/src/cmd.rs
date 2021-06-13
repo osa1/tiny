@@ -1,6 +1,3 @@
-// I think borrowed boxing is necessary for objekt::clone_box to work
-#![allow(clippy::borrowed_box)]
-
 use crate::config;
 use crate::ui::UI;
 use crate::utils;
