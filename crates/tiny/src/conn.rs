@@ -65,9 +65,8 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
             );
         }
         Connected => {
-            ui.add_msg(
+            ui.add_client_msg(
                 "Connected.",
-                time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
                 },
