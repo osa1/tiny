@@ -163,7 +163,7 @@ impl<'de> Deserialize<'de> for KeyMap {
             where
                 A: MapAccess<'de>,
             {
-                let mut key_map = HashMap::with_capacity(map.size_hint().unwrap_or(0));
+                let mut key_map = HashMap::new();
                 while let Some((key, action)) = map.next_entry::<MappedKey, KeyAction>()? {
                     key_map.insert(key.0, action);
                 }
@@ -200,6 +200,15 @@ impl<'de> Deserialize<'de> for MappedKey {
                 E: serde::de::Error,
             {
                 let key_combo = v.split_once('_');
+                let single_key = |s: &str| {
+                    let mut chars = s.chars();
+                    if let (Some(c), None) = (chars.next(), chars.next()) {
+                        Ok(c)
+                    } else {
+                        Err(E::invalid_value(Unexpected::Str(s), &Self))
+                    }
+                };
+
                 let key = match key_combo {
                     None => match v {
                         "backspace" => Key::Backspace,
@@ -214,10 +223,7 @@ impl<'de> Deserialize<'de> for MappedKey {
                         "down" => Key::Arrow(Arrow::Down),
                         "left" => Key::Arrow(Arrow::Left),
                         "right" => Key::Arrow(Arrow::Right),
-                        ch if ch.chars().size_hint().0 == 1 => {
-                            Key::Char(ch.chars().next().unwrap())
-                        }
-                        unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
+                        ch => Key::Char(single_key(ch)?),
                     },
                     Some((k1, k2)) => match k1 {
                         "alt" => match k2 {
@@ -225,20 +231,14 @@ impl<'de> Deserialize<'de> for MappedKey {
                             "down" => Key::AltArrow(Arrow::Down),
                             "left" => Key::AltArrow(Arrow::Left),
                             "right" => Key::AltArrow(Arrow::Right),
-                            ch if ch.chars().size_hint().0 == 1 => {
-                                Key::AltChar(ch.chars().next().unwrap())
-                            }
-                            unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
+                            ch => Key::AltChar(single_key(ch)?),
                         },
                         "ctrl" => match k2 {
                             "up" => Key::CtrlArrow(Arrow::Up),
                             "down" => Key::CtrlArrow(Arrow::Down),
                             "left" => Key::CtrlArrow(Arrow::Left),
                             "right" => Key::CtrlArrow(Arrow::Right),
-                            ch if ch.chars().size_hint().0 == 1 => {
-                                Key::Ctrl(ch.chars().next().unwrap())
-                            }
-                            unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
+                            ch => Key::Ctrl(single_key(ch)?),
                         },
                         "shift" => match k2 {
                             "up" => Key::ShiftUp,
