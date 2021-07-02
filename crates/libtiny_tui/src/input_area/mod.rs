@@ -260,6 +260,14 @@ impl InputArea {
                 self.move_cursor_to_end();
                 WidgetRet::KeyHandled
             }
+            KeyAction::InputDeleteToStart => {
+                if self.cursor != 0 {
+                    self.modify();
+                    self.buffer.drain(..self.cursor as usize);
+                    self.move_cursor(0);
+                }
+                WidgetRet::KeyHandled
+            }
             KeyAction::InputDeleteToEnd => {
                 if self.cursor != self.current_buffer_len() {
                     self.modify();
