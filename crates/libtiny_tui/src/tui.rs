@@ -624,11 +624,14 @@ impl TUI {
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        let key_action = self.key_map.get(&key);
-        match self.tabs[self.active_idx]
-            .widget
-            .keypressed(key, key_action)
-        {
+        let key_action = self.key_map.get(&key).or_else(|| {
+            if let Key::Char(c) = key {
+                Some(KeyAction::Input(c))
+            } else {
+                None
+            }
+        });
+        match self.tabs[self.active_idx].widget.keypressed(key_action) {
             WidgetRet::KeyHandled => TUIRet::KeyHandled,
             WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
             WidgetRet::Input(input) => TUIRet::Input {

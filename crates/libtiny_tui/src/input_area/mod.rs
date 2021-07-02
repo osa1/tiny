@@ -1,7 +1,6 @@
 use std::cmp::{max, min};
 use std::mem;
 
-use term_input::{Arrow, Key};
 use termbox_simple::Termbox;
 
 use crate::config::{Colors, Style};
@@ -216,9 +215,9 @@ impl InputArea {
         }
     }
 
-    pub(crate) fn keypressed(&mut self, key: Key, key_action: Option<KeyAction>) -> WidgetRet {
+    pub(crate) fn keypressed(&mut self, key_action: KeyAction) -> WidgetRet {
         match key_action {
-            Some(KeyAction::InputSend) => {
+            KeyAction::InputSend => {
                 if self.current_buffer_len() > 0 {
                     self.modify();
 
@@ -237,7 +236,7 @@ impl InputArea {
                     WidgetRet::KeyHandled
                 }
             }
-            Some(KeyAction::InputDeletePrevChar) => {
+            KeyAction::InputDeletePrevChar => {
                 if self.cursor > 0 {
                     self.modify();
                     self.buffer.remove(self.cursor as usize - 1);
@@ -245,7 +244,7 @@ impl InputArea {
                 }
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputDeleteNextChar) => {
+            KeyAction::InputDeleteNextChar => {
                 if self.cursor < self.current_buffer_len() {
                     self.modify();
                     self.buffer.remove(self.cursor as usize);
@@ -253,34 +252,34 @@ impl InputArea {
                 }
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputMoveCursStart) => {
+            KeyAction::InputMoveCursStart => {
                 self.move_cursor(0);
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputMoveCursEnd) => {
+            KeyAction::InputMoveCursEnd => {
                 self.move_cursor_to_end();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputDeleteToEnd) => {
+            KeyAction::InputDeleteToEnd => {
                 if self.cursor != self.current_buffer_len() {
                     self.modify();
                     self.buffer.drain(self.cursor as usize..);
                 }
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputDeletePrevWord) => {
+            KeyAction::InputDeletePrevWord => {
                 self.consume_word_before_curs();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputMoveCursLeft) => {
+            KeyAction::InputMoveCursLeft => {
                 self.dec_cursor();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputMoveCursRight) => {
+            KeyAction::InputMoveCursRight => {
                 self.inc_cursor();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputMoveWordLeft) => {
+            KeyAction::InputMoveWordLeft => {
                 if self.cursor > 0 {
                     let mut cur = self.cursor as usize;
                     let mut skipped = false;
@@ -299,7 +298,7 @@ impl InputArea {
                 }
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputMoveWordRight) => {
+            KeyAction::InputMoveWordRight => {
                 let len = self.current_buffer_len() as usize;
                 if (self.cursor as usize) < len {
                     let mut cur = self.cursor as usize;
@@ -319,122 +318,21 @@ impl InputArea {
                 }
                 WidgetRet::KeyHandled
             }
-            _ => {
-                match key {
-                    Key::Char(ch) => {
-                        self.modify();
-                        self.buffer.insert(self.cursor as usize, ch);
-                        self.inc_cursor();
-                        WidgetRet::KeyHandled
-                    }
-                    ////////////////////////////////////////////////////////////////////
-                    // Scrolling in history or autocompletion list
-                    Key::Arrow(Arrow::Up) => {
-                        // invalidate height calculation
-                        self.height = None;
-                        let mode = mem::replace(&mut self.mode, Mode::Edit);
-
-                        match mode {
-                            Mode::Edit => {
-                                if !self.history.is_empty() {
-                                    self.mode = Mode::History((self.history.len() as i32) - 1);
-                                    self.move_cursor_to_end();
-                                }
-                            }
-                            Mode::History(hist_curs) => {
-                                self.mode = Mode::History(if hist_curs > 0 {
-                                    hist_curs - 1
-                                } else {
-                                    hist_curs
-                                });
-                                self.move_cursor_to_end();
-                            }
-                            Mode::Autocomplete {
-                                original_buffer,
-                                insertion_point,
-                                word_starts,
-                                completions,
-                                current_completion,
-                                ..
-                            } => {
-                                let current_completion =
-                                    if current_completion == completions.len() - 1 {
-                                        0
-                                    } else {
-                                        current_completion + 1
-                                    };
-
-                                let cursor = (insertion_point
-                                    + completions[current_completion].len())
-                                    as i32;
-
-                                self.mode = Mode::Autocomplete {
-                                    original_buffer,
-                                    insertion_point,
-                                    word_starts,
-                                    completions,
-                                    current_completion,
-                                };
-
-                                self.move_cursor(cursor);
-                            }
-                        }
-
-                        WidgetRet::KeyHandled
-                    }
-
-                    Key::Arrow(Arrow::Down) => {
-                        // invalidate height calculation
-                        self.height = None;
-                        let mode = mem::replace(&mut self.mode, Mode::Edit);
-
-                        match mode {
-                            Mode::Edit => {}
-                            Mode::History(hist_curs) => {
-                                if hist_curs != (self.history.len() - 1) as i32 {
-                                    self.mode = Mode::History(hist_curs + 1);
-                                } else {
-                                    self.mode = Mode::Edit;
-                                }
-                                self.move_cursor_to_end();
-                            }
-                            Mode::Autocomplete {
-                                original_buffer,
-                                insertion_point,
-                                word_starts,
-                                completions,
-                                current_completion,
-                                ..
-                            } => {
-                                let current_completion = if current_completion == 0 {
-                                    completions.len() - 1
-                                } else {
-                                    current_completion - 1
-                                };
-
-                                let cursor = (insertion_point
-                                    + completions[current_completion].len())
-                                    as i32;
-
-                                self.mode = Mode::Autocomplete {
-                                    original_buffer,
-                                    insertion_point,
-                                    word_starts,
-                                    completions,
-                                    current_completion,
-                                };
-
-                                self.move_cursor(cursor);
-                            }
-                        }
-
-                        WidgetRet::KeyHandled
-                    }
-
-                    ////////////////////////////////////////////////////////////////////
-                    _ => WidgetRet::KeyIgnored,
-                }
+            KeyAction::InputPrevEntry => {
+                self.completion_prev_entry();
+                WidgetRet::KeyHandled
             }
+            KeyAction::InputNextEntry => {
+                self.completion_next_entry();
+                WidgetRet::KeyHandled
+            }
+            KeyAction::Input(ch) => {
+                self.modify();
+                self.buffer.insert(self.cursor as usize, ch);
+                self.inc_cursor();
+                WidgetRet::KeyHandled
+            }
+            _ => WidgetRet::KeyIgnored,
         }
     }
 
@@ -499,6 +397,99 @@ impl InputArea {
         }
         self.buffer.drain(((begin_range + 1) as usize)..end_range);
         self.move_cursor(begin_range + 1);
+    }
+
+    fn completion_prev_entry(&mut self) {
+        // invalidate height calculation
+        self.height = None;
+        let mode = mem::replace(&mut self.mode, Mode::Edit);
+
+        match mode {
+            Mode::Edit => {
+                if !self.history.is_empty() {
+                    self.mode = Mode::History((self.history.len() as i32) - 1);
+                    self.move_cursor_to_end();
+                }
+            }
+            Mode::History(hist_curs) => {
+                self.mode = Mode::History(if hist_curs > 0 {
+                    hist_curs - 1
+                } else {
+                    hist_curs
+                });
+                self.move_cursor_to_end();
+            }
+            Mode::Autocomplete {
+                original_buffer,
+                insertion_point,
+                word_starts,
+                completions,
+                current_completion,
+                ..
+            } => {
+                let current_completion = if current_completion == completions.len() - 1 {
+                    0
+                } else {
+                    current_completion + 1
+                };
+
+                let cursor = (insertion_point + completions[current_completion].len()) as i32;
+
+                self.mode = Mode::Autocomplete {
+                    original_buffer,
+                    insertion_point,
+                    word_starts,
+                    completions,
+                    current_completion,
+                };
+
+                self.move_cursor(cursor);
+            }
+        }
+    }
+
+    fn completion_next_entry(&mut self) {
+        // invalidate height calculation
+        self.height = None;
+        let mode = mem::replace(&mut self.mode, Mode::Edit);
+
+        match mode {
+            Mode::Edit => {}
+            Mode::History(hist_curs) => {
+                if hist_curs != (self.history.len() - 1) as i32 {
+                    self.mode = Mode::History(hist_curs + 1);
+                } else {
+                    self.mode = Mode::Edit;
+                }
+                self.move_cursor_to_end();
+            }
+            Mode::Autocomplete {
+                original_buffer,
+                insertion_point,
+                word_starts,
+                completions,
+                current_completion,
+                ..
+            } => {
+                let current_completion = if current_completion == 0 {
+                    completions.len() - 1
+                } else {
+                    current_completion - 1
+                };
+
+                let cursor = (insertion_point + completions[current_completion].len()) as i32;
+
+                self.mode = Mode::Autocomplete {
+                    original_buffer,
+                    insertion_point,
+                    word_starts,
+                    completions,
+                    current_completion,
+                };
+
+                self.move_cursor(cursor);
+            }
+        }
     }
 
     // Ignoring auto-completions
@@ -720,8 +711,8 @@ impl InputArea {
 impl InputArea {
     pub(crate) fn autocomplete(&mut self, dict: &Trie) {
         if self.in_autocomplete() {
-            // AWFUL CODE YO
-            self.keypressed(Key::Arrow(Arrow::Up), Some(KeyAction::InputAutoComplete));
+            // scroll next if you hit the KeyAction::InputAutoComplete key again
+            self.completion_prev_entry();
             return;
         }
 
@@ -780,29 +771,22 @@ impl InputArea {
 mod tests {
 
     use super::*;
-    use term_input::{Arrow, Key};
 
     #[test]
     fn text_field_bug() {
         let mut text_field = InputArea::new(10, 50);
-        text_field.keypressed(Key::Char('a'), None);
-        text_field.keypressed(Key::Char(' '), None);
-        text_field.keypressed(Key::Char('b'), None);
-        text_field.keypressed(Key::Char(' '), None);
-        text_field.keypressed(Key::Char('c'), None);
-        text_field.keypressed(Key::Char('\r'), Some(KeyAction::InputSend));
-        text_field.keypressed(Key::Arrow(Arrow::Up), None);
+        text_field.keypressed(KeyAction::Input('a'));
+        text_field.keypressed(KeyAction::Input(' '));
+        text_field.keypressed(KeyAction::Input('b'));
+        text_field.keypressed(KeyAction::Input(' '));
+        text_field.keypressed(KeyAction::Input('c'));
+        text_field.keypressed(KeyAction::InputSend);
+        text_field.keypressed(KeyAction::InputPrevEntry);
         // this panics:
-        text_field.keypressed(
-            Key::CtrlArrow(Arrow::Left),
-            Some(KeyAction::InputMoveWordLeft),
-        );
+        text_field.keypressed(KeyAction::InputMoveWordLeft);
         // a b ^c
         assert_eq!(text_field.cursor, 4);
-        text_field.keypressed(
-            Key::CtrlArrow(Arrow::Right),
-            Some(KeyAction::InputMoveWordRight),
-        );
+        text_field.keypressed(KeyAction::InputMoveWordRight);
         assert_eq!(text_field.cursor, 5);
     }
 

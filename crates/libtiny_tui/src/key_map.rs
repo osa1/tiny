@@ -11,6 +11,7 @@ pub(crate) struct KeyMap(HashMap<Key, KeyAction>);
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum KeyAction {
+    Cancel,
     Disable,
     Exit,
 
@@ -29,7 +30,10 @@ pub(crate) enum KeyAction {
     MessagesScrollTop,
     MessagesScrollBottom,
 
+    Input(char),
     InputAutoComplete,
+    InputNextEntry,
+    InputPrevEntry,
     InputSend,
     InputDeletePrevChar,
     InputDeleteNextChar,
@@ -46,6 +50,7 @@ pub(crate) enum KeyAction {
 impl Display for KeyAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
+            KeyAction::Cancel => "cancel",
             KeyAction::Disable => "disable",
             KeyAction::Exit => "exit",
             KeyAction::RunEditor => "run_editor",
@@ -60,7 +65,10 @@ impl Display for KeyAction {
             KeyAction::MessagesScrollDown => "messages_scroll_down",
             KeyAction::MessagesScrollTop => "messages_scroll_top",
             KeyAction::MessagesScrollBottom => "messages_scroll_bottom",
+            KeyAction::Input(c) => return writeln!(f, "input_{}", c),
             KeyAction::InputAutoComplete => "input_auto_complete",
+            KeyAction::InputNextEntry => "input_next_entry",
+            KeyAction::InputPrevEntry => "input_prev_entry",
             KeyAction::InputSend => "input_send",
             KeyAction::InputDeletePrevChar => "input_delete_prev_char",
             KeyAction::InputDeleteNextChar => "input_delete_next_char",
@@ -80,6 +88,7 @@ impl Display for KeyAction {
 impl Default for KeyMap {
     fn default() -> Self {
         let map = vec![
+            (Key::Esc, KeyAction::Cancel),
             (Key::Ctrl('c'), KeyAction::Exit),
             (Key::Ctrl('x'), KeyAction::RunEditor),
             (Key::Ctrl('n'), KeyAction::TabNext),
@@ -105,6 +114,8 @@ impl Default for KeyMap {
             (Key::Home, KeyAction::MessagesScrollTop),
             (Key::End, KeyAction::MessagesScrollBottom),
             (Key::Tab, KeyAction::InputAutoComplete),
+            (Key::Arrow(Arrow::Up), KeyAction::InputPrevEntry),
+            (Key::Arrow(Arrow::Down), KeyAction::InputNextEntry),
             (Key::Char('\r'), KeyAction::InputSend),
             (Key::Backspace, KeyAction::InputDeletePrevChar),
             (Key::Del, KeyAction::InputDeleteNextChar),
@@ -283,12 +294,19 @@ fn deser_key_action_goto_tab() {
 
 #[test]
 fn deser_keymap() {
-    let s = "ctrl_a: input_move_curs_start\nctrl_e: \n  tab_goto: 1";
+    let s = r#"
+    ctrl_a: input_move_curs_start
+    ctrl_e: 
+      tab_goto: 1
+    a: 
+      input: b
+    "#;
     let mut expect = KeyMap(HashMap::new());
     expect
         .0
         .insert(Key::Ctrl('a'), KeyAction::InputMoveCursStart);
     expect.0.insert(Key::Ctrl('e'), KeyAction::TabGoto('1'));
+    expect.0.insert(Key::Char('a'), KeyAction::Input('b'));
 
     let key_map: KeyMap = serde_yaml::from_str(s).unwrap();
     assert_eq!(expect, key_map);

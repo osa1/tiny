@@ -1,4 +1,3 @@
-use term_input::Key;
 use termbox_simple::Termbox;
 
 use std::convert::From;
@@ -136,7 +135,7 @@ impl MessagingUI {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
     }
 
-    pub(crate) fn keypressed(&mut self, key: Key, key_action: Option<KeyAction>) -> WidgetRet {
+    pub(crate) fn keypressed(&mut self, key_action: Option<KeyAction>) -> WidgetRet {
         match key_action {
             Some(KeyAction::Exit) => {
                 self.toggle_exit_dialogue();
@@ -172,12 +171,12 @@ impl MessagingUI {
                 }
                 WidgetRet::KeyHandled
             }
-            _ => {
+            Some(key_action) => {
                 let ret = {
                     if let Some(exit_dialogue) = self.exit_dialogue.as_ref() {
-                        exit_dialogue.keypressed(key)
+                        exit_dialogue.keypressed(key_action)
                     } else {
-                        self.input_field.keypressed(key, key_action)
+                        self.input_field.keypressed(key_action)
                     }
                 };
 
@@ -188,6 +187,7 @@ impl MessagingUI {
                     ret
                 }
             }
+            _ => WidgetRet::KeyIgnored,
         }
     }
 
