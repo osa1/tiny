@@ -4,12 +4,14 @@
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style};
 use crate::editor;
+use crate::key_map::{KeyAction, KeyMap};
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::msg_area::Layout;
 use crate::notifier::Notifier;
@@ -17,7 +19,7 @@ use crate::tab::Tab;
 use crate::widget::WidgetRet;
 
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
-use term_input::{Arrow, Event, Key};
+use term_input::{Event, Key};
 pub use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
@@ -90,6 +92,8 @@ pub struct TUI {
     height: i32,
     h_scroll: i32,
 
+    key_map: KeyMap,
+
     /// Config file path
     config_path: Option<PathBuf>,
 }
@@ -151,6 +155,7 @@ impl TUI {
             width,
             height,
             h_scroll: 0,
+            key_map: KeyMap::default(),
             config_path,
         };
 
@@ -310,9 +315,11 @@ impl TUI {
                     scrollback,
                     layout,
                     max_nick_length,
+                    key_map,
                 }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
+                    self.key_map.load(&key_map.unwrap_or_default());
                     if let Some(layout) = layout {
                         match layout {
                             crate::config::Layout::Compact => self.msg_layout = Layout::Compact,
@@ -342,8 +349,6 @@ impl TUI {
         notifier: Notifier,
         alias: Option<String>,
     ) {
-        use std::collections::HashMap;
-
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
         for tab in &self.tabs {
             if let Some(key) = tab.switch {
@@ -632,87 +637,57 @@ impl TUI {
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        match self.tabs[self.active_idx].widget.keypressed(key) {
-            WidgetRet::KeyHandled => TUIRet::KeyHandled,
-            WidgetRet::KeyIgnored => self.handle_keypress(key, rcv_editor_ret),
-            WidgetRet::Input(input) => TUIRet::Input {
-                msg: input,
-                from: self.tabs[self.active_idx].src.clone(),
-            },
-            WidgetRet::Remove => unimplemented!(),
-            WidgetRet::Abort => TUIRet::Abort,
+        let key_action = self.key_map.get(&key).or_else(|| match key {
+            Key::Char(c) => Some(KeyAction::Input(c)),
+            Key::AltChar(c) => Some(KeyAction::TabGoto(c)),
+            _ => None,
+        });
+
+        if let Some(key_action) = key_action {
+            match self.tabs[self.active_idx].widget.keypressed(key_action) {
+                WidgetRet::KeyHandled => TUIRet::KeyHandled,
+                WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
+                WidgetRet::Input(input) => TUIRet::Input {
+                    msg: input,
+                    from: self.tabs[self.active_idx].src.clone(),
+                },
+                WidgetRet::Remove => unimplemented!(),
+                WidgetRet::Abort => TUIRet::Abort,
+            }
+        } else {
+            TUIRet::KeyIgnored(key)
         }
     }
 
     fn handle_keypress(
         &mut self,
         key: Key,
+        key_action: KeyAction,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        match key {
-            Key::Ctrl('n') => {
-                self.next_tab();
-                TUIRet::KeyHandled
-            }
-
-            Key::Ctrl('p') => {
-                self.prev_tab();
-                TUIRet::KeyHandled
-            }
-
-            Key::Ctrl('x') => {
+        match key_action {
+            KeyAction::RunEditor => {
                 self.run_editor("", rcv_editor_ret);
                 TUIRet::KeyHandled
             }
-
-            Key::AltChar(c) => match c.to_digit(10) {
-                Some(i) => {
-                    let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
-                        self.tabs.len() - 1
-                    } else {
-                        i as usize - 1
-                    };
-                    match new_tab_idx.cmp(&self.active_idx) {
-                        Ordering::Greater => {
-                            for _ in 0..new_tab_idx - self.active_idx {
-                                self.next_tab_();
-                            }
-                        }
-                        Ordering::Less => {
-                            for _ in 0..self.active_idx - new_tab_idx {
-                                self.prev_tab_();
-                            }
-                        }
-                        Ordering::Equal => {}
-                    }
-                    self.tabs[self.active_idx].set_style(TabStyle::Normal);
-                    TUIRet::KeyHandled
-                }
-                None => {
-                    // multiple tabs can have same switch character so scan
-                    // forwards instead of starting from the first tab
-                    for i in 1..=self.tabs.len() {
-                        let idx = (self.active_idx + i) % self.tabs.len();
-                        if self.tabs[idx].switch == Some(c) {
-                            self.select_tab(idx);
-                            break;
-                        }
-                    }
-                    TUIRet::KeyHandled
-                }
-            },
-
-            Key::AltArrow(Arrow::Left) => {
+            KeyAction::TabNext => {
+                self.next_tab();
+                TUIRet::KeyHandled
+            }
+            KeyAction::TabPrev => {
+                self.prev_tab();
+                TUIRet::KeyHandled
+            }
+            KeyAction::TabMoveLeft => {
                 self.move_tab_left();
                 TUIRet::KeyHandled
             }
-
-            Key::AltArrow(Arrow::Right) => {
+            KeyAction::TabMoveRight => {
                 self.move_tab_right();
                 TUIRet::KeyHandled
             }
-
-            key => TUIRet::KeyIgnored(key),
+            KeyAction::TabGoto(c) => self.go_to_tab(c),
+            _ => TUIRet::KeyIgnored(key),
         }
     }
 
@@ -1120,6 +1095,45 @@ impl TUI {
         }
     }
 
+    fn go_to_tab(&mut self, c: char) -> TUIRet {
+        match c.to_digit(10) {
+            Some(i) => {
+                let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
+                    self.tabs.len() - 1
+                } else {
+                    i as usize - 1
+                };
+                match new_tab_idx.cmp(&self.active_idx) {
+                    Ordering::Greater => {
+                        for _ in 0..new_tab_idx - self.active_idx {
+                            self.next_tab_();
+                        }
+                    }
+                    Ordering::Less => {
+                        for _ in 0..self.active_idx - new_tab_idx {
+                            self.prev_tab_();
+                        }
+                    }
+                    Ordering::Equal => {}
+                }
+                self.tabs[self.active_idx].set_style(TabStyle::Normal);
+                TUIRet::KeyHandled
+            }
+            None => {
+                // multiple tabs can have same switch character so scan
+                // forwards instead of starting from the first tab
+                for i in 1..=self.tabs.len() {
+                    let idx = (self.active_idx + i) % self.tabs.len();
+                    if self.tabs[idx].switch == Some(c) {
+                        self.select_tab(idx);
+                        break;
+                    }
+                }
+                TUIRet::KeyHandled
+            }
+        }
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Interfacing with tabs
 
@@ -1215,9 +1229,9 @@ impl TUI {
 
     pub(crate) fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
         self.apply_to_target(target, false, &|tab: &mut Tab, is_active: bool| {
-            if !is_active
+            if (tab.widget.is_showing_status() || style != TabStyle::JoinOrPart)
                 && tab.style < style
-                && !(style == TabStyle::JoinOrPart && !tab.widget.is_showing_status())
+                && !is_active
             {
                 tab.set_style(style);
             }

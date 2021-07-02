@@ -1,6 +1,6 @@
-use term_input::Key;
 use termbox_simple::Termbox;
 
+use crate::key_map::KeyAction;
 use crate::{config::Colors, widget::WidgetRet};
 
 #[derive(Debug)]
@@ -48,9 +48,9 @@ impl ExitDialogue {
         }
     }
 
-    pub(crate) fn keypressed(&self, key: Key) -> WidgetRet {
-        match key {
-            Key::Char('y') | Key::Char('\r') => WidgetRet::Abort,
+    pub(crate) fn keypressed(&self, key_action: KeyAction) -> WidgetRet {
+        match key_action {
+            KeyAction::Input('y') | KeyAction::InputSend => WidgetRet::Abort,
             _ => WidgetRet::Remove,
         }
     }

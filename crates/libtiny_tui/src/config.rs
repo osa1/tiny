@@ -9,6 +9,8 @@ use std::path::Path;
 
 pub use termbox_simple::*;
 
+use crate::key_map::KeyMap;
+
 #[derive(Deserialize)]
 pub(crate) struct Config {
     #[serde(default)]
@@ -21,6 +23,9 @@ pub(crate) struct Config {
 
     #[serde(default = "default_max_nick_length")]
     pub(crate) max_nick_length: usize,
+
+    #[serde(default)]
+    pub(crate) key_map: Option<KeyMap>,
 }
 
 fn default_max_nick_length() -> usize {
