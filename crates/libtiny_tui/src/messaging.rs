@@ -135,43 +135,43 @@ impl MessagingUI {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
     }
 
-    pub(crate) fn keypressed(&mut self, key_action: Option<KeyAction>) -> WidgetRet {
+    pub(crate) fn keypressed(&mut self, key_action: KeyAction) -> WidgetRet {
         match key_action {
-            Some(KeyAction::Exit) => {
+            KeyAction::Exit => {
                 self.toggle_exit_dialogue();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::MessagesPageUp) => {
+            KeyAction::MessagesPageUp => {
                 self.msg_area.page_up();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::MessagesPageDown) => {
+            KeyAction::MessagesPageDown => {
                 self.msg_area.page_down();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::MessagesScrollUp) => {
+            KeyAction::MessagesScrollUp => {
                 self.msg_area.scroll_up();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::MessagesScrollDown) => {
+            KeyAction::MessagesScrollDown => {
                 self.msg_area.scroll_down();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::MessagesScrollTop) => {
+            KeyAction::MessagesScrollTop => {
                 self.msg_area.scroll_top();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::MessagesScrollBottom) => {
+            KeyAction::MessagesScrollBottom => {
                 self.msg_area.scroll_bottom();
                 WidgetRet::KeyHandled
             }
-            Some(KeyAction::InputAutoComplete) => {
+            KeyAction::InputAutoComplete => {
                 if self.exit_dialogue.is_none() {
                     self.input_field.autocomplete(&self.nicks);
                 }
                 WidgetRet::KeyHandled
             }
-            Some(key_action) => {
+            key_action => {
                 let ret = {
                     if let Some(exit_dialogue) = self.exit_dialogue.as_ref() {
                         exit_dialogue.keypressed(key_action)
@@ -187,7 +187,6 @@ impl MessagingUI {
                     ret
                 }
             }
-            _ => WidgetRet::KeyIgnored,
         }
     }
 

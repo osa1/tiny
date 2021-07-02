@@ -624,60 +624,57 @@ impl TUI {
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        let key_action = self.key_map.get(&key).or_else(|| {
-            if let Key::Char(c) = key {
-                Some(KeyAction::Input(c))
-            } else {
-                None
-            }
+        let key_action = self.key_map.get(&key).or_else(|| match key {
+            Key::Char(c) => Some(KeyAction::Input(c)),
+            Key::AltChar(c) => Some(KeyAction::TabGoto(c)),
+            _ => None,
         });
-        match self.tabs[self.active_idx].widget.keypressed(key_action) {
-            WidgetRet::KeyHandled => TUIRet::KeyHandled,
-            WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
-            WidgetRet::Input(input) => TUIRet::Input {
-                msg: input,
-                from: self.tabs[self.active_idx].src.clone(),
-            },
-            WidgetRet::Remove => unimplemented!(),
-            WidgetRet::Abort => TUIRet::Abort,
+
+        if let Some(key_action) = key_action {
+            match self.tabs[self.active_idx].widget.keypressed(key_action) {
+                WidgetRet::KeyHandled => TUIRet::KeyHandled,
+                WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
+                WidgetRet::Input(input) => TUIRet::Input {
+                    msg: input,
+                    from: self.tabs[self.active_idx].src.clone(),
+                },
+                WidgetRet::Remove => unimplemented!(),
+                WidgetRet::Abort => TUIRet::Abort,
+            }
+        } else {
+            TUIRet::KeyIgnored(key)
         }
     }
 
     fn handle_keypress(
         &mut self,
         key: Key,
-        key_action: Option<KeyAction>,
+        key_action: KeyAction,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
         match key_action {
-            Some(KeyAction::RunEditor) => {
+            KeyAction::RunEditor => {
                 self.run_editor("", rcv_editor_ret);
                 TUIRet::KeyHandled
             }
-            Some(KeyAction::TabNext) => {
+            KeyAction::TabNext => {
                 self.next_tab();
                 TUIRet::KeyHandled
             }
-            Some(KeyAction::TabPrev) => {
+            KeyAction::TabPrev => {
                 self.prev_tab();
                 TUIRet::KeyHandled
             }
-            Some(KeyAction::TabMoveLeft) => {
+            KeyAction::TabMoveLeft => {
                 self.move_tab_left();
                 TUIRet::KeyHandled
             }
-            Some(KeyAction::TabMoveRight) => {
+            KeyAction::TabMoveRight => {
                 self.move_tab_right();
                 TUIRet::KeyHandled
             }
-            Some(KeyAction::TabGoto(c)) => self.go_to_tab(c),
-            _ => {
-                if let Key::AltChar(c) = key {
-                    self.go_to_tab(c)
-                } else {
-                    TUIRet::KeyIgnored(key)
-                }
-            }
+            KeyAction::TabGoto(c) => self.go_to_tab(c),
+            _ => TUIRet::KeyIgnored(key),
         }
     }
 
