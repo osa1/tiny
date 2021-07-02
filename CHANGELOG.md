@@ -9,6 +9,10 @@
   tiny. (8061042)
 - Minor improvements in logging (d0505f2, bbb4b81)
 - `/join` (without arguments) now rejoins the current channel. (#334)
+- Key bindings can be configured in the config file. See the [wiki
+  page][key-bindings-wiki] for details. (#328, #336)
+
+[key-bindings-wiki]: https://github.com/osa1/tiny/wiki/Configuring-key-bindings
 
 # 2021/05/12: 0.9.0
 

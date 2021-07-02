@@ -32,8 +32,8 @@ tiny is an IRC client written in Rust.
 - Disconnect detection and automatic reconnects. You can keep tiny running on
   your laptop and it automatically reconnects after a sleep etc.
 
-- Key bindings inspired by terminal emulators and vim. See [key bindings
-  section](#key-bindings) below.
+- Configurable key bindings inspired by terminal emulators and vim. See [key
+  bindings section](#key-bindings) below.
 
 - Configurable colors
 
