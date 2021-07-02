@@ -129,6 +129,11 @@ You can use `--config <path>` to specify your config file location.
 
 ## Key bindings
 
+Key bindings can be configured in the config file, see the [wiki
+page][key-bindings-wiki] for details.
+
+Default key bindings:
+
 - `C-a`/`C-e` move cursor to beginning/end in the input field
 
 - `C-k` delete rest of the line
@@ -152,6 +157,8 @@ You can use `--config <path>` to specify your config file location.
 - `alt-left/right` move tab to left/right
 
 - `C-x` edit current message in `$EDITOR`
+
+[key-bindings-wiki]: https://github.com/osa1/tiny/wiki/Configuring-key-bindings
 
 ## Commands
 
