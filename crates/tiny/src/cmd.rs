@@ -97,7 +97,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 9] = [
+static CMDS: [&Cmd; 10] = [
     &AWAY_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
@@ -106,6 +106,7 @@ static CMDS: [&Cmd; 9] = [
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
+    &WHOIS_CMD,
     &HELP_CMD,
 ];
 
@@ -510,6 +511,47 @@ fn nick(args: CmdArgs) {
         );
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static WHOIS_CMD: Cmd = Cmd {
+    name: "whois",
+    cmd_fn: whois,
+    description: "whois lookup for a user",
+    usage: "`/whois <nick>`",
+};
+
+fn whois(args: CmdArgs) {
+    let CmdArgs {
+        args,
+        ui,
+        clients,
+        src,
+        ..
+    } = args;
+
+    let words: Vec<&str> = args.split_whitespace().collect();
+
+    // Allow lookup for only one user at a time
+    if let Some(client) = find_client(clients, src.serv_name()) {
+        match words.get(0) {
+            Some(word) => client.whois(&word),
+            None => {
+                ui.add_client_err_msg(
+                    &format!("Usage: {}", WHOIS_CMD.usage),
+                    &MsgTarget::CurrentTab,
+                );
+            }
+        };
+    } else {
+        ui.add_client_err_msg(
+            &format!("Usage: {}", WHOIS_CMD.usage),
+            &MsgTarget::CurrentTab,
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static HELP_CMD: Cmd = Cmd {
     name: "help",

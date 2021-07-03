@@ -161,6 +161,11 @@ impl Client {
         self.state.is_nick_accepted()
     }
 
+    /// Query the server for a nick to get more information about the user
+    pub fn whois(&mut self, nick: &str) {
+        self.raw_msg(&format!("WHOIS {}", nick));
+    }
+
     /// Send a message directly to the server. "\r\n" suffix is added by this method.
     pub fn raw_msg(&mut self, msg: &str) {
         self.msg_chan
