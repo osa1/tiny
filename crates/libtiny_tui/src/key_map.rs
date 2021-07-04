@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::str::FromStr;
 
 use serde::de::{MapAccess, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer};
-use term_input::{Arrow, Key};
+use term_input::{Arrow, FKey, Key};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct KeyMap(HashMap<Key, KeyAction>);
@@ -111,8 +112,8 @@ impl Default for KeyMap {
             (Key::Ctrl('d'), KeyAction::MessagesPageDown),
             (Key::PageUp, KeyAction::MessagesPageUp),
             (Key::PageDown, KeyAction::MessagesPageDown),
-            (Key::Shift(Arrow::Up), KeyAction::MessagesScrollUp),
-            (Key::Shift(Arrow::Down), KeyAction::MessagesScrollDown),
+            (Key::ShiftArrow(Arrow::Up), KeyAction::MessagesScrollUp),
+            (Key::ShiftArrow(Arrow::Down), KeyAction::MessagesScrollDown),
             (Key::Home, KeyAction::MessagesScrollTop),
             (Key::End, KeyAction::MessagesScrollBottom),
             (Key::Tab, KeyAction::InputAutoComplete),
@@ -201,10 +202,10 @@ impl<'de> Deserialize<'de> for MappedKey {
             type Value = MappedKey;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9]. ")?;
+                write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9], [f1-f12]. ")?;
                 write!(
                     formatter,
-                    "modifiers with arrow key or single characters:  alt, shift, ctrl"
+                    "modifiers with an arrow key, function key, or single characters:  alt, shift, ctrl"
                 )
             }
 
@@ -236,6 +237,7 @@ impl<'de> Deserialize<'de> for MappedKey {
                         "down" => Key::Arrow(Arrow::Down),
                         "left" => Key::Arrow(Arrow::Left),
                         "right" => Key::Arrow(Arrow::Right),
+                        f if FKey::from_str(f).is_ok() => Key::FKey(FKey::from_str(f).unwrap()),
                         ch => Key::Char(single_key(ch)?),
                     },
                     Some((k1, k2)) => match k1 {
@@ -244,6 +246,7 @@ impl<'de> Deserialize<'de> for MappedKey {
                             "down" => Key::AltArrow(Arrow::Down),
                             "left" => Key::AltArrow(Arrow::Left),
                             "right" => Key::AltArrow(Arrow::Right),
+                            f if FKey::from_str(f).is_ok() => Key::AltF(FKey::from_str(f).unwrap()),
                             ch => Key::AltChar(single_key(ch)?),
                         },
                         "ctrl" => match k2 {
@@ -251,11 +254,19 @@ impl<'de> Deserialize<'de> for MappedKey {
                             "down" => Key::CtrlArrow(Arrow::Down),
                             "left" => Key::CtrlArrow(Arrow::Left),
                             "right" => Key::CtrlArrow(Arrow::Right),
+                            f if FKey::from_str(f).is_ok() => {
+                                Key::CtrlF(FKey::from_str(f).unwrap())
+                            }
                             ch => Key::Ctrl(single_key(ch)?),
                         },
                         "shift" => match k2 {
-                            "up" => Key::Shift(Arrow::Up),
-                            "down" => Key::Shift(Arrow::Down),
+                            "up" => Key::ShiftArrow(Arrow::Up),
+                            "down" => Key::ShiftArrow(Arrow::Down),
+                            "left" => Key::ShiftArrow(Arrow::Left),
+                            "right" => Key::ShiftArrow(Arrow::Right),
+                            f if FKey::from_str(f).is_ok() => {
+                                Key::ShiftF(FKey::from_str(f).unwrap())
+                            }
                             unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                         },
                         unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
@@ -288,6 +299,15 @@ fn deser_key() {
     let s = "ctrl_/";
     let key: MappedKey = serde_yaml::from_str(s).unwrap();
     assert_eq!(Key::Ctrl('/'), key.0);
+    let s = "ctrl_f2";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::CtrlF(FKey::F2), key.0);
+    let s = "alt_f2";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::AltF(FKey::F2), key.0);
+    let s = "shift_f2";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::ShiftF(FKey::F2), key.0);
 }
 
 #[test]

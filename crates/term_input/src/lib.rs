@@ -14,6 +14,7 @@ use std::char;
 use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::task::{Context, Poll};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
@@ -32,11 +33,13 @@ extern crate log;
 pub enum Key {
     AltArrow(Arrow),
     AltChar(char),
+    AltF(FKey),
     Arrow(Arrow),
     Backspace,
     Char(char),
     Ctrl(char),
     CtrlArrow(Arrow),
+    CtrlF(FKey),
     Del,
     End,
     Esc,
@@ -44,7 +47,8 @@ pub enum Key {
     Home,
     PageDown,
     PageUp,
-    Shift(Arrow),
+    ShiftArrow(Arrow),
+    ShiftF(FKey),
     Tab,
 }
 
@@ -70,6 +74,28 @@ pub enum FKey {
     F10,
     F11,
     F12,
+}
+
+impl FromStr for FKey {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "f1" => Ok(FKey::F1),
+            "f2" => Ok(FKey::F2),
+            "f3" => Ok(FKey::F3),
+            "f4" => Ok(FKey::F4),
+            "f5" => Ok(FKey::F5),
+            "f6" => Ok(FKey::F6),
+            "f7" => Ok(FKey::F7),
+            "f8" => Ok(FKey::F8),
+            "f9" => Ok(FKey::F9),
+            "f10" => Ok(FKey::F10),
+            "f11" => Ok(FKey::F11),
+            "f12" => Ok(FKey::F12),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -101,6 +127,18 @@ byte_seq_parser! {
     [27, 91, 49, 59, 51, 68] => Key::AltArrow(Arrow::Left),
     [27, 91, 49, 59, 51, 67] => Key::AltArrow(Arrow::Right),
     [27, 91, 49, 59, 51, 65] => Key::AltArrow(Arrow::Up),
+    [27, 91, 49, 59, 51, 80] => Key::AltF(FKey::F1),
+    [27, 91, 49, 59, 51, 81] => Key::AltF(FKey::F2),
+    [27, 91, 49, 59, 51, 82] => Key::AltF(FKey::F3),
+    [27, 91, 49, 59, 51, 83] => Key::AltF(FKey::F4),
+    [27, 91, 49, 53, 59, 51, 126] => Key::AltF(FKey::F5),
+    [27, 91, 49, 55, 59, 51, 126] => Key::AltF(FKey::F6),
+    [27, 91, 49, 56, 59, 51, 126] => Key::AltF(FKey::F7),
+    [27, 91, 49, 57, 59, 51, 126] => Key::AltF(FKey::F8),
+    [27, 91, 50, 48, 59, 51, 126] => Key::AltF(FKey::F9),
+    [27, 91, 50, 49, 59, 51, 126] => Key::AltF(FKey::F10),
+    [27, 91, 50, 51, 59, 51, 126] => Key::AltF(FKey::F11),
+    [27, 91, 50, 52, 59, 51, 126] => Key::AltF(FKey::F12),
     [27, 91, 66] => Key::Arrow(Arrow::Down),
     [27, 79, 66] => Key::Arrow(Arrow::Down),
     [27, 91, 68] => Key::Arrow(Arrow::Left),
@@ -113,13 +151,37 @@ byte_seq_parser! {
     [27, 91, 49, 59, 53, 68] => Key::CtrlArrow(Arrow::Left),
     [27, 91, 49, 59, 53, 67] => Key::CtrlArrow(Arrow::Right),
     [27, 91, 49, 59, 53, 65] => Key::CtrlArrow(Arrow::Up),
+    [27, 91, 49, 59, 53, 80] => Key::CtrlF(FKey::F1),
+    [27, 91, 49, 59, 53, 81] => Key::CtrlF(FKey::F2),
+    [27, 91, 49, 59, 53, 82] => Key::CtrlF(FKey::F3),
+    [27, 91, 49, 59, 53, 83] => Key::CtrlF(FKey::F4),
+    [27, 91, 49, 53, 59, 53, 126] => Key::CtrlF(FKey::F5),
+    [27, 91, 49, 55, 59, 53, 126] => Key::CtrlF(FKey::F6),
+    [27, 91, 49, 56, 59, 53, 126] => Key::CtrlF(FKey::F7),
+    [27, 91, 49, 57, 59, 53, 126] => Key::CtrlF(FKey::F8),
+    [27, 91, 50, 48, 59, 53, 126] => Key::CtrlF(FKey::F9),
+    [27, 91, 50, 49, 59, 53, 126] => Key::CtrlF(FKey::F10),
+    [27, 91, 50, 51, 59, 53, 126] => Key::CtrlF(FKey::F11),
+    [27, 91, 50, 52, 59, 53, 126] => Key::CtrlF(FKey::F12),
     [27, 91, 51, 126] => Key::Del,
     [27, 91, 54, 126] => Key::PageDown,
     [27, 91, 53, 126] => Key::PageUp,
-    [27, 91, 49, 59, 50, 65] => Key::Shift(Arrow::Up),
-    [27, 91, 49, 59, 50, 66] => Key::Shift(Arrow::Down),
-    [27, 91, 49, 59, 50, 68] => Key::Shift(Arrow::Left),
-    [27, 91, 49, 59, 50, 67] => Key::Shift(Arrow::Right),
+    [27, 91, 49, 59, 50, 65] => Key::ShiftArrow(Arrow::Up),
+    [27, 91, 49, 59, 50, 66] => Key::ShiftArrow(Arrow::Down),
+    [27, 91, 49, 59, 50, 68] => Key::ShiftArrow(Arrow::Left),
+    [27, 91, 49, 59, 50, 67] => Key::ShiftArrow(Arrow::Right),
+    [27, 91, 49, 59, 50, 80] => Key::ShiftF(FKey::F1),
+    [27, 91, 49, 59, 50, 81] => Key::ShiftF(FKey::F2),
+    [27, 91, 49, 59, 50, 82] => Key::ShiftF(FKey::F3),
+    [27, 91, 49, 59, 50, 83] => Key::ShiftF(FKey::F4),
+    [27, 91, 49, 53, 59, 50, 126] => Key::ShiftF(FKey::F5),
+    [27, 91, 49, 55, 59, 50, 126] => Key::ShiftF(FKey::F6),
+    [27, 91, 49, 56, 59, 50, 126] => Key::ShiftF(FKey::F7),
+    [27, 91, 49, 57, 59, 50, 126] => Key::ShiftF(FKey::F8),
+    [27, 91, 50, 48, 59, 50, 126] => Key::ShiftF(FKey::F9),
+    [27, 91, 50, 49, 59, 50, 126] => Key::ShiftF(FKey::F10),
+    [27, 91, 50, 51, 59, 50, 126] => Key::ShiftF(FKey::F11),
+    [27, 91, 50, 52, 59, 50, 126] => Key::ShiftF(FKey::F12),
     [27, 91, 72] => Key::Home,
     [27, 91, 70] => Key::End,
     [27, 79, 72] => Key::Home,
