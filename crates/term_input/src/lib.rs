@@ -40,11 +40,11 @@ pub enum Key {
     Del,
     End,
     Esc,
+    FKey(FKey),
     Home,
     PageDown,
     PageUp,
-    ShiftDown,
-    ShiftUp,
+    Shift(Arrow),
     Tab,
 }
 
@@ -54,6 +54,22 @@ pub enum Arrow {
     Right,
     Up,
     Down,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
+pub enum FKey {
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -100,13 +116,27 @@ byte_seq_parser! {
     [27, 91, 51, 126] => Key::Del,
     [27, 91, 54, 126] => Key::PageDown,
     [27, 91, 53, 126] => Key::PageUp,
-    [27, 91, 49, 59, 50, 65] => Key::ShiftUp,
-    [27, 91, 49, 59, 50, 66] => Key::ShiftDown,
+    [27, 91, 49, 59, 50, 65] => Key::Shift(Arrow::Up),
+    [27, 91, 49, 59, 50, 66] => Key::Shift(Arrow::Down),
+    [27, 91, 49, 59, 50, 68] => Key::Shift(Arrow::Left),
+    [27, 91, 49, 59, 50, 67] => Key::Shift(Arrow::Right),
     [27, 91, 72] => Key::Home,
     [27, 91, 70] => Key::End,
     [27, 79, 72] => Key::Home,
     [27, 79, 70] => Key::End,
     [27, 91, 52, 126] => Key::End,
+    [27, 79, 80] => Key::FKey(FKey::F1),
+    [27, 79, 81] => Key::FKey(FKey::F2),
+    [27, 79, 82] => Key::FKey(FKey::F3),
+    [27, 79, 83] => Key::FKey(FKey::F4),
+    [27, 91, 49, 53, 126] => Key::FKey(FKey::F5),
+    [27, 91, 49, 55, 126] => Key::FKey(FKey::F6),
+    [27, 91, 49, 56, 126] => Key::FKey(FKey::F7),
+    [27, 91, 49, 57, 126] => Key::FKey(FKey::F8),
+    [27, 91, 50, 48, 126] => Key::FKey(FKey::F9),
+    [27, 91, 50, 49, 126] => Key::FKey(FKey::F10),
+    [27, 91, 50, 51, 126] => Key::FKey(FKey::F11),
+    [27, 91, 50, 52, 126] => Key::FKey(FKey::F12),
     [9] => Key::Tab,
     [8] => Key::Backspace,
     [127] => Key::Backspace,
@@ -134,6 +164,9 @@ byte_seq_parser! {
     [24] => Key::Ctrl('x'),
     [25] => Key::Ctrl('y'),
     [26] => Key::Ctrl('z'),
+    [28] => Key::Ctrl('\\'),
+    [29] => Key::Ctrl(']'),
+    [31] => Key::Ctrl('/'),
 }
 
 // static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];

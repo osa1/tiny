@@ -111,8 +111,8 @@ impl Default for KeyMap {
             (Key::Ctrl('d'), KeyAction::MessagesPageDown),
             (Key::PageUp, KeyAction::MessagesPageUp),
             (Key::PageDown, KeyAction::MessagesPageDown),
-            (Key::ShiftUp, KeyAction::MessagesScrollUp),
-            (Key::ShiftDown, KeyAction::MessagesScrollDown),
+            (Key::Shift(Arrow::Up), KeyAction::MessagesScrollUp),
+            (Key::Shift(Arrow::Down), KeyAction::MessagesScrollDown),
             (Key::Home, KeyAction::MessagesScrollTop),
             (Key::End, KeyAction::MessagesScrollBottom),
             (Key::Tab, KeyAction::InputAutoComplete),
@@ -254,8 +254,8 @@ impl<'de> Deserialize<'de> for MappedKey {
                             ch => Key::Ctrl(single_key(ch)?),
                         },
                         "shift" => match k2 {
-                            "up" => Key::ShiftUp,
-                            "down" => Key::ShiftDown,
+                            "up" => Key::Shift(Arrow::Up),
+                            "down" => Key::Shift(Arrow::Down),
                             unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                         },
                         unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
@@ -285,6 +285,9 @@ fn deser_key() {
     let s = "alt__";
     let key: MappedKey = serde_yaml::from_str(s).unwrap();
     assert_eq!(Key::AltChar('_'), key.0);
+    let s = "ctrl_/";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::Ctrl('/'), key.0);
 }
 
 #[test]
