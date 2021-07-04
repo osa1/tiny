@@ -14,7 +14,6 @@ use std::char;
 use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
 use std::pin::Pin;
-use std::str::FromStr;
 use std::task::{Context, Poll};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
@@ -60,20 +59,6 @@ pub enum Arrow {
     Down,
 }
 
-impl FromStr for Arrow {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "up" => Ok(Arrow::Up),
-            "down" => Ok(Arrow::Down),
-            "left" => Ok(Arrow::Left),
-            "right" => Ok(Arrow::Right),
-            _ => Err(()),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
 pub enum FKey {
     F1,
@@ -88,28 +73,6 @@ pub enum FKey {
     F10,
     F11,
     F12,
-}
-
-impl FromStr for FKey {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "f1" => Ok(FKey::F1),
-            "f2" => Ok(FKey::F2),
-            "f3" => Ok(FKey::F3),
-            "f4" => Ok(FKey::F4),
-            "f5" => Ok(FKey::F5),
-            "f6" => Ok(FKey::F6),
-            "f7" => Ok(FKey::F7),
-            "f8" => Ok(FKey::F8),
-            "f9" => Ok(FKey::F9),
-            "f10" => Ok(FKey::F10),
-            "f11" => Ok(FKey::F11),
-            "f12" => Ok(FKey::F12),
-            _ => Err(()),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

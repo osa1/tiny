@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::str::FromStr;
 
 use serde::de::{MapAccess, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer};
@@ -233,37 +232,49 @@ impl<'de> Deserialize<'de> for MappedKey {
                         "pgdown" => Key::PageDown,
                         "pgup" => Key::PageUp,
                         "tab" => Key::Tab,
-                        arrow if Arrow::from_str(arrow).is_ok() => {
-                            Key::Arrow(Arrow::from_str(arrow).unwrap())
+                        other => {
+                            if let Some(arrow) = parse_arrow(other) {
+                                Key::Arrow(arrow)
+                            } else if let Some(f_key) = parse_f_key(other) {
+                                Key::FKey(f_key)
+                            } else {
+                                Key::Char(single_key(other)?)
+                            }
                         }
-                        f if FKey::from_str(f).is_ok() => Key::FKey(FKey::from_str(f).unwrap()),
-                        ch => Key::Char(single_key(ch)?),
                     },
                     Some((k1, k2)) => match k1 {
                         "alt" => match k2 {
-                            arrow if Arrow::from_str(arrow).is_ok() => {
-                                Key::AltArrow(Arrow::from_str(arrow).unwrap())
+                            other => {
+                                if let Some(arrow) = parse_arrow(other) {
+                                    Key::AltArrow(arrow)
+                                } else if let Some(f_key) = parse_f_key(other) {
+                                    Key::AltF(f_key)
+                                } else {
+                                    Key::AltChar(single_key(other)?)
+                                }
                             }
-                            f if FKey::from_str(f).is_ok() => Key::AltF(FKey::from_str(f).unwrap()),
-                            ch => Key::AltChar(single_key(ch)?),
                         },
                         "ctrl" => match k2 {
-                            arrow if Arrow::from_str(arrow).is_ok() => {
-                                Key::CtrlArrow(Arrow::from_str(arrow).unwrap())
+                            other => {
+                                if let Some(arrow) = parse_arrow(other) {
+                                    Key::CtrlArrow(arrow)
+                                } else if let Some(f_key) = parse_f_key(other) {
+                                    Key::CtrlF(f_key)
+                                } else {
+                                    Key::Ctrl(single_key(other)?)
+                                }
                             }
-                            f if FKey::from_str(f).is_ok() => {
-                                Key::CtrlF(FKey::from_str(f).unwrap())
-                            }
-                            ch => Key::Ctrl(single_key(ch)?),
                         },
                         "shift" => match k2 {
-                            arrow if Arrow::from_str(arrow).is_ok() => {
-                                Key::ShiftArrow(Arrow::from_str(arrow).unwrap())
+                            other => {
+                                if let Some(arrow) = parse_arrow(other) {
+                                    Key::ShiftArrow(arrow)
+                                } else if let Some(f_key) = parse_f_key(other) {
+                                    Key::ShiftF(f_key)
+                                } else {
+                                    return Err(E::invalid_value(Unexpected::Str(other), &Self));
+                                }
                             }
-                            f if FKey::from_str(f).is_ok() => {
-                                Key::ShiftF(FKey::from_str(f).unwrap())
-                            }
-                            unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                         },
                         unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                     },
@@ -278,6 +289,34 @@ impl<'de> Deserialize<'de> for MappedKey {
         }
 
         deserializer.deserialize_str(MappedKeyVisitor)
+    }
+}
+
+fn parse_arrow(s: &str) -> Option<Arrow> {
+    match s {
+        "up" => Some(Arrow::Up),
+        "down" => Some(Arrow::Down),
+        "left" => Some(Arrow::Left),
+        "right" => Some(Arrow::Right),
+        _ => None,
+    }
+}
+
+fn parse_f_key(s: &str) -> Option<FKey> {
+    match s {
+        "f1" => Some(FKey::F1),
+        "f2" => Some(FKey::F2),
+        "f3" => Some(FKey::F3),
+        "f4" => Some(FKey::F4),
+        "f5" => Some(FKey::F5),
+        "f6" => Some(FKey::F6),
+        "f7" => Some(FKey::F7),
+        "f8" => Some(FKey::F8),
+        "f9" => Some(FKey::F9),
+        "f10" => Some(FKey::F10),
+        "f11" => Some(FKey::F11),
+        "f12" => Some(FKey::F12),
+        _ => None,
     }
 }
 
