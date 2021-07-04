@@ -146,6 +146,7 @@ fn close(args: CmdArgs) {
         MsgSource::Serv { ref serv } if serv == "mentions" => {
             // ignore
         }
+        MsgSource::Serv { ref serv } if serv == "help" => ui.close_server_tab(&serv),
         MsgSource::Serv { serv } => {
             ui.close_server_tab(&serv);
             let client_idx = find_client_idx(&clients, &serv).unwrap();
@@ -520,16 +521,16 @@ static HELP_CMD: Cmd = Cmd {
 
 fn help(args: CmdArgs) {
     let CmdArgs { ui, .. } = args;
-    ui.add_client_msg("Client Commands:", &MsgTarget::CurrentTab);
-    for cmd in CMDS.iter() {
-        ui.add_client_msg(
-            &format!(
+    let msgs = CMDS
+        .iter()
+        .map(|cmd| {
+            format!(
                 "/{:<10} - {:<25} - Usage: {}",
                 cmd.name, cmd.description, cmd.usage
-            ),
-            &MsgTarget::CurrentTab,
-        )
-    }
+            )
+        })
+        .collect::<Vec<_>>();
+    ui.show_help_tab(&msgs);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

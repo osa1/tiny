@@ -282,20 +282,6 @@ impl TUI {
                 self.reload_config();
                 CmdResult::Ok
             }
-            Some("help") => {
-                self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
-                for cmd in TUI_COMMANDS.iter() {
-                    self.add_client_msg(
-                        &format!(
-                            "/{:<10} - {:<25} - Usage: {}",
-                            cmd.name, cmd.description, cmd.usage
-                        ),
-                        &MsgTarget::CurrentTab,
-                    );
-                }
-                // Fall through to print help for cmd.rs commands
-                CmdResult::Continue
-            }
             Some("quit") => CmdResult::Quit,
             _ => CmdResult::Continue,
         }
@@ -630,6 +616,42 @@ impl TUI {
         let tab = &mut self.tabs[self.active_idx].widget;
         tab.set_input_field(&text_field_contents);
         tab.set_cursor(cursor);
+    }
+
+    pub fn show_help_tab(&mut self, messages: &[String]) {
+        let tab_name = "help";
+        if let Some(tab_idx) = self.new_server_tab(tab_name, None) {
+            let target = &MsgTarget::Server { serv: tab_name };
+
+            let mut cmds = vec!["\x0303Commands: ".to_string()];
+            cmds.extend(TUI_COMMANDS.iter().map(|cmd| {
+                format!(
+                    "/{:<10} - {:<25} - Usage: {}",
+                    cmd.name, cmd.description, cmd.usage
+                )
+            }));
+            cmds.extend_from_slice(messages);
+            cmds.sort();
+
+            // add current keybindings
+            let mut bindings = vec!["\x0303Key Bindings: ".to_string()];
+            let mut keys = self
+                .key_map
+                .iter()
+                .map(|(key, action)| format!("{:<20} - {:?}", format!("{:?}", action), key))
+                .collect::<Vec<_>>();
+            keys.sort();
+            bindings.extend(keys.into_iter());
+
+            for msg in cmds.iter().chain(bindings.iter()) {
+                self.add_client_msg(&msg, target);
+            }
+
+            self.select_tab(tab_idx);
+            self.tabs[tab_idx]
+                .widget
+                .keypressed(KeyAction::MessagesScrollTop);
+        }
     }
 
     fn keypressed(

@@ -87,6 +87,7 @@ impl UI {
     delegate_ui!(set_nick(serv: &str, nick: &str,));
     delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
+    delegate_ui!(show_help_tab(messages: &[String],));
 
     pub(crate) fn current_tab(&self) -> Option<MsgSource> {
         self.ui.current_tab()
@@ -178,7 +179,7 @@ pub(crate) fn send_msg(
     msg: String,
     is_action: bool,
 ) {
-    if src.serv_name() == "mentions" {
+    if src.serv_name() == "mentions" || src.serv_name() == "help" {
         if clients.len() == 0 {
             ui.add_client_err_msg(
                 "No connected server found, please use `/connect <server>` to connect to a server",
@@ -186,7 +187,10 @@ pub(crate) fn send_msg(
             );
         } else {
             ui.add_client_err_msg(
-                "You are on the mentions tab, please use `/switch <tab name>` to switch to a tab",
+                &format!(
+                    "You are on the {} tab, please use `/switch <tab name>` to switch to a tab",
+                    src.serv_name()
+                ),
                 &MsgTarget::CurrentTab,
             );
         }

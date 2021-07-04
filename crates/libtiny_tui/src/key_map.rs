@@ -1,3 +1,4 @@
+use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -151,6 +152,10 @@ impl KeyMap {
 
     pub(crate) fn load(&mut self, key_map: &KeyMap) {
         self.0.extend(key_map.0.iter())
+    }
+
+    pub(crate) fn iter(&self) -> Iter<Key, KeyAction> {
+        self.0.iter()
     }
 }
 
