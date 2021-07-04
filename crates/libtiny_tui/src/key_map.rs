@@ -233,37 +233,33 @@ impl<'de> Deserialize<'de> for MappedKey {
                         "pgdown" => Key::PageDown,
                         "pgup" => Key::PageUp,
                         "tab" => Key::Tab,
-                        "up" => Key::Arrow(Arrow::Up),
-                        "down" => Key::Arrow(Arrow::Down),
-                        "left" => Key::Arrow(Arrow::Left),
-                        "right" => Key::Arrow(Arrow::Right),
+                        arrow if Arrow::from_str(arrow).is_ok() => {
+                            Key::Arrow(Arrow::from_str(arrow).unwrap())
+                        }
                         f if FKey::from_str(f).is_ok() => Key::FKey(FKey::from_str(f).unwrap()),
                         ch => Key::Char(single_key(ch)?),
                     },
                     Some((k1, k2)) => match k1 {
                         "alt" => match k2 {
-                            "up" => Key::AltArrow(Arrow::Up),
-                            "down" => Key::AltArrow(Arrow::Down),
-                            "left" => Key::AltArrow(Arrow::Left),
-                            "right" => Key::AltArrow(Arrow::Right),
+                            arrow if Arrow::from_str(arrow).is_ok() => {
+                                Key::AltArrow(Arrow::from_str(arrow).unwrap())
+                            }
                             f if FKey::from_str(f).is_ok() => Key::AltF(FKey::from_str(f).unwrap()),
                             ch => Key::AltChar(single_key(ch)?),
                         },
                         "ctrl" => match k2 {
-                            "up" => Key::CtrlArrow(Arrow::Up),
-                            "down" => Key::CtrlArrow(Arrow::Down),
-                            "left" => Key::CtrlArrow(Arrow::Left),
-                            "right" => Key::CtrlArrow(Arrow::Right),
+                            arrow if Arrow::from_str(arrow).is_ok() => {
+                                Key::CtrlArrow(Arrow::from_str(arrow).unwrap())
+                            }
                             f if FKey::from_str(f).is_ok() => {
                                 Key::CtrlF(FKey::from_str(f).unwrap())
                             }
                             ch => Key::Ctrl(single_key(ch)?),
                         },
                         "shift" => match k2 {
-                            "up" => Key::ShiftArrow(Arrow::Up),
-                            "down" => Key::ShiftArrow(Arrow::Down),
-                            "left" => Key::ShiftArrow(Arrow::Left),
-                            "right" => Key::ShiftArrow(Arrow::Right),
+                            arrow if Arrow::from_str(arrow).is_ok() => {
+                                Key::ShiftArrow(Arrow::from_str(arrow).unwrap())
+                            }
                             f if FKey::from_str(f).is_ok() => {
                                 Key::ShiftF(FKey::from_str(f).unwrap())
                             }
@@ -308,6 +304,9 @@ fn deser_key() {
     let s = "shift_f2";
     let key: MappedKey = serde_yaml::from_str(s).unwrap();
     assert_eq!(Key::ShiftF(FKey::F2), key.0);
+    let s = "shift_left";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::ShiftArrow(Arrow::Left), key.0);
 }
 
 #[test]

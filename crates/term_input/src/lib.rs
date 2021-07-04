@@ -60,6 +60,20 @@ pub enum Arrow {
     Down,
 }
 
+impl FromStr for Arrow {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "up" => Ok(Arrow::Up),
+            "down" => Ok(Arrow::Down),
+            "left" => Ok(Arrow::Left),
+            "right" => Ok(Arrow::Right),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
 pub enum FKey {
     F1,
