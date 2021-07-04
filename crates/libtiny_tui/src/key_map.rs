@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use serde::de::{MapAccess, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer};
-use term_input::{Arrow, Key};
+use term_input::{Arrow, FKey, Key};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct KeyMap(HashMap<Key, KeyAction>);
@@ -111,8 +111,8 @@ impl Default for KeyMap {
             (Key::Ctrl('d'), KeyAction::MessagesPageDown),
             (Key::PageUp, KeyAction::MessagesPageUp),
             (Key::PageDown, KeyAction::MessagesPageDown),
-            (Key::ShiftUp, KeyAction::MessagesScrollUp),
-            (Key::ShiftDown, KeyAction::MessagesScrollDown),
+            (Key::ShiftArrow(Arrow::Up), KeyAction::MessagesScrollUp),
+            (Key::ShiftArrow(Arrow::Down), KeyAction::MessagesScrollDown),
             (Key::Home, KeyAction::MessagesScrollTop),
             (Key::End, KeyAction::MessagesScrollBottom),
             (Key::Tab, KeyAction::InputAutoComplete),
@@ -201,10 +201,10 @@ impl<'de> Deserialize<'de> for MappedKey {
             type Value = MappedKey;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9]. ")?;
+                write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9], [f1-f12]. ")?;
                 write!(
                     formatter,
-                    "modifiers with arrow key or single characters:  alt, shift, ctrl"
+                    "modifiers with an arrow key, function key, or single characters:  alt, shift, ctrl"
                 )
             }
 
@@ -232,31 +232,49 @@ impl<'de> Deserialize<'de> for MappedKey {
                         "pgdown" => Key::PageDown,
                         "pgup" => Key::PageUp,
                         "tab" => Key::Tab,
-                        "up" => Key::Arrow(Arrow::Up),
-                        "down" => Key::Arrow(Arrow::Down),
-                        "left" => Key::Arrow(Arrow::Left),
-                        "right" => Key::Arrow(Arrow::Right),
-                        ch => Key::Char(single_key(ch)?),
+                        other => {
+                            if let Some(arrow) = parse_arrow(other) {
+                                Key::Arrow(arrow)
+                            } else if let Some(f_key) = parse_f_key(other) {
+                                Key::FKey(f_key)
+                            } else {
+                                Key::Char(single_key(other)?)
+                            }
+                        }
                     },
                     Some((k1, k2)) => match k1 {
                         "alt" => match k2 {
-                            "up" => Key::AltArrow(Arrow::Up),
-                            "down" => Key::AltArrow(Arrow::Down),
-                            "left" => Key::AltArrow(Arrow::Left),
-                            "right" => Key::AltArrow(Arrow::Right),
-                            ch => Key::AltChar(single_key(ch)?),
+                            other => {
+                                if let Some(arrow) = parse_arrow(other) {
+                                    Key::AltArrow(arrow)
+                                } else if let Some(f_key) = parse_f_key(other) {
+                                    Key::AltF(f_key)
+                                } else {
+                                    Key::AltChar(single_key(other)?)
+                                }
+                            }
                         },
                         "ctrl" => match k2 {
-                            "up" => Key::CtrlArrow(Arrow::Up),
-                            "down" => Key::CtrlArrow(Arrow::Down),
-                            "left" => Key::CtrlArrow(Arrow::Left),
-                            "right" => Key::CtrlArrow(Arrow::Right),
-                            ch => Key::Ctrl(single_key(ch)?),
+                            other => {
+                                if let Some(arrow) = parse_arrow(other) {
+                                    Key::CtrlArrow(arrow)
+                                } else if let Some(f_key) = parse_f_key(other) {
+                                    Key::CtrlF(f_key)
+                                } else {
+                                    Key::Ctrl(single_key(other)?)
+                                }
+                            }
                         },
                         "shift" => match k2 {
-                            "up" => Key::ShiftUp,
-                            "down" => Key::ShiftDown,
-                            unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
+                            other => {
+                                if let Some(arrow) = parse_arrow(other) {
+                                    Key::ShiftArrow(arrow)
+                                } else if let Some(f_key) = parse_f_key(other) {
+                                    Key::ShiftF(f_key)
+                                } else {
+                                    return Err(E::invalid_value(Unexpected::Str(other), &Self));
+                                }
+                            }
                         },
                         unexp => return Err(E::invalid_value(Unexpected::Str(unexp), &Self)),
                     },
@@ -274,6 +292,34 @@ impl<'de> Deserialize<'de> for MappedKey {
     }
 }
 
+fn parse_arrow(s: &str) -> Option<Arrow> {
+    match s {
+        "up" => Some(Arrow::Up),
+        "down" => Some(Arrow::Down),
+        "left" => Some(Arrow::Left),
+        "right" => Some(Arrow::Right),
+        _ => None,
+    }
+}
+
+fn parse_f_key(s: &str) -> Option<FKey> {
+    match s {
+        "f1" => Some(FKey::F1),
+        "f2" => Some(FKey::F2),
+        "f3" => Some(FKey::F3),
+        "f4" => Some(FKey::F4),
+        "f5" => Some(FKey::F5),
+        "f6" => Some(FKey::F6),
+        "f7" => Some(FKey::F7),
+        "f8" => Some(FKey::F8),
+        "f9" => Some(FKey::F9),
+        "f10" => Some(FKey::F10),
+        "f11" => Some(FKey::F11),
+        "f12" => Some(FKey::F12),
+        _ => None,
+    }
+}
+
 #[test]
 fn deser_key() {
     let s = "alt_p";
@@ -285,6 +331,21 @@ fn deser_key() {
     let s = "alt__";
     let key: MappedKey = serde_yaml::from_str(s).unwrap();
     assert_eq!(Key::AltChar('_'), key.0);
+    let s = "ctrl_/";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::Ctrl('/'), key.0);
+    let s = "ctrl_f2";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::CtrlF(FKey::F2), key.0);
+    let s = "alt_f2";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::AltF(FKey::F2), key.0);
+    let s = "shift_f2";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::ShiftF(FKey::F2), key.0);
+    let s = "shift_left";
+    let key: MappedKey = serde_yaml::from_str(s).unwrap();
+    assert_eq!(Key::ShiftArrow(Arrow::Left), key.0);
 }
 
 #[test]
