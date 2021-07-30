@@ -31,7 +31,7 @@ fn tab_style(style: TabStyle, colors: &Colors) -> Style {
 impl Tab {
     pub(crate) fn visible_name(&self) -> &str {
         match self.alias {
-            Some(ref alias) => &alias,
+            Some(ref alias) => alias,
             None => self.src.visible_name(),
         }
     }

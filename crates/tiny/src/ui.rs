@@ -173,7 +173,7 @@ pub(crate) fn send_msg(
     is_action: bool,
 ) {
     if src.serv_name() == "mentions" {
-        if clients.len() == 0 {
+        if clients.is_empty() {
             ui.add_client_err_msg(
                 "No connected server found, please use `/connect <server>` to connect to a server",
                 &MsgTarget::CurrentTab,
