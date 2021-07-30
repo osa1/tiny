@@ -5,11 +5,9 @@ use libtiny_client::{Client, ServerInfo};
 use libtiny_common::{ChanName, ChanNameRef, MsgSource, MsgTarget};
 
 use std::borrow::Borrow;
-use std::path::Path;
 
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
-    pub config_path: &'a Path,
     pub defaults: &'a config::Defaults,
     pub ui: &'a UI,
     pub clients: &'a mut Vec<Client>,
