@@ -325,7 +325,7 @@ pub(crate) fn draw_line(
             pos_y,
             width,
             cursor,
-            &line,
+            line,
             &completion_range,
         );
     }

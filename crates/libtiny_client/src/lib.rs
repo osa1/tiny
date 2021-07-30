@@ -631,7 +631,7 @@ async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
         for addr in addrs {
             snd_ev.send(Event::Connecting(addr)).await.unwrap();
             let mb_stream = if use_tls {
-                Stream::new_tls(addr, &serv_name).await
+                Stream::new_tls(addr, serv_name).await
             } else {
                 Stream::new_tcp(addr).await
             };

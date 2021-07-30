@@ -192,7 +192,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 wire::MsgTarget::Chan(chan) => {
                     let ui_msg_target = MsgTarget::Chan { serv, chan: &chan };
                     // highlight the message if it mentions us
-                    if msg.find(&client.get_nick()).is_some() {
+                    if msg.contains(&client.get_nick()) {
                         ui.add_privmsg(sender, &msg, ts, &ui_msg_target, true, is_action);
                         ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
                         let mentions_target = MsgTarget::Server { serv: "mentions" };
@@ -494,7 +494,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
             } else if n == 4 // RPL_MYINFO
                     || n == 5 // RPL_BOUNCE
-                    || (n >= 252 && n <= 254)
+                    || (252..=254).contains(&n)
             // RPL_LUSEROP, RPL_LUSERUNKNOWN, RPL_LUSERCHANNELS
             {
                 let msg = params.into_iter().collect::<Vec<String>>().join(" ");

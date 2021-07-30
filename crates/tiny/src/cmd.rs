@@ -146,14 +146,14 @@ fn close(args: CmdArgs) {
         }
         MsgSource::Serv { serv } => {
             ui.close_server_tab(&serv);
-            let client_idx = find_client_idx(&clients, &serv).unwrap();
+            let client_idx = find_client_idx(clients, &serv).unwrap();
             // TODO: this probably won't close the connection?
             let mut client = clients.remove(client_idx);
             client.quit(None);
         }
         MsgSource::Chan { serv, chan } => {
             ui.close_chan_tab(&serv, chan.borrow());
-            let client_idx = find_client_idx(&clients, &serv).unwrap();
+            let client_idx = find_client_idx(clients, &serv).unwrap();
             clients[client_idx].part(&chan);
         }
         MsgSource::User { serv, nick } => {
