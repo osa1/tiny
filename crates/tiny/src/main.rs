@@ -173,7 +173,7 @@ fn run(
         }
 
         // Block on TUI task
-        ui::task(config_path, defaults, tui, clients, rcv_tui_ev).await;
+        ui::task(defaults, tui, clients, rcv_tui_ev).await;
     });
 
     runtime.block_on(local);

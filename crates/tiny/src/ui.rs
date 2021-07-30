@@ -7,8 +7,6 @@ use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use libtiny_logger::Logger;
 use libtiny_tui::TUI;
 
-use std::path::{Path, PathBuf};
-
 use time::Tm;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -94,7 +92,6 @@ impl UI {
 }
 
 pub(crate) async fn task(
-    config_path: PathBuf,
     defaults: config::Defaults,
     ui: UI,
     mut clients: Vec<Client>,
@@ -102,13 +99,12 @@ pub(crate) async fn task(
 ) {
     let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
-        handle_input_ev(&config_path, &defaults, &ui, &mut clients, ev);
+        handle_input_ev(&defaults, &ui, &mut clients, ev);
         ui.draw();
     }
 }
 
 fn handle_input_ev(
-    config_path: &Path,
     defaults: &config::Defaults,
     ui: &UI,
     clients: &mut Vec<Client>,
@@ -129,12 +125,11 @@ fn handle_input_ev(
                 send_msg(ui, clients, &source, line, false)
             }
         }
-        Cmd { cmd, source } => handle_cmd(config_path, defaults, ui, clients, source, &cmd),
+        Cmd { cmd, source } => handle_cmd(defaults, ui, clients, source, &cmd),
     }
 }
 
 fn handle_cmd(
-    config_path: &Path,
     defaults: &config::Defaults,
     ui: &UI,
     clients: &mut Vec<Client>,
@@ -145,7 +140,6 @@ fn handle_cmd(
         ParseCmdResult::Ok { cmd, rest } => {
             let cmd_args = CmdArgs {
                 args: rest,
-                config_path,
                 defaults,
                 ui,
                 clients,
