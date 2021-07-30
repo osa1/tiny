@@ -719,6 +719,7 @@ async fn retry_channel_join(
 
     let mut rcv_abort = ReceiverStream::new(rcv_abort).fuse();
 
+    // Send join message after timeout. Ok means channel tab was closed.
     if timeout(Duration::from_secs(10), rcv_abort.next())
         .await
         .is_err()
