@@ -188,7 +188,7 @@ Commands start with `/` character.
 - `/names`: List all nicks in the current channel. You can use `/names <nick>` to
   check if a specific nick is in the channel.
 
-- `/reload`: Reload configuration
+- `/reload`: Reload TUI configuration
 
 - `/clear`: Clears tab contents
 
