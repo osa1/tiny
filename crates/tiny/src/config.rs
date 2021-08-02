@@ -1,4 +1,6 @@
 use serde::{Deserialize, Deserializer};
+use serde_yaml::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -41,7 +43,7 @@ pub(crate) struct Server {
 
     /// Channels to automatically join.
     #[serde(default)]
-    pub(crate) join: Vec<String>,
+    pub(crate) join: Vec<Chan>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
     pub(crate) nickserv_ident: Option<String>,
@@ -62,6 +64,28 @@ pub(crate) struct Defaults {
     pub(crate) join: Vec<String>,
     #[serde(default)]
     pub(crate) tls: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub(crate) enum Chan {
+    /// Channel specified by name only
+    Name(String),
+    /// Channel specified by name with extra configuration (used by tui crate)
+    WithExtra {
+        name: String,
+        #[serde(flatten)]
+        extra: HashMap<String, Value>,
+    },
+}
+
+impl Chan {
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Chan::Name(name) => name,
+            Chan::WithExtra { name, .. } => name,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -222,8 +246,8 @@ mod tests {
                 panic!();
             }
             Ok(Config { servers, .. }) => {
-                assert_eq!(servers[0].join, vec!["#tiny".to_owned()]);
-                assert!(servers[0].tls);
+                assert_eq!(servers[0].join, vec![Chan::Name("#tiny".to_owned())]);
+                assert_eq!(servers[0].tls, true);
             }
         }
     }
@@ -269,6 +293,28 @@ mod tests {
         assert_eq!(
             &errors[3],
             "'realname' can't be empty, please update 'realname' field of 'my_server'"
+        );
+    }
+
+    #[test]
+    fn parse_chan_config() {
+        let config = r##"- "#tiny""##;
+        assert_eq!(
+            serde_yaml::from_str::<Vec<Chan>>(config).unwrap(),
+            vec![Chan::Name("#tiny".to_string())]
+        );
+        let config = r##"
+        - name: "#tiny"
+          ignore: true
+        "##;
+        let mut extra = HashMap::new();
+        extra.insert("ignore".to_string(), Value::Bool(true));
+        assert_eq!(
+            serde_yaml::from_str::<Vec<Chan>>(config).unwrap(),
+            vec![Chan::WithExtra {
+                name: "#tiny".to_string(),
+                extra
+            }]
         );
     }
 }

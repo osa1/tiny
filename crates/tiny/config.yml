@@ -10,6 +10,11 @@ servers:
       # alias: OFTC
 
       # Channels to automatically join
+      # Can be represented as a String or map with configs
+      # join:
+      #   - name: "#tiny"
+      #     ignore: false
+      #     notifier: <off | mentions | messages>
       join:
           - "#tiny"
 
@@ -29,12 +34,24 @@ servers:
       # (useful when `pass` or `sasl` fields above are not used)
       # nickserv_ident: 'hunter2'
 
+      # Set /ignore for this server and all its tabs, default: false
+      # ignore: true  
+
+      # Set notifier for this server and all its tabs, default: mentions
+      # notifier: <off | mentions | messages>
+
 # Defaults used when connecting to servers via the /connect command
 defaults:
     nicks: [tiny_user]
     realname: yourname
     join: []
     tls: false
+
+    # Set /ignore for all servers and all its tabs, default: false
+    # ignore: true 
+
+    # Set notifier for all servers and all its tabs, default: mentions
+    # notifier: <off | mentions | messages>
 
 # Where to put log files
 log_dir: "{}"

@@ -1,6 +1,7 @@
 // To see how color numbers map to actual colors in your terminal run
 // `cargo run --example colors`. Use tab to swap fg/bg colors.
 
+use libtiny_common::ChanNameRef;
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
 use std::fs::File;
@@ -10,9 +11,14 @@ use std::path::Path;
 pub use termbox_simple::*;
 
 use crate::key_map::KeyMap;
+use crate::notifier::Notifier;
 
-#[derive(Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub(crate) struct Config {
+    pub(crate) servers: Vec<Server>,
+
+    pub(crate) defaults: Defaults,
+
     #[serde(default)]
     pub(crate) colors: Colors,
 
@@ -28,6 +34,117 @@ pub(crate) struct Config {
     pub(crate) key_map: Option<KeyMap>,
 }
 
+impl Config {
+    /// Gets tab configs for `server`
+    /// Prioritizing configs under the server or using defaults
+    pub(crate) fn server_tab_configs(&self, server: &str) -> TabConfigs {
+        let server_config = self.servers.iter().find_map(|s| {
+            if s.addr == server {
+                Some(&s.configs)
+            } else {
+                None
+            }
+        });
+        self.defaults.tab_configs.merge(server_config)
+    }
+
+    /// Gets tab configs for `chan` in `server`
+    /// Prioritizing configs under the chan, then the server, then the defaults
+    pub(crate) fn chan_tab_configs(&self, server: &str, chan: &ChanNameRef) -> TabConfigs {
+        let tab_config = self
+            .servers
+            .iter()
+            .find(|s| s.addr == server)
+            .and_then(|s| {
+                s.join
+                    .iter()
+                    .find_map(|c| {
+                        if c.name() == chan.display() {
+                            Some(c.tab_configs())
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten()
+            });
+        self.server_tab_configs(server).merge(tab_config)
+    }
+
+    pub(crate) fn user_tab_configs(&self) -> TabConfigs {
+        TabConfigs {
+            ignore: Some(false),
+            notifier: Some(Notifier::Messages),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct Server {
+    pub(crate) addr: String,
+    pub(crate) join: Vec<Chan>,
+    #[serde(flatten)]
+    pub(crate) configs: TabConfigs,
+}
+
+#[derive(Debug, Default, Deserialize, PartialEq)]
+pub(crate) struct Defaults {
+    #[serde(flatten)]
+    pub(crate) tab_configs: TabConfigs,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub(crate) enum Chan {
+    /// Channel specified by name only
+    Name(String),
+    /// Channel specified by name and extra configurations
+    WithConfigs {
+        name: String,
+        #[serde(flatten)]
+        configs: TabConfigs,
+    },
+}
+
+#[derive(Debug, Default, Copy, Clone, Deserialize, PartialEq)]
+pub(crate) struct TabConfigs {
+    /// `true` if tab is ignored
+    #[serde(default)]
+    pub(crate) ignore: Option<bool>,
+    /// Notification setting for tab
+    #[serde(default)]
+    pub(crate) notifier: Option<Notifier>,
+}
+
+impl Chan {
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Chan::Name(name) => name,
+            Chan::WithConfigs { name, .. } => name,
+        }
+    }
+
+    pub(crate) fn tab_configs(&self) -> Option<&TabConfigs> {
+        match self {
+            Chan::Name(_) => None,
+            Chan::WithConfigs { configs, .. } => Some(configs),
+        }
+    }
+}
+
+impl TabConfigs {
+    /// Overwrites `self`'s values with `o`'s if `o`'s are `Some`
+    pub(crate) fn merge(&self, o: Option<&TabConfigs>) -> TabConfigs {
+        if let Some(o) = o {
+            TabConfigs {
+                ignore: o.ignore.or(self.ignore),
+                notifier: o.notifier.or(self.notifier),
+            }
+        } else {
+            self.to_owned()
+        }
+    }
+}
+
 fn default_max_nick_length() -> usize {
     12
 }
@@ -41,14 +158,14 @@ pub struct Style {
     pub bg: u16,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Layout {
     Compact,
     Aligned,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(default)]
 pub struct Colors {
     pub nick: Vec<u8>,

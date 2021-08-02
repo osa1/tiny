@@ -152,7 +152,7 @@ fn run(
                 auto_join: server
                     .join
                     .iter()
-                    .map(|c| ChanNameRef::new(c).to_owned())
+                    .map(|c| ChanNameRef::new(c.name()).to_owned())
                     .collect(),
                 nickserv_ident: server.nickserv_ident,
                 sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {

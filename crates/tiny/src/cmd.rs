@@ -292,7 +292,7 @@ static JOIN_CMD: Cmd = Cmd {
     name: "join",
     cmd_fn: join,
     description: "Joins a channel",
-    usage: "`/join <chan1>,<chan2>,...` or `/join` in a channel tab to rejoin",
+    usage: "`/join <chan1> <chan2>,...` or `/join` in a channel tab to rejoin",
 };
 
 fn join(args: CmdArgs) {
