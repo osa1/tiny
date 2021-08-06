@@ -621,9 +621,12 @@ impl TUI {
     pub fn show_help_tab(&mut self, messages: &[String]) {
         let tab_name = "help";
         if let Some(tab_idx) = self.new_server_tab(tab_name, None) {
+            // TUI supports color codes
+            let green_color_code = "\x0303";
             let target = &MsgTarget::Server { serv: tab_name };
 
-            let mut cmds = vec!["\x0303Commands: ".to_string()];
+            let cmd_header = format!("{}{}", green_color_code, "Commands: ");
+            let mut cmds = vec![cmd_header];
             cmds.extend(TUI_COMMANDS.iter().map(|cmd| {
                 format!(
                     "/{:<10} - {:<25} - Usage: {}",
@@ -634,7 +637,8 @@ impl TUI {
             cmds.sort();
 
             // add current keybindings
-            let mut bindings = vec!["\x0303Key Bindings: ".to_string()];
+            let bindings_header = format!("{}{}", green_color_code, "Key Bindings: ");
+            let mut bindings = vec![bindings_header];
             let mut keys = self
                 .key_map
                 .iter()

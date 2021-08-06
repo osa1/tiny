@@ -296,7 +296,7 @@ fn join(args: CmdArgs) {
     } = args;
 
     if let MsgSource::Serv { serv } = &src {
-        if serv == "mentions" {
+        if serv == "mentions" || serv == "help" {
             return ui.add_client_err_msg(
                 "Switch to a server tab to join a channel",
                 &MsgTarget::CurrentTab,
