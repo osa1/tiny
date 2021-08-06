@@ -128,11 +128,7 @@ impl InputArea {
     }
 
     pub(crate) fn get_nick(&self) -> Option<String> {
-        if let Some(nick) = &self.nick {
-            Some(nick.value.clone())
-        } else {
-            None
-        }
+        self.nick.as_ref().map(|nick| nick.value.clone())
     }
 
     /// Resizes input area
@@ -224,10 +220,8 @@ impl InputArea {
                     let ret = mem::replace(&mut self.buffer, InputLine::new());
                     if self.history.len() == HIST_SIZE {
                         self.history.remove(0);
-                        self.history.push(ret.clone());
-                    } else {
-                        self.history.push(ret.clone());
                     }
+                    self.history.push(ret.clone());
 
                     self.move_cursor(0);
 
@@ -634,7 +628,7 @@ impl InputArea {
                 ..
             } => {
                 let mut buffer = mem::replace(original_buffer, InputLine::new());
-                let completions: Vec<String> = mem::replace(completions, vec![]);
+                let completions: Vec<String> = mem::take(completions);
                 let word = &completions[current_completion];
 
                 // FIXME: This is inefficient

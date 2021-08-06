@@ -212,11 +212,7 @@ byte_seq_parser! {
 // static XTERM_FOCUS_LOST: [u8; 3] = [27, 91, 79];
 
 pub fn is_valid_key(key: Key) -> bool {
-    parse_key_bytes_is_valid_key(key)
-        | match key {
-            Key::AltChar(_) | Key::Char(_) => true,
-            _ => false,
-        }
+    parse_key_bytes_is_valid_key(key) | matches!(key, Key::AltChar(_) | Key::Char(_))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,11 +232,8 @@ pub struct Input {
 impl Drop for Input {
     fn drop(&mut self) {
         if let Some(old_flags) = self.old_stdin_flags.take() {
-            match fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
-                Err(err) => {
-                    error!("Unable to restore stdin flags: {:?}", err);
-                }
-                Ok(_) => {}
+            if let Err(err) = fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
+                error!("Unable to restore stdin flags: {:?}", err);
             }
         }
     }

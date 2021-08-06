@@ -719,16 +719,15 @@ async fn retry_channel_join(
 
     let mut rcv_abort = ReceiverStream::new(rcv_abort).fuse();
 
-    match timeout(Duration::from_secs(10), rcv_abort.next()).await {
-        Err(_) => {
-            // Send join message
-            snd_irc_msg
-                .try_send(wire::join(std::iter::once(channel.as_ref())))
-                .unwrap();
-        }
-        Ok(_) => {
-            // Channel tab was closed
-        }
+    // Send join message after timeout. Ok means channel tab was closed.
+    if timeout(Duration::from_secs(10), rcv_abort.next())
+        .await
+        .is_err()
+    {
+        // Send join message
+        snd_irc_msg
+            .try_send(wire::join(std::iter::once(channel.as_ref())))
+            .unwrap();
     }
 }
 
@@ -738,7 +737,7 @@ const SERVERNAME_PREFIX_LEN: usize = SERVERNAME_PREFIX.len();
 /// Parse server name from RPL_YOURHOST reply or fallback to using the server name inside
 /// Pfx::Server. See https://www.irc.com/dev/docs/refs/numerics/002.html for more info.
 fn parse_servername(pfx: Option<&Pfx>, params: &[String]) -> Option<String> {
-    parse_yourhost_msg(&params).or_else(|| parse_server_pfx(pfx))
+    parse_yourhost_msg(params).or_else(|| parse_server_pfx(pfx))
 }
 
 /// Try to parse servername in a 002 RPL_YOURHOST reply params.

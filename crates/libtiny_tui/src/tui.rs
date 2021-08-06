@@ -174,19 +174,13 @@ impl TUI {
     fn ignore(&mut self, src: &MsgSource) {
         match src {
             MsgSource::Serv { serv } => {
-                self.toggle_ignore(&MsgTarget::AllServTabs { serv: &serv });
+                self.toggle_ignore(&MsgTarget::AllServTabs { serv });
             }
             MsgSource::Chan { serv, chan } => {
-                self.toggle_ignore(&MsgTarget::Chan {
-                    serv: &serv,
-                    chan: chan.borrow(),
-                });
+                self.toggle_ignore(&MsgTarget::Chan { serv, chan });
             }
             MsgSource::User { serv, nick } => {
-                self.toggle_ignore(&MsgTarget::User {
-                    serv: &serv,
-                    nick: &nick,
-                });
+                self.toggle_ignore(&MsgTarget::User { serv, nick });
             }
         }
     }
@@ -347,7 +341,7 @@ impl TUI {
             let mut n = 0;
             let visible_name = match alias.as_ref() {
                 None => src.visible_name(),
-                Some(ref alias) => alias,
+                Some(alias) => alias,
             };
             for ch in visible_name.chars() {
                 if !ch.is_alphabetic() {
