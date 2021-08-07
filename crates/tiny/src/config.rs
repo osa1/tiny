@@ -1,6 +1,5 @@
+use libtiny_tui::config::Chan;
 use serde::{Deserialize, Deserializer};
-use serde_yaml::Value;
-use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -42,7 +41,7 @@ pub(crate) struct Server {
     pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
-    #[serde(default)]
+    // #[serde(default, deserialize_with = "deser_chans")]
     pub(crate) join: Vec<Chan>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
@@ -64,28 +63,6 @@ pub(crate) struct Defaults {
     pub(crate) join: Vec<String>,
     #[serde(default)]
     pub(crate) tls: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-#[serde(untagged)]
-pub(crate) enum Chan {
-    /// Channel specified by name only
-    Name(String),
-    /// Channel specified by name with extra configuration (used by tui crate)
-    WithExtra {
-        name: String,
-        #[serde(flatten)]
-        extra: HashMap<String, Value>,
-    },
-}
-
-impl Chan {
-    pub(crate) fn name(&self) -> &str {
-        match self {
-            Chan::Name(name) => name,
-            Chan::WithExtra { name, .. } => name,
-        }
-    }
 }
 
 #[derive(Deserialize)]
@@ -237,6 +214,10 @@ fn get_default_config_yaml() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use libtiny_common::ChanName;
+    use libtiny_tui::config::TabConfig;
+    use libtiny_tui::Notifier;
+    use serde_yaml;
 
     #[test]
     fn parse_default_config() {
@@ -246,7 +227,13 @@ mod tests {
                 panic!();
             }
             Ok(Config { servers, .. }) => {
-                assert_eq!(servers[0].join, vec![Chan::Name("#tiny".to_owned())]);
+                assert_eq!(
+                    servers[0].join,
+                    vec![Chan {
+                        name: ChanName::new("#tiny".to_string()),
+                        config: TabConfig::default()
+                    }]
+                );
                 assert_eq!(servers[0].tls, true);
             }
         }
@@ -297,23 +284,19 @@ mod tests {
     }
 
     #[test]
-    fn parse_chan_config() {
-        let config = r##"- "#tiny""##;
+    fn parse_chan_with_args() {
+        let config: Config = serde_yaml::from_str(
+            &get_default_config_yaml().replace("#tiny", "#tiny -ignore -notify off"),
+        )
+        .expect("parsed config");
         assert_eq!(
-            serde_yaml::from_str::<Vec<Chan>>(config).unwrap(),
-            vec![Chan::Name("#tiny".to_string())]
-        );
-        let config = r##"
-        - name: "#tiny"
-          ignore: true
-        "##;
-        let mut extra = HashMap::new();
-        extra.insert("ignore".to_string(), Value::Bool(true));
-        assert_eq!(
-            serde_yaml::from_str::<Vec<Chan>>(config).unwrap(),
-            vec![Chan::WithExtra {
-                name: "#tiny".to_string(),
-                extra
+            config.servers[0].join,
+            vec![Chan {
+                name: ChanName::new("#tiny".to_string()),
+                config: TabConfig {
+                    ignore: Some(true),
+                    notifier: Some(Notifier::Off)
+                }
             }]
         );
     }

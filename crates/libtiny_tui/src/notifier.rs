@@ -1,4 +1,5 @@
 use crate::MsgTarget;
+use std::str::FromStr;
 
 use libtiny_wire::formatting::remove_irc_control_chars;
 use serde::Deserialize;
@@ -9,7 +10,7 @@ use notify_rust::Notification;
 /// Destktop notification handler
 #[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum Notifier {
+pub enum Notifier {
     /// Notifications are disabled.
     Off,
     /// Generate notifications only for mentions.
@@ -24,6 +25,19 @@ impl Default for Notifier {
             Notifier::Mentions
         } else {
             Notifier::Off
+        }
+    }
+}
+
+impl FromStr for Notifier {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "off" => Ok(Notifier::Off),
+            "mentions" => Ok(Notifier::Mentions),
+            "messages" => Ok(Notifier::Messages),
+            _ => Err(format!("Unknown Notifier variant: {}", s)),
         }
     }
 }

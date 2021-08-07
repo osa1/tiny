@@ -7,6 +7,7 @@ use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use libtiny_logger::Logger;
 use libtiny_tui::TUI;
 
+use libtiny_tui::config::TabConfig;
 use time::Tm;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -84,6 +85,7 @@ impl UI {
     delegate_ui!(clear_nicks(serv: &str,));
     delegate_ui!(set_nick(serv: &str, nick: &str,));
     delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
+    delegate_ui!(set_tab_config(config: TabConfig, target: &MsgTarget,));
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
 
     pub(crate) fn current_tab(&self) -> Option<MsgSource> {

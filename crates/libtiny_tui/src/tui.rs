@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
 
-use crate::config::{parse_config, Colors, Config, Style, TabConfigs};
+use crate::config::{parse_config, Colors, Config, Style, TabConfig};
 use crate::editor;
 use crate::key_map::{KeyAction, KeyMap};
 use crate::messaging::{MessagingUI, Timestamp};
@@ -418,7 +418,7 @@ impl TUI {
         };
 
         // Get tab configs for the type of tab being created
-        let TabConfigs { ignore, notifier } = if let Some(config) = self.load_config() {
+        let TabConfig { ignore, notifier } = if let Some(config) = self.load_config() {
             match &src {
                 MsgSource::Serv { serv } => config.server_tab_configs(serv),
                 MsgSource::Chan { serv, chan } => {
@@ -429,7 +429,7 @@ impl TUI {
                         .iter()
                         .find_map(|tab| {
                             if tab.src.serv_name() == serv {
-                                Some(TabConfigs {
+                                Some(TabConfig {
                                     ignore: Some(!tab.widget.is_showing_status()),
                                     notifier: Some(tab.notifier),
                                 })
@@ -444,9 +444,8 @@ impl TUI {
             }
         } else {
             // Config could not be parsed
-            TabConfigs::default()
+            TabConfig::default()
         };
-
         let status = !ignore.unwrap_or(false);
         let notifier = notifier.unwrap_or_default();
 
@@ -1284,6 +1283,17 @@ impl TUI {
         });
     }
 
+    pub(crate) fn set_tab_config(&mut self, config: TabConfig, target: &MsgTarget) {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
+            if let Some(ignore) = config.ignore {
+                tab.widget.set_or_toggle_status(Some(!ignore));
+            }
+            if let Some(notifier) = config.notifier {
+                tab.notifier = notifier;
+            }
+        });
+    }
+
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
     pub(crate) fn add_client_err_msg(&mut self, msg: &str, target: &MsgTarget) {
@@ -1414,11 +1424,11 @@ impl TUI {
                 }
             }
             self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-                tab.widget.set_or_toggle_ignore(Some(!status_val));
+                tab.widget.set_or_toggle_status(Some(!status_val));
             });
         } else {
             self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-                tab.widget.set_or_toggle_ignore(None);
+                tab.widget.set_or_toggle_status(None);
             });
         }
     }

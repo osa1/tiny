@@ -1,4 +1,4 @@
-use libtiny_common::ChanNameRef;
+use libtiny_common::{ChanName, ChanNameRef};
 
 use crate::config::*;
 use crate::notifier::Notifier;
@@ -9,15 +9,14 @@ fn parsing_tab_configs() {
         servers:
           - addr: "server"
             join: 
-              - name: "#tiny"
-                ignore: false
-                notifier: messages
+              - "#tiny -ignore -notify messages"
             notifier: mentions
           - addr: "server2"
             join:
               - "#tiny2" 
-        defaults:
             ignore: true
+        defaults:
+            ignore: false
             notifier: off
         "##;
     let config: Config = serde_yaml::from_str(config_str).expect("parsed config");
@@ -25,30 +24,36 @@ fn parsing_tab_configs() {
         servers: vec![
             Server {
                 addr: "server".to_string(),
-                join: vec![Chan::WithConfigs {
-                    name: "#tiny".to_string(),
-                    configs: TabConfigs {
-                        ignore: Some(false),
+                join: vec![Chan {
+                    name: ChanName::new("#tiny".to_string()),
+                    config: TabConfig {
+                        ignore: Some(true),
                         notifier: Some(Notifier::Messages),
                     },
                 }],
-                configs: TabConfigs {
+                configs: TabConfig {
                     ignore: None,
                     notifier: Some(Notifier::Mentions),
                 },
             },
             Server {
                 addr: "server2".to_string(),
-                join: vec![Chan::Name("#tiny2".to_string())],
-                configs: TabConfigs {
-                    ignore: None,
+                join: vec![Chan {
+                    name: ChanName::new("#tiny2".to_string()),
+                    config: TabConfig {
+                        ignore: None,
+                        notifier: None,
+                    },
+                }],
+                configs: TabConfig {
+                    ignore: Some(true),
                     notifier: None,
                 },
             },
         ],
         defaults: Defaults {
-            tab_configs: TabConfigs {
-                ignore: Some(true),
+            tab_configs: TabConfig {
+                ignore: Some(false),
                 notifier: Some(Notifier::Off),
             },
         },
@@ -59,48 +64,48 @@ fn parsing_tab_configs() {
 
     assert_eq!(
         config.server_tab_configs("server"),
-        TabConfigs {
-            ignore: Some(true),                 // overwritten by defaults
+        TabConfig {
+            ignore: Some(false),                // overwritten by defaults
             notifier: Some(Notifier::Mentions)  // configured
         }
     );
 
     assert_eq!(
         config.server_tab_configs("server2"),
-        TabConfigs {
-            ignore: Some(true),            // overwritten by defaults
+        TabConfig {
+            ignore: Some(true),            // configured
             notifier: Some(Notifier::Off)  // overwritten by defaults
         }
     );
 
     assert_eq!(
         config.server_tab_configs("randomserver"),
-        TabConfigs {
-            ignore: Some(true),            // defaults
+        TabConfig {
+            ignore: Some(false),           // defaults
             notifier: Some(Notifier::Off)  // defaults
         }
     );
 
     assert_eq!(
         config.chan_tab_configs("server", ChanNameRef::new("#tiny")),
-        TabConfigs {
-            ignore: Some(false),                // configured
+        TabConfig {
+            ignore: Some(true),                 // configured
             notifier: Some(Notifier::Messages)  // configured
         }
     );
 
     assert_eq!(
         config.chan_tab_configs("server", ChanNameRef::new("##rust")),
-        TabConfigs {
-            ignore: Some(true),                 // overwritten by defaults
+        TabConfig {
+            ignore: Some(false),                // overwritten by defaults
             notifier: Some(Notifier::Mentions)  // overwritten by server
         }
     );
 
     assert_eq!(
         config.chan_tab_configs("server2", ChanNameRef::new("#tiny2")),
-        TabConfigs {
-            ignore: Some(true),            // overwritten by defaults
+        TabConfig {
+            ignore: Some(true),            // overwritten by server
             notifier: Some(Notifier::Off)  // overwritten by defaults
         }
     );

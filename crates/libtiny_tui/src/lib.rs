@@ -1,7 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::cognitive_complexity)]
 
-mod config;
+pub mod config;
 mod editor;
 mod exit_dialogue;
 mod input_area;
@@ -23,6 +23,9 @@ mod widget;
 #[cfg(test)]
 mod tests;
 
+pub use notifier::Notifier;
+
+use crate::config::TabConfig;
 use crate::tui::{CmdResult, TUIRet};
 use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
 use term_input::Input;
@@ -255,6 +258,7 @@ impl TUI {
         chan_name: &ChanNameRef,
     ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
+    delegate!(set_tab_config(config: TabConfig, target: &MsgTarget,));
 
     pub fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
         match self.inner.upgrade() {
