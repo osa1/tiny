@@ -14,9 +14,9 @@ source=("git+$url#commit=5e5c90c8f6b85b5ba38c974ed8113beef0e916ed") # tag: v0.9.
 sha512sums=(SKIP)
 
 build() {
-  cargo build \
-    --manifest-path "$srcdir/tiny/Cargo.toml" \
-    --release
+          cargo build \
+            --manifest-path "$srcdir/tiny/Cargo.toml" \
+            --release
 }
 
 package() {
