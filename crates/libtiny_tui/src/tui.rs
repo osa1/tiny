@@ -1297,7 +1297,7 @@ impl TUI {
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
     pub(crate) fn add_client_err_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget.add_client_err_msg(msg);
         });
     }
