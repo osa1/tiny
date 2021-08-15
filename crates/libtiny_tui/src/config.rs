@@ -220,7 +220,7 @@ pub(crate) enum Layout {
     Aligned,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Colors {
     pub nick: Vec<u8>,
