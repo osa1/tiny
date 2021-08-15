@@ -10,11 +10,11 @@ servers:
       # alias: OFTC
 
       # Channels to automatically join
-      # Can be represented as a String or map with configs
+      # Can include channel config arguments
+      # -ignore: ignores join/part messages
+      # -notify [off | mentions | messages]: sets notifier
       # join:
-      #   - name: "#tiny"
-      #     ignore: false
-      #     notifier: <off | mentions | messages>
+      #   - "#tiny -ignore -notify off"
       join:
           - "#tiny"
 
