@@ -4,7 +4,7 @@
 //! IRC event handling
 
 use crate::ui::UI;
-use libtiny_common::{ChanNameRef, MsgTarget, TabStyle};
+use libtiny_common::{ChanNameRef, MsgTarget, TabStyle, MENTIONS_TAB};
 use libtiny_wire as wire;
 
 use tokio::sync::mpsc;
@@ -195,7 +195,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                     if msg.contains(&client.get_nick()) {
                         ui.add_privmsg(sender, &msg, ts, &ui_msg_target, true, is_action);
                         ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
-                        let mentions_target = MsgTarget::Server { serv: "mentions" };
+                        let mentions_target = MsgTarget::Misc { name: MENTIONS_TAB };
                         ui.add_msg(
                             &format!("{} in {}:{}: {}", sender, serv, chan.display(), msg),
                             ts,

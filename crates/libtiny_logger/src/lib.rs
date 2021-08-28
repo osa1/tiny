@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use time::Tm;
 
-use libtiny_common::{ChanName, ChanNameRef, MsgTarget};
+use libtiny_common::{ChanName, ChanNameRef, MsgTarget, MENTIONS_TAB};
 
 #[macro_use]
 extern crate log;
@@ -444,6 +444,20 @@ impl LoggerInner {
             },
             MsgTarget::CurrentTab => {
                 // Probably a cmd error; these are ignored
+            }
+
+            MsgTarget::Misc { name: MENTIONS_TAB } => {
+                // create mentions tab log file like we do with user tabs
+                let mut path = self.log_dir.clone();
+                path.push("mentions.txt");
+                if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
+                    report_io_err!(self.report_err, print_header(&mut fd));
+                    f(&mut fd, &*self.report_err);
+                }
+            }
+
+            MsgTarget::Misc { .. } => {
+                // don't log other Misc tabs
             }
         }
     }

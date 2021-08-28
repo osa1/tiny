@@ -1,4 +1,4 @@
-use libtiny_common::{Event, MsgTarget};
+use libtiny_common::{Event, MsgTarget, MENTIONS_TAB};
 use libtiny_tui::TUI;
 
 use std::fs::File;
@@ -17,7 +17,7 @@ fn main() {
 
     let local = tokio::task::LocalSet::new();
 
-    let tab = MsgTarget::Server { serv: "mentions" };
+    let tab = MsgTarget::Misc { name: MENTIONS_TAB };
 
     local.block_on(&runtime, async move {
         let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));

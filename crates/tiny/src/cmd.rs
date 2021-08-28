@@ -122,8 +122,10 @@ fn away(args: CmdArgs) {
     } else {
         Some(args.args)
     };
-    if let Some(client) = find_client(args.clients, args.src.serv_name()) {
-        client.away(msg);
+    if let Some(serv_name) = args.src.serv_name() {
+        if let Some(client) = find_client(args.clients, serv_name) {
+            client.away(msg);
+        }
     }
 }
 
@@ -141,12 +143,6 @@ fn close(args: CmdArgs) {
         ui, clients, src, ..
     } = args;
     match src {
-        MsgSource::Serv { ref serv } if serv == "mentions" => {
-            // ignore
-        }
-        MsgSource::Chan { ref serv, chan } if chan.display() == "help" => {
-            ui.close_chan_tab(serv, &chan)
-        }
         MsgSource::Serv { serv } => {
             ui.close_server_tab(&serv);
             let client_idx = find_client_idx(clients, &serv).unwrap();
@@ -162,6 +158,7 @@ fn close(args: CmdArgs) {
         MsgSource::User { serv, nick } => {
             ui.close_user_tab(&serv, &nick);
         }
+        MsgSource::Misc { name } => ui.close_misc_tab(&name),
     }
 }
 
@@ -197,14 +194,14 @@ fn connect(args: CmdArgs) {
 }
 
 fn reconnect(ui: &UI, clients: &mut Vec<Client>, src: MsgSource) {
-    if let Some(client) = find_client(clients, src.serv_name()) {
-        ui.add_client_msg(
-            "Reconnecting...",
-            &MsgTarget::AllServTabs {
-                serv: src.serv_name(),
-            },
-        );
-        client.reconnect(None);
+    if let Some(serv_name) = src.serv_name() {
+        if let Some(client) = find_client(clients, serv_name) {
+            ui.add_client_msg(
+                "Reconnecting...",
+                &MsgTarget::AllServTabs { serv: serv_name },
+            );
+            client.reconnect(None);
+        }
     }
 }
 
@@ -295,13 +292,11 @@ fn join(args: CmdArgs) {
         ..
     } = args;
 
-    if let MsgSource::Serv { serv } = &src {
-        if serv == "mentions" {
-            return ui.add_client_err_msg(
-                "Switch to a server tab to join a channel",
-                &MsgTarget::CurrentTab,
-            );
-        }
+    if let MsgSource::Misc { .. } = &src {
+        return ui.add_client_err_msg(
+            "Switch to a server tab to join a channel",
+            &MsgTarget::CurrentTab,
+        );
     }
 
     let words = args
@@ -326,10 +321,12 @@ fn join(args: CmdArgs) {
         words
     };
 
-    match find_client(clients, src.serv_name()) {
+    // safe to unwrap due to returning above if src is Misc tab
+    let serv_name = src.serv_name().unwrap();
+    match find_client(clients, serv_name) {
         Some(client) => client.join(chans.iter().map(ChanName::as_ref)),
         None => ui.add_client_err_msg(
-            &format!("Can't join: Not connected to server {}", src.serv_name()),
+            &format!("Can't join: Not connected to server {}", serv_name),
             &MsgTarget::CurrentTab,
         ),
     }
@@ -401,6 +398,14 @@ fn msg(args: CmdArgs) {
         src,
         ..
     } = args;
+
+    if let MsgSource::Misc { name } = &src {
+        ui.add_client_err_msg(
+            &format!("Cannot send message from {} tab (no server)", name),
+            &MsgTarget::CurrentTab,
+        );
+    }
+
     let fail = || {
         ui.add_client_err_msg(&format!("Usage: {}", MSG_CMD.usage), &MsgTarget::CurrentTab);
     };
@@ -424,9 +429,10 @@ fn msg(args: CmdArgs) {
             serv: target.to_owned(),
         }
     } else {
-        let serv = src.serv_name();
+        // safe to unwrap due to returning above if src is Misc tab
+        let serv = src.serv_name().unwrap().to_owned();
         MsgSource::User {
-            serv: serv.to_owned(),
+            serv,
             nick: target.to_owned(),
         }
     };
@@ -453,31 +459,36 @@ fn names(args: CmdArgs) {
     } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
 
-    let client = match find_client(clients, src.serv_name()) {
-        None => {
-            return;
-        }
-        Some(client) => client,
-    };
-
-    if let MsgSource::Chan { ref serv, ref chan } = src {
-        let nicks_vec = client.get_chan_nicks(chan);
-        let target = MsgTarget::Chan { serv, chan };
-        if words.is_empty() {
-            ui.add_client_msg(
-                &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
-                &target,
-            );
-        } else {
-            let nick = words[0];
-            if nicks_vec.iter().any(|v| v == nick) {
-                ui.add_client_msg(&format!("{} is online", nick), &target);
-            } else {
-                ui.add_client_msg(&format!("{} is not in the channel", nick), &target);
+    if let Some(serv_name) = src.serv_name() {
+        match find_client(clients, serv_name) {
+            None => {
+                return;
+            }
+            Some(client) => {
+                if let MsgSource::Chan { ref serv, ref chan } = src {
+                    let nicks_vec = client.get_chan_nicks(chan);
+                    let target = MsgTarget::Chan { serv, chan };
+                    if words.is_empty() {
+                        ui.add_client_msg(
+                            &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
+                            &target,
+                        );
+                    } else {
+                        let nick = words[0];
+                        if nicks_vec.iter().any(|v| v == nick) {
+                            ui.add_client_msg(&format!("{} is online", nick), &target);
+                        } else {
+                            ui.add_client_msg(&format!("{} is not in the channel", nick), &target);
+                        }
+                    }
+                } else {
+                    ui.add_client_err_msg(
+                        "/names only supported in chan tabs",
+                        &MsgTarget::CurrentTab,
+                    );
+                }
             }
         }
-    } else {
-        ui.add_client_err_msg("/names only supported in chan tabs", &MsgTarget::CurrentTab);
     }
 }
 
@@ -500,9 +511,11 @@ fn nick(args: CmdArgs) {
     } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
     if words.len() == 1 {
-        if let Some(client) = find_client(clients, src.serv_name()) {
-            let new_nick = words[0];
-            client.nick(new_nick);
+        if let Some(serv_name) = src.serv_name() {
+            if let Some(client) = find_client(clients, serv_name) {
+                let new_nick = words[0];
+                client.nick(new_nick);
+            }
         }
     } else {
         ui.add_client_err_msg(

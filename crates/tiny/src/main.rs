@@ -12,7 +12,7 @@ mod utils;
 mod tests;
 
 use libtiny_client::{Client, ServerInfo};
-use libtiny_common::{ChanNameRef, MsgTarget};
+use libtiny_common::{ChanNameRef, MsgTarget, ERRORS_TAB};
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
 use ui::UI;
@@ -110,10 +110,9 @@ fn run(
         let report_logger_error = {
             let tui_clone = tui.clone();
             Box::new(move |err: String| {
-                // Somehwat hacky -- only tab we have is "mentions" so we show the error there
                 tui_clone.add_client_err_msg(
                     &format!("Logger error: {}", err),
-                    &MsgTarget::Server { serv: "mentions" },
+                    &MsgTarget::Misc { name: ERRORS_TAB },
                 )
             })
         };
@@ -122,17 +121,12 @@ fn run(
                 Err(LoggerInitError::CouldNotCreateDir { dir_path, err }) => {
                     tui.add_client_err_msg(
                         &format!("Could not create log directory {:?}: {}", dir_path, err),
-                        &MsgTarget::Server { serv: "mentions" },
+                        &MsgTarget::Misc { name: ERRORS_TAB },
                     );
                     tui.draw();
                     None
                 }
-                Ok(logger) => {
-                    // Create "mentions" log file manually -- the tab is already created in the TUI so
-                    // we won't be creating a "mentions" file in the logger without this.
-                    logger.new_server_tab("mentions");
-                    Some(logger)
-                }
+                Ok(logger) => Some(logger),
             });
 
         let tui = UI::new(tui, logger);

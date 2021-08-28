@@ -86,6 +86,7 @@ impl UI {
     delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
     delegate_ui!(show_help_tab(messages: &[String],));
+    delegate_ui!(close_misc_tab(name: &str,));
 
     pub(crate) fn current_tab(&self) -> Option<MsgSource> {
         self.ui.current_tab()
@@ -173,7 +174,7 @@ pub(crate) fn send_msg(
     msg: String,
     is_action: bool,
 ) {
-    if src.serv_name() == "mentions" || src.visible_name() == "help" {
+    if src.serv_name().is_none() {
         if clients.is_empty() {
             ui.add_client_err_msg(
                 "No connected server found, please use `/connect <server>` to connect to a server",
@@ -182,8 +183,8 @@ pub(crate) fn send_msg(
         } else {
             ui.add_client_err_msg(
                 &format!(
-                    "You are on the {} tab, please use `/switch <tab name>` to switch to a tab",
-                    src.serv_name()
+                    "You are on the {} tab, please switch to a channel tab to send a message (`/switch <tab name>`)",
+                    src.visible_name()
                 ),
                 &MsgTarget::CurrentTab,
             );
@@ -193,7 +194,10 @@ pub(crate) fn send_msg(
 
     let client = clients
         .iter_mut()
-        .find(|client| client.get_serv_name() == src.serv_name())
+        .find(|client| {
+            src.serv_name()
+                .map_or(false, |s| s == client.get_serv_name())
+        })
         .unwrap();
 
     // TODO: For errors:
@@ -226,6 +230,10 @@ pub(crate) fn send_msg(
                     MsgTarget::User { serv, nick }
                 };
                 (msg_target, nick)
+            }
+            MsgSource::Misc { .. } => {
+                // we explicity return at the top of the fn when there is no serv
+                unreachable!()
             }
         }
     };
