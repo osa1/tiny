@@ -614,10 +614,12 @@ impl TUI {
 
     pub fn show_help_tab(&mut self, messages: &[String]) {
         let tab_name = "help";
-        if let Some(tab_idx) = self.new_server_tab(tab_name, None) {
+        let serv = self.current_tab().serv_name().to_owned();
+        let chan = ChanNameRef::new(tab_name);
+        if let Some(tab_idx) = self.new_chan_tab(&serv, chan) {
             // TUI supports color codes
             let green_color_code = "\x0303";
-            let target = &MsgTarget::Server { serv: tab_name };
+            let target = &MsgTarget::Chan { serv: &serv, chan };
 
             let cmd_header = format!("{}{}", green_color_code, "Commands: ");
             let mut cmds = vec![cmd_header];

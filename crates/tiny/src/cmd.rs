@@ -144,7 +144,9 @@ fn close(args: CmdArgs) {
         MsgSource::Serv { ref serv } if serv == "mentions" => {
             // ignore
         }
-        MsgSource::Serv { ref serv } if serv == "help" => ui.close_server_tab(&serv),
+        MsgSource::Chan { ref serv, chan } if chan.display() == "help" => {
+            ui.close_chan_tab(serv, &chan)
+        }
         MsgSource::Serv { serv } => {
             ui.close_server_tab(&serv);
             let client_idx = find_client_idx(clients, &serv).unwrap();
@@ -294,7 +296,7 @@ fn join(args: CmdArgs) {
     } = args;
 
     if let MsgSource::Serv { serv } = &src {
-        if serv == "mentions" || serv == "help" {
+        if serv == "mentions" {
             return ui.add_client_err_msg(
                 "Switch to a server tab to join a channel",
                 &MsgTarget::CurrentTab,

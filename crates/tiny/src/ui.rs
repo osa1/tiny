@@ -173,7 +173,7 @@ pub(crate) fn send_msg(
     msg: String,
     is_action: bool,
 ) {
-    if src.serv_name() == "mentions" || src.serv_name() == "help" {
+    if src.serv_name() == "mentions" || src.visible_name() == "help" {
         if clients.is_empty() {
             ui.add_client_err_msg(
                 "No connected server found, please use `/connect <server>` to connect to a server",
