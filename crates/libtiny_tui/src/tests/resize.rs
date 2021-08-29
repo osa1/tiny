@@ -3,7 +3,7 @@ use std::io::{BufRead, BufReader};
 use std::panic::Location;
 
 use libtiny_common::{ChanNameRef, MsgTarget};
-use term_input::Key;
+use term_input::{Arrow, Key};
 
 use crate::test_utils::expect_screen;
 use crate::tui::TUI;
@@ -118,7 +118,10 @@ fn test_resize_scroll_stick_to_top() {
 
     // scroll up two lines, resize to add one extra line and verify that the next line on the bottom shows
     for _ in 0..2 {
-        tui.handle_input_event(term_input::Event::Key(Key::ShiftUp), &mut None);
+        tui.handle_input_event(
+            term_input::Event::Key(Key::ShiftArrow(Arrow::Up)),
+            &mut None,
+        );
     }
     tui.draw();
     tui.set_size(18, 11);
