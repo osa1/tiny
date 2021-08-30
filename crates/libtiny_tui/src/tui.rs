@@ -1272,7 +1272,7 @@ impl TUI {
 
             MsgTarget::Misc(misc) => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if tab.src.visible_name() == misc.display() {
+                    if tab.src == MsgSource::Misc(misc) {
                         target_idxs.push(tab_idx);
                         break;
                     }
@@ -1549,7 +1549,7 @@ impl TUI {
     }
 
     fn is_misc_tab(&self, idx: usize) -> bool {
-        matches!(self.tabs[idx].src, MsgSource::Misc { .. })
+        matches!(self.tabs[idx].src, MsgSource::Misc(..))
     }
 
     /// Given a tab index return range of tabs for the server of this tab.
