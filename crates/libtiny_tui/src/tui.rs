@@ -17,7 +17,7 @@ use crate::notifier::Notifier;
 use crate::tab::Tab;
 use crate::widget::WidgetRet;
 
-use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle, HELP_TAB, MENTIONS_TAB};
+use libtiny_common::{ChanNameRef, MiscTab, MsgSource, MsgTarget, TabStyle};
 use term_input::{Event, Key};
 pub use termbox_simple::{CellBuf, Termbox};
 
@@ -498,8 +498,8 @@ impl TUI {
         self.fix_scroll_after_close();
     }
 
-    pub(crate) fn new_misc_tab(&mut self, name: &str, idx: Option<usize>) -> Option<usize> {
-        match self.find_misc_tab_idx(name) {
+    pub(crate) fn new_misc_tab(&mut self, misc_tab: MiscTab, idx: Option<usize>) -> Option<usize> {
+        match self.find_misc_tab_idx(misc_tab) {
             None => {
                 let tab_idx = if let Some(idx) = idx {
                     // use requested index
@@ -514,9 +514,7 @@ impl TUI {
                 };
                 self.new_tab(
                     tab_idx,
-                    MsgSource::Misc {
-                        name: name.to_string(),
-                    },
+                    MsgSource::Misc(misc_tab),
                     true,
                     if cfg!(feature = "desktop-notifications") {
                         Notifier::Mentions
@@ -534,8 +532,8 @@ impl TUI {
         }
     }
 
-    pub(crate) fn close_misc_tab(&mut self, name: &str) {
-        if let Some(tab_idx) = self.find_misc_tab_idx(name) {
+    pub(crate) fn close_misc_tab(&mut self, misc_tab: MiscTab) {
+        if let Some(tab_idx) = self.find_misc_tab_idx(misc_tab) {
             self.tabs.remove(tab_idx);
             if self.active_idx == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
@@ -647,20 +645,19 @@ impl TUI {
 
     /// Shows "mentions" tab at the beginning of the tab list
     pub(crate) fn show_mentions_tab(&mut self) -> Option<usize> {
-        let idx = self.new_misc_tab(MENTIONS_TAB, Some(0));
+        let idx = self.new_misc_tab(MiscTab::Mentions, Some(0));
         self.add_client_msg(
             "Any mentions to you will be listed here.",
-            &MsgTarget::Misc { name: MENTIONS_TAB },
+            &MsgTarget::Misc(MiscTab::Mentions),
         );
         idx
     }
 
     pub(crate) fn show_help_tab(&mut self, messages: &[String]) {
-        let name = HELP_TAB;
-        if let Some(tab_idx) = self.new_misc_tab(name, None) {
+        if let Some(tab_idx) = self.new_misc_tab(MiscTab::Help, None) {
             // TUI supports color codes
             let green_color_code = "\x0303";
-            let target = &MsgTarget::Misc { name };
+            let target = &MsgTarget::Misc(MiscTab::Help);
 
             let cmd_header = format!("{}{}", green_color_code, "Commands: ");
             let mut cmds = vec![cmd_header];
@@ -1058,8 +1055,8 @@ impl TUI {
                         break;
                     }
                 }
-                MsgSource::Misc { name } => {
-                    if name.contains(string) {
+                MsgSource::Misc(misc) => {
+                    if misc.display().contains(string) {
                         next_idx = tab_idx;
                         break;
                     }
@@ -1273,9 +1270,9 @@ impl TUI {
                 target_idxs.push(self.active_idx);
             }
 
-            MsgTarget::Misc { name } => {
+            MsgTarget::Misc(misc) => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if tab.src.visible_name() == name {
+                    if tab.src.visible_name() == misc.display() {
                         target_idxs.push(tab_idx);
                         break;
                     }
@@ -1305,9 +1302,9 @@ impl TUI {
 
             MsgTarget::User { serv, nick } => self.new_user_tab(serv, nick),
 
-            MsgTarget::Misc { name: MENTIONS_TAB } => self.show_mentions_tab(),
+            MsgTarget::Misc(MiscTab::Mentions) => self.show_mentions_tab(),
 
-            MsgTarget::Misc { name } => self.new_misc_tab(name, None),
+            MsgTarget::Misc(misc) => self.new_misc_tab(misc, None),
 
             _ => None,
         }
@@ -1528,12 +1525,10 @@ impl TUI {
         None
     }
 
-    fn find_misc_tab_idx(&self, name_: &str) -> Option<usize> {
+    fn find_misc_tab_idx(&self, misc_tab: MiscTab) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Misc { ref name } = tab.src {
-                if name_ == name {
-                    return Some(tab_idx);
-                }
+            if MsgSource::Misc(misc_tab) == tab.src {
+                return Some(tab_idx);
             }
         }
         None

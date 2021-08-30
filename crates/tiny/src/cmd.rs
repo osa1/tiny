@@ -158,7 +158,7 @@ fn close(args: CmdArgs) {
         MsgSource::User { serv, nick } => {
             ui.close_user_tab(&serv, &nick);
         }
-        MsgSource::Misc { name } => ui.close_misc_tab(&name),
+        MsgSource::Misc(misc) => ui.close_misc_tab(misc),
     }
 }
 
@@ -399,9 +399,12 @@ fn msg(args: CmdArgs) {
         ..
     } = args;
 
-    if let MsgSource::Misc { name } = &src {
+    if let MsgSource::Misc(misc) = &src {
         ui.add_client_err_msg(
-            &format!("Cannot send message from {} tab (no server)", name),
+            &format!(
+                "Cannot send message from {} tab (no server)",
+                misc.display()
+            ),
             &MsgTarget::CurrentTab,
         );
     }

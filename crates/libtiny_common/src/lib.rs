@@ -4,10 +4,6 @@ use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-pub const MENTIONS_TAB: &str = "mentions";
-pub const HELP_TAB: &str = "help";
-pub const ERRORS_TAB: &str = "errors";
-
 /// Channel names according to RFC 2812, section 1.3. Channel names are case insensitive, so this
 /// type defines `Eq`, and `Hash` traits that work in a case-insensitive way. `ChanName::display`
 /// method shows the channel name with the original casing.
@@ -162,7 +158,7 @@ pub enum MsgTarget<'a> {
     User { serv: &'a str, nick: &'a str },
 
     /// Show the message in a miscellaneous tab.
-    Misc { name: &'a str },
+    Misc(MiscTab),
 
     /// Show the message in all tabs of a server.
     AllServTabs { serv: &'a str },
@@ -184,7 +180,7 @@ pub enum MsgSource {
     User { serv: String, nick: String },
 
     /// Miscellaneous tab not associated with a server
-    Misc { name: String },
+    Misc(MiscTab),
 }
 
 impl MsgSource {
@@ -205,7 +201,7 @@ impl MsgSource {
                 chan: chan.borrow(),
             },
             MsgSource::User { serv, nick } => MsgTarget::User { serv, nick },
-            MsgSource::Misc { name } => MsgTarget::Misc { name },
+            MsgSource::Misc(misc) => MsgTarget::Misc(misc.to_owned()),
         }
     }
 
@@ -214,7 +210,22 @@ impl MsgSource {
             MsgSource::Serv { serv, .. } => serv,
             MsgSource::Chan { chan, .. } => chan.display(),
             MsgSource::User { nick, .. } => nick,
-            MsgSource::Misc { name } => name,
+            MsgSource::Misc(misc) => misc.display(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MiscTab {
+    Help,
+    Mentions,
+}
+
+impl MiscTab {
+    pub fn display(&self) -> &str {
+        match self {
+            MiscTab::Help => "help",
+            MiscTab::Mentions => "mentions",
         }
     }
 }

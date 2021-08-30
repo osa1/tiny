@@ -76,7 +76,7 @@ fn handle_input_ev(ui: &TUI, ev: Event) {
                     MsgSource::User { serv, nick } => {
                         ui.close_user_tab(&serv, &nick);
                     }
-                    MsgSource::Misc { name } => ui.close_misc_tab(&name),
+                    MsgSource::Misc(misc) => ui.close_misc_tab(misc),
                 }
             }
         }

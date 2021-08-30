@@ -12,7 +12,7 @@ mod utils;
 mod tests;
 
 use libtiny_client::{Client, ServerInfo};
-use libtiny_common::{ChanNameRef, MsgTarget, ERRORS_TAB};
+use libtiny_common::{ChanNameRef, MiscTab, MsgTarget};
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
 use ui::UI;
@@ -110,9 +110,10 @@ fn run(
         let report_logger_error = {
             let tui_clone = tui.clone();
             Box::new(move |err: String| {
+                // show error on mentions tab because it's the only one we have at this point
                 tui_clone.add_client_err_msg(
                     &format!("Logger error: {}", err),
-                    &MsgTarget::Misc { name: ERRORS_TAB },
+                    &MsgTarget::Misc(MiscTab::Mentions),
                 )
             })
         };
@@ -121,7 +122,7 @@ fn run(
                 Err(LoggerInitError::CouldNotCreateDir { dir_path, err }) => {
                     tui.add_client_err_msg(
                         &format!("Could not create log directory {:?}: {}", dir_path, err),
-                        &MsgTarget::Misc { name: ERRORS_TAB },
+                        &MsgTarget::Misc(MiscTab::Mentions),
                     );
                     tui.draw();
                     None

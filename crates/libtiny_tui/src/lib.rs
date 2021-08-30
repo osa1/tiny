@@ -24,7 +24,7 @@ mod widget;
 mod tests;
 
 use crate::tui::{CmdResult, TUIRet};
-use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
+use libtiny_common::{ChanNameRef, Event, MiscTab, MsgSource, MsgTarget, TabStyle};
 use term_input::Input;
 
 use std::cell::RefCell;
@@ -226,7 +226,7 @@ impl TUI {
     delegate!(new_chan_tab(serv_name: &str, chan: &ChanNameRef,));
     delegate!(close_chan_tab(serv_name: &str, chan: &ChanNameRef,));
     delegate!(close_user_tab(serv_name: &str, nick: &str,));
-    delegate!(close_misc_tab(name: &str,));
+    delegate!(close_misc_tab(misc_tab: MiscTab,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
     delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
     delegate!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
