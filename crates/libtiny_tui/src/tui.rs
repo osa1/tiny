@@ -396,7 +396,7 @@ impl TUI {
     pub(crate) fn close_server_tab(&mut self, serv: &str) {
         if let Some(tab_idx) = self.find_serv_tab_idx(serv) {
             self.tabs
-                .retain(|tab: &Tab| tab.src.serv_name().map_or(true, |s| s != serv));
+                .retain(|tab: &Tab| tab.src.serv_name() != Some(serv));
             if self.active_idx == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
@@ -1263,7 +1263,7 @@ impl TUI {
 
             MsgTarget::AllServTabs { serv } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if tab.src.serv_name().map_or(false, |s| s == serv) {
+                    if tab.src.serv_name() == Some(serv) {
                         target_idxs.push(tab_idx);
                     }
                 }
@@ -1542,7 +1542,7 @@ impl TUI {
     /// Index of the last tab with the given server name.
     fn find_last_serv_tab_idx(&self, serv: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate().rev() {
-            if tab.src.serv_name().map_or(false, |s| s == serv) {
+            if tab.src.serv_name() == Some(serv) {
                 return Some(tab_idx);
             }
         }

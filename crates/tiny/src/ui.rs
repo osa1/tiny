@@ -194,10 +194,7 @@ pub(crate) fn send_msg(
 
     let client = clients
         .iter_mut()
-        .find(|client| {
-            src.serv_name()
-                .map_or(false, |s| s == client.get_serv_name())
-        })
+        .find(|client| src.serv_name() == Some(client.get_serv_name()))
         .unwrap();
 
     // TODO: For errors:
