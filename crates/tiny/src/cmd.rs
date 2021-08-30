@@ -2,7 +2,7 @@ use crate::config;
 use crate::ui::UI;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
-use libtiny_common::{ChanName, ChanNameRef, MsgSource, MsgTarget};
+use libtiny_common::{ChanName, ChanNameRef, MiscTab, MsgSource, MsgTarget};
 
 use std::borrow::Borrow;
 
@@ -158,6 +158,8 @@ fn close(args: CmdArgs) {
         MsgSource::User { serv, nick } => {
             ui.close_user_tab(&serv, &nick);
         }
+        // Don't allow closing the mentions tab
+        MsgSource::Misc(MiscTab::Mentions) => {}
         MsgSource::Misc(misc) => ui.close_misc_tab(misc),
     }
 }
@@ -546,7 +548,7 @@ fn help(args: CmdArgs) {
             )
         })
         .collect::<Vec<_>>();
-    ui.show_help_tab(&msgs);
+    ui.create_help_tab(&msgs);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

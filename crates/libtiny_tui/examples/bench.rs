@@ -48,7 +48,7 @@ fn run_bench() {
 }
 
 async fn bench_task(tui: TUI, lines: Vec<String>) {
-    let msg_target = MsgTarget::Server { serv: "server" };
+    let msg_target = MsgTarget::Server { serv: "mentions" };
     let time = time::now();
 
     for line in &lines {

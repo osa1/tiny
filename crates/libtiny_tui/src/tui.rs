@@ -160,7 +160,11 @@ impl TUI {
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
         // show any errors in TUI.
-        tui.show_mentions_tab();
+        tui.new_misc_tab(MiscTab::Mentions, None);
+        tui.add_client_msg(
+            "Any mentions to you will be listed here.",
+            &MsgTarget::Misc(MiscTab::Mentions),
+        );
 
         tui.reload_config();
         tui
@@ -498,6 +502,7 @@ impl TUI {
         self.fix_scroll_after_close();
     }
 
+    /// Creates a new Misc tab and returns its index, or None if it already exists
     pub(crate) fn new_misc_tab(&mut self, misc_tab: MiscTab, idx: Option<usize>) -> Option<usize> {
         match self.find_misc_tab_idx(misc_tab) {
             None => {
@@ -525,10 +530,7 @@ impl TUI {
                 );
                 Some(tab_idx)
             }
-            Some(idx) => {
-                self.select_tab(idx);
-                None
-            }
+            Some(_) => None,
         }
     }
 
@@ -643,17 +645,8 @@ impl TUI {
         tab.set_cursor(cursor);
     }
 
-    /// Shows "mentions" tab at the beginning of the tab list
-    pub(crate) fn show_mentions_tab(&mut self) -> Option<usize> {
-        let idx = self.new_misc_tab(MiscTab::Mentions, Some(0));
-        self.add_client_msg(
-            "Any mentions to you will be listed here.",
-            &MsgTarget::Misc(MiscTab::Mentions),
-        );
-        idx
-    }
-
-    pub(crate) fn show_help_tab(&mut self, messages: &[String]) {
+    /// Creates a new help tab if one does not already exist.
+    pub(crate) fn create_help_tab(&mut self, messages: &[String]) {
         if let Some(tab_idx) = self.new_misc_tab(MiscTab::Help, None) {
             // TUI supports color codes
             let green_color_code = "\x0303";
@@ -685,7 +678,7 @@ impl TUI {
                 self.add_client_msg(msg, target);
             }
 
-            self.select_tab(tab_idx);
+            self.set_tab_style(TabStyle::Highlight, &MsgTarget::Misc(MiscTab::Help));
             self.tabs[tab_idx]
                 .widget
                 .keypressed(KeyAction::MessagesScrollTop);
@@ -1035,7 +1028,7 @@ impl TUI {
     pub(crate) fn switch(&mut self, string: &str) {
         let mut next_idx = self.active_idx;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            match &tab.src {
+            match tab.src {
                 MsgSource::Serv { ref serv } => {
                     if serv.contains(string) {
                         next_idx = tab_idx;
@@ -1301,8 +1294,6 @@ impl TUI {
             MsgTarget::Chan { serv, chan } => self.new_chan_tab(serv, chan),
 
             MsgTarget::User { serv, nick } => self.new_user_tab(serv, nick),
-
-            MsgTarget::Misc(MiscTab::Mentions) => self.show_mentions_tab(),
 
             MsgTarget::Misc(misc) => self.new_misc_tab(misc, None),
 

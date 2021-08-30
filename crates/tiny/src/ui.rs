@@ -85,7 +85,7 @@ impl UI {
     delegate_ui!(set_nick(serv: &str, nick: &str,));
     delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
-    delegate_ui!(show_help_tab(messages: &[String],));
+    delegate_ui!(create_help_tab(messages: &[String],));
     delegate_ui!(close_misc_tab(misc_tab: MiscTab,));
 
     pub(crate) fn current_tab(&self) -> Option<MsgSource> {
@@ -183,7 +183,7 @@ pub(crate) fn send_msg(
         } else {
             ui.add_client_err_msg(
                 &format!(
-                    "You are on the {} tab, please switch to a channel tab to send a message (`/switch <tab name>`)",
+                    "You are on the {} tab, please switch to a server, channel, or user tab to send a message",
                     src.visible_name()
                 ),
                 &MsgTarget::CurrentTab,

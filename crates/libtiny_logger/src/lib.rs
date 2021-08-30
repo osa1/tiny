@@ -446,7 +446,7 @@ impl LoggerInner {
                 // Probably a cmd error; these are ignored
             }
 
-            MsgTarget::Misc(ref misc) => {
+            MsgTarget::Misc(misc) => {
                 match misc {
                     MiscTab::Help => {}
                     MiscTab::Mentions => {
