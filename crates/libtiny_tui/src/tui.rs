@@ -1060,6 +1060,13 @@ impl TUI {
         }
     }
 
+    pub(crate) fn switch_to_tab(&mut self, src: &MsgSource) {
+        let idx = self.find_tab_by_source(src);
+        if let Some(idx) = idx {
+            self.select_tab(idx)
+        }
+    }
+
     fn next_tab_(&mut self) {
         if self.active_idx == self.tabs.len() - 1 {
             self.active_idx = 0;
@@ -1481,6 +1488,15 @@ impl TUI {
 
     ////////////////////////////////////////////////////////////////////////////
     // Helpers
+
+    fn find_tab_by_source(&self, src: &MsgSource) -> Option<usize> {
+        for (tab_idx, tab) in self.tabs.iter().enumerate() {
+            if src == &tab.src {
+                return Some(tab_idx);
+            }
+        }
+        None
+    }
 
     fn find_serv_tab_idx(&self, serv_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {

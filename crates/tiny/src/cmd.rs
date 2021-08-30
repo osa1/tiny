@@ -464,36 +464,34 @@ fn names(args: CmdArgs) {
     } = args;
     let words: Vec<&str> = args.split_whitespace().collect();
 
-    if let Some(serv_name) = src.serv_name() {
-        match find_client(clients, serv_name) {
-            None => {
-                return;
-            }
-            Some(client) => {
-                if let MsgSource::Chan { ref serv, ref chan } = src {
-                    let nicks_vec = client.get_chan_nicks(chan);
-                    let target = MsgTarget::Chan { serv, chan };
-                    if words.is_empty() {
-                        ui.add_client_msg(
-                            &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
-                            &target,
-                        );
-                    } else {
-                        let nick = words[0];
-                        if nicks_vec.iter().any(|v| v == nick) {
-                            ui.add_client_msg(&format!("{} is online", nick), &target);
-                        } else {
-                            ui.add_client_msg(&format!("{} is not in the channel", nick), &target);
-                        }
-                    }
-                } else {
-                    ui.add_client_err_msg(
-                        "/names only supported in chan tabs",
-                        &MsgTarget::CurrentTab,
-                    );
-                }
+    let serv_name = match src.serv_name() {
+        None => return,
+        Some(serv_name) => serv_name,
+    };
+
+    let client = match find_client(clients, serv_name) {
+        None => return,
+        Some(client) => client,
+    };
+
+    if let MsgSource::Chan { ref serv, ref chan } = src {
+        let nicks_vec = client.get_chan_nicks(chan);
+        let target = MsgTarget::Chan { serv, chan };
+        if words.is_empty() {
+            ui.add_client_msg(
+                &format!("{} users: {}", nicks_vec.len(), nicks_vec.join(", ")),
+                &target,
+            );
+        } else {
+            let nick = words[0];
+            if nicks_vec.iter().any(|v| v == nick) {
+                ui.add_client_msg(&format!("{} is online", nick), &target);
+            } else {
+                ui.add_client_msg(&format!("{} is not in the channel", nick), &target);
             }
         }
+    } else {
+        ui.add_client_err_msg("/names only supported in chan tabs", &MsgTarget::CurrentTab);
     }
 }
 
@@ -549,7 +547,7 @@ fn help(args: CmdArgs) {
         })
         .collect::<Vec<_>>();
     ui.create_help_tab(&msgs);
-    ui.switch(MiscTab::Help.display());
+    ui.switch_to_tab(&MsgSource::Misc(MiscTab::Help));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

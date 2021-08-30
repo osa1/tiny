@@ -257,7 +257,7 @@ impl TUI {
     ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
     delegate!(create_help_tab(messages: &[String],));
-    delegate!(switch(string: &str,));
+    delegate!(switch_to_tab(src: &MsgSource,));
 
     pub fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
         match self.inner.upgrade() {
