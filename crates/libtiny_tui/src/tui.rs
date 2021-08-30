@@ -678,7 +678,6 @@ impl TUI {
                 self.add_client_msg(msg, target);
             }
 
-            self.set_tab_style(TabStyle::Highlight, &MsgTarget::Misc(MiscTab::Help));
             self.tabs[tab_idx]
                 .widget
                 .keypressed(KeyAction::MessagesScrollTop);

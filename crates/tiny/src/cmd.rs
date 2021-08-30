@@ -549,6 +549,7 @@ fn help(args: CmdArgs) {
         })
         .collect::<Vec<_>>();
     ui.create_help_tab(&msgs);
+    ui.switch(MiscTab::Help.display());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -87,6 +87,7 @@ impl UI {
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
     delegate_ui!(create_help_tab(messages: &[String],));
     delegate_ui!(close_misc_tab(misc_tab: MiscTab,));
+    delegate_ui!(switch(string: &str,));
 
     pub(crate) fn current_tab(&self) -> Option<MsgSource> {
         self.ui.current_tab()
