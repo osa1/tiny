@@ -128,7 +128,7 @@ RFC 2812 has two rules related to character names:
 
 - Channel names are case insensitive
 - The characters "{}|^" are considered lowercase, and their uppercase
-  equivalents are "[]\~".
+  equivalents are "[]\\~".
 
 There's also a rule implemented by servers:
 
