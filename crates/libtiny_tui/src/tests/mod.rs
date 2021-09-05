@@ -6,7 +6,6 @@ use term_input::{Event, Key};
 use crate::test_utils::expect_screen;
 use crate::tui::TUI;
 
-mod layout;
 mod resize;
 
 fn enter_string(tui: &mut TUI, s: &str) {
