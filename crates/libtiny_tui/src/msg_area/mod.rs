@@ -67,13 +67,13 @@ impl MsgArea {
     }
 
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
-        self.width = if self.scroll != 0 { width - 1 } else { width };
+        self.width = width;
         let old_height = self.height;
         self.height = height;
         let old_total_lines = self.lines_height;
         self.lines_height = None;
 
-        self.total_visible_lines();
+        self.update_total_visible_lines();
         self.recalculate_scroll(old_height, old_total_lines.unwrap());
     }
 
@@ -134,7 +134,7 @@ impl MsgArea {
 
 impl MsgArea {
     /// The total number of visible lines if each Line was rendered at the current screen width
-    fn total_visible_lines(&mut self) -> i32 {
+    fn update_total_visible_lines(&mut self) -> i32 {
         match self.lines_height {
             Some(height) => height,
             None => {
@@ -149,7 +149,7 @@ impl MsgArea {
     }
 
     pub(crate) fn scroll_up(&mut self) {
-        if self.scroll < max(0, self.total_visible_lines() - self.height) {
+        if self.scroll < max(0, self.update_total_visible_lines() - self.height) {
             self.scroll += 1;
         }
     }
@@ -161,7 +161,7 @@ impl MsgArea {
     }
 
     pub(crate) fn scroll_top(&mut self) {
-        self.scroll = max(0, self.total_visible_lines() - self.height);
+        self.scroll = max(0, self.update_total_visible_lines() - self.height);
     }
 
     pub(crate) fn scroll_bottom(&mut self) {
@@ -182,7 +182,7 @@ impl MsgArea {
     fn recalculate_scroll(&mut self, old_height: i32, old_total_lines: i32) {
         if self.scroll > 0 {
             let ratio = (self.scroll as f32 + old_height as f32) / old_total_lines as f32;
-            let total_lines = self.total_visible_lines();
+            let total_lines = self.update_total_visible_lines();
             self.scroll = ((ratio * total_lines as f32) as i32).saturating_sub(self.height);
         }
     }
@@ -272,6 +272,6 @@ mod tests {
         // Will pop out "first" line
         msg_area.flush_line();
         assert_eq!(msg_area.lines.len(), 3);
-        assert_eq!(msg_area.total_visible_lines(), 3);
+        assert_eq!(msg_area.update_total_visible_lines(), 3);
     }
 }
