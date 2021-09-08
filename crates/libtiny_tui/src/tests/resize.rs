@@ -245,3 +245,73 @@ fn test_resize() {
         tui.draw();
     }
 }
+
+// https://github.com/osa1/tiny/pull/351#issuecomment-915447462
+#[test]
+fn test_resize_scroll_resize() {
+    let mut tui = TUI::new_test(16, 10);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+
+    for i in 0..15 {
+        tui.add_privmsg(
+            "osa1",
+            &format!("a long line {}", i),
+            ts,
+            &target,
+            false,
+            false,
+        );
+    }
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen1 =
+       "|osa1: a long    |
+        |line 11         |
+        |osa1: a long    |
+        |line 12         |
+        |osa1: a long    |
+        |line 13         |
+        |osa1: a long    |
+        |line 14         |
+        |                |
+        |< #chan         |";
+
+    expect_screen(screen1, &tui.get_front_buffer(), 16, 10, Location::caller());
+    tui.handle_input_event(
+        term_input::Event::Key(Key::ShiftArrow(Arrow::Up)),
+        &mut None,
+    );
+    tui.set_size(20, 15);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen1 =
+       "|osa1: a long line 2 |
+        |osa1: a long line 3 | 
+        |osa1: a long line 4 |
+        |osa1: a long line 5 |
+        |osa1: a long line 6 |
+        |osa1: a long line 7 |
+        |osa1: a long line 8 |
+        |osa1: a long line 9 |
+        |osa1: a long line 10|
+        |osa1: a long line 11|
+        |osa1: a long line 12|
+        |osa1: a long line 13|
+        |osa1: a long line 14|
+        |osa1:               |
+        |< #chan             |";
+
+    expect_screen(screen1, &tui.get_front_buffer(), 20, 15, Location::caller());
+}

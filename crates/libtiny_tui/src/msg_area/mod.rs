@@ -183,7 +183,7 @@ impl MsgArea {
         if self.scroll > 0 {
             let ratio = (self.scroll as f32 + old_height as f32) / old_total_lines as f32;
             let total_lines = self.update_total_visible_lines();
-            self.scroll = ((ratio * total_lines as f32) as i32).saturating_sub(self.height);
+            self.scroll = max(0, ((ratio * total_lines as f32) as i32) - self.height);
         }
     }
 }
