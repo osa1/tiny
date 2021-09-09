@@ -38,7 +38,7 @@ servers:
       # ignore: true  
 
       # Set notifier for this server and all its tabs, default: mentions
-      # notifier: <off | mentions | messages>
+      # notifier: [off | mentions | messages]
 
 # Defaults used when connecting to servers via the /connect command
 defaults:
@@ -51,7 +51,7 @@ defaults:
     # ignore: true 
 
     # Set notifier for all servers and all its tabs, default: mentions
-    # notifier: <off | mentions | messages>
+    # notifier: [off | mentions | messages]
 
 # Where to put log files
 log_dir: "{}"
