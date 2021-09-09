@@ -9,7 +9,7 @@ use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
 
-pub(crate) use termbox_simple::*;
+pub use termbox_simple::*;
 
 use crate::key_map::KeyMap;
 use crate::notifier::Notifier;
