@@ -427,15 +427,10 @@ impl TUI {
                     let server_tab_config = self
                         .tabs
                         .iter()
-                        .find_map(|tab| {
-                            if tab.src.serv_name() == serv {
-                                Some(TabConfig {
-                                    ignore: Some(!tab.widget.is_showing_status()),
-                                    notifier: Some(tab.notifier),
-                                })
-                            } else {
-                                None
-                            }
+                        .find(|tab| tab.src.serv_name() == serv)
+                        .map(|tab| TabConfig {
+                            ignore: Some(!tab.widget.is_showing_status()),
+                            notifier: Some(tab.notifier),
                         })
                         .expect("Creating a channel or user tab, but the server tab doesn't exist");
                     server_tab_config.merge(Some(&tab_configs))

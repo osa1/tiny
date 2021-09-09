@@ -39,13 +39,11 @@ impl Config {
     /// Gets tab configs for `server`
     /// Prioritizing configs under the server or using defaults
     pub(crate) fn server_tab_configs(&self, server: &str) -> TabConfig {
-        let server_config = self.servers.iter().find_map(|s| {
-            if s.addr == server {
-                Some(&s.configs)
-            } else {
-                None
-            }
-        });
+        let server_config = self
+            .servers
+            .iter()
+            .find(|s| s.addr == server)
+            .map(|s| &s.configs);
         self.defaults.tab_configs.merge(server_config)
     }
 
@@ -56,15 +54,7 @@ impl Config {
             .servers
             .iter()
             .find(|s| s.addr == server)
-            .and_then(|s| {
-                s.join.iter().find_map(|c| {
-                    if &c.name == chan {
-                        Some(c.config)
-                    } else {
-                        None
-                    }
-                })
-            });
+            .and_then(|s| s.join.iter().find(|c| chan == &c.name).map(|c| c.config));
         self.server_tab_configs(server).merge(tab_config.as_ref())
     }
 
