@@ -222,7 +222,7 @@ fn test_resize_no_scroll_stay_on_bottom() {
     expect_screen(screen3, &tui.get_front_buffer(), 18, 11, Location::caller());
 }
 
-// Simulate resize from 50x50 -> 0x0 -> 50x50
+// Testing for crashes by resizing from 50x50 -> 0x0 -> 50x50
 #[test]
 fn test_resize() {
     let mut tui = TUI::new_test(80, 50);

@@ -139,7 +139,7 @@ impl MsgArea {
             Some(height) => height,
             None => {
                 let mut total_height = 0;
-                for line in self.lines.iter_mut() {
+                for line in &mut self.lines {
                     total_height += line.rendered_height(self.width);
                 }
                 self.lines_height = Some(total_height);
