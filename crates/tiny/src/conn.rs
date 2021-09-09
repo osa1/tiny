@@ -479,117 +479,122 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
             // Ignore
         }
 
-        // Solanum is used for OFTC and Libera
-        // https://github.com/solanum-ircd/solanum/blob/main/include/numeric.h
         Reply { num: n, params } => {
             let n_params = params.len();
-            match (n, n_params) {
-                ( 000..=003 // RPL_WELCOME, RPL_YOURHOST, RPL_CREATED
-                | 251 // RPL_LUSERCLIENT
-                | 255 // RPL_LUSERME
-                | 372 // RPL_MOTD
-                | 375 // RPL_MOTDSTART
-                | 376 // RPL_ENDOFMOTD
-                , 2) => {
-                    let msg = &params[1];
-                    ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
-                }
-                ( 4 // RPL_MYINFO
-                | 5 // RPL_BOUNCE
-                | 252..=254  // RPL_LUSEROP, RPL_LUSERUNKNOWN, RPL_LUSERCHANNELS
-                , _) => {
-                    let msg = params.into_iter().collect::<Vec<String>>().join(" ");
-                    ui.add_msg(&msg, time::now(), &MsgTarget::Server { serv });
-                }
-                (250 | 265 | 266, n_params) if n_params > 0 => {
-                    let msg = &params[n_params - 1];
-                    ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
-                }
-                //RPL_TOPIC
-                (332, 3 | 2) => {
-                    // RFC 2812 says this will have 2 arguments, but freenode sends 3 arguments (extra
-                    // one being our nick).
-                    let chan = &params[n_params - 2];
+            if (
+                n <= 003 // RPL_WELCOME, RPL_YOURHOST, RPL_CREATED
+                    || n == 251 // RPL_LUSERCLIENT
+                    || n == 255 // RPL_LUSERME
+                    || n == 372 // RPL_MOTD
+                    || n == 375 // RPL_MOTDSTART
+                    || n == 376
+                // RPL_ENDOFMOTD
+            ) && n_params == 2
+            {
+                let msg = &params[1];
+                ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
+            } else if n == 4 // RPL_MYINFO
+                    || n == 5 // RPL_BOUNCE
+                    || (252..=254).contains(&n)
+            // RPL_LUSEROP, RPL_LUSERUNKNOWN, RPL_LUSERCHANNELS
+            {
+                let msg = params.into_iter().collect::<Vec<String>>().join(" ");
+                ui.add_msg(&msg, time::now(), &MsgTarget::Server { serv });
+            } else if (n == 265 || n == 266 || n == 250) && n_params > 0 {
+                let msg = &params[n_params - 1];
+                ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
+            }
+            // RPL_TOPIC
+            else if n == 332 && (n_params == 3 || n_params == 2) {
+                // RFC 2812 says this will have 2 arguments, but freenode sends 3 arguments (extra
+                // one being our nick).
+                let chan = &params[n_params - 2];
                 let topic = &params[n_params - 1];
                 ui.set_topic(topic, time::now(), serv, ChanNameRef::new(chan));
-                }
-                // RPL_NAMREPLY: List of users in a channel
-                (353, 3) => {
-                    let chan = &params[2];
-                    let chan_target = MsgTarget::Chan {
-                        serv,
-                        chan: ChanNameRef::new(chan),
-                    };
+            }
+            // RPL_NAMREPLY: List of users in a channel
+            else if n == 353 && n_params > 3 {
+                let chan = &params[2];
+                let chan_target = MsgTarget::Chan {
+                    serv,
+                    chan: ChanNameRef::new(chan),
+                };
 
-                    for nick in params[3].split_whitespace() {
-                        ui.add_nick(wire::drop_nick_prefix(nick), None, &chan_target);
+                for nick in params[3].split_whitespace() {
+                    ui.add_nick(wire::drop_nick_prefix(nick), None, &chan_target);
+                }
+            }
+            // RPL_ENDOFNAMES: End of NAMES list
+            else if n == 366 {
+            }
+            // RPL_UNAWAY or RPL_NOWAWAY
+            else if (n == 305 || n == 306) && n_params > 1 {
+                let msg = &params[1];
+                ui.add_client_msg(msg, &MsgTarget::AllServTabs { serv });
+            }
+            // ERR_NOSUCHNICK
+            else if n == 401 && n_params > 2 {
+                let nick = &params[1];
+                let msg = &params[2];
+                ui.add_client_msg(msg, &MsgTarget::User { serv, nick });
+            // RPL_AWAY
+            } else if n == 301 && n_params > 2 {
+                let nick = &params[1];
+                let msg = &params[2];
+                ui.add_client_msg(
+                    &format!("{} is away: {}", nick, msg),
+                    &MsgTarget::User { serv, nick },
+                );
+            }
+            // ERR_BADCHANNAME
+            else if n == 479 && n_params > 2 {
+                let chan = &params[1];
+                let msg = &params[2];
+                ui.add_client_err_msg(
+                    &format!("Unable to join {}: {}", chan, msg),
+                    &MsgTarget::Chan {
+                        chan: ChanNameRef::new(chan),
+                        serv,
+                    },
+                );
+            }
+            // ERR_CHANNELISFULL    471
+            // ERR_INVITEONLYCHAN   473
+            // ERR_BANNEDFROMCHAN   474
+            // ERR_BADCHANNELKEY    475
+            // ERR_NEEDREGGEDNICK   477
+            // ERR_THROTTLE         480
+            else if (n == 471 || n == 473 || n == 474 || n == 475 || n == 477 || n == 480)
+                && n_params == 3
+            {
+                let chan = &params[1];
+                let msg = &params[2];
+                ui.add_client_err_msg(
+                    msg,
+                    &MsgTarget::Chan {
+                        chan: ChanNameRef::new(chan),
+                        serv,
+                    },
+                );
+            } else {
+                match pfx {
+                    Some(Server(msg_serv)) | Some(Ambiguous(msg_serv)) => {
+                        let msg_target = MsgTarget::Server { serv };
+                        ui.add_privmsg(
+                            &msg_serv,
+                            &params.join(" "),
+                            time::now(),
+                            &msg_target,
+                            false,
+                            false,
+                        );
+                        ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
-                }
-                // RPL_ENDOFNAMES: End of NAMES list
-                (366, _) => {}
-                 // RPL_UNAWAY or RPL_NOWAWAY
-                (305 | 306, _) => {
-                    let msg = &params[1];
-                    ui.add_client_msg(msg, &MsgTarget::AllServTabs { serv });
-                }
-                // ERR_NOSUCHNICK
-                (401, 3) => {
-                    let nick = &params[1];
-                    let msg = &params[2];
-                    ui.add_client_msg(msg, &MsgTarget::User { serv, nick });
-                }
-                // RPL_AWAY
-                (301, 3) => {
-                    let nick = &params[1];
-                    let msg = &params[2];
-                    ui.add_client_msg(
-                        &format!("{} is away: {}", nick, msg),
-                        &MsgTarget::User { serv, nick },
-                    );
-                }
-                // ERR_BADCHANNAME
-                (479, 3)  => {
-                    let chan = &params[1];
-                    let msg = &params[2];
-                    ui.add_client_err_msg(
-                        &format!("Unable to join {}: {}", chan, msg),
-                        &MsgTarget::Chan { chan: ChanNameRef::new(chan), serv },
-                    );
-                }
-                // ERR_CHANNELISFULL    471
-                // ERR_INVITEONLYCHAN   473
-                // ERR_BANNEDFROMCHAN   474
-                // ERR_BADCHANNELKEY    475
-                // ERR_NEEDREGGEDNICK   477
-                // ERR_THROTTLE         480
-                (471 | 473 | 474 | 475 | 477 | 480, 3) => {
-                    let chan = &params[1];
-                    let msg = &params[2];
-                    ui.add_client_err_msg(
-                        msg,
-                        &MsgTarget::Chan { chan: ChanNameRef::new(chan), serv },
-                    );
-                }
-                _ => {
-                    match pfx {
-                        Some(Server(msg_serv)) | Some(Ambiguous(msg_serv)) => {
-                            let msg_target = MsgTarget::Server { serv };
-                            ui.add_privmsg(
-                                &msg_serv,
-                                &params.join(" "),
-                                time::now(),
-                                &msg_target,
-                                false,
-                                false,
-                            );
-                            ui.set_tab_style(TabStyle::NewMsg, &msg_target);
-                        }
-                        Some(User { .. }) | None => {
-                            debug!(
-                                "Ignoring numeric reply {}: pfx={:?}, params={:?}",
-                                n, pfx, params
-                            );
-                        }
+                    Some(User { .. }) | None => {
+                        debug!(
+                            "Ignoring numeric reply {}: pfx={:?}, params={:?}",
+                            n, pfx, params
+                        );
                     }
                 }
             }
