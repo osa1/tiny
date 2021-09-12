@@ -7,7 +7,6 @@ mod state;
 mod stream;
 mod utils;
 
-pub use dcc::DCCType;
 use libtiny_common::{ChanName, ChanNameRef};
 pub use libtiny_wire as wire;
 
@@ -27,6 +26,8 @@ use tokio::time::timeout;
 use tokio::{pin, select};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+
+pub use crate::dcc::{DccRecordInfo, DccType};
 
 #[macro_use]
 extern crate log;
@@ -261,7 +262,7 @@ impl Client {
         self.state.get_chan_nicks(chan)
     }
 
-    /// Checks if we have a stored DCCRecord for the provided parameters
+    /// Checks if we have a stored DccRecord for the provided parameters
     /// Starts download of file if a record is found.
     /// Deletes record after download attempt
     /// Returns boolean if record is found
@@ -271,10 +272,10 @@ impl Client {
             debug!("found rec {:?}", rec);
             dcc_file_get(
                 &mut self.msg_chan,
-                *rec.get_addr(),
+                *rec.address(),
                 download_dir,
                 file_name.to_string(),
-                rec.get_receiver().to_string(),
+                rec.receiver().to_string(),
             );
             true
         } else {
@@ -283,11 +284,7 @@ impl Client {
     }
 
     /// Creates a dcc record and returns the argument (filename) and file size if provided
-    pub fn create_dcc_rec(
-        &self,
-        origin: &str,
-        msg: &str,
-    ) -> Option<(dcc::DCCType, String, Option<u32>)> {
+    pub fn create_dcc_rec(&self, origin: &str, msg: &str) -> Option<DccRecordInfo> {
         self.state.add_dcc_rec(origin, msg)
     }
 }

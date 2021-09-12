@@ -1,6 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::dcc::{DCCRecord, DCCType};
+use crate::dcc::{DccRecord, DccType};
 use crate::utils;
 use crate::{Event, ServerInfo};
 use libtiny_wire as wire;
@@ -66,8 +66,8 @@ impl State {
         self.inner.borrow().get_chan_nicks(chan)
     }
 
-    /// Gets a DCCRecord and removes it
-    pub(crate) fn get_dcc_rec(&self, origin: &str, argument: &str) -> Option<DCCRecord> {
+    /// Gets a DccRecord and removes it
+    pub(crate) fn get_dcc_rec(&self, origin: &str, argument: &str) -> Option<DccRecord> {
         self.inner
             .borrow_mut()
             .dcc_recs
@@ -80,7 +80,7 @@ impl State {
         origin: &str,
         msg: &str,
     ) -> Option<(DCCType, String, Option<u32>)> {
-        let record = DCCRecord::from(origin, &self.get_nick(), msg);
+        let record = DccRecord::from(origin, &self.get_nick(), msg);
         debug!("record: {:?}", record);
         if let Ok(record) = record {
             let argument = record.get_argument().clone();
@@ -122,8 +122,8 @@ struct StateInner {
     /// order, in TUI?
     chans: Vec<(String, HashSet<String>)>,
 
-    /// Map of DCCRecords indexed by the nickname of the sender and the argument (filename or 'chat')
-    dcc_recs: HashMap<(String, String), DCCRecord>,
+    /// Map of DccRecords indexed by the nickname of the sender and the argument (filename or 'chat')
+    dcc_recs: HashMap<(String, String), DccRecord>,
 
     /// Away reason if away mode is on. `None` otherwise. TODO: I don't think the message is used?
     away_status: Option<String>,

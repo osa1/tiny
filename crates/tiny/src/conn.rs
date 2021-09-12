@@ -5,7 +5,7 @@
 
 use crate::ui::UI;
 
-use libtiny_client::DCCType;
+use libtiny_client::{DccRecordInfo, DccType};
 use libtiny_common::{ChanNameRef, MsgTarget, TabStyle};
 use libtiny_wire as wire;
 
@@ -20,7 +20,7 @@ pub(crate) trait Client {
 
     fn is_nick_accepted(&self) -> bool;
 
-    fn create_dcc_rec(&self, origin: &str, msg: &str) -> Option<(DCCType, String, Option<u32>)>;
+    fn create_dcc_rec(&self, origin: &str, msg: &str) -> Option<DccRecordInfo>;
 }
 
 impl Client for libtiny_client::Client {
@@ -36,7 +36,7 @@ impl Client for libtiny_client::Client {
         self.is_nick_accepted()
     }
 
-    fn create_dcc_rec(&self, origin: &str, msg: &str) -> Option<(DCCType, String, Option<u32>)> {
+    fn create_dcc_rec(&self, origin: &str, msg: &str) -> Option<DccRecordInfo> {
         self.create_dcc_rec(origin, msg)
     }
 }
@@ -200,11 +200,14 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 } else {
                     MsgTarget::Server { serv }
                 };
-                if let Some((dcc_type, argument, file_size)) =
-                    client.create_dcc_rec(&sender.to_owned(), &msg)
+                if let Some(DccRecordInfo {
+                    dcc_type,
+                    argument,
+                    file_size,
+                }) = client.create_dcc_rec(&sender.to_owned(), &msg)
                 {
                     match dcc_type {
-                        DCCType::SEND => {
+                        DccType::SEND => {
                             let file_size =
                                 file_size.map_or("unknown size".to_string(), |s| s.to_string());
                             ui.add_client_msg(
@@ -219,7 +222,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                                 &msg_target,
                             );
                         }
-                        DCCType::CHAT => {}
+                        DccType::CHAT => ui.add_client_err_msg("DCC CHAT unsupported", &msg_target),
                     }
                 }
                 return;
