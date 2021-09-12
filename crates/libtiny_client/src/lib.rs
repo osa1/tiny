@@ -761,7 +761,7 @@ fn dcc_file_get(
         // Create a new file for write inside the download directory
         let mut file = match OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(download_dir)
             .await
         {
