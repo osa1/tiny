@@ -3,7 +3,7 @@ use crate::ui::UI;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
-use libtiny_tui::config::{Chan, TabConfig};
+use libtiny_tui::config::Chan;
 
 use std::borrow::Borrow;
 use std::str::FromStr;
@@ -337,7 +337,7 @@ fn join(args: CmdArgs) {
             Some(MsgSource::Chan { serv: _, chan }) => {
                 vec![Chan {
                     name: chan,
-                    config: TabConfig::default(),
+                    config: None,
                 }]
             }
             Some(_) => {
@@ -357,13 +357,15 @@ fn join(args: CmdArgs) {
             let iter_ref = chans.iter().map(|c| c.name.as_ref());
             // set tab configs of new channel tabs (creates new tab)
             for chan in &chans {
-                ui.set_tab_config(
-                    chan.config,
-                    &MsgTarget::Chan {
-                        chan: &chan.name,
-                        serv: serv_name,
-                    },
-                )
+                if let Some(tab_config) = chan.config {
+                    ui.set_tab_config(
+                        tab_config,
+                        &MsgTarget::Chan {
+                            chan: &chan.name,
+                            serv: serv_name,
+                        },
+                    )
+                }
             }
             client.join(iter_ref);
         }

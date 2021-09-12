@@ -47,10 +47,10 @@ defaults:
     join: []
     tls: false
 
-    # Set /ignore for all servers and all its tabs, default: false
+    # Set /ignore as the default for all servers and all its tabs, default: false
     # ignore: true 
 
-    # Set notifier for all servers and all its tabs, default: mentions
+    # Set notifier as the default for all servers and all its tabs, default: mentions
     # notifier: [off | mentions | messages]
 
 # Where to put log files

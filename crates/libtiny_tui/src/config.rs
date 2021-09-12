@@ -4,6 +4,7 @@
 use libtiny_common::{ChanName, ChanNameRef};
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -35,55 +36,24 @@ pub(crate) struct Config {
     pub(crate) key_map: Option<KeyMap>,
 }
 
-impl Config {
-    /// Gets tab configs for `server`
-    /// Prioritizing configs under the server or using defaults
-    pub(crate) fn server_tab_configs(&self, server: &str) -> TabConfig {
-        let server_config = self
-            .servers
-            .iter()
-            .find(|s| s.addr == server)
-            .map(|s| &s.configs);
-        self.defaults.tab_configs.merge(server_config)
-    }
-
-    /// Gets tab configs for `chan` in `server`
-    /// Prioritizing configs under the chan, then the server, then the defaults
-    pub(crate) fn chan_tab_configs(&self, server: &str, chan: &ChanNameRef) -> TabConfig {
-        let tab_config = self
-            .servers
-            .iter()
-            .find(|s| s.addr == server)
-            .and_then(|s| s.join.iter().find(|c| chan == &c.name).map(|c| c.config));
-        self.server_tab_configs(server).merge(tab_config.as_ref())
-    }
-
-    pub(crate) fn user_tab_configs(&self) -> TabConfig {
-        TabConfig {
-            ignore: Some(false),
-            notifier: Some(Notifier::Messages),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub(crate) struct Server {
     pub(crate) addr: String,
     pub(crate) join: Vec<Chan>,
     #[serde(flatten)]
-    pub(crate) configs: TabConfig,
+    pub(crate) config: Option<TabConfig>,
 }
 
-#[derive(Debug, Default, Deserialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
 pub(crate) struct Defaults {
     #[serde(flatten)]
-    pub(crate) tab_configs: TabConfig,
+    pub(crate) tab_config: TabConfig,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chan {
     pub name: ChanName,
-    pub config: TabConfig,
+    pub config: Option<TabConfig>,
 }
 
 impl<'de> Deserialize<'de> for Chan {
@@ -122,41 +92,80 @@ impl FromStr for Chan {
             s.to_string()
         };
         // Try to split chan name and args
-        match s.split_once(" ") {
+        match s.split_once(' ') {
             // with args
             Some((name, args)) => {
                 let configs = TabConfig::from_str(args)?;
                 Ok(Chan {
                     name: ChanName::new(name.to_string()),
-                    config: configs,
+                    config: Some(configs),
                 })
             }
             // chan name only
             None => Ok(Chan {
                 name: ChanName::new(s),
-                config: TabConfig::default(),
+                config: None,
             }),
         }
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, Deserialize, PartialEq)]
+/// Map of TabConfigs by tab names
+#[derive(Debug, Default)]
+pub(crate) struct TabConfigs(HashMap<String, TabConfig>);
+
+impl TabConfigs {
+    pub(crate) fn serv_conf(&self, serv_name: &str) -> Option<TabConfig> {
+        self.0.get(serv_name).cloned()
+    }
+
+    pub(crate) fn chan_conf(&self, serv_name: &str, chan: &ChanNameRef) -> Option<&TabConfig> {
+        self.0.get(&format!("{}_{}", serv_name, chan.display()))
+    }
+}
+
+impl From<&Config> for TabConfigs {
+    fn from(config: &Config) -> Self {
+        let mut tab_configs = HashMap::new();
+        for server in &config.servers {
+            let serv_tc = config.defaults.tab_config.merge(server.config.as_ref());
+            tab_configs.insert(server.addr.clone(), serv_tc);
+            for chan in &server.join {
+                let tc = serv_tc.merge(chan.config.as_ref());
+                tab_configs.insert(format!("{}_{}", server.addr, chan.name.display()), tc);
+            }
+        }
+        Self(tab_configs)
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, Deserialize, PartialEq, Eq)]
 pub struct TabConfig {
     /// `true` if tab is ignoring join/part messages
     #[serde(default)]
-    pub ignore: Option<bool>,
+    pub ignore: bool,
     /// Notification setting for tab
     #[serde(default)]
-    pub notifier: Option<Notifier>,
+    pub notifier: Notifier,
 }
 
 impl TabConfig {
-    /// Overwrites `self`'s values with `o`'s if `o`'s are `Some`
-    pub(crate) fn merge(&self, o: Option<&TabConfig>) -> TabConfig {
-        if let Some(o) = o {
+    pub(crate) fn user_tab_config() -> TabConfig {
+        TabConfig {
+            ignore: false,
+            notifier: Notifier::Messages,
+        }
+    }
+
+    pub(crate) fn merge(&self, config: Option<&TabConfig>) -> TabConfig {
+        if let Some(config) = config {
             TabConfig {
-                ignore: o.ignore.or(self.ignore),
-                notifier: o.notifier.or(self.notifier),
+                ignore: self.ignore ^ config.ignore,
+                notifier: if config.notifier > self.notifier {
+                    config.notifier
+                } else {
+                    self.notifier
+                },
             }
         } else {
             self.to_owned()
@@ -174,13 +183,13 @@ impl FromStr for TabConfig {
             .try_fold(TabConfig::default(), |mut tc, arg| match arg {
                 // flag
                 "ignore" => {
-                    tc.ignore = Some(true);
+                    tc.ignore = true;
                     Ok(tc)
                 }
                 arg => match arg.split_once(' ') {
                     // arg with parameter
                     Some(("notify", val)) => {
-                        tc.notifier = Some(Notifier::from_str(val)?);
+                        tc.notifier = Notifier::from_str(val)?;
                         Ok(tc)
                     }
                     _ => Err(format!("Unexpected argument: {:?}", arg)),

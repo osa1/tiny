@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
 
-use crate::config::{parse_config, Colors, Config, Style, TabConfig};
+use crate::config::{parse_config, Colors, Config, Style, TabConfig, TabConfigs};
 use crate::editor;
 use crate::key_map::{KeyAction, KeyMap};
 use crate::messaging::{MessagingUI, Timestamp};
@@ -100,6 +100,9 @@ pub struct TUI {
 
     /// Config file path
     config_path: Option<PathBuf>,
+
+    /// TabConfig settings loaded from config file
+    tab_configs: TabConfigs,
 }
 
 pub(crate) enum CmdResult {
@@ -166,6 +169,7 @@ impl TUI {
             h_scroll: 0,
             key_map: KeyMap::default(),
             config_path,
+            tab_configs: TabConfigs::default(),
         };
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
@@ -332,6 +336,7 @@ impl TUI {
 
     fn apply_config(&mut self, config: Option<Config>) {
         if let Some(config) = config {
+            self.tab_configs = config.borrow().into();
             let Config {
                 colors,
                 scrollback,
@@ -367,14 +372,7 @@ impl TUI {
         self.colors = colors;
     }
 
-    fn new_tab(
-        &mut self,
-        idx: usize,
-        src: MsgSource,
-        status: bool,
-        notifier: Notifier,
-        alias: Option<String>,
-    ) {
+    fn new_tab(&mut self, idx: usize, src: MsgSource, alias: Option<String>) {
         let visible_name = alias.unwrap_or_else(|| match &src {
             MsgSource::Serv { serv } => serv.to_owned(),
             MsgSource::Chan { chan, .. } => chan.display().to_owned(),
@@ -418,31 +416,25 @@ impl TUI {
         };
 
         // Get tab configs for the type of tab being created
-        let TabConfig { ignore, notifier } = if let Some(config) = self.load_config() {
-            match &src {
-                MsgSource::Serv { serv } => config.server_tab_configs(serv),
-                MsgSource::Chan { serv, chan } => {
-                    let tab_configs = config.chan_tab_configs(serv, chan);
-                    // Prioritize config file but fallback to current server tab settings (when Defaults are not set)
-                    let server_tab_config = self
-                        .tabs
-                        .iter()
-                        .find(|tab| tab.src.serv_name() == serv)
-                        .map(|tab| TabConfig {
-                            ignore: Some(!tab.widget.is_showing_status()),
-                            notifier: Some(tab.notifier),
-                        })
-                        .expect("Creating a channel or user tab, but the server tab doesn't exist");
-                    server_tab_config.merge(Some(&tab_configs))
-                }
-                MsgSource::User { .. } => config.user_tab_configs(),
+        let TabConfig { ignore, notifier } = match &src {
+            MsgSource::Serv { serv } => self.tab_configs.serv_conf(serv).unwrap_or_default(),
+            MsgSource::Chan { serv, chan } => {
+                let tab_configs = self.tab_configs.chan_conf(serv, chan);
+                // Prioritize config file but fallback to current server tab settings (when Defaults are not set)
+                let server_tab_config = self
+                    .tabs
+                    .iter()
+                    .find(|tab| tab.src.serv_name() == serv)
+                    .map(|tab| TabConfig {
+                        ignore: !tab.widget.is_showing_status(),
+                        notifier: tab.notifier,
+                    })
+                    .expect("Creating a channel or user tab, but the server tab doesn't exist");
+                server_tab_config.merge(tab_configs)
             }
-        } else {
-            // Config could not be parsed
-            TabConfig::default()
+            MsgSource::User { .. } => TabConfig::user_tab_config(),
         };
-        let status = !ignore.unwrap_or(false);
-        let notifier = notifier.unwrap_or_default();
+        let status = !ignore;
 
         self.tabs.insert(
             idx,
@@ -1280,12 +1272,8 @@ impl TUI {
 
     pub(crate) fn set_tab_config(&mut self, config: TabConfig, target: &MsgTarget) {
         self.apply_to_target(target, true, &|tab: &mut Tab, _| {
-            if let Some(ignore) = config.ignore {
-                tab.widget.set_or_toggle_status(Some(!ignore));
-            }
-            if let Some(notifier) = config.notifier {
-                tab.notifier = notifier;
-            }
+            tab.widget.set_or_toggle_status(Some(!config.ignore));
+            tab.notifier = config.notifier;
         });
     }
 

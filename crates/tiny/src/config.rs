@@ -231,7 +231,7 @@ mod tests {
                     servers[0].join,
                     vec![Chan {
                         name: ChanName::new("#tiny".to_string()),
-                        config: TabConfig::default()
+                        config: None,
                     }]
                 );
                 assert_eq!(servers[0].tls, true);
@@ -293,10 +293,10 @@ mod tests {
             config.servers[0].join,
             vec![Chan {
                 name: ChanName::new("#tiny".to_string()),
-                config: TabConfig {
-                    ignore: Some(true),
-                    notifier: Some(Notifier::Off)
-                }
+                config: Some(TabConfig {
+                    ignore: true,
+                    notifier: Notifier::Off
+                })
             }]
         );
     }
