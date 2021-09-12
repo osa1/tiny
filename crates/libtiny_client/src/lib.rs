@@ -824,7 +824,7 @@ fn dcc_file_get(
         let success_msg = format!(
             "Downloaded file: {} ({1:.2}KB)",
             file_name,
-            (bytes_received as f32 / 1024 as f32)
+            (bytes_received as f32 / 1024_f32)
         );
         dcc_to_msgchan(&mut msg_chan, target.as_str(), success_msg.as_str()).await;
     });

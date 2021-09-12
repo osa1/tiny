@@ -58,21 +58,21 @@ impl fmt::Display for DCCType {
 impl DCCRecord {
     /// DCC type argument address port [size]
     ///
-    /// type	 - The connection type.
+    /// type     - The connection type.
     /// argument - The connectin type dependant argument.
-    /// address	 - The host address of the initiator as an integer.
-    /// port	 - The port or the socket on which the initiator expects
-    /// 	       to receive the connection.
+    /// address     - The host address of the initiator as an integer.
+    /// port     - The port or the socket on which the initiator expects
+    ///            to receive the connection.
     /// size     - If the connection type is "SEND" (see below), then size
-    /// 	       will indicate the size of the file being offered. Obsolete
-    /// 	       IRCII clients do not send this, so be prepared if this is
-    /// 	       not present.
+    ///            will indicate the size of the file being offered. Obsolete
+    ///            IRCII clients do not send this, so be prepared if this is
+    ///            not present.
 
     /// The following DCC connection types are defined:
     ///
-    /// Type	Purpose					                Argument
-    /// CHAT	To carry on a semi-secure conversation	the string "chat"
-    /// SEND	To send a file to the recipient		    the file name
+    /// Type    Purpose                                 Argument
+    /// CHAT    To carry on a semi-secure conversation  the string "chat"
+    /// SEND    To send a file to the recipient         the file name
     pub fn from(
         origin: &str,
         receiver: &str,

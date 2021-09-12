@@ -551,7 +551,7 @@ fn dcc(args: CmdArgs) {
         ..
     } = args;
 
-    if let Some(client) = find_client(clients, &src.serv_name()) {
+    if let Some(client) = find_client(clients, src.serv_name()) {
         // parse args, ex. GET <sender nick> <filename>
         let mut params = args.split_whitespace();
         if let Some(sub_cmd) = params.next() {

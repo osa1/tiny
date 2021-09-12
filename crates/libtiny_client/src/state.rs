@@ -97,7 +97,7 @@ impl State {
         debug!("record: {:?}", record);
         if let Ok(record) = record {
             let argument = record.get_argument().clone();
-            let dcc_type = record.get_type().clone();
+            let dcc_type = record.get_type();
             let file_size = record.get_file_size();
             self.inner
                 .borrow_mut()
