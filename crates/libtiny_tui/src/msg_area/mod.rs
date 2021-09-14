@@ -74,9 +74,7 @@ impl MsgArea {
         self.lines_height = None;
 
         self.update_total_visible_lines();
-        if let Some(old_total_lines) = old_total_lines {
-            self.recalculate_scroll(old_height, old_total_lines);
-        }
+        self.recalculate_scroll(old_height, old_total_lines.unwrap());
     }
 
     pub(crate) fn layout(&self) -> Layout {
