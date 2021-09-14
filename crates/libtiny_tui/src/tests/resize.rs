@@ -315,3 +315,45 @@ fn test_resize_scroll_resize() {
 
     expect_screen(screen1, &tui.get_front_buffer(), 20, 15, Location::caller());
 }
+
+// https://github.com/osa1/tiny/issues/355
+#[test]
+fn test_clear_resize_recalc_scroll() {
+    let mut tui = TUI::new_test(15, 5);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+    for _ in 0..6 {
+        tui.add_privmsg("osa1", &"1111 ".repeat(3), ts, &target, false, false);
+    }
+
+    tui.draw();
+
+    // scroll up
+    tui.handle_input_event(term_input::Event::Key(Key::PageUp), &mut None);
+
+    // clear the screen
+    tui.clear(&target);
+
+    // resize window (testing for panic)
+    tui.set_size(20, 6);
+
+    // at bottom with no scroll
+    #[rustfmt::skip]
+    let screen1 =
+       "|                    |
+        |                    |
+        |                    |
+        |                    |
+        |osa1:               |
+        |< #chan             |";
+
+    expect_screen(screen1, &tui.get_front_buffer(), 20, 6, Location::caller());
+}
