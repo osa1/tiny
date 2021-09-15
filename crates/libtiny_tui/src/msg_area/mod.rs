@@ -228,7 +228,7 @@ impl MsgArea {
     pub(crate) fn clear(&mut self) {
         self.lines.clear();
         self.scroll = 0;
-        self.lines_height = None;
+        self.lines_height = Some(0);
     }
 }
 
