@@ -1,10 +1,8 @@
+use crate::config::{Colors, Style};
+use crate::line_split::LineDataCache;
 use crate::line_split::LineType;
-use crate::{
-    config::{Colors, Style},
-    line_split::LineDataCache,
-    utils::translate_irc_control_chars,
-};
-use std::mem;
+use crate::utils::translate_irc_control_chars;
+
 use termbox_simple::{self, Termbox};
 
 /// A single line added to the widget. May be rendered as multiple lines on the
@@ -103,7 +101,7 @@ impl Line {
         if self.current_seg.string.is_empty() {
             self.current_seg.style = style;
         } else if self.current_seg.style != style {
-            let seg = mem::replace(
+            let seg = std::mem::replace(
                 &mut self.current_seg,
                 StyledString {
                     string: String::new(),
