@@ -34,10 +34,10 @@ fn default_max_nick_length() -> usize {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
-    /// Termbox fg.
+    /// Termbox fg
     pub fg: u16,
 
-    /// Termbox bg.
+    /// Termbox bg
     pub bg: u16,
 }
 

@@ -55,92 +55,27 @@ pub(crate) fn is_nick_char(c: char) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-use std::{iter::Peekable, str::Chars};
+use crate::irc_format::{parse_irc_formatting, IrcFormatEvent};
 
-/// Parse at least one, at most two digits. Does not consume the iterator when
-/// result is `None`.
-fn parse_color_code(chars: &mut Peekable<Chars>) -> Option<u8> {
-    fn to_dec(ch: char) -> Option<u8> {
-        ch.to_digit(10).map(|c| c as u8)
-    }
-
-    let c1_char = *chars.peek()?;
-    let c1_digit = match to_dec(c1_char) {
-        None => {
-            return None;
-        }
-        Some(c1_digit) => {
-            chars.next();
-            c1_digit
-        }
-    };
-
-    match chars.peek().cloned() {
-        None => Some(c1_digit),
-        Some(c2) => match to_dec(c2) {
-            None => Some(c1_digit),
-            Some(c2_digit) => {
-                chars.next();
-                Some(c1_digit * 10 + c2_digit)
-            }
-        },
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-/// Translate IRC color codes using the callback, replace tabs with 8 spaces, and remove other
-/// ASCII control characters from the input.
-pub(crate) fn translate_irc_control_chars(
-    str: &str,
-    push_color: fn(ret: &mut String, fg: u8, bg: Option<u8>),
-) -> String {
-    let mut ret = String::with_capacity(str.len());
-    let mut iter = str.chars().peekable();
-
-    while let Some(char) = iter.next() {
-        if char == '\x03' {
-            match parse_color_code(&mut iter) {
-                None => {
-                    // just skip the control char
-                }
-                Some(fg) => {
-                    if let Some(char) = iter.peek().cloned() {
-                        if char == ',' {
-                            iter.next(); // consume ','
-                            match parse_color_code(&mut iter) {
-                                None => {
-                                    // comma was not part of the color code,
-                                    // add it to the new string
-                                    push_color(&mut ret, fg, None);
-                                    ret.push(char);
-                                }
-                                Some(bg) => {
-                                    push_color(&mut ret, fg, Some(bg));
-                                }
-                            }
-                        } else {
-                            push_color(&mut ret, fg, None);
-                        }
-                    } else {
-                        push_color(&mut ret, fg, None);
-                    }
-                }
-            }
-        } else if char == '\t' {
-            ret.push_str("        ");
-        } else if !char.is_ascii_control() {
-            ret.push(char);
-        }
-    }
-
-    ret
-}
-
-/// Like `translate_irc_control_chars`, but skips color codes.
+/// Removes all IRC formatting characters and ASCII control characters.
 pub(crate) fn remove_irc_control_chars(str: &str) -> String {
-    fn push_color(_ret: &mut String, _fg: u8, _bg: Option<u8>) {}
-    translate_irc_control_chars(str, push_color)
+    let mut s = String::with_capacity(str.len());
+
+    for event in parse_irc_formatting(str) {
+        match event {
+            IrcFormatEvent::Bold
+            | IrcFormatEvent::Italic
+            | IrcFormatEvent::Underline
+            | IrcFormatEvent::Strikethrough
+            | IrcFormatEvent::Monospace
+            | IrcFormatEvent::Color { .. }
+            | IrcFormatEvent::ReverseColor
+            | IrcFormatEvent::Reset => {}
+            IrcFormatEvent::Text(text) => s.push_str(text),
+        }
+    }
+
+    s
 }
 
 #[test]
