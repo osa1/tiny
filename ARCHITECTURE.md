@@ -103,6 +103,7 @@ for user input events and a TUI handle to update the TUI. The types are:
 | term_input     | Input handling (reading events from `stdin`) |
 | termbox_simple | Terminal manipulation (drawing) |
 | libtiny_common | The "channel name" type |
+| libtiny_wire   | Parsing IRC message formatting characters (colors etc.) |
 
 ### libtiny_wire
 
