@@ -55,7 +55,7 @@ pub(crate) fn is_nick_char(c: char) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-use crate::irc_format::{parse_irc_formatting, IrcFormatEvent};
+use libtiny_wire::formatting::{parse_irc_formatting, IrcFormatEvent};
 
 /// Removes all IRC formatting characters and ASCII control characters.
 pub(crate) fn remove_irc_control_chars(str: &str) -> String {

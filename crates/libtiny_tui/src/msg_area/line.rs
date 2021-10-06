@@ -1,7 +1,7 @@
 use crate::config::{Colors, Style};
-use crate::irc_format::{parse_irc_formatting, Color, IrcFormatEvent};
 use crate::line_split::{LineDataCache, LineType};
 
+use libtiny_wire::formatting::{parse_irc_formatting, Color, IrcFormatEvent};
 use termbox_simple::{self, Termbox};
 
 /// A single line added to the widget. May be rendered as multiple lines on the

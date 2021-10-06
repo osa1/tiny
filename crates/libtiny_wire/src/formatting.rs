@@ -12,7 +12,7 @@ const CHAR_REVERSE_COLOR: char = '\x16';
 const CHAR_RESET: char = '\x0F';
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum IrcFormatEvent<'a> {
+pub enum IrcFormatEvent<'a> {
     Text(&'a str),
 
     Bold,
@@ -34,7 +34,7 @@ pub(crate) enum IrcFormatEvent<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Color {
+pub enum Color {
     White,
     Black,
     Blue,
@@ -355,7 +355,7 @@ impl<'a> Iterator for FormatEventParser<'a> {
     }
 }
 
-pub(crate) fn parse_irc_formatting<'a>(s: &'a str) -> impl Iterator<Item = IrcFormatEvent> + 'a {
+pub fn parse_irc_formatting<'a>(s: &'a str) -> impl Iterator<Item = IrcFormatEvent> + 'a {
     FormatEventParser::new(s)
 }
 

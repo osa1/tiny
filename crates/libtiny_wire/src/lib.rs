@@ -5,6 +5,8 @@
 //! This library is for implementing clients rather than servers or services, and does not support
 //! the IRC message format in full generality.
 
+pub mod formatting;
+
 use std::str;
 
 use libtiny_common::{ChanName, ChanNameRef};

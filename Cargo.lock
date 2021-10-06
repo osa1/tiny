@@ -370,6 +370,7 @@ dependencies = [
  "bencher",
  "libc",
  "libtiny_common",
+ "libtiny_wire",
  "log",
  "mio",
  "notify-rust",
