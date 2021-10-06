@@ -9,6 +9,7 @@ use std::rc::Rc;
 use time::Tm;
 
 use libtiny_common::{ChanName, ChanNameRef, MsgTarget};
+use libtiny_wire::formatting::remove_irc_control_chars;
 
 #[macro_use]
 extern crate log;
@@ -306,6 +307,7 @@ impl LoggerInner {
         _highlight: bool,
         is_action: bool,
     ) {
+        let msg = remove_irc_control_chars(msg);
         self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
             let io_ret = if is_action {
                 writeln!(fd, "[{}] {} {}", strf(&ts), sender, msg)

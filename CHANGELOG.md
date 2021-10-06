@@ -11,6 +11,12 @@
 - `/join` (without arguments) now rejoins the current channel. (#334)
 - Key bindings can be configured in the config file. See the [wiki
   page][key-bindings-wiki] for details. (#328, #336)
+- Handling of IRC formatting characters (colors etc.) in TUI and logger
+  improved: 
+  - TUI now handles "reset" control character, to reset the text style to the
+    default.
+  - Logger now filters out all control characters before writing to the file.
+  (#360)
 
 [key-bindings-wiki]: https://github.com/osa1/tiny/wiki/Configuring-key-bindings
 

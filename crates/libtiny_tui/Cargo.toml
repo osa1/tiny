@@ -14,6 +14,7 @@ desktop-notifications = ["notify-rust"]
 
 [dependencies]
 libtiny_common = { path = "../libtiny_common" }
+libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 notify-rust = { version = "3", optional = true }
 serde = { version = "1.0", features = ["derive"] }

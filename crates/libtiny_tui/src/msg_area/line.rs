@@ -1,10 +1,7 @@
-use crate::line_split::LineType;
-use crate::{
-    config::{Colors, Style},
-    line_split::LineDataCache,
-    utils::translate_irc_control_chars,
-};
-use std::mem;
+use crate::config::{Colors, Style};
+use crate::line_split::{LineDataCache, LineType};
+
+use libtiny_wire::formatting::{parse_irc_formatting, Color, IrcFormatEvent};
 use termbox_simple::{self, Termbox};
 
 /// A single line added to the widget. May be rendered as multiple lines on the
@@ -13,6 +10,7 @@ use termbox_simple::{self, Termbox};
 pub(crate) struct Line {
     /// Line segments.
     segments: Vec<StyledString>,
+
     /// The segment we're currently extending.
     current_seg: StyledString,
 
@@ -35,7 +33,7 @@ pub(crate) enum SegStyle {
     /// of the color list, so make sure to use mod.
     NickColor(usize),
 
-    /// A style from the current color scheme.
+    // Rest of the styles are from the color scheme
     UserMsg,
     ErrMsg,
     Topic,
@@ -78,9 +76,6 @@ impl Default for StyledString {
     }
 }
 
-// TODO get rid of this
-const TERMBOX_COLOR_PREFIX: char = '\x00';
-
 impl Line {
     pub(crate) fn new() -> Line {
         Line {
@@ -103,7 +98,7 @@ impl Line {
         if self.current_seg.string.is_empty() {
             self.current_seg.style = style;
         } else if self.current_seg.style != style {
-            let seg = mem::replace(
+            let seg = std::mem::replace(
                 &mut self.current_seg,
                 StyledString {
                     string: String::new(),
@@ -115,31 +110,36 @@ impl Line {
     }
 
     fn add_text_inner(&mut self, str: &str) {
-        fn push_color(ret: &mut String, irc_fg: u8, irc_bg: Option<u8>) {
-            ret.push(TERMBOX_COLOR_PREFIX);
-            ret.push(0 as char); // style
-            ret.push(irc_color_to_termbox(irc_fg) as char);
-            ret.push(
-                irc_bg
-                    .map(irc_color_to_termbox)
-                    .unwrap_or(termbox_simple::TB_DEFAULT as u8) as char,
-            );
-        }
-        let str = translate_irc_control_chars(str, push_color);
-        self.current_seg.string.reserve(str.len());
+        for format_event in parse_irc_formatting(str) {
+            match format_event {
+                IrcFormatEvent::Bold
+                | IrcFormatEvent::Italic
+                | IrcFormatEvent::Underline
+                | IrcFormatEvent::Strikethrough
+                | IrcFormatEvent::Monospace => {
+                    // TODO
+                }
+                IrcFormatEvent::Text(text) => {
+                    self.current_seg.string.push_str(text);
+                }
+                IrcFormatEvent::Color { fg, bg } => {
+                    let style = SegStyle::Fixed(Style {
+                        fg: u16::from(irc_color_to_termbox(fg)),
+                        bg: bg
+                            .map(|bg| u16::from(irc_color_to_termbox(bg)))
+                            .unwrap_or(termbox_simple::TB_DEFAULT),
+                    });
 
-        let mut iter = str.chars();
-        while let Some(char) = iter.next() {
-            if char == TERMBOX_COLOR_PREFIX {
-                let st = iter.next().unwrap() as u8;
-                let fg = iter.next().unwrap() as u8;
-                let bg = iter.next().unwrap() as u8;
-                let fg = (u16::from(st) << 8) | u16::from(fg);
-                let bg = u16::from(bg);
-                let style = Style { fg, bg };
-                self.set_message_style(SegStyle::Fixed(style));
-            } else if char > '\x08' {
-                self.current_seg.string.push(char);
+                    self.set_message_style(style);
+                }
+                IrcFormatEvent::ReverseColor => {
+                    if let SegStyle::Fixed(Style { fg, bg }) = self.current_seg.style {
+                        self.set_message_style(SegStyle::Fixed(Style { fg: bg, bg: fg }));
+                    }
+                }
+                IrcFormatEvent::Reset => {
+                    self.set_message_style(SegStyle::UserMsg);
+                }
             }
         }
     }
@@ -150,7 +150,6 @@ impl Line {
     }
 
     pub(crate) fn add_char(&mut self, char: char, style: SegStyle) {
-        assert_ne!(char, TERMBOX_COLOR_PREFIX);
         self.set_message_style(style);
         self.current_seg.string.push(char);
     }
@@ -230,28 +229,28 @@ impl Line {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// IRC colors: http://en.wikichip.org/wiki/irc/colors
 // Termbox colors: http://www.calmar.ws/vim/256-xterm-24bit-rgb-color-chart.html
 //                 (alternatively just run `cargo run --example colors`)
-fn irc_color_to_termbox(irc_color: u8) -> u8 {
+fn irc_color_to_termbox(irc_color: Color) -> u8 {
     match irc_color {
-        0 => 15,  // white
-        1 => 0,   // black
-        2 => 17,  // navy
-        3 => 2,   // green
-        4 => 9,   // red
-        5 => 88,  // maroon
-        6 => 5,   // purple
-        7 => 130, // olive
-        8 => 11,  // yellow
-        9 => 10,  // light green
-        10 => 6,  // teal
-        11 => 14, // cyan
-        12 => 12, // awful blue
-        13 => 13, // magenta
-        14 => 8,  // gray
-        15 => 7,  // light gray
-        _ => termbox_simple::TB_DEFAULT as u8,
+        Color::White => 255,
+        Color::Black => 16,
+        Color::Blue => 21,
+        Color::Green => 46,
+        Color::Red => 196,
+        Color::Brown => 88,
+        Color::Magenta => 93,
+        Color::Orange => 210,
+        Color::Yellow => 228,
+        Color::LightGreen => 154,
+        Color::Cyan => 75,
+        Color::LightCyan => 39,
+        Color::LightBlue => 38,
+        Color::Pink => 129,
+        Color::Grey => 243,
+        Color::LightGrey => 249,
+        Color::Default => termbox_simple::TB_DEFAULT as u8,
+        Color::Ansi(ansi_color) => ansi_color,
     }
 }
 
