@@ -105,6 +105,18 @@ for user input events and a TUI handle to update the TUI. The types are:
 | libtiny_common | The "channel name" type |
 | libtiny_wire   | Parsing IRC message formatting characters (colors etc.) |
 
+### libtiny_logger
+
+Implements logging IRC events (incoming messages, user left/joined etc.) to
+user-specified log directory.
+
+#### Dependencies of `libtiny_logger`:
+
+| Dependency     | Used for      |
+| -------------- | ------------- |
+| libtiny_common | The "channel name" type |
+| libtiny_wire   | Filtering out IRC message formatting characters (colors etc.) |
+
 ### libtiny_wire
 
 Implements IRC message parsing and generation. Entry point for parsing is

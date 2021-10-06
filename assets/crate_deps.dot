@@ -24,6 +24,7 @@ digraph mygraph {
     "libtiny_client" -> "libtiny_wire"
 
     "libtiny_logger" -> "libtiny_common"
+    "libtiny_logger" -> "libtiny_wire"
 
     "libtiny_tui" -> "libtiny_common"
     "libtiny_tui" -> "libtiny_wire"
