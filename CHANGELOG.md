@@ -11,6 +11,7 @@
 - `/join` (without arguments) now rejoins the current channel. (#334)
 - Key bindings can be configured in the config file. See the [wiki
   page][key-bindings-wiki] for details. (#328, #336)
+- Handling of IRC formatting characters (colors etc.) improved. (#360)
 
 [key-bindings-wiki]: https://github.com/osa1/tiny/wiki/Configuring-key-bindings
 
