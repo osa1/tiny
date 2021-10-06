@@ -359,6 +359,40 @@ pub fn parse_irc_formatting<'a>(s: &'a str) -> impl Iterator<Item = IrcFormatEve
     FormatEventParser::new(s)
 }
 
+/// Removes all IRC formatting characters and ASCII control characters.
+pub fn remove_irc_control_chars(str: &str) -> String {
+    let mut s = String::with_capacity(str.len());
+
+    for event in parse_irc_formatting(str) {
+        match event {
+            IrcFormatEvent::Bold
+            | IrcFormatEvent::Italic
+            | IrcFormatEvent::Underline
+            | IrcFormatEvent::Strikethrough
+            | IrcFormatEvent::Monospace
+            | IrcFormatEvent::Color { .. }
+            | IrcFormatEvent::ReverseColor
+            | IrcFormatEvent::Reset => {}
+            IrcFormatEvent::Text(text) => s.push_str(text),
+        }
+    }
+
+    s
+}
+
+#[test]
+fn test_translate_irc_control_chars() {
+    assert_eq!(
+        remove_irc_control_chars("  Le Voyageur imprudent  "),
+        "  Le Voyageur imprudent  "
+    );
+    assert_eq!(remove_irc_control_chars("\x0301,02foo"), "foo");
+    assert_eq!(remove_irc_control_chars("\x0301,2foo"), "foo");
+    assert_eq!(remove_irc_control_chars("\x031,2foo"), "foo");
+    assert_eq!(remove_irc_control_chars("\x031,foo"), ",foo");
+    assert_eq!(remove_irc_control_chars("\x03,foo"), ",foo");
+}
+
 #[test]
 fn test_parse_text_1() {
     let s = "just \x02\x1d\x1f\x1e\x11\x04rrggbb\x16\x0f testing";

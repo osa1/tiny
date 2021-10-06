@@ -7,5 +7,6 @@ edition = "2018"
 
 [dependencies]
 libtiny_common = { path = "../libtiny_common" }
+libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 time = "0.1"

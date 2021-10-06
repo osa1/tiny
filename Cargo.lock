@@ -359,6 +359,7 @@ name = "libtiny_logger"
 version = "0.1.0"
 dependencies = [
  "libtiny_common",
+ "libtiny_wire",
  "log",
  "time",
 ]
