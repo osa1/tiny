@@ -256,103 +256,99 @@ fn irc_color_to_termbox(irc_color: Color) -> u8 {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(test)]
-mod tests {
+#[test]
+fn height_test_1() {
+    let mut line = Line::new();
+    line.add_text("a b c d e", SegStyle::UserMsg);
+    assert_eq!(line.rendered_height(1), 9);
+    assert_eq!(line.rendered_height(2), 5);
+    assert_eq!(line.rendered_height(3), 3);
+    assert_eq!(line.rendered_height(4), 3);
+    assert_eq!(line.rendered_height(5), 2);
+    assert_eq!(line.rendered_height(6), 2);
+    assert_eq!(line.rendered_height(7), 2);
+    assert_eq!(line.rendered_height(8), 2);
+    assert_eq!(line.rendered_height(9), 1);
+}
 
-    use super::*;
-    use std::{fs::File, io::Read};
+#[test]
+fn height_test_2() {
+    let mut line = Line::new();
+    line.add_text("ab c d e", SegStyle::UserMsg);
+    assert_eq!(line.rendered_height(1), 8);
+    assert_eq!(line.rendered_height(2), 4);
+    assert_eq!(line.rendered_height(3), 3);
+    assert_eq!(line.rendered_height(4), 2);
+    assert_eq!(line.rendered_height(5), 2);
+    assert_eq!(line.rendered_height(6), 2);
+    assert_eq!(line.rendered_height(7), 2);
+    assert_eq!(line.rendered_height(8), 1);
+}
 
-    #[test]
-    fn height_test_1() {
-        let mut line = Line::new();
-        line.add_text("a b c d e", SegStyle::UserMsg);
-        assert_eq!(line.rendered_height(1), 9);
-        assert_eq!(line.rendered_height(2), 5);
-        assert_eq!(line.rendered_height(3), 3);
-        assert_eq!(line.rendered_height(4), 3);
-        assert_eq!(line.rendered_height(5), 2);
-        assert_eq!(line.rendered_height(6), 2);
-        assert_eq!(line.rendered_height(7), 2);
-        assert_eq!(line.rendered_height(8), 2);
-        assert_eq!(line.rendered_height(9), 1);
-    }
+#[test]
+fn height_test_3() {
+    let mut line = Line::new();
+    line.add_text("ab cd e", SegStyle::UserMsg);
+    assert_eq!(line.rendered_height(1), 7);
+    assert_eq!(line.rendered_height(2), 4);
+    assert_eq!(line.rendered_height(3), 3);
+    assert_eq!(line.rendered_height(4), 2);
+    assert_eq!(line.rendered_height(5), 2);
+    assert_eq!(line.rendered_height(6), 2);
+    assert_eq!(line.rendered_height(7), 1);
+}
 
-    #[test]
-    fn height_test_2() {
-        let mut line = Line::new();
-        line.add_text("ab c d e", SegStyle::UserMsg);
-        assert_eq!(line.rendered_height(1), 8);
-        assert_eq!(line.rendered_height(2), 4);
-        assert_eq!(line.rendered_height(3), 3);
-        assert_eq!(line.rendered_height(4), 2);
-        assert_eq!(line.rendered_height(5), 2);
-        assert_eq!(line.rendered_height(6), 2);
-        assert_eq!(line.rendered_height(7), 2);
-        assert_eq!(line.rendered_height(8), 1);
-    }
+#[test]
+fn height_test_4() {
+    let mut line = Line::new();
+    line.add_text("ab cde", SegStyle::UserMsg);
+    assert_eq!(line.rendered_height(1), 6);
+    assert_eq!(line.rendered_height(2), 4);
+    assert_eq!(line.rendered_height(3), 2);
+    assert_eq!(line.rendered_height(4), 2);
+    assert_eq!(line.rendered_height(5), 2);
+    assert_eq!(line.rendered_height(6), 1);
+}
 
-    #[test]
-    fn height_test_3() {
-        let mut line = Line::new();
-        line.add_text("ab cd e", SegStyle::UserMsg);
-        assert_eq!(line.rendered_height(1), 7);
-        assert_eq!(line.rendered_height(2), 4);
-        assert_eq!(line.rendered_height(3), 3);
-        assert_eq!(line.rendered_height(4), 2);
-        assert_eq!(line.rendered_height(5), 2);
-        assert_eq!(line.rendered_height(6), 2);
-        assert_eq!(line.rendered_height(7), 1);
-    }
+#[test]
+fn height_test_5() {
+    use std::fs::File;
+    use std::io::Read;
 
-    #[test]
-    fn height_test_4() {
-        let mut line = Line::new();
-        line.add_text("ab cde", SegStyle::UserMsg);
-        assert_eq!(line.rendered_height(1), 6);
-        assert_eq!(line.rendered_height(2), 4);
-        assert_eq!(line.rendered_height(3), 2);
-        assert_eq!(line.rendered_height(4), 2);
-        assert_eq!(line.rendered_height(5), 2);
-        assert_eq!(line.rendered_height(6), 1);
-    }
-
-    #[test]
-    fn height_test_5() {
-        let text: String = {
-            let mut text = String::new();
-            let mut single_line = String::new();
-            let mut file = File::open("test/lipsum.txt").unwrap();
-            file.read_to_string(&mut text).unwrap();
-            let lines: Vec<&str> = text.lines().collect();
-            assert_eq!(lines.len(), 102); // make sure we did it right
-            for (line_idx, line) in lines.iter().enumerate() {
-                single_line.push_str(line);
-                if line_idx != lines.len() - 1 {
-                    single_line.push(' ');
-                }
+    let text: String = {
+        let mut text = String::new();
+        let mut single_line = String::new();
+        let mut file = File::open("test/lipsum.txt").unwrap();
+        file.read_to_string(&mut text).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 102); // make sure we did it right
+        for (line_idx, line) in lines.iter().enumerate() {
+            single_line.push_str(line);
+            if line_idx != lines.len() - 1 {
+                single_line.push(' ');
             }
-            single_line
-        };
+        }
+        single_line
+    };
 
-        let mut line = Line::new();
-        line.add_text(&text, SegStyle::UserMsg);
-        // lipsum.txt has 1160 words in it. each line should contain at most one
-        // word so we should have 1160 lines.
-        assert_eq!(line.rendered_height(80), 102);
-    }
+    let mut line = Line::new();
+    line.add_text(&text, SegStyle::UserMsg);
+    // lipsum.txt has 1160 words in it. each line should contain at most one
+    // word so we should have 1160 lines.
+    assert_eq!(line.rendered_height(80), 102);
+}
 
-    #[test]
-    fn align_test() {
-        let mut line = Line::new();
-        line.set_type(LineType::AlignedMsg { msg_padding: 1 });
-        /*
-        123
-         45
-         67
-         8
-        */
-        line.add_text_inner("12345678");
+#[test]
+fn align_test() {
+    let mut line = Line::new();
+    line.set_type(LineType::AlignedMsg { msg_padding: 1 });
+    /*
+    123
+     45
+     67
+     8
+    */
+    line.add_text_inner("12345678");
 
-        assert_eq!(line.rendered_height(3), 4);
-    }
-} // mod tests
+    assert_eq!(line.rendered_height(3), 4);
+}
