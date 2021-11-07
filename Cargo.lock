@@ -982,7 +982,7 @@ dependencies = [
 
 [[package]]
 name = "tiny"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "clap",
  "dirs 3.0.2",

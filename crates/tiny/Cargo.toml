@@ -1,6 +1,6 @@
 [package]
 name = "tiny"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 repository = "https://github.com/osa1/tiny"
 readme = "README.md"
