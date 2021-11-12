@@ -11,12 +11,14 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-use libtiny_client::{Client, ServerInfo};
+use libtiny_client::{Client, SASLAuth, SASLExternal, ServerInfo};
 use libtiny_common::{ChanNameRef, MsgTarget};
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
 use ui::UI;
 
+use std::fs::File;
+use std::io::{BufReader, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -147,10 +149,26 @@ fn run(
         for server in servers.iter().cloned() {
             tui.new_server_tab(&server.addr, server.alias);
 
+            let tls = server.tls;
+            let sasl_auth = if let Some(sasl_auth) = &server.sasl_auth {
+                match sasl_from_config(tls, sasl_auth) {
+                    Ok(sasl) => Some(sasl),
+                    Err(e) => {
+                        tui.add_client_err_msg(
+                            &format!("SASL error for server [{}]: {}", server.addr, e),
+                            &MsgTarget::Server { serv: "mentions" },
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
             let server_info = ServerInfo {
                 addr: server.addr,
                 port: server.port,
-                tls: server.tls,
+                tls,
                 pass: server.pass,
                 realname: server.realname,
                 nicks: server.nicks,
@@ -160,10 +178,7 @@ fn run(
                     .map(|c| ChanNameRef::new(c).to_owned())
                     .collect(),
                 nickserv_ident: server.nickserv_ident,
-                sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {
-                    username: auth.username,
-                    password: auth.password,
-                }),
+                sasl_auth,
             };
 
             let (client, rcv_conn_ev) = Client::new(server_info);
@@ -182,4 +197,42 @@ fn run(
     });
 
     runtime.block_on(local);
+}
+
+// Helper to parse SASL config into a libtiny_client SASL struct
+fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth) -> Result<SASLAuth, String> {
+    match sasl_config {
+        config::SASLAuth::Plain { username, password } => Ok(SASLAuth::Plain {
+            username: username.to_string(),
+            password: password.to_string(),
+        }),
+        config::SASLAuth::External { pem } => {
+            // TLS must be on for EXTERNAL
+            if !tls {
+                Err("TLS not enabled".to_string())
+            } else {
+                // load in a cert and private key for TLS client auth
+                match File::open(pem) {
+                    Ok(file) => {
+                        let mut buf = BufReader::new(file);
+                        // extract certificate
+                        let cert = rustls_pemfile::certs(&mut buf)
+                            .map_err(|e| format!("Could not parse pkcs8 PEM: {}", e))?
+                            .pop()
+                            .ok_or("Cert PEM must have one cert")?;
+
+                        // extract private key
+                        buf.seek(SeekFrom::Start(0)).unwrap();
+                        let key = rustls_pemfile::pkcs8_private_keys(&mut buf)
+                            .map_err(|e| format!("Could not parse pkcs8 PEM: {}", e))?
+                            .pop()
+                            .ok_or("Cert PEM must have one private key")?;
+
+                        Ok(SASLAuth::External(SASLExternal { cert, key }))
+                    }
+                    Err(e) => Err(format!("Could not open PEM file: {}", e)),
+                }
+            }
+        }
+    }
 }

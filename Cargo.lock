@@ -1372,6 +1372,7 @@ dependencies = [
  "libtiny_wire",
  "log",
  "rustc_tools_util",
+ "rustls-pemfile",
  "serde",
  "serde_yaml",
  "shell-words",

@@ -16,14 +16,20 @@ servers:
       # Three authentication methods: pass, sasl, and nickserv_ident
       # These are optional and you probably only need one of these, delete
       # others.
+      # For SASL EXTERNAL certificate and fingerprint generation, see server documentation.
+      # You will need to register the cert's fingerprint with NickServ
+      # ex. https://www.oftc.net/NickServ/CertFP/
 
       # Server or nick password
       # pass: 'hunter2'
 
       # SASL authentication
       # sasl:
-      #   username: 'tiny_user'
-      #   password: 'hunter2'
+      #   plain:
+      #     username: 'tiny_user'
+      #     password: 'hunter2'
+      #   external:
+      #     pem: "/home/.config/tiny/oftc.pem"
 
       # Identify nick by sending a message to NickServ:
       # (useful when `pass` or `sasl` fields above are not used)

@@ -14,29 +14,53 @@ use tokio_native_tls::TlsStream;
 #[cfg(feature = "tls-rustls")]
 use tokio_rustls::client::TlsStream;
 
+use crate::SASLExternal;
+
 #[cfg(feature = "tls-native")]
 lazy_static! {
-    static ref TLS_CONNECTOR: tokio_native_tls::TlsConnector =
-        tokio_native_tls::TlsConnector::from(native_tls::TlsConnector::builder().build().unwrap());
+    static ref TLS_CONNECTOR: tokio_native_tls::TlsConnector = tls_connector(None);
+}
+
+#[cfg(feature = "tls-native")]
+fn tls_connector(sasl: Option<&SASLExternal>) -> tokio_native_tls::TlsConnector {
+    let mut builder = native_tls::TlsConnector::builder();
+    if let Some(SASLExternal { cert, key }) = sasl {
+        todo!("Waiting for https://github.com/sfackler/rust-native-tls/pull/209")
+    }
+    tokio_native_tls::TlsConnector::from(builder.build().unwrap())
 }
 
 #[cfg(feature = "tls-rustls")]
 lazy_static! {
-    static ref TLS_CONNECTOR: tokio_rustls::TlsConnector = {
-        use tokio_rustls::rustls;
-        let mut roots = rustls::RootCertStore::empty();
-        for cert in rustls_native_certs::load_native_certs().unwrap() {
-            roots.add(&rustls::Certificate(cert.0)).unwrap();
-        }
-        let config = rustls::ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(roots)
-            .with_no_client_auth();
-        tokio_rustls::TlsConnector::from(std::sync::Arc::new(config))
-    };
+    static ref TLS_CONNECTOR: tokio_rustls::TlsConnector = tls_connector(None);
 }
 
-#[derive(Debug)]
+#[cfg(feature = "tls-rustls")]
+fn tls_connector(sasl: Option<&SASLExternal>) -> tokio_rustls::TlsConnector {
+    use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
+
+    let mut roots = RootCertStore::empty();
+    for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
+        roots.add(&Certificate(cert.0)).unwrap();
+    }
+
+    let builder = ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(roots);
+
+    let config = if let Some(SASLExternal { cert, key }) = sasl {
+        builder
+            .with_single_cert(
+                vec![Certificate(cert.to_owned())],
+                PrivateKey(key.to_owned()),
+            )
+            .expect("Client auth cert")
+    } else {
+        builder.with_no_client_auth()
+    };
+    tokio_rustls::TlsConnector::from(std::sync::Arc::new(config))
+}
+
 // We box the fields to reduce type size. Without boxing the type size is 64 with native-tls and
 // 1288 with native-tls. With boxing it's 16 in both. More importantly, there's a large size
 // difference between the variants when using rustls, see #189.
@@ -73,18 +97,38 @@ impl Stream {
     }
 
     #[cfg(feature = "tls-native")]
-    pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
+    pub(crate) async fn new_tls(
+        addr: SocketAddr,
+        host_name: &str,
+        sasl: Option<&SASLExternal>,
+    ) -> Result<Stream, StreamError> {
         let tcp_stream = TcpStream::connect(addr).await?;
-        let tls_stream = TLS_CONNECTOR.connect(host_name, tcp_stream).await?;
+        // If SASL EXTERNAL is enabled create a new TLS connector with client auth cert
+        let tls_stream = if sasl.is_some() {
+            tls_connector(sasl).connect(host_name, tcp_stream).await?
+        } else {
+            TLS_CONNECTOR.connect(host_name, tcp_stream).await?
+        };
         Ok(Stream::TlsStream(tls_stream.into()))
     }
 
     #[cfg(feature = "tls-rustls")]
-    pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
+    pub(crate) async fn new_tls(
+        addr: SocketAddr,
+        host_name: &str,
+        sasl: Option<&SASLExternal>,
+    ) -> Result<Stream, StreamError> {
+        use std::convert::TryFrom;
+        use tokio_rustls::rustls::ServerName;
+
         let tcp_stream = TcpStream::connect(addr).await?;
-        let name = tokio_rustls::rustls::ServerName::try_from(host_name)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        let tls_stream = TLS_CONNECTOR.connect(name, tcp_stream).await?;
+        let name = ServerName::try_from(host_name).unwrap();
+        // If SASL EXTERNAL is enabled create a new TLS connector with client auth cert
+        let tls_stream = if sasl.is_some() {
+            tls_connector(sasl).connect(name, tcp_stream).await?
+        } else {
+            TLS_CONNECTOR.connect(name, tcp_stream).await?
+        };
         Ok(Stream::TlsStream(tls_stream.into()))
     }
 }
