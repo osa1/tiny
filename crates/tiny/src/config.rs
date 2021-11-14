@@ -15,7 +15,7 @@ pub(crate) enum SASLAuth<P> {
         password: P,
     },
     External {
-        /// Path to PEM file with private key and certificate (PKCS12 format).
+        /// Path to PEM file with private key and certificate (PKCS8 format).
         /// A fingerprint of the certificate should be registered with NickServ
         pem: PathBuf,
     },
