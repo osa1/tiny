@@ -659,17 +659,14 @@ impl StateInner {
                 if param.as_str() == "+" {
                     // Empty AUTHENTICATE response; server accepted the specified SASL mechanism
                     if let Some(ref auth) = self.server_info.sasl_auth {
-                        match auth {
+                        let msg = match auth {
                             SASLAuth::Plain { username, password } => {
                                 let msg = format!("{}\x00{}\x00{}", username, username, password);
-                                snd_irc_msg
-                                    .try_send(wire::authenticate(&base64::encode(&msg)))
-                                    .unwrap();
+                                base64::encode(&msg)
                             }
-                            SASLAuth::External { .. } => {
-                                snd_irc_msg.try_send(wire::authenticate("+")).unwrap()
-                            }
-                        }
+                            SASLAuth::External { .. } => "+".to_string(),
+                        };
+                        snd_irc_msg.try_send(wire::authenticate(&msg)).unwrap();
                     }
                 }
             }
