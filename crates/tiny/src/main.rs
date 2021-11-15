@@ -155,8 +155,8 @@ fn run(
                     Ok(sasl) => Some(sasl),
                     Err(e) => {
                         tui.add_client_err_msg(
-                            &format!("SASL error for server [{}]: {}", server.addr, e),
-                            &MsgTarget::Server { serv: "mentions" },
+                            &format!("SASL error: {}", e),
+                            &MsgTarget::Server { serv: &server.addr },
                         );
                         None
                     }
@@ -203,13 +203,13 @@ fn run(
 fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth) -> Result<SASLAuth, String> {
     match sasl_config {
         config::SASLAuth::Plain { username, password } => Ok(SASLAuth::Plain {
-            username: username.to_string(),
-            password: password.to_string(),
+            username: username.clone(),
+            password: password.clone(),
         }),
         config::SASLAuth::External { pem } => {
             // TLS must be on for EXTERNAL
             if !tls {
-                Err("TLS not enabled".to_string())
+                Err("TLS is not enabled for this server, but SASL EXTERNAL authentication requires SASL. Please enable SASL for this server in the config file.".to_string())
             } else {
                 // load in a cert and private key for TLS client auth
                 match File::open(pem) {
@@ -217,16 +217,16 @@ fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth) -> Result<SASLAut
                         let mut buf = BufReader::new(file);
                         // extract certificate
                         let cert = rustls_pemfile::certs(&mut buf)
-                            .map_err(|e| format!("Could not parse pkcs8 PEM: {}", e))?
+                            .map_err(|e| format!("Could not parse PKCS8 PEM: {}", e))?
                             .pop()
-                            .ok_or("Cert PEM must have one cert")?;
+                            .ok_or("Cert PEM must have at least one cert")?;
 
                         // extract private key
                         buf.seek(SeekFrom::Start(0)).unwrap();
                         let key = rustls_pemfile::pkcs8_private_keys(&mut buf)
-                            .map_err(|e| format!("Could not parse pkcs8 PEM: {}", e))?
+                            .map_err(|e| format!("Could not parse PKCS8 PEM: {}", e))?
                             .pop()
-                            .ok_or("Cert PEM must have one private key")?;
+                            .ok_or("Cert PEM must have at least one private key")?;
 
                         Ok(SASLAuth::External(SASLExternal { cert, key }))
                     }
