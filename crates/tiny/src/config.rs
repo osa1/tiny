@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum SASLAuth<P> {
+#[serde(untagged, rename_all = "snake_case")]
+pub(crate) enum SASLAuth {
     Plain {
         /// Registered username
         username: String,
