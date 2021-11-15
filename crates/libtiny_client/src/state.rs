@@ -655,6 +655,7 @@ impl StateInner {
                 }
             }
 
+            // https://ircv3.net/specs/extensions/sasl-3.1.html
             AUTHENTICATE { ref param } => {
                 if param.as_str() == "+" {
                     // Empty AUTHENTICATE response; server accepted the specified SASL mechanism
@@ -664,6 +665,7 @@ impl StateInner {
                                 let msg = format!("{}\x00{}\x00{}", username, username, password);
                                 base64::encode(&msg)
                             }
+                            // Reply with an empty response (Empty responses are sent as "AUTHENTICATE +")
                             SASLAuth::External { .. } => "+".to_string(),
                         };
                         snd_irc_msg.try_send(wire::authenticate(&msg)).unwrap();

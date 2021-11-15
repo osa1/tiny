@@ -32,7 +32,7 @@ servers:
       #   username: 'tiny_user'
       #   password: 'hunter2'
       # OR
-      #   pem: "/home/.config/tiny/oftc.pem"
+      #   pem: "/home/user/.config/tiny/oftc.pem"
 
       # Identify nick by sending a message to NickServ:
       # (useful when `pass` or `sasl` fields above are not used)
