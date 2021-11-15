@@ -475,8 +475,8 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
 ///
 /// See also:
 ///
-/// - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
-/// - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
+/// - <https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html>
+/// - <https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html>
 pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
     loop {
         let old_len = buf.len();

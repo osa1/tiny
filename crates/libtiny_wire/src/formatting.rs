@@ -1,5 +1,5 @@
 //! Implements parsing IRC formatting characters. Reference:
-//! https://modern.ircdocs.horse/formatting.html
+//! <https://modern.ircdocs.horse/formatting.html>
 
 const CHAR_BOLD: char = '\x02';
 const CHAR_ITALIC: char = '\x1D';

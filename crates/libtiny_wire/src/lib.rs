@@ -196,7 +196,7 @@ pub struct Msg {
     pub cmd: Cmd,
 }
 
-/// A client-to-client protocol message. See https://defs.ircdocs.horse/defs/ctcp.html
+/// A client-to-client protocol message. See <https://defs.ircdocs.horse/defs/ctcp.html>.
 #[derive(Debug, PartialEq, Eq)]
 pub enum CTCP {
     Version,
@@ -516,7 +516,7 @@ fn parse_params(chrs: &str) -> Vec<&str> {
 
 /// Nicks may have prefixes, indicating it is a operator, founder, or something else.
 ///
-/// Channel Membership Prefixes: http://modern.ircdocs.horse/#channel-membership-prefixes
+/// Channel membership prefixes: <http://modern.ircdocs.horse/#channel-membership-prefixes>
 ///
 /// Returns the nick without prefix.
 pub fn drop_nick_prefix(nick: &str) -> &str {
