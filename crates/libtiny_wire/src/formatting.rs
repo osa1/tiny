@@ -11,6 +11,8 @@ const CHAR_HEX_COLOR: char = '\x04';
 const CHAR_REVERSE_COLOR: char = '\x16';
 const CHAR_RESET: char = '\x0F';
 
+static TAB_STR: &str = "        ";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum IrcFormatEvent<'a> {
     Text(&'a str),
@@ -193,7 +195,7 @@ impl<'a> FormatEventParser<'a> {
     fn parse_text(&mut self) -> &'a str {
         let cursor = self.cursor;
         while let Some(next) = self.next() {
-            if is_irc_format_char(next) {
+            if is_irc_format_char(next) || next.is_ascii_control() {
                 self.cursor -= 1;
                 return &self.str[cursor..self.cursor];
             }
@@ -344,7 +346,20 @@ impl<'a> Iterator for FormatEventParser<'a> {
                     return Some(IrcFormatEvent::Reset);
                 }
 
+                '\t' => {
+                    self.bump(1);
+                    return Some(IrcFormatEvent::Text(TAB_STR));
+                }
+
+                '\n' | '\r' => {
+                    // RFC 2812 does not allow standalone CR or LF in messages so we're free to
+                    // interpret this however we want.
+                    self.bump(1);
+                    return Some(IrcFormatEvent::Text(" "));
+                }
+
                 other if other.is_ascii_control() => {
+                    // ASCII controls other than tab, CR, and LF are ignored.
                     self.bump(1);
                     continue;
                 }
@@ -531,5 +546,19 @@ fn test_parse_color() {
     assert_eq!(
         parser.parse_color(),
         Some((Color::Black, Some(Color::Blue)))
+    );
+}
+
+#[test]
+fn test_newline() {
+    assert_eq!(remove_irc_control_chars("\na\nb\nc\n"), " a b c ");
+    assert_eq!(remove_irc_control_chars("\ra\rb\rc\r"), " a b c ");
+}
+
+#[test]
+fn test_tab() {
+    assert_eq!(
+        remove_irc_control_chars("\ta\tb\tc\t"),
+        "        a        b        c        "
     );
 }

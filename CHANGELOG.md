@@ -1,3 +1,12 @@
+# Unreleased
+
+- Fixed handling of CR, LF, and tab characters in IRC format parser. IRC RFCs
+  don't allow standalone CR and LF characters, but some servers still them.
+  tiny now shows those characters as single space. Tab characters are shown as
+  8 spaces, as in tiny 0.9.0.
+
+  This bug was introduced in 0.10.0 with 33df77e. (#366)
+
 # 2021/11/07: 0.10.0
 
 Thanks to @trevarj for contributing to this release.
