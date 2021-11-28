@@ -22,8 +22,8 @@ fn init_screen() {
 
     #[rustfmt::skip]
     let screen =
-        "|Any mentions to you |
-         |will be listed here.|
+        "|                    |
+         |                    |
          |                    |
          |mentions            |";
     expect_screen(screen, &tui.get_front_buffer(), 20, 4, Location::caller());
@@ -66,8 +66,8 @@ fn close_rightmost_tab() {
 
     #[rustfmt::skip]
     let screen =
-        "|Any mentions to you |
-         |will be listed here.|
+        "|                    |
+         |                    |
          |                    |
          |mentions            |";
     expect_screen(screen, &tui.get_front_buffer(), 20, 4, Location::caller());
