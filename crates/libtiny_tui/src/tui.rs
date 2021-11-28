@@ -72,6 +72,20 @@ const TUI_COMMANDS: [CmdUsage; 6] = [
     QUIT_CMD, CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD,
 ];
 
+const WELCOME_MSG: &str = r"
+            tt    iii                 
+            tt        nn nnn  yy   yy 
+            tttt  iii nnn  nn yy   yy 
+            tt    iii nn   nn  yyyyyy 
+             tttt iii nn   nn      yy 
+                               yyyyy 
+    ┌─────────────────────────────────────────┐
+    |           Welcome to tiny!              |  
+    | Use /help for a list of commands.       |
+    | Alt + [1-9] switches to a tab.          |
+    | Any mentions to you will be listed here.|
+    └─────────────────────────────────────────┘";
+
 // Public for benchmarks
 pub struct TUI {
     /// Termbox instance
@@ -162,10 +176,9 @@ impl TUI {
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
         // show any errors in TUI.
         tui.new_server_tab("mentions", None);
-        tui.add_client_msg(
-            "Any mentions to you will be listed here.",
-            &MsgTarget::Server { serv: "mentions" },
-        );
+        for line in WELCOME_MSG.split('\n') {
+            tui.add_client_msg(line, &MsgTarget::Server { serv: "mentions" });
+        }
 
         tui.reload_config();
         tui
