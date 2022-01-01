@@ -126,7 +126,7 @@ fn test_privmsg_from_user_without_user_or_host_part_issue_247() {
 
             // Send a PRIVMSG to the channel
             let chan_msg = Msg {
-                pfx: Some(Pfx::Ambiguous("blah".to_owned())),
+                pfx: Some(Pfx::Ambiguous("tiny_test_user".to_owned())),
                 cmd: Cmd::PRIVMSG {
                     target: MsgTarget::Chan(ChanName::new("#chan".to_owned())),
                     msg: "msg to chan".to_owned(),
@@ -142,10 +142,13 @@ fn test_privmsg_from_user_without_user_or_host_part_issue_247() {
 
             // Send a PRIVMSG to current nick
             let msg = Msg {
-                pfx: Some(Pfx::Ambiguous("blah".to_owned())),
+                pfx: Some(Pfx::Ambiguous("tiny_test_user".to_owned())),
                 cmd: Cmd::PRIVMSG {
                     target: MsgTarget::User("osa1".to_owned()),
-                    msg: "msg to user".to_owned(),
+                    // This generates a notification when the test is run with
+                    // desktop-notifications feature, so show a helpful message to not confuse
+                    // users (#371)
+                    msg: "this is a test in tiny IRC client -- please ignore".to_owned(),
                     is_notice: false,
                     ctcp: None,
                 },
@@ -163,9 +166,9 @@ fn test_privmsg_from_user_without_user_or_host_part_issue_247() {
             let screen =
             "|                                        |
              |                                        |
-             |00:00 blah: msg to chan                 |
+             |00:00 tiny_test_user: msg to chan       |
              |osa1:                                   |
-             |mentions x.y.z #chan blah               |";
+             |mentions x.y.z #chan tiny_test_user     |";
 
             let mut front_buffer = tui.get_front_buffer();
             normalize_timestamps(&mut front_buffer, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
@@ -185,10 +188,10 @@ fn test_privmsg_from_user_without_user_or_host_part_issue_247() {
             #[rustfmt::skip]
             let screen =
             "|                                        |
-             |                                        |
-             |00:00 blah: msg to user                 |
+             |00:00 tiny_test_user: this is a test in |
+             |tiny IRC client -- please ignore        |
              |osa1:                                   |
-             |mentions x.y.z #chan blah               |";
+             |mentions x.y.z #chan tiny_test_user     |";
 
             let mut front_buffer = tui.get_front_buffer();
             normalize_timestamps(&mut front_buffer, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
@@ -286,12 +289,15 @@ fn test_privmsg_targetmask_issue_278() {
             snd_conn_ev
                 .send(client::Event::Msg(Msg {
                     pfx: Some(Pfx::User {
-                        nick: "e".to_owned(),
+                        nick: "tiny_test_user".to_owned(),
                         user: "e@a/b/c.d".to_owned(),
                     }),
                     cmd: Cmd::PRIVMSG {
                         target: MsgTarget::User("$$*".to_owned()),
-                        msg: "blah blah blah".to_owned(),
+                        // This generates a notification when the test is run with
+                        // desktop-notifications feature, so show a helpful message to not confuse
+                        // users (#371)
+                        msg: "this is a test in tiny IRC client -- please ignore".to_owned(),
                         is_notice: true,
                         ctcp: None,
                     },
@@ -310,10 +316,10 @@ fn test_privmsg_targetmask_issue_278() {
             #[rustfmt::skip]
             let screen =
             "|                                        |
-             |                                        |
-             |00:00 e: blah blah blah                 |
+             |00:00 tiny_test_user: this is a test in |
+             |tiny IRC client -- please ignore        |
              |osa1:                                   |
-             |mentions x.y.z e                        |";
+             |mentions x.y.z tiny_test_user           |";
 
             let mut front_buffer = tui.get_front_buffer();
             normalize_timestamps(&mut front_buffer, DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
