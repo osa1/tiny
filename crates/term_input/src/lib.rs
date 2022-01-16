@@ -11,6 +11,7 @@ mod tests;
 use term_input_macros::byte_seq_parser;
 
 use std::char;
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
 use std::pin::Pin;
@@ -468,6 +469,9 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
     char::from_u32(codepoint).unwrap()
 }
 
+/// How many bytes to read from `stdin` in a single `read()`
+const STDIN_READ_SIZE: u8 = 100;
+
 /// Read `stdin` until `read` fails with `EWOULDBLOCK` (happens in non-canonical mode, when `stdin`
 /// is set to non-blocking mode) or returns 0 (happens in non-canonical mode when `VMIN` and
 /// `VTIME` are 0). If you are using `term_input` with `termbox` then you don't need to set `stdin`
@@ -480,31 +484,27 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
 pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
     loop {
         let old_len = buf.len();
-        buf.reserve(100);
-        unsafe {
-            buf.set_len(old_len + 100);
-        }
+        buf.reserve(usize::from(STDIN_READ_SIZE));
 
-        match nix::unistd::read(libc::STDIN_FILENO, &mut buf[old_len..]) {
-            Ok(n_read) => {
-                unsafe { buf.set_len(old_len + n_read) };
-                if n_read == 0 {
-                    // We're in non-canonical mode, or stdin is closed. We can't distinguish the
-                    // two here but I think it's fine to return OK when stdin is closed.
-                    return Ok(());
-                }
+        let read_ptr = unsafe { buf.as_mut_ptr().add(old_len) };
+
+        let n_read = unsafe { libc::read(libc::STDIN_FILENO, read_ptr as *mut libc::c_void, 100) };
+
+        assert!(n_read <= isize::from(STDIN_READ_SIZE));
+
+        match n_read.cmp(&0) {
+            Ordering::Equal => {
+                // We're in non-canonical mode, or stdin is closed. We can't distinguish the two
+                // here but I think it's fine to return OK when stdin is closed.
+                return Ok(());
             }
-            Err(err) => {
-                unsafe { buf.set_len(old_len) };
-                match err {
-                    nix::Error::Sys(nix::errno::EWOULDBLOCK) => {
-                        return Ok(());
-                    }
-                    _ => {
-                        return Err(err);
-                    }
-                }
+            Ordering::Greater => {
+                unsafe { buf.set_len(old_len + n_read as usize) };
             }
+            Ordering::Less => match nix::Error::last() {
+                nix::Error::Sys(nix::errno::EWOULDBLOCK) => return Ok(()),
+                other => return Err(other),
+            },
         }
     }
 }
