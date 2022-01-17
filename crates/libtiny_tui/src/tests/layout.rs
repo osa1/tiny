@@ -68,3 +68,18 @@ fn test_alignment_long_string() {
 
     expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
 }
+
+#[test]
+fn test_mnemonic_generation() {
+    let mut tui = TUI::new_test(10, 10);
+    tui.new_chan_tab("s1", ChanNameRef::new("#ab"));
+    tui.new_chan_tab("s2", ChanNameRef::new("#ab"));
+    tui.new_chan_tab("s3", ChanNameRef::new("#ab"));
+    tui.new_chan_tab("s4", ChanNameRef::new("#ab"));
+    let tabs = tui.get_tabs();
+    assert_eq!(tabs.len(), 9); // mentions, 4 servers, 4 channels
+    assert_eq!(tabs[2].switch, Some('a'));
+    assert_eq!(tabs[4].switch, Some('b'));
+    assert_eq!(tabs[6].switch, Some('a'));
+    assert_eq!(tabs[8].switch, Some('b'));
+}

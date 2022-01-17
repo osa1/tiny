@@ -142,6 +142,11 @@ impl TUI {
         &self.tabs[self.active_idx].src
     }
 
+    #[cfg(test)]
+    pub(crate) fn get_tabs(&self) -> &[Tab] {
+        &self.tabs
+    }
+
     fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
         // This is now done in reload_config() below
         // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
@@ -347,44 +352,52 @@ impl TUI {
         notifier: Notifier,
         alias: Option<String>,
     ) {
-        let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
-        for tab in &self.tabs {
-            if let Some(key) = tab.switch {
-                switch_keys.entry(key).and_modify(|e| *e += 1).or_insert(1);
-            }
-        }
+        let visible_name = alias.unwrap_or_else(|| match &src {
+            MsgSource::Serv { serv } => serv.to_owned(),
+            MsgSource::Chan { chan, .. } => chan.display().to_owned(),
+            MsgSource::User { nick, .. } => nick.to_owned(),
+        });
 
         let switch = {
-            let mut ret = None;
-            let mut n = 0;
-            let visible_name = match alias.as_ref() {
-                None => src.visible_name(),
-                Some(alias) => alias,
-            };
+            // Maps a switch key to number of times it's used
+            let mut switch_keys: HashMap<char, u16> = HashMap::with_capacity(self.tabs.len());
+
+            for tab in &self.tabs {
+                if let Some(key) = tab.switch {
+                    *switch_keys.entry(key).or_default() += 1;
+                }
+            }
+
+            // From the characters in tab name, find the one that is used the least
+            let mut new_tab_switch_char: Option<(char, u16)> = None;
             for ch in visible_name.chars() {
                 if !ch.is_alphabetic() {
                     continue;
                 }
-                match switch_keys.get(&ch) {
+                match switch_keys.get(&ch).copied() {
                     None => {
-                        ret = Some(ch);
+                        new_tab_switch_char = Some((ch, 0));
                         break;
                     }
-                    Some(n_) => {
-                        if ret == None || n > *n_ {
-                            ret = Some(ch);
-                            n = *n_;
+                    Some(n_uses) => match new_tab_switch_char {
+                        None => {
+                            new_tab_switch_char = Some((ch, n_uses));
                         }
-                    }
+                        Some((_, new_tab_switch_char_n_uses)) => {
+                            if new_tab_switch_char_n_uses > n_uses {
+                                new_tab_switch_char = Some((ch, n_uses));
+                            }
+                        }
+                    },
                 }
             }
-            ret
+            new_tab_switch_char.map(|(ch, _)| ch)
         };
 
         self.tabs.insert(
             idx,
             Tab {
-                alias,
+                visible_name,
                 widget: MessagingUI::new(
                     self.width,
                     self.height - 1,

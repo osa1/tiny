@@ -196,14 +196,6 @@ impl MsgSource {
             MsgSource::User { serv, nick } => MsgTarget::User { serv, nick },
         }
     }
-
-    pub fn visible_name(&self) -> &str {
-        match self {
-            MsgSource::Serv { serv, .. } => serv,
-            MsgSource::Chan { chan, .. } => chan.display(),
-            MsgSource::User { nick, .. } => nick,
-        }
-    }
 }
 
 // NOTE: Keep the variants sorted in increasing significance, to avoid updating
