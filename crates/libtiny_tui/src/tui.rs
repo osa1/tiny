@@ -1,6 +1,10 @@
-#![allow(clippy::cognitive_complexity)]
-#![allow(clippy::new_without_default)]
-#![allow(clippy::too_many_arguments)]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::new_without_default,
+    clippy::too_many_arguments
+)]
+// https://github.com/rust-lang/rust-clippy/issues/7526
+#![allow(clippy::needless_collect)]
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;

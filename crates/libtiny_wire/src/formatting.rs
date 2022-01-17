@@ -1,6 +1,8 @@
 //! Implements parsing IRC formatting characters. Reference:
 //! <https://modern.ircdocs.horse/formatting.html>
 
+#![allow(clippy::single_match)]
+
 const CHAR_BOLD: char = '\x02';
 const CHAR_ITALIC: char = '\x1D';
 const CHAR_UNDERLINE: char = '\x1F';

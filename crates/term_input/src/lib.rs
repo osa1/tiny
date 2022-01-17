@@ -1,4 +1,4 @@
-#![allow(clippy::new_without_default)]
+#![allow(clippy::new_without_default, clippy::collapsible_match)]
 
 //! Interprets the terminal events we care about (keyboard input).
 //!
