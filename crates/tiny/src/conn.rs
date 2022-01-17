@@ -420,9 +420,10 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
         }
 
         Reply { num: 433, .. } => {
-            // ERR_NICKNAMEINUSE
+            // ERR_NICKNAMEINUSE. If the nick is accepted once then the error is for a nick change
+            // request from the user, so show an error message. Otherwise don't show an error
+            // message, the client will be silently searching for an available nick.
             if client.is_nick_accepted() {
-                // Nick change request from user failed. Just show an error message.
                 ui.add_err_msg(
                     "Nickname is already in use",
                     time::now(),

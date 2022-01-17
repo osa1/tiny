@@ -156,7 +156,6 @@ impl Client {
     }
 
     /// Is current nick accepted by the server?
-    // TODO: Do we really need this?
     pub fn is_nick_accepted(&self) -> bool {
         self.state.is_nick_accepted()
     }
