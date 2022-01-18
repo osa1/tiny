@@ -24,7 +24,7 @@ mod widget;
 mod tests;
 
 use crate::tui::{CmdResult, TUIRet};
-use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
+use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, ServerId, TabStyle};
 use term_input::Input;
 
 use std::cell::RefCell;
@@ -222,16 +222,20 @@ macro_rules! delegate {
 impl TUI {
     delegate!(draw());
     delegate!(new_server_tab(serv_name: &str, alias: Option<String>,));
-    delegate!(close_server_tab(serv_name: &str,));
-    delegate!(new_chan_tab(serv_name: &str, chan: &ChanNameRef,));
-    delegate!(close_chan_tab(serv_name: &str, chan: &ChanNameRef,));
-    delegate!(close_user_tab(serv_name: &str, nick: &str,));
+    delegate!(close_server_tab(serv_id: ServerId,));
+    delegate!(new_chan_tab(
+        serv_id: ServerId,
+        serv_name: &str,
+        chan: &ChanNameRef,
+    ));
+    delegate!(close_chan_tab(serv_id: ServerId, chan: &ChanNameRef,));
+    delegate!(close_user_tab(serv_id: ServerId, nick: &str,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
     delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
     delegate!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
     delegate!(add_client_err_msg(msg: &str, target: &MsgTarget,));
-    delegate!(clear_nicks(serv_name: &str,));
-    delegate!(set_nick(serv_name: &str, new_nick: &str,));
+    delegate!(clear_nicks(serv_id: ServerId, serv_name: &str,));
+    delegate!(set_nick(serv_id: ServerId, serv_name: &str, new_nick: &str,));
     delegate!(add_privmsg(
         sender: &str,
         msg: &str,
@@ -251,14 +255,19 @@ impl TUI {
     delegate!(set_topic(
         topic: &str,
         ts: Tm,
+        serv_id: ServerId,
         serv_name: &str,
         chan_name: &ChanNameRef,
     ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
 
-    pub fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
+    pub fn mentions_serv_id(&self) -> ServerId {
+        self.inner.upgrade().unwrap().borrow().mentions_serv_id()
+    }
+
+    pub fn user_tab_exists(&self, serv_id: ServerId, nick: &str) -> bool {
         match self.inner.upgrade() {
-            Some(tui) => tui.borrow().user_tab_exists(serv_name, nick),
+            Some(tui) => tui.borrow().user_tab_exists(serv_id, nick),
             None => false,
         }
     }

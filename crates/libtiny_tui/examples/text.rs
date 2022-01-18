@@ -17,10 +17,15 @@ fn main() {
 
     let local = tokio::task::LocalSet::new();
 
-    let tab = MsgTarget::Server { serv: "mentions" };
-
     local.block_on(&runtime, async move {
         let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));
+
+        let serv_id = tui.mentions_serv_id();
+
+        let tab = MsgTarget::Server {
+            serv_id,
+            serv: "mentions",
+        };
 
         let mut text = String::new();
         let mut file = File::open("test/lipsum.txt").unwrap();

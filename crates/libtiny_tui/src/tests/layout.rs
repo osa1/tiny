@@ -11,13 +11,17 @@ fn test_join_part_overflow() {
     let mut tui = TUI::new_test(21, 4);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
     tui.add_nick("123456", Some(ts), &target);
     tui.add_nick("abcdef", Some(ts), &target);
@@ -40,13 +44,17 @@ fn test_alignment_long_string() {
     tui.set_layout(Layout::Aligned { max_nick_len: 12 });
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
     tui.add_privmsg(
         "osa1",
@@ -72,10 +80,14 @@ fn test_alignment_long_string() {
 #[test]
 fn test_mnemonic_generation() {
     let mut tui = TUI::new_test(10, 10);
-    tui.new_chan_tab("s1", ChanNameRef::new("#ab"));
-    tui.new_chan_tab("s2", ChanNameRef::new("#ab"));
-    tui.new_chan_tab("s3", ChanNameRef::new("#ab"));
-    tui.new_chan_tab("s4", ChanNameRef::new("#ab"));
+    let (s1, _) = tui.new_server_tab("s1", None);
+    tui.new_chan_tab(s1, "s1", ChanNameRef::new("#ab"));
+    let (s2, _) = tui.new_server_tab("s2", None);
+    tui.new_chan_tab(s2, "s2", ChanNameRef::new("#ab"));
+    let (s3, _) = tui.new_server_tab("s3", None);
+    tui.new_chan_tab(s3, "s3", ChanNameRef::new("#ab"));
+    let (s4, _) = tui.new_server_tab("s4", None);
+    tui.new_chan_tab(s4, "s4", ChanNameRef::new("#ab"));
     let tabs = tui.get_tabs();
     assert_eq!(tabs.len(), 9); // mentions, 4 servers, 4 channels
     assert_eq!(tabs[2].switch, Some('a'));

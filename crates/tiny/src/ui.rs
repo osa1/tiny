@@ -209,17 +209,34 @@ pub(crate) fn send_msg(
                 return;
             }
 
-            MsgSource::Chan { ref serv, ref chan } => {
-                (MsgTarget::Chan { serv, chan }, chan.display())
-            }
+            MsgSource::Chan {
+                serv_id,
+                serv,
+                chan,
+            } => (
+                MsgTarget::Chan {
+                    serv_id,
+                    serv,
+                    chan,
+                },
+                chan.display(),
+            ),
 
-            MsgSource::User { ref serv, ref nick } => {
+            MsgSource::User {
+                serv_id,
+                serv,
+                nick,
+            } => {
                 let msg_target = if nick.eq_ignore_ascii_case("nickserv")
                     || nick.eq_ignore_ascii_case("chanserv")
                 {
-                    MsgTarget::Server { serv }
+                    MsgTarget::Server { serv_id, serv }
                 } else {
-                    MsgTarget::User { serv, nick }
+                    MsgTarget::User {
+                        serv_id,
+                        serv,
+                        nick,
+                    }
                 };
                 (msg_target, nick)
             }
