@@ -142,23 +142,48 @@ impl Hash for ChanNameRef {
     }
 }
 
+#[derive(Debug)]
+pub struct ServerIdGen {
+    next: ServerId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ServerId(usize);
+
+impl ServerIdGen {
+    pub fn new() -> Self {
+        Self { next: ServerId(0) }
+    }
+
+    pub fn next(&mut self) -> ServerId {
+        let next = self.next;
+        self.next = ServerId(self.next.0 + 1);
+        next
+    }
+}
+
 /// Target of a message to be shown in a UI.
 #[derive(Debug)]
 pub enum MsgTarget<'a> {
     /// Show the message in the server tab.
-    Server { serv: &'a str },
+    Server { serv_id: ServerId, serv: &'a str },
 
     /// Show the message in the channel tab.
     Chan {
+        serv_id: ServerId,
         serv: &'a str,
         chan: &'a ChanNameRef,
     },
 
     /// Show the message in the privmsg tab.
-    User { serv: &'a str, nick: &'a str },
+    User {
+        serv_id: ServerId,
+        serv: &'a str,
+        nick: &'a str,
+    },
 
     /// Show the message in all tabs of a server.
-    AllServTabs { serv: &'a str },
+    AllServTabs { serv_id: ServerId, serv: &'a str },
 
     /// Show the message in currently active tab.
     CurrentTab,
@@ -168,19 +193,36 @@ pub enum MsgTarget<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MsgSource {
     /// Message sent in a server tab.
-    Serv { serv: String },
+    Serv { serv_id: ServerId, serv: String },
 
     /// Message sent in a channel tab.
-    Chan { serv: String, chan: ChanName },
+    Chan {
+        serv_id: ServerId,
+        serv: String,
+        chan: ChanName,
+    },
 
     /// Message sent in a privmsg tab.
-    User { serv: String, nick: String },
+    User {
+        serv_id: ServerId,
+        serv: String,
+        nick: String,
+    },
 }
 
 impl MsgSource {
+    pub fn serv_id(&self) -> ServerId {
+        match self {
+            MsgSource::Serv { serv_id, .. }
+            | MsgSource::Chan { serv_id, .. }
+            | MsgSource::User { serv_id, .. } => *serv_id,
+        }
+    }
+
+    // TODO: Most uses of this method should be replaced by `serv_id`
     pub fn serv_name(&self) -> &str {
         match self {
-            MsgSource::Serv { serv }
+            MsgSource::Serv { serv, .. }
             | MsgSource::Chan { serv, .. }
             | MsgSource::User { serv, .. } => serv,
         }
@@ -188,12 +230,28 @@ impl MsgSource {
 
     pub fn to_target(&self) -> MsgTarget {
         match self {
-            MsgSource::Serv { serv } => MsgTarget::Server { serv },
-            MsgSource::Chan { serv, chan } => MsgTarget::Chan {
+            MsgSource::Serv { serv_id, serv } => MsgTarget::Server {
+                serv_id: *serv_id,
+                serv,
+            },
+            MsgSource::Chan {
+                serv_id,
+                serv,
+                chan,
+            } => MsgTarget::Chan {
+                serv_id: *serv_id,
                 serv,
                 chan: chan.borrow(),
             },
-            MsgSource::User { serv, nick } => MsgTarget::User { serv, nick },
+            MsgSource::User {
+                serv_id,
+                serv,
+                nick,
+            } => MsgTarget::User {
+                serv_id: *serv_id,
+                serv,
+                nick,
+            },
         }
     }
 }

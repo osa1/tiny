@@ -13,13 +13,17 @@ fn test_resize_recalc_scroll() {
     let mut tui = TUI::new_test(15, 5);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
     tui.add_privmsg(
         "osa1",
@@ -86,13 +90,17 @@ fn test_resize_scroll_stick_to_top() {
     let mut tui = TUI::new_test(18, 10);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
 
     for i in 0..15 {
@@ -148,13 +156,17 @@ fn test_resize_no_scroll_stay_on_bottom() {
     let mut tui = TUI::new_test(18, 10);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
 
     for i in 0..15 {
@@ -252,13 +264,17 @@ fn test_resize_scroll_resize() {
     let mut tui = TUI::new_test(16, 10);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
 
     for i in 0..15 {
@@ -322,13 +338,17 @@ fn test_clear_resize_recalc_scroll() {
     let mut tui = TUI::new_test(15, 5);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
     for _ in 0..6 {
         tui.add_privmsg("osa1", &"1111 ".repeat(3), ts, &target, false, false);

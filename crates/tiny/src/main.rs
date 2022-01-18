@@ -104,6 +104,7 @@ fn run(
     local.block_on(&runtime, async move {
         // Create TUI task
         let (tui, rcv_tui_ev) = TUI::run(config_path.clone());
+        let mentions_serv_id = tui.mentions_serv_id();
         tui.draw();
 
         // Create logger
@@ -113,7 +114,10 @@ fn run(
                 // Somehwat hacky -- only tab we have is "mentions" so we show the error there
                 tui_clone.add_client_err_msg(
                     &format!("Logger error: {}", err),
-                    &MsgTarget::Server { serv: "mentions" },
+                    &MsgTarget::Server {
+                        serv_id: mentions_serv_id,
+                        serv: "mentions",
+                    },
                 )
             })
         };
@@ -122,7 +126,10 @@ fn run(
                 Err(LoggerInitError::CouldNotCreateDir { dir_path, err }) => {
                     tui.add_client_err_msg(
                         &format!("Could not create log directory {:?}: {}", dir_path, err),
-                        &MsgTarget::Server { serv: "mentions" },
+                        &MsgTarget::Server {
+                            serv_id: mentions_serv_id,
+                            serv: "mentions",
+                        },
                     );
                     tui.draw();
                     None

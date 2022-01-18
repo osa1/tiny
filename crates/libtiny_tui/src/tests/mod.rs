@@ -33,8 +33,8 @@ fn init_screen() {
 fn close_rightmost_tab() {
     // After closing right-most tab the tab bar should scroll left.
     let mut tui = TUI::new_test(20, 4);
-    tui.new_server_tab("irc.server_1.org", None);
-    tui.new_server_tab("irc.server_2.org", None);
+    let (serv1_id, _) = tui.new_server_tab("irc.server_1.org", None);
+    let (serv2_id, _) = tui.new_server_tab("irc.server_2.org", None);
     tui.next_tab();
     tui.next_tab();
     tui.draw();
@@ -49,7 +49,7 @@ fn close_rightmost_tab() {
 
     // Should scroll left when the server tab is closed. Left arrow should still be visible as
     // there are still tabs to the left.
-    tui.close_server_tab("irc.server_2.org");
+    tui.close_server_tab(serv2_id);
     tui.draw();
 
     #[rustfmt::skip]
@@ -61,7 +61,7 @@ fn close_rightmost_tab() {
     expect_screen(screen, &tui.get_front_buffer(), 20, 4, Location::caller());
 
     // Scroll left again, left arrow should disappear this time.
-    tui.close_server_tab("irc.server_1.org");
+    tui.close_server_tab(serv1_id);
     tui.draw();
 
     #[rustfmt::skip]
@@ -78,13 +78,17 @@ fn small_screen_1() {
     let mut tui = TUI::new_test(21, 3);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
     tui.add_nick("123456", Some(ts), &target);
     tui.add_nick("abcdef", Some(ts), &target);
@@ -127,15 +131,19 @@ fn small_screen_2() {
     let mut tui = TUI::new_test(21, 4);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
-    let target = MsgTarget::Chan { serv, chan };
+    let target = MsgTarget::Chan {
+        serv_id,
+        serv,
+        chan,
+    };
     let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.set_topic("Blah blah blah-", ts.clone(), serv, chan);
+    tui.set_topic("Blah blah blah-", ts.clone(), serv_id, serv, chan);
 
     tui.draw();
 
@@ -164,9 +172,9 @@ fn ctrl_w() {
     let mut tui = TUI::new_test(30, 3);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
-    tui.new_server_tab(serv, None);
-    tui.set_nick(serv, "osa1");
-    tui.new_chan_tab(serv, chan);
+    let (serv_id, _) = tui.new_server_tab(serv, None);
+    tui.set_nick(serv_id, serv, "osa1");
+    tui.new_chan_tab(serv_id, serv, chan);
     tui.next_tab();
     tui.next_tab();
 
@@ -233,8 +241,8 @@ fn test_text_field_wrap() {
     let mut tui = TUI::new_test(40, 8);
 
     let server = "chat.freenode.net";
-    tui.new_server_tab(server, None);
-    tui.set_nick(server, "x");
+    let (serv_id, _) = tui.new_server_tab(server, None);
+    tui.set_nick(serv_id, server, "x");
 
     // Switch to server tab
     tui.next_tab();
