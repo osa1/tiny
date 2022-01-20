@@ -202,9 +202,13 @@ Commands start with `/` character.
   Running this command in a server tab applies it to all channels of that
   server. You can check your notify state in the status line.
 
+- `/dcc [get] <sender> <filename>`: When you receive a DCC SEND message, you can 
+  accept it and download the file with this command. Currently sending files
+  is not supported.
+
 - `/quit`: Quit
 
-## Server commands
+## Server Commands
 
 For commands not supported by tiny as a slash command, sending the command in
 the server tab will send the message directly to the server.

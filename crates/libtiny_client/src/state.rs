@@ -1,5 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
+use crate::dcc::{DccRecord, DccRecordInfo};
 use crate::utils;
 use crate::{Cmd, Event, ServerInfo};
 use libtiny_common::{ChanName, ChanNameRef};
@@ -7,7 +8,7 @@ use libtiny_wire as wire;
 use libtiny_wire::{Msg, Pfx};
 
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -77,6 +78,30 @@ impl State {
     pub(crate) fn kill_join_tasks(&self) {
         self.inner.borrow_mut().kill_join_tasks();
     }
+
+    /// Gets a DccRecord and removes it
+    pub(crate) fn get_dcc_rec(&self, origin: &str, argument: &str) -> Option<DccRecord> {
+        self.inner
+            .borrow_mut()
+            .dcc_recs
+            .remove(&(origin.to_string(), argument.to_string()))
+    }
+
+    /// Adds a DCC record and returns the type, argument and filesize if successfully created
+    pub(crate) fn add_dcc_rec(&self, origin: &str, msg: &str) -> Option<DccRecordInfo> {
+        let record = DccRecord::new(origin, &self.get_nick(), msg);
+        debug!("record: {:?}", record);
+        if let Ok(record) = record {
+            let info = record.info();
+            self.inner
+                .borrow_mut()
+                .dcc_recs
+                .insert((origin.to_string(), record.argument().to_string()), record);
+            Some(info)
+        } else {
+            None
+        }
+    }
 }
 
 struct StateInner {
@@ -103,6 +128,9 @@ struct StateInner {
     /// TODO: I'm not sure if this is necessary. Why not just create channel tabs in the specified
     /// order, in TUI?
     chans: Vec<Chan>,
+
+    /// Map of DccRecords indexed by the nickname of the sender and the argument (filename or 'chat')
+    dcc_recs: HashMap<(String, String), DccRecord>,
 
     /// Away reason if away mode is on. `None` otherwise.
     away_status: Option<String>,
@@ -213,6 +241,7 @@ impl StateInner {
             current_nick_idx: 0,
             current_nick,
             chans,
+            dcc_recs: HashMap::new(),
             away_status: None,
             servername: None,
             usermask: None,
