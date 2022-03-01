@@ -10,7 +10,3 @@ members = [
     "crates/termbox",
     "crates/tiny",
 ]
-
-[profile.release]
-lto = true
-codegen-units = 1
