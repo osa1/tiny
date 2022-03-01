@@ -135,7 +135,7 @@ fn small_screen_2() {
 
     let target = MsgTarget::Chan { serv, chan };
     let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.set_topic("Blah blah blah-", ts.clone(), serv, chan);
+    tui.set_topic("Blah blah blah-", ts, serv, chan);
 
     tui.draw();
 

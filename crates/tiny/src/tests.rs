@@ -4,7 +4,7 @@ use libtiny_common::ChanName;
 use libtiny_tui::test_utils::expect_screen;
 use libtiny_tui::TUI;
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
-use term_input;
+
 use termbox_simple::CellBuf;
 
 use libtiny_client as client;
@@ -63,11 +63,8 @@ where
         // Create test TUI
         let (snd_input_ev, rcv_input_ev) = mpsc::channel::<term_input::Event>(100);
         let rcv_input_ev = ReceiverStream::new(rcv_input_ev);
-        let (tui, _rcv_tui_ev) = TUI::run_test(
-            DEFAULT_TUI_WIDTH,
-            DEFAULT_TUI_HEIGHT,
-            rcv_input_ev.map(|ev| Ok(ev)),
-        );
+        let (tui, _rcv_tui_ev) =
+            TUI::run_test(DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT, rcv_input_ev.map(Ok));
 
         let tiny_ui = UI::new(tui.clone(), None);
 

@@ -43,7 +43,7 @@ fn main() {
 
 async fn ui_task(ui: TUI, rcv_ev: mpsc::Receiver<Event>) {
     let mut rcv_ev = ReceiverStream::new(rcv_ev);
-    while let Some(_) = rcv_ev.next().await {
+    while (rcv_ev.next().await).is_some() {
         ui.draw();
     }
 }

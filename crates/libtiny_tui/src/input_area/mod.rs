@@ -797,7 +797,7 @@ mod tests {
         let mut input_area = InputArea::new(40, 50);
         // a string that will be more than one line - 41 characters
         let multiline_string_no_spaces = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        input_area.set(&multiline_string_no_spaces);
+        input_area.set(multiline_string_no_spaces);
         assert_eq!(input_area.get_height(input_area.width), 2);
     }
 }

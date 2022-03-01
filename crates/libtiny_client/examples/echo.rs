@@ -41,7 +41,7 @@ fn main() {
         pass: None,
         realname: "tiny echo bot".to_owned(),
         nicks: vec![nick],
-        auto_join: chans.to_owned(),
+        auto_join: chans,
         nickserv_ident: None,
         sasl_auth: None,
     };
