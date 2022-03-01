@@ -6,7 +6,7 @@ repository = "https://github.com/osa1/tiny"
 readme = "README.md"
 license = "MIT"
 description = "An IRC client"
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["tls-rustls"]
