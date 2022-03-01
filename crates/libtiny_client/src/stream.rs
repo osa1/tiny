@@ -23,8 +23,15 @@ lazy_static! {
 #[cfg(feature = "tls-rustls")]
 lazy_static! {
     static ref TLS_CONNECTOR: tokio_rustls::TlsConnector = {
-        let mut config = tokio_rustls::rustls::ClientConfig::default();
-        config.root_store = rustls_native_certs::load_native_certs().unwrap();
+        use tokio_rustls::rustls;
+        let mut roots = rustls::RootCertStore::empty();
+        for cert in rustls_native_certs::load_native_certs().unwrap() {
+            roots.add(&rustls::Certificate(cert.0)).unwrap();
+        }
+        let config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
         tokio_rustls::TlsConnector::from(std::sync::Arc::new(config))
     };
 }
@@ -41,7 +48,7 @@ pub(crate) enum Stream {
 #[cfg(feature = "tls-native")]
 pub(crate) type TlsError = native_tls::Error;
 #[cfg(feature = "tls-rustls")]
-pub(crate) type TlsError = tokio_rustls::rustls::TLSError;
+pub(crate) type TlsError = tokio_rustls::rustls::Error;
 
 pub(crate) enum StreamError {
     TlsError(TlsError),
@@ -74,8 +81,10 @@ impl Stream {
 
     #[cfg(feature = "tls-rustls")]
     pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
+        use std::convert::TryFrom;
+
         let tcp_stream = TcpStream::connect(addr).await?;
-        let name = tokio_rustls::webpki::DNSNameRef::try_from_ascii_str(host_name)
+        let name = tokio_rustls::rustls::ServerName::try_from(host_name)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         let tls_stream = TLS_CONNECTOR.connect(name, tcp_stream).await?;
         Ok(Stream::TlsStream(tls_stream.into()))

@@ -329,8 +329,7 @@ impl Stream for Input {
                                 // NOTE: `poll_ret` is ignored here but I think that's OK?
                                 // TODO: Contents of `buf` is ignored here until `poll_next` is
                                 // called again.
-                                let err =
-                                    std::io::Error::from(err.as_errno().expect("Weird nix error"));
+                                let err = std::io::Error::from(err);
                                 return Poll::Ready(Some(Err(err)));
                             }
                         }
@@ -502,7 +501,7 @@ pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
                 unsafe { buf.set_len(old_len + n_read as usize) };
             }
             Ordering::Less => match nix::Error::last() {
-                nix::Error::Sys(nix::errno::EWOULDBLOCK) => return Ok(()),
+                nix::Error::EWOULDBLOCK => return Ok(()),
                 other => return Err(other),
             },
         }

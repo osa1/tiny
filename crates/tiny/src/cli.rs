@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{crate_authors, crate_description, crate_name, crate_version, App, Arg};
+use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, Command};
 
 /// Command line arguments.
 #[derive(Debug)]
@@ -23,21 +23,22 @@ pub(crate) fn parse() -> Args {
         version = format!("{} ({})", version, commit_hash);
     }
 
-    let m = App::new(crate_name!())
+    let m = Command::new(crate_name!())
         .version(version.as_str())
         .about(crate_description!())
         .author(crate_authors!())
         .arg(
-            Arg::with_name("config")
-                .short("c")
+            Arg::new("config")
+                .short('c')
                 .long("config")
                 .value_name("FILE")
                 .help("Use this config file")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("servers")
-                .multiple(true)
+            Arg::new("servers")
+                .multiple_values(true)
+                .takes_value(true)
                 .help(
                     "Servers to connect. For example, `tiny foo bar` \
                      connects to servers whose names contain \"foo\" OR \
