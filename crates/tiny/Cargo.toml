@@ -15,9 +15,9 @@ tls-rustls = ["libtiny_client/tls-rustls"]
 desktop-notifications = ["libtiny_tui/desktop-notifications"]
 
 [dependencies]
-clap = "2.33"
-dirs = "3.0"
-env_logger = { version = "0.8", default-features = false }
+clap = { version = "3.1", features = ["cargo"] }
+dirs = "4.0"
+env_logger = { version = "0.9", default-features = false }
 libtiny_client = { path = "../libtiny_client", default-features = false }
 libtiny_common = { path = "../libtiny_common" }
 libtiny_logger = { path = "../libtiny_logger" }
@@ -27,8 +27,8 @@ log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 time = "0.1"
-tokio = { version = "1.6.1", default-features = false, features = [] }
-tokio-stream = { version = "0.1.6", features = [] }
+tokio = { version = "1.17", default-features = false, features = [] }
+tokio-stream = { version = "0.1", features = [] }
 
 [dev-dependencies]
 term_input = { path = "../term_input" }
