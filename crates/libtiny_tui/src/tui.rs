@@ -648,7 +648,7 @@ impl TUI {
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        let key_action = self.key_map.get(&key).or_else(|| match key {
+        let key_action = self.key_map.get(&key).or(match key {
             Key::Char(c) => Some(KeyAction::Input(c)),
             Key::AltChar(c) => Some(KeyAction::TabGoto(c)),
             _ => None,

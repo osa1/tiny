@@ -213,7 +213,6 @@ fn get_default_config_yaml() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_yaml;
 
     #[test]
     fn parse_default_config() {
@@ -224,7 +223,7 @@ mod tests {
             }
             Ok(Config { servers, .. }) => {
                 assert_eq!(servers[0].join, vec!["#tiny".to_owned()]);
-                assert_eq!(servers[0].tls, true);
+                assert!(servers[0].tls);
             }
         }
     }

@@ -63,17 +63,12 @@ fn main() {
             let nicks = ["short", "some_long_nick_name____"];
             let mut nick_idx = 1;
             let mut rcv_abort_fused = ReceiverStream::new(rcv_abort).fuse();
-            loop {
-                match timeout(std::time::Duration::from_secs(3), rcv_abort_fused.next()).await {
-                    Err(_) => {
-                        tui_clone.set_nick(SERV, nicks[nick_idx]);
-                        tui_clone.draw();
-                        nick_idx = (nick_idx + 1) % nicks.len();
-                    }
-                    Ok(_) => {
-                        break;
-                    }
-                }
+            while (timeout(std::time::Duration::from_secs(3), rcv_abort_fused.next()).await)
+                .is_err()
+            {
+                tui_clone.set_nick(SERV, nicks[nick_idx]);
+                tui_clone.draw();
+                nick_idx = (nick_idx + 1) % nicks.len();
             }
         });
 
