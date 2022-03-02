@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "crates/libtiny_client",
     "crates/libtiny_common",
