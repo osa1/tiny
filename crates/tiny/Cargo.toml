@@ -24,7 +24,6 @@ libtiny_logger = { path = "../libtiny_logger" }
 libtiny_tui = { path = "../libtiny_tui", default-features = false }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
-rustls-pemfile = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 shell-words = "1.1.0"

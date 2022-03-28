@@ -11,14 +11,14 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-use libtiny_client::{Client, SASLAuth, SASLExternal, ServerInfo};
+use libtiny_client::{Client, SASLAuth, ServerInfo};
 use libtiny_common::{ChanNameRef, MsgTarget};
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
 use ui::UI;
 
 use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -214,22 +214,10 @@ fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth) -> Result<SASLAut
             } else {
                 // load in a cert and private key for TLS client auth
                 match File::open(pem) {
-                    Ok(file) => {
-                        let mut buf = BufReader::new(file);
-                        // extract certificate
-                        let cert = rustls_pemfile::certs(&mut buf)
-                            .map_err(|e| format!("Could not parse PKCS8 PEM: {}", e))?
-                            .pop()
-                            .ok_or("Cert PEM must have at least one cert")?;
-
-                        // extract private key
-                        buf.seek(SeekFrom::Start(0)).unwrap();
-                        let key = rustls_pemfile::pkcs8_private_keys(&mut buf)
-                            .map_err(|e| format!("Could not parse PKCS8 PEM: {}", e))?
-                            .pop()
-                            .ok_or("Cert PEM must have at least one private key")?;
-
-                        Ok(SASLAuth::External(SASLExternal { cert, key }))
+                    Ok(mut file) => {
+                        let mut pem = Vec::new();
+                        let _ = file.read_to_end(&mut pem);
+                        Ok(SASLAuth::External { pem })
                     }
                     Err(e) => Err(format!("Could not open PEM file: {}", e)),
                 }

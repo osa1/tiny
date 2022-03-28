@@ -633,7 +633,7 @@ impl StateInner {
                             if let Some(sasl) = &self.server_info.sasl_auth {
                                 let msg = match sasl {
                                     SASLAuth::Plain { .. } => "PLAIN",
-                                    SASLAuth::External(_) => "EXTERNAL",
+                                    SASLAuth::External { .. } => "EXTERNAL",
                                 };
                                 snd_irc_msg.try_send(wire::authenticate(msg)).unwrap();
                             } else {

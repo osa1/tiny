@@ -68,16 +68,14 @@ pub struct ServerInfo {
 /// - <https://www.alphachat.net/sasl.xhtml>
 #[derive(Debug, Clone)]
 pub enum SASLAuth {
-    Plain { username: String, password: String },
-    External(SASLExternal),
-}
-
-#[derive(Debug, Clone)]
-pub struct SASLExternal {
-    /// DER-encoded X.509 certificate used for TLS Client Authorization
-    pub cert: Vec<u8>,
-    /// DER-encoded Private Key that was used to generate `cert`
-    pub key: Vec<u8>,
+    Plain {
+        username: String,
+        password: String,
+    },
+    External {
+        /// PEM-encoded X509 private cert and private key file
+        pem: Vec<u8>,
+    },
 }
 
 /// IRC client events. Returned by `Client` to the users via a channel.
@@ -397,19 +395,17 @@ async fn main_loop(
         // Establish TCP connection to the server
         //
 
-        let sasl_ext = server_info.sasl_auth.as_ref().and_then(|s| {
-            if let SASLAuth::External(s) = s {
-                Some(s)
-            } else {
-                None
-            }
-        });
+        let sasl_pem = if let Some(SASLAuth::External { pem }) = &server_info.sasl_auth {
+            Some(pem)
+        } else {
+            None
+        };
 
         let stream = match try_connect(
             addrs,
             &serv_name,
             server_info.tls,
-            sasl_ext,
+            sasl_pem,
             &mut rcv_cmd,
             &mut snd_ev,
         )
@@ -642,7 +638,7 @@ async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
     addrs: Vec<SocketAddr>,
     serv_name: &str,
     use_tls: bool,
-    sasl: Option<&SASLExternal>,
+    sasl_pem: Option<&Vec<u8>>,
     rcv_cmd: &mut S,
     snd_ev: &mut mpsc::Sender<Event>,
 ) -> TaskResult<Option<Stream>> {
@@ -650,7 +646,7 @@ async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
         for addr in addrs {
             snd_ev.send(Event::Connecting(addr)).await.unwrap();
             let mb_stream = if use_tls {
-                Stream::new_tls(addr, serv_name, sasl).await
+                Stream::new_tls(addr, serv_name, sasl_pem).await
             } else {
                 Stream::new_tcp(addr).await
             };
