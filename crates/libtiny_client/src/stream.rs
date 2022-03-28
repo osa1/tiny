@@ -25,7 +25,7 @@ fn tls_connector(pem: Option<&Vec<u8>>) -> tokio_native_tls::TlsConnector {
 
     let mut builder = native_tls::TlsConnector::builder();
     if let Some(pem) = pem {
-        let identity = Identity::from_pkcs8(&pem, &pem).expect("X509 Cert and private key");
+        let identity = Identity::from_pkcs8(pem, pem).expect("X509 Cert and private key");
         builder.identity(identity);
     }
     tokio_native_tls::TlsConnector::from(builder.build().unwrap())
@@ -66,10 +66,7 @@ fn tls_connector(sasl: Option<&Vec<u8>>) -> tokio_rustls::TlsConnector {
             .expect("Cert PEM must have at least one private key");
 
         builder
-            .with_single_cert(
-                vec![Certificate(cert.to_owned())],
-                PrivateKey(key.to_owned()),
-            )
+            .with_single_cert(vec![Certificate(cert)], PrivateKey(key))
             .expect("Client auth cert")
     } else {
         builder.with_no_client_auth()
@@ -134,7 +131,6 @@ impl Stream {
         host_name: &str,
         sasl: Option<&Vec<u8>>,
     ) -> Result<Stream, StreamError> {
-        use std::convert::TryFrom;
         use tokio_rustls::rustls::ServerName;
 
         let tcp_stream = TcpStream::connect(addr).await?;
