@@ -179,7 +179,7 @@ async fn input_handler<S>(
                     TUIRet::Input { msg, from } => {
                         if msg[0] == '/' {
                             // Handle TUI commands, send others to downstream
-                            let cmd: String = (&msg[1..]).iter().collect();
+                            let cmd: String = msg[1..].iter().collect();
                             let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
                             match result {
                                 CmdResult::Ok => {}

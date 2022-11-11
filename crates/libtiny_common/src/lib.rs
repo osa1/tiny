@@ -29,7 +29,7 @@ impl AsRef<ChanNameRef> for ChanName {
     }
 }
 
-impl<'a> Borrow<ChanNameRef> for ChanName {
+impl Borrow<ChanNameRef> for ChanName {
     fn borrow(&self) -> &ChanNameRef {
         self.as_ref()
     }

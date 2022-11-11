@@ -86,7 +86,7 @@ fn find_client_idx(clients: &[Client], serv_name: &str) -> Option<usize> {
     None
 }
 
-fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a mut Client> {
+fn find_client<'a>(clients: &'a mut [Client], serv_name: &str) -> Option<&'a mut Client> {
     match find_client_idx(clients, serv_name) {
         None => None,
         Some(idx) => Some(&mut clients[idx]),
@@ -193,7 +193,7 @@ fn connect(args: CmdArgs) {
     }
 }
 
-fn reconnect(ui: &UI, clients: &mut Vec<Client>, src: MsgSource) {
+fn reconnect(ui: &UI, clients: &mut [Client], src: MsgSource) {
     if let Some(client) = find_client(clients, src.serv_name()) {
         ui.add_client_msg(
             "Reconnecting...",

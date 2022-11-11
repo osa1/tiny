@@ -81,8 +81,6 @@ impl Stream {
 
     #[cfg(feature = "tls-rustls")]
     pub(crate) async fn new_tls(addr: SocketAddr, host_name: &str) -> Result<Stream, StreamError> {
-        use std::convert::TryFrom;
-
         let tcp_stream = TcpStream::connect(addr).await?;
         let name = tokio_rustls::rustls::ServerName::try_from(host_name)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
