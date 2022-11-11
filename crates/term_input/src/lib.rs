@@ -296,7 +296,7 @@ impl Stream for Input {
     type Item = std::io::Result<Event>;
 
     fn poll_next(mut self: Pin<&mut Input>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let self_: &mut Input = &mut *self;
+        let self_: &mut Input = &mut self;
 
         'main: loop {
             // Try to parse any bytes in the input buffer from the last poll

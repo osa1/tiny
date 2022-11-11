@@ -480,7 +480,7 @@ impl StateInner {
                         {
                             i += 1;
                         }
-                        let usermask = (&param[i..]).trim();
+                        let usermask = param[i..].trim();
                         self.usermask = Some(usermask.to_owned());
                     }
                 }
@@ -746,7 +746,7 @@ fn parse_yourhost_msg(params: &[String]) -> Option<String> {
     if msg.len() >= SERVERNAME_PREFIX_LEN && &msg[..SERVERNAME_PREFIX_LEN] == SERVERNAME_PREFIX {
         let slice1 = &msg[SERVERNAME_PREFIX_LEN..];
         let servername_ends = slice1.find('[').or_else(|| slice1.find(','))?;
-        Some((&slice1[..servername_ends]).to_owned())
+        Some(slice1[..servername_ends].to_owned())
     } else {
         None
     }

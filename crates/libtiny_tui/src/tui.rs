@@ -844,7 +844,7 @@ impl TUI {
                 width_left -= 2;
             }
             // drop any tabs that overflows from the screen
-            for (tab_idx, tab) in (&self.tabs[i..]).iter().enumerate() {
+            for (tab_idx, tab) in self.tabs[i..].iter().enumerate() {
                 if tab.width() > width_left {
                     break;
                 } else {
@@ -894,7 +894,7 @@ impl TUI {
         // debug!("left_arr: {}, right_arr: {}", left_arr, right_arr);
 
         // finally draw the tabs
-        for (tab_idx, tab) in (&self.tabs[tab_left..tab_right]).iter().enumerate() {
+        for (tab_idx, tab) in self.tabs[tab_left..tab_right].iter().enumerate() {
             tab.draw(
                 &mut self.tb,
                 &self.colors,

@@ -150,8 +150,8 @@ impl Pfx {
 fn parse_pfx(pfx: &str) -> Pfx {
     match pfx.find(&['!', '@'][..]) {
         Some(idx) => Pfx::User {
-            nick: (&pfx[0..idx]).to_owned(),
-            user: (&pfx[idx + 1..]).to_owned(),
+            nick: pfx[0..idx].to_owned(),
+            user: pfx[idx + 1..].to_owned(),
         },
         None => {
             // Chars that nicks can have but servernames cannot

@@ -372,7 +372,7 @@ impl<'a> Iterator for FormatEventParser<'a> {
     }
 }
 
-pub fn parse_irc_formatting<'a>(s: &'a str) -> impl Iterator<Item = IrcFormatEvent> + 'a {
+pub fn parse_irc_formatting(s: &str) -> impl Iterator<Item = IrcFormatEvent> {
     FormatEventParser::new(s)
 }
 
