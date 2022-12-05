@@ -107,8 +107,8 @@ pub(crate) enum CmdResult {
     Ok,
     /// Pass command through to cmd.rs for further handling
     Continue,
-    /// Quit command was executed
-    Quit,
+    /// Quit command was executed, with the payload as a quit message
+    Quit(Option<String>),
 }
 
 impl TUI {
@@ -299,7 +299,21 @@ impl TUI {
                 // Fall through to print help for cmd.rs commands
                 CmdResult::Continue
             }
-            Some("quit") => CmdResult::Quit,
+            Some("quit") => {
+                // Cut the "quit " part of the command
+                // (the slash is already cut outside this function),
+                // and use the rest as the message for the /quit,
+                // including other (potentially consecutive) spaces.
+                // `&cmd[("quit ".len())..]` would freeze the program
+                // if the command given has nothing more besides "/quit".
+                let reason: String = cmd.chars().skip(5 /* "quit ".len() */).collect();
+
+                if reason.is_empty() {
+                    CmdResult::Quit(None)
+                } else {
+                    CmdResult::Quit(Some(reason))
+                }
+            }
             _ => CmdResult::Continue,
         }
     }

@@ -186,8 +186,8 @@ async fn input_handler<S>(
                                 CmdResult::Continue => {
                                     snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap()
                                 }
-                                CmdResult::Quit => {
-                                    snd_ev.try_send(Event::Abort { msg: None }).unwrap();
+                                CmdResult::Quit(msg) => {
+                                    snd_ev.try_send(Event::Abort { msg }).unwrap();
                                     let _ = snd_abort.try_send(());
                                     return;
                                 }
