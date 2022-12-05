@@ -212,7 +212,9 @@ pub enum TabStyle {
 /// UI events
 #[derive(Debug)]
 pub enum Event {
-    Abort,
+    Abort {
+        msg: Option<String>,
+    },
     Msg {
         msg: String,
         source: MsgSource,

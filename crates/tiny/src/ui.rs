@@ -112,9 +112,9 @@ fn handle_input_ev(
 ) {
     use libtiny_common::Event::*;
     match ev {
-        Abort => {
+        Abort { msg } => {
             for client in clients {
-                client.quit(None);
+                client.quit(msg.clone());
             }
         }
         Msg { msg, source } => {

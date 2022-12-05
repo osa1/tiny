@@ -96,7 +96,7 @@ fn handle_input_ev(ui: &TUI, ev: Event, abort: &mut mpsc::Sender<()>) {
                 ui.set_nick(SERV, new_nick);
             }
         }
-        Abort => {
+        Abort { .. } => {
             abort.try_send(()).unwrap();
         }
         Msg { .. } | Lines { .. } => {}
