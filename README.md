@@ -202,7 +202,7 @@ Commands start with `/` character.
   Running this command in a server tab applies it to all channels of that
   server. You can check your notify state in the status line.
 
-- `/quit`: Quit
+- `/quit`: Quit. You can use `/quit <reason>` to send a goodbye message.
 
 ## Server commands
 

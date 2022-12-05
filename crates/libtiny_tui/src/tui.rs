@@ -61,7 +61,7 @@ impl CmdUsage {
     }
 }
 
-const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "`/quit`");
+const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "`/quit` or `/quit <reason>`");
 const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "`/clear`");
 const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "`/ignore`");
 const NOTIFY_CMD: CmdUsage = CmdUsage::new(
