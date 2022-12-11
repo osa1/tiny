@@ -138,7 +138,7 @@ static CLOSE_CMD: Cmd = Cmd {
 
 fn close(args: CmdArgs) {
     let CmdArgs {
-        ui, clients, src, ..
+        args, ui, clients, src, ..
     } = args;
     match src {
         MsgSource::Serv { ref serv } if serv == "mentions" => {
@@ -149,7 +149,11 @@ fn close(args: CmdArgs) {
             let client_idx = find_client_idx(clients, &serv).unwrap();
             // TODO: this probably won't close the connection?
             let mut client = clients.remove(client_idx);
-            client.quit(None);
+            if args.is_empty() {
+                client.quit(None);
+            } else {
+                client.quit(Some(args.to_string()));
+            }
         }
         MsgSource::Chan { serv, chan } => {
             ui.close_chan_tab(&serv, chan.borrow());
