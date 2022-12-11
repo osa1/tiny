@@ -300,13 +300,8 @@ impl TUI {
                 CmdResult::Continue
             }
             Some("quit") => {
-                // Cut the "quit " part of the command
-                // (the slash is already cut outside this function),
-                // and use the rest as the message for the /quit,
-                // including other (potentially consecutive) spaces.
-                // `&cmd[("quit ".len())..]` would freeze the program
-                // if the command given has nothing more besides "/quit".
-                let reason: String = cmd.chars().skip(5 /* "quit ".len() */).collect();
+                // Note: `SplitWhitespace::as_str` could be used here instead, when it gets stabilized.
+                let reason: String = cmd.chars().skip("quit ".len()).collect();
 
                 if reason.is_empty() {
                     CmdResult::Quit(None)
