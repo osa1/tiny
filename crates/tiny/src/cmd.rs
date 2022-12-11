@@ -158,7 +158,11 @@ fn close(args: CmdArgs) {
         MsgSource::Chan { serv, chan } => {
             ui.close_chan_tab(&serv, chan.borrow());
             let client_idx = find_client_idx(clients, &serv).unwrap();
-            clients[client_idx].part(&chan);
+            if args.is_empty() {
+                clients[client_idx].part(&chan, None);
+            } else {
+                clients[client_idx].part(&chan, Some(args.to_string()));
+            }
         }
         MsgSource::User { serv, nick } => {
             ui.close_user_tab(&serv, &nick);
