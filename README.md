@@ -90,13 +90,14 @@ tiny is tested on Linux and OSX.
 
 tiny looks for these places for a config file:
 
-- `$XDG_CONFIG_HOME/tiny/config.yml`
-- (when `$XDG_CONFIG_HOME` is not defined) `$HOME/.config/tiny/config.yml`
-- (deprecated) `$HOME/.tinyrc.yml`
+- On Linux: `$XDG_CONFIG_HOME/tiny/config.yml`, on macOS:
+  `$HOME/Library/Application Support/tiny/config.yml`
+- (when not found) `$HOME/.config/tiny/config.yml`
+- (when not found, deprecated) `$HOME/.tinyrc.yml`
 
-when a config file is not found in one of these locations tiny creates one with
-defaults and exists, printing path to the config file. Edit that file before
-re-running tiny to change the defaults.
+When a config file is not found in one of these locations tiny creates one in
+the first path above with defaults and exits, printing path to the config file.
+Edit that file before re-running tiny to change the defaults.
 
 **A note on nick identification:** Some IRC servers such as ircd-seven (used by
 Freenode) and InspIRCd (used by Mozilla) support identification via the `PASS`
