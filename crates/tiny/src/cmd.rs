@@ -138,7 +138,11 @@ static CLOSE_CMD: Cmd = Cmd {
 
 fn close(args: CmdArgs) {
     let CmdArgs {
-        args, ui, clients, src, ..
+        args,
+        ui,
+        clients,
+        src,
+        ..
     } = args;
     match src {
         MsgSource::Serv { ref serv } if serv == "mentions" => {
