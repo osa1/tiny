@@ -1,11 +1,15 @@
 # Unreleased
 
+Thanks to @ALEX11BR for contributing to this release.
+
 - Fixed handling of CR, LF, and tab characters in IRC format parser. IRC RFCs
   don't allow standalone CR and LF characters, but some servers still them.
   tiny now shows those characters as single space. Tab characters are shown as
   8 spaces, as in tiny 0.9.0.
 
   This bug was introduced in 0.10.0 with 33df77e. (#366)
+- `/close` and `/quit` commands now take optional message parameters to be sent
+  with PART and QUIT messages to the server. (#365, #395)
 
 # 2021/11/07: 0.10.0
 
