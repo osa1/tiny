@@ -222,8 +222,8 @@ impl Client {
     }
 
     /// Leave a channel.
-    pub fn part(&mut self, chan: &ChanNameRef) {
-        self.state.leave_channel(&mut self.msg_chan, chan)
+    pub fn part(&mut self, chan: &ChanNameRef, reason: Option<String>) {
+        self.state.leave_channel(&mut self.msg_chan, chan, reason)
     }
 
     /// Set away status. `None` means not away.

@@ -61,7 +61,7 @@ impl CmdUsage {
     }
 }
 
-const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "`/quit`");
+const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "`/quit` or `/quit <reason>`");
 const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "`/clear`");
 const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "`/ignore`");
 const NOTIFY_CMD: CmdUsage = CmdUsage::new(
@@ -107,8 +107,8 @@ pub(crate) enum CmdResult {
     Ok,
     /// Pass command through to cmd.rs for further handling
     Continue,
-    /// Quit command was executed
-    Quit,
+    /// Quit command was executed, with the payload as a quit message
+    Quit(Option<String>),
 }
 
 impl TUI {
@@ -299,7 +299,16 @@ impl TUI {
                 // Fall through to print help for cmd.rs commands
                 CmdResult::Continue
             }
-            Some("quit") => CmdResult::Quit,
+            Some("quit") => {
+                // Note: `SplitWhitespace::as_str` could be used here instead, when it gets stabilized.
+                let reason: String = cmd.chars().skip("quit ".len()).collect();
+
+                if reason.is_empty() {
+                    CmdResult::Quit(None)
+                } else {
+                    CmdResult::Quit(Some(reason))
+                }
+            }
             _ => CmdResult::Continue,
         }
     }

@@ -70,8 +70,15 @@ impl State {
         self.inner.borrow().get_chan_nicks(chan)
     }
 
-    pub(crate) fn leave_channel(&self, msg_chan: &mut Sender<Cmd>, chan: &ChanNameRef) {
-        self.inner.borrow_mut().leave_channel(msg_chan, chan)
+    pub(crate) fn leave_channel(
+        &self,
+        msg_chan: &mut Sender<Cmd>,
+        chan: &ChanNameRef,
+        reason: Option<String>,
+    ) {
+        self.inner
+            .borrow_mut()
+            .leave_channel(msg_chan, chan, reason)
     }
 
     pub(crate) fn kill_join_tasks(&self) {
@@ -687,7 +694,12 @@ impl StateInner {
     }
 
     /// If channel is in Joining state cancel Joining task, otherwise sent part message
-    fn leave_channel(&mut self, msg_chan: &mut Sender<Cmd>, chan: &ChanNameRef) {
+    fn leave_channel(
+        &mut self,
+        msg_chan: &mut Sender<Cmd>,
+        chan: &ChanNameRef,
+        reason: Option<String>,
+    ) {
         if let Some(idx) = utils::find_idx(&self.chans, |c| c.name == *chan) {
             match &mut self.chans[idx].join_state {
                 JoinState::NotJoined => {}
@@ -695,7 +707,9 @@ impl StateInner {
                     debug!("Aborting task to retry joining {}", chan.display());
                     let _ = stop_task.try_send(());
                 }
-                JoinState::Joined => msg_chan.try_send(Cmd::Msg(wire::part(chan))).unwrap(),
+                JoinState::Joined => msg_chan
+                    .try_send(Cmd::Msg(wire::part(chan, reason)))
+                    .unwrap(),
             }
         }
     }

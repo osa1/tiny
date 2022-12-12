@@ -133,12 +133,16 @@ static CLOSE_CMD: Cmd = Cmd {
     name: "close",
     cmd_fn: close,
     description: "Closes current tab",
-    usage: "`/close`",
+    usage: "`/close` or `/close <reason>`",
 };
 
 fn close(args: CmdArgs) {
     let CmdArgs {
-        ui, clients, src, ..
+        args,
+        ui,
+        clients,
+        src,
+        ..
     } = args;
     match src {
         MsgSource::Serv { ref serv } if serv == "mentions" => {
@@ -149,12 +153,20 @@ fn close(args: CmdArgs) {
             let client_idx = find_client_idx(clients, &serv).unwrap();
             // TODO: this probably won't close the connection?
             let mut client = clients.remove(client_idx);
-            client.quit(None);
+            if args.is_empty() {
+                client.quit(None);
+            } else {
+                client.quit(Some(args.to_string()));
+            }
         }
         MsgSource::Chan { serv, chan } => {
             ui.close_chan_tab(&serv, chan.borrow());
             let client_idx = find_client_idx(clients, &serv).unwrap();
-            clients[client_idx].part(&chan);
+            if args.is_empty() {
+                clients[client_idx].part(&chan, None);
+            } else {
+                clients[client_idx].part(&chan, Some(args.to_string()));
+            }
         }
         MsgSource::User { serv, nick } => {
             ui.close_user_tab(&serv, &nick);
