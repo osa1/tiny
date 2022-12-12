@@ -50,7 +50,7 @@ where
 pub fn part(chan: &ChanNameRef, reason: Option<String>) -> String {
     match reason {
         None => format!("PART {}\r\n", chan.display()),
-        Some(reason) => format!("PART {} {}\r\n", chan.display(), reason),
+        Some(reason) => format!("PART {} :{}\r\n", chan.display(), reason),
     }
 }
 
