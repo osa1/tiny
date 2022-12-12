@@ -133,7 +133,7 @@ static CLOSE_CMD: Cmd = Cmd {
     name: "close",
     cmd_fn: close,
     description: "Closes current tab",
-    usage: "`/close`",
+    usage: "`/close` or `/close <reason>`",
 };
 
 fn close(args: CmdArgs) {

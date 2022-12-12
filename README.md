@@ -171,7 +171,7 @@ Commands start with `/` character.
 - `/join <channel>`: Join to a channel
 
 - `/close`: Close the current tab. Leaves the channel if the current tab is a
-  channel. Leaves the server if the tab is a server.
+  channel. Leaves the server if the tab is a server. You can use `/close <reason>` to send a goodbye message.
 
 - `/connect <hostname>:<port>`: Connect to a server. Uses `defaults` in the
   config file for nick, realname, hostname and auto cmds.
