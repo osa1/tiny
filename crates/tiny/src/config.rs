@@ -181,10 +181,15 @@ impl Config<PassOrCmd> {
     pub(crate) fn validate(&self) -> Vec<String> {
         let mut errors = vec![];
 
-        // Check that nick lists are not empty
         if self.defaults.nicks.is_empty() {
             errors.push(
-                "Default nick list can't be empty, please add at least one defaut nick".to_string(),
+                "Default nick list can't be empty, please add at least one defaut nick".to_owned(),
+            );
+        }
+
+        if self.defaults.realname.is_empty() {
+            errors.push(
+                "realname can't be empty, please update 'realname' field of 'defaults'".to_owned(),
             );
         }
 
