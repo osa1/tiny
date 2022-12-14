@@ -115,7 +115,7 @@ impl<'de> Deserialize<'de> for PassOrCmd {
     {
         let str = String::deserialize(deserializer)?;
         let trimmed = str.trim();
-        if trimmed.starts_with('$') {
+        if let Some(trimmed) = trimmed.strip_prefix('$') {
             let rest = trimmed[1..].trim(); // drop '$'
             Ok(PassOrCmd::Cmd(
                 rest.split_whitespace().map(str::to_owned).collect(),
