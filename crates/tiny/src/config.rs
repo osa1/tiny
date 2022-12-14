@@ -1,9 +1,10 @@
-use libtiny_tui::config::Chan;
-use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+
+use libtiny_tui::config::Chan;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) struct SASLAuth {
@@ -35,8 +36,9 @@ pub(crate) struct Server {
     #[serde(deserialize_with = "deser_trimmed_str")]
     pub(crate) realname: String,
 
-    /// Nicks to try when connecting to this server. tiny tries these sequentially, and starts
-    /// adding trailing underscores to the last one if none of the nicks are available.
+    /// Nicks to try when connecting to this server. tiny tries these
+    /// sequentially, and starts adding trailing underscores to the last one
+    /// if none of the nicks are available.
     #[serde(deserialize_with = "deser_trimmed_str_vec")]
     pub(crate) nicks: Vec<String>,
 
@@ -44,7 +46,8 @@ pub(crate) struct Server {
     // #[serde(default, deserialize_with = "deser_chans")]
     pub(crate) join: Vec<Chan>,
 
-    /// NickServ identification password. Used on connecting to the server and nick change.
+    /// NickServ identification password. Used on connecting to the server and
+    /// nick change.
     pub(crate) nickserv_ident: Option<String>,
 
     /// Authenication method
@@ -148,7 +151,8 @@ impl Config {
 /// - $HOME/.config/tiny/config.yml
 /// - $HOME/.tinyrc.yml (old, for backward compat)
 ///
-/// Panics when none of $XDG_CONFIG_HOME or $HOME can be found (using the `dirs` crate).
+/// Panics when none of $XDG_CONFIG_HOME or $HOME can be found (using the `dirs`
+/// crate).
 pub(crate) fn get_config_path() -> PathBuf {
     let xdg_config_path = dirs::config_dir().map(|mut xdg_config_home| {
         xdg_config_home.push("tiny");
@@ -213,11 +217,12 @@ fn get_default_config_yaml() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use libtiny_common::ChanName;
     use libtiny_tui::config::TabConfig;
     use libtiny_tui::Notifier;
     use serde_yaml;
+
+    use super::*;
 
     #[test]
     fn parse_default_config() {
@@ -227,13 +232,10 @@ mod tests {
                 panic!();
             }
             Ok(Config { servers, .. }) => {
-                assert_eq!(
-                    servers[0].join,
-                    vec![Chan {
-                        name: ChanName::new("#tiny".to_string()),
-                        config: None,
-                    }]
-                );
+                assert_eq!(servers[0].join, vec![Chan {
+                    name: ChanName::new("#tiny".to_string()),
+                    config: TabConfig::default(),
+                }]);
                 assert_eq!(servers[0].tls, true);
             }
         }
@@ -241,8 +243,9 @@ mod tests {
 
     #[test]
     fn validation() {
-        // We trim the string fields when deserializing, so `validate` doesn't consider non-empty
-        // strings as empty even if they have only spaces, it assumes spaces should be trimmed
+        // We trim the string fields when deserializing, so `validate` doesn't consider
+        // non-empty strings as empty even if they have only spaces, it assumes
+        // spaces should be trimmed
         let config = Config {
             servers: vec![Server {
                 addr: "my_server".to_owned(),
@@ -289,15 +292,12 @@ mod tests {
             &get_default_config_yaml().replace("#tiny", "#tiny -ignore -notify off"),
         )
         .expect("parsed config");
-        assert_eq!(
-            config.servers[0].join,
-            vec![Chan {
-                name: ChanName::new("#tiny".to_string()),
-                config: Some(TabConfig {
-                    ignore: true,
-                    notifier: Notifier::Off
-                })
-            }]
-        );
+        assert_eq!(config.servers[0].join, vec![Chan {
+            name: ChanName::new("#tiny".to_string()),
+            config: TabConfig {
+                ignore: Some(true),
+                notifier: Some(Notifier::Off)
+            }
+        }]);
     }
 }

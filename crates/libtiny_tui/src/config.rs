@@ -1,15 +1,15 @@
 // To see how color numbers map to actual colors in your terminal run
 // `cargo run --example colors`. Use tab to swap fg/bg colors.
 
-use libtiny_common::{ChanName, ChanNameRef};
-use serde::de::{self, Deserializer, MapAccess, Visitor};
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
 
+use libtiny_common::{ChanName, ChanNameRef};
+use serde::de::{self, Deserializer, MapAccess, Visitor};
+use serde::Deserialize;
 pub use termbox_simple::*;
 
 use crate::key_map::KeyMap;
@@ -41,19 +41,30 @@ pub(crate) struct Server {
     pub(crate) addr: String,
     pub(crate) join: Vec<Chan>,
     #[serde(flatten)]
-    pub(crate) config: Option<TabConfig>,
+    pub(crate) config: TabConfig,
 }
 
-#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub(crate) struct Defaults {
-    #[serde(flatten)]
+    #[serde(default, flatten)]
     pub(crate) tab_config: TabConfig,
+}
+
+impl Default for Defaults {
+    fn default() -> Self {
+        Defaults {
+            tab_config: TabConfig {
+                ignore: Some(false),
+                notifier: Some(Notifier::default()),
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chan {
     pub name: ChanName,
-    pub config: Option<TabConfig>,
+    pub config: TabConfig,
 }
 
 impl<'de> Deserialize<'de> for Chan {
@@ -95,16 +106,16 @@ impl FromStr for Chan {
         match s.split_once(' ') {
             // with args
             Some((name, args)) => {
-                let configs = TabConfig::from_str(args)?;
+                let config = TabConfig::from_str(args)?;
                 Ok(Chan {
                     name: ChanName::new(name.to_string()),
-                    config: Some(configs),
+                    config,
                 })
             }
             // chan name only
             None => Ok(Chan {
                 name: ChanName::new(s),
-                config: None,
+                config: TabConfig::default(),
             }),
         }
     }
@@ -119,8 +130,10 @@ impl TabConfigs {
         self.0.get(serv_name).cloned()
     }
 
-    pub(crate) fn chan_conf(&self, serv_name: &str, chan: &ChanNameRef) -> Option<&TabConfig> {
-        self.0.get(&format!("{}_{}", serv_name, chan.display()))
+    pub(crate) fn chan_conf(&self, serv_name: &str, chan: &ChanNameRef) -> Option<TabConfig> {
+        self.0
+            .get(&format!("{}_{}", serv_name, chan.display()))
+            .cloned()
     }
 }
 
@@ -128,13 +141,14 @@ impl From<&Config> for TabConfigs {
     fn from(config: &Config) -> Self {
         let mut tab_configs = HashMap::new();
         for server in &config.servers {
-            let serv_tc = config.defaults.tab_config.merge(server.config.as_ref());
+            let serv_tc = server.config.or_use(&config.defaults.tab_config);
             tab_configs.insert(server.addr.clone(), serv_tc);
             for chan in &server.join {
-                let tc = serv_tc.merge(chan.config.as_ref());
+                let tc = chan.config.or_use(&serv_tc);
                 tab_configs.insert(format!("{}_{}", server.addr, chan.name.display()), tc);
             }
         }
+        debug!("new {tab_configs:?}");
         Self(tab_configs)
     }
 }
@@ -143,32 +157,24 @@ impl From<&Config> for TabConfigs {
 pub struct TabConfig {
     /// `true` if tab is ignoring join/part messages
     #[serde(default)]
-    pub ignore: bool,
+    pub ignore: Option<bool>,
     /// Notification setting for tab
     #[serde(default)]
-    pub notifier: Notifier,
+    pub notifier: Option<Notifier>,
 }
 
 impl TabConfig {
-    pub(crate) fn user_tab_config() -> TabConfig {
+    pub fn user_tab_config() -> TabConfig {
         TabConfig {
-            ignore: false,
-            notifier: Notifier::Messages,
+            ignore: Some(false),
+            notifier: Some(Notifier::Messages),
         }
     }
 
-    pub(crate) fn merge(&self, config: Option<&TabConfig>) -> TabConfig {
-        if let Some(config) = config {
-            TabConfig {
-                ignore: self.ignore ^ config.ignore,
-                notifier: if config.notifier > self.notifier {
-                    config.notifier
-                } else {
-                    self.notifier
-                },
-            }
-        } else {
-            self.to_owned()
+    pub(crate) fn or_use(&self, config: &TabConfig) -> TabConfig {
+        TabConfig {
+            ignore: self.ignore.or(config.ignore),
+            notifier: self.notifier.or(config.notifier),
         }
     }
 }
@@ -183,13 +189,13 @@ impl FromStr for TabConfig {
             .try_fold(TabConfig::default(), |mut tc, arg| match arg {
                 // flag
                 "ignore" => {
-                    tc.ignore = true;
+                    tc.ignore = Some(true);
                     Ok(tc)
                 }
                 arg => match arg.split_once(' ') {
                     // arg with parameter
                     Some(("notify", val)) => {
-                        tc.notifier = Notifier::from_str(val)?;
+                        tc.notifier = Some(Notifier::from_str(val)?);
                         Ok(tc)
                     }
                     _ => Err(format!("Unexpected argument: {:?}", arg)),
@@ -311,7 +317,6 @@ impl Default for Colors {
     }
 }
 
-//
 // Parsing
 //
 

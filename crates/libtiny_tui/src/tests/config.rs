@@ -27,32 +27,32 @@ fn parsing_tab_configs() {
                 addr: "server".to_string(),
                 join: vec![Chan {
                     name: ChanName::new("#tiny".to_string()),
-                    config: Some(TabConfig {
-                        ignore: true,
-                        notifier: Notifier::Messages,
-                    }),
+                    config: TabConfig {
+                        ignore: Some(true),
+                        notifier: Some(Notifier::Messages),
+                    },
                 }],
-                config: Some(TabConfig {
-                    notifier: Notifier::Mentions,
+                config: TabConfig {
+                    notifier: Some(Notifier::Mentions),
                     ..Default::default()
-                }),
+                },
             },
             Server {
                 addr: "server2".to_string(),
                 join: vec![Chan {
                     name: ChanName::new("#tiny2".to_string()),
-                    config: None,
+                    config: TabConfig::default(),
                 }],
-                config: Some(TabConfig {
-                    ignore: true,
+                config: TabConfig {
+                    ignore: Some(true),
                     ..Default::default()
-                }),
+                },
             },
         ],
         defaults: Defaults {
             tab_config: TabConfig {
-                ignore: false,
-                notifier: Notifier::Off,
+                ignore: Some(false),
+                notifier: Some(Notifier::Off),
             },
         },
         ..Default::default()
@@ -63,16 +63,16 @@ fn parsing_tab_configs() {
     assert_eq!(
         tab_configs.serv_conf("server"),
         Some(TabConfig {
-            ignore: false,                // overwritten by defaults
-            notifier: Notifier::Mentions  // configured
+            ignore: Some(false),                // overwritten by defaults
+            notifier: Some(Notifier::Mentions)  // configured
         })
     );
 
     assert_eq!(
         tab_configs.serv_conf("server2"),
         Some(TabConfig {
-            ignore: true,            // configured
-            notifier: Notifier::Off  // overwritten by defaults
+            ignore: Some(true),                  // configured
+            notifier: Some(Notifier::default())  // overwritten by defaults
         })
     );
 
@@ -81,8 +81,8 @@ fn parsing_tab_configs() {
     assert_eq!(
         tab_configs.chan_conf("server", ChanNameRef::new("#tiny")),
         Some(&TabConfig {
-            ignore: true,                 // configured
-            notifier: Notifier::Messages  // configured
+            ignore: Some(true),                 // configured
+            notifier: Some(Notifier::Messages)  // configured
         })
     );
 
@@ -94,8 +94,8 @@ fn parsing_tab_configs() {
     assert_eq!(
         tab_configs.chan_conf("server2", ChanNameRef::new("#tiny2")),
         Some(&TabConfig {
-            ignore: true,            // overwritten by server
-            notifier: Notifier::Off  // overwritten by defaults
+            ignore: Some(true),            // overwritten by server
+            notifier: Some(Notifier::Off)  // overwritten by defaults
         })
     );
 }

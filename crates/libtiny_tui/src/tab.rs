@@ -1,13 +1,10 @@
 use libtiny_common::{MsgSource, TabStyle};
 use termbox_simple::{Termbox, TB_UNDERLINE};
-
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    config::{Colors, Style},
-    messaging::MessagingUI,
-    notifier::Notifier,
-};
+use crate::config::{Colors, Style, TabConfigs};
+use crate::messaging::MessagingUI;
+use crate::notifier::Notifier;
 
 pub(crate) struct Tab {
     pub(crate) visible_name: String,
@@ -71,6 +68,19 @@ impl Tab {
                 tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
             }
             pos_x += 1;
+        }
+    }
+
+    pub(crate) fn update_config(&mut self, configs: &TabConfigs) {
+        let config = match &self.src {
+            MsgSource::Serv { serv } => configs.serv_conf(serv),
+            MsgSource::Chan { serv, chan } => configs.chan_conf(serv, chan.as_ref()),
+            MsgSource::User { .. } => None,
+        };
+        if let Some(config) = config {
+            self.widget
+                .set_or_toggle_status(Some(config.ignore.map(|i| !i).unwrap_or_default()));
+            self.notifier = config.notifier.unwrap_or(self.notifier);
         }
     }
 }

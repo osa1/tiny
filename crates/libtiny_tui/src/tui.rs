@@ -11,6 +11,10 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
+
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
+use term_input::{Event, Key};
+pub use termbox_simple::{CellBuf, Termbox};
 use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style, TabConfig, TabConfigs};
@@ -21,10 +25,6 @@ use crate::msg_area::Layout;
 use crate::notifier::Notifier;
 use crate::tab::Tab;
 use crate::widget::WidgetRet;
-
-use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
-use term_input::{Event, Key};
-pub use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
@@ -120,8 +120,9 @@ impl TUI {
         TUI::new_tb(Some(config_path), tb)
     }
 
-    /// Create a test instance. Does not render to the screen, just updates the termbox buffer.
-    /// Useful for testing rendering. See also [`get_front_buffer`](TUI::get_front_buffer).
+    /// Create a test instance. Does not render to the screen, just updates the
+    /// termbox buffer. Useful for testing rendering. See also
+    /// [`get_front_buffer`](TUI::get_front_buffer).
     pub fn new_test(w: u16, h: u16) -> TUI {
         let tb = Termbox::init_test(w, h);
         TUI::new_tb(None, tb)
@@ -172,8 +173,8 @@ impl TUI {
             tab_configs: TabConfigs::default(),
         };
 
-        // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
-        // show any errors in TUI.
+        // Init "mentions" tab. This needs to happen right after creating the TUI to be
+        // able to show any errors in TUI.
         tui.new_server_tab("mentions", None);
         tui.add_client_msg(
             "Any mentions to you will be listed here.",
@@ -287,6 +288,7 @@ impl TUI {
             }
             Some("reload") => {
                 self.reload_config();
+                self.add_client_notify_msg("Reloaded config file.", &MsgTarget::CurrentTab);
                 CmdResult::Ok
             }
             Some("help") => {
@@ -304,7 +306,8 @@ impl TUI {
                 CmdResult::Continue
             }
             Some("quit") => {
-                // Note: `SplitWhitespace::as_str` could be used here instead, when it gets stabilized.
+                // Note: `SplitWhitespace::as_str` could be used here instead, when it gets
+                // stabilized.
                 let reason: String = cmd.chars().skip("quit ".len()).collect();
 
                 if reason.is_empty() {
@@ -337,6 +340,9 @@ impl TUI {
     fn apply_config(&mut self, config: Option<Config>) {
         if let Some(config) = config {
             self.tab_configs = config.borrow().into();
+            for tab in &mut self.tabs {
+                tab.update_config(&self.tab_configs);
+            }
             let Config {
                 colors,
                 scrollback,
@@ -420,39 +426,38 @@ impl TUI {
             MsgSource::Serv { serv } => self.tab_configs.serv_conf(serv).unwrap_or_default(),
             MsgSource::Chan { serv, chan } => {
                 let tab_configs = self.tab_configs.chan_conf(serv, chan);
-                // Prioritize config file but fallback to current server tab settings (when Defaults are not set)
+                // Prioritize config file but fallback to current server tab settings (when
+                // Defaults are not set)
                 let server_tab_config = self
                     .tabs
                     .iter()
                     .find(|tab| tab.src.serv_name() == serv)
                     .map(|tab| TabConfig {
-                        ignore: !tab.widget.is_showing_status(),
-                        notifier: tab.notifier,
+                        ignore: Some(!tab.widget.is_showing_status()),
+                        notifier: Some(tab.notifier),
                     })
                     .expect("Creating a channel or user tab, but the server tab doesn't exist");
-                server_tab_config.merge(tab_configs)
+                debug!("{visible_name} tab conf: {tab_configs:?}");
+                tab_configs.unwrap_or(server_tab_config)
             }
             MsgSource::User { .. } => TabConfig::user_tab_config(),
         };
-        let status = !ignore;
+        let status = !ignore.unwrap_or_default();
 
-        self.tabs.insert(
-            idx,
-            Tab {
-                visible_name,
-                widget: MessagingUI::new(
-                    self.width,
-                    self.height - 1,
-                    status,
-                    self.scrollback,
-                    self.msg_layout,
-                ),
-                src,
-                style: TabStyle::Normal,
-                switch,
-                notifier,
-            },
-        );
+        self.tabs.insert(idx, Tab {
+            visible_name,
+            widget: MessagingUI::new(
+                self.width,
+                self.height - 1,
+                status,
+                self.scrollback,
+                self.msg_layout,
+            ),
+            src,
+            style: TabStyle::Normal,
+            switch,
+            notifier: notifier.unwrap_or_default(),
+        });
     }
 
     /// Returns index of the new tab if a new tab is created.
@@ -961,8 +966,9 @@ impl TUI {
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
 
-    /// After closing a tab scroll left if there is space on the right and we can fit more tabs
-    /// from the left into the visible part of the tab bar.
+    /// After closing a tab scroll left if there is space on the right and we
+    /// can fit more tabs from the left into the visible part of the tab
+    /// bar.
     fn fix_scroll_after_close(&mut self) {
         let (tab_left, tab_right) = self.rendered_tabs();
 
@@ -986,8 +992,8 @@ impl TUI {
         // How much to scroll left
         let mut scroll_left = 0;
 
-        // Start iterating tabs on the left, add the tab size to `scroll_left` as long as scrolling
-        // doesn't make the right-most tab go out of bounds
+        // Start iterating tabs on the left, add the tab size to `scroll_left` as long
+        // as scrolling doesn't make the right-most tab go out of bounds
         for left_tab_idx in (0..tab_left).rev() {
             let tab_width = self.tabs[left_tab_idx].width() + 1; // 1 for space
             let draw_arrow = left_tab_idx != 0;
@@ -1173,9 +1179,9 @@ impl TUI {
     where
         F: Fn(&mut Tab, bool),
     {
-        // Creating a vector just to make borrow checker happy (I can't have a Vec<&mut Tab>)
-        // I need to collect tabs here because of the "create if not exists" logic.
-        // (see `target_idxs.is_empty()` below)
+        // Creating a vector just to make borrow checker happy (I can't have a Vec<&mut
+        // Tab>) I need to collect tabs here because of the "create if not
+        // exists" logic. (see `target_idxs.is_empty()` below)
         let mut target_idxs: Vec<usize> = Vec::with_capacity(1);
 
         match *target {
@@ -1272,8 +1278,8 @@ impl TUI {
 
     pub(crate) fn set_tab_config(&mut self, config: TabConfig, target: &MsgTarget) {
         self.apply_to_target(target, true, &|tab: &mut Tab, _| {
-            tab.widget.set_or_toggle_status(Some(!config.ignore));
-            tab.notifier = config.notifier;
+            tab.widget.set_or_toggle_status(config.ignore.map(|i| !i));
+            tab.notifier = config.notifier.unwrap_or_default();
         });
     }
 

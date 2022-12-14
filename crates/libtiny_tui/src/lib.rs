@@ -23,17 +23,13 @@ mod widget;
 #[cfg(test)]
 mod tests;
 
-pub use notifier::Notifier;
-
-use crate::config::TabConfig;
-use crate::tui::{CmdResult, TUIRet};
-use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
-use term_input::Input;
-
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 
+use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
+pub use notifier::Notifier;
+use term_input::Input;
 use time::Tm;
 use tokio::select;
 use tokio::signal::unix::{signal, SignalKind};
@@ -41,6 +37,9 @@ use tokio::sync::mpsc;
 use tokio::task::spawn_local;
 use tokio_stream::wrappers::{ReceiverStream, SignalStream};
 use tokio_stream::{Stream, StreamExt};
+
+use crate::config::TabConfig;
+use crate::tui::{CmdResult, TUIRet};
 
 #[macro_use]
 extern crate log;
@@ -70,8 +69,9 @@ impl TUI {
         (TUI { inner }, rcv_ev)
     }
 
-    /// Create a test instance that doesn't render to the terminal, just updates the termbox
-    /// buffer. Useful for testing. See also [`get_front_buffer`](TUI::get_front_buffer).
+    /// Create a test instance that doesn't render to the terminal, just updates
+    /// the termbox buffer. Useful for testing. See also
+    /// [`get_front_buffer`](TUI::get_front_buffer).
     pub fn run_test<S>(width: u16, height: u16, input_stream: S) -> (TUI, mpsc::Receiver<Event>)
     where
         S: Stream<Item = std::io::Result<term_input::Event>> + Unpin + 'static,

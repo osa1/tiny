@@ -1,11 +1,11 @@
-use crate::MsgTarget;
 use std::str::FromStr;
 
 use libtiny_wire::formatting::remove_irc_control_chars;
-use serde::Deserialize;
-
 #[cfg(feature = "desktop-notifications")]
 use notify_rust::Notification;
+use serde::Deserialize;
+
+use crate::MsgTarget;
 
 /// Destktop notification handler
 #[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
