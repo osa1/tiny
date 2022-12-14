@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn parse_default_config() {
-        match serde_yaml::from_str(&get_default_config_yaml()) {
+        match serde_yaml::from_str::<Config<String>>(&get_default_config_yaml()) {
             Err(yaml_err) => {
                 println!("{}", yaml_err);
                 panic!();
