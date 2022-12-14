@@ -207,6 +207,15 @@ impl Config<PassOrCmd> {
                 ));
             }
 
+            for (nick_idx, nick) in server.nicks.iter().enumerate() {
+                if nick.is_empty() {
+                    errors.push(format!(
+                        "Nicks can't be empty, please update nick {} for '{}'",
+                        nick_idx, server.addr
+                    ));
+                }
+            }
+
             if server.realname.is_empty() {
                 errors.push(format!(
                     "'realname' can't be empty, please update 'realname' field of '{}'",
