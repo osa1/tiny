@@ -44,7 +44,10 @@ fn main() {
             Ok(config) => {
                 let config_errors = config.validate();
                 if !config_errors.is_empty() {
-                    println!("Config file error(s):");
+                    println!(
+                        "Config file error{}:",
+                        if config_errors.len() > 1 { "s" } else { "" }
+                    );
                     for error in config_errors {
                         println!("- {}", error);
                     }
@@ -175,7 +178,7 @@ fn run(
         }
 
         // Block on TUI task
-        ui::task(config_path, defaults, tui, clients, rcv_tui_ev).await;
+        ui::task(defaults, tui, clients, rcv_tui_ev).await;
     });
 
     runtime.block_on(local);

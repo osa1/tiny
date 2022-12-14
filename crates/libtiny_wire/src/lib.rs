@@ -5,6 +5,8 @@
 //! This library is for implementing clients rather than servers or services, and does not support
 //! the IRC message format in full generality.
 
+pub mod formatting;
+
 use std::str;
 
 use libtiny_common::{ChanName, ChanNameRef};
@@ -37,13 +39,19 @@ pub fn pong(arg: &str) -> String {
     format!("PONG {}\r\n", arg)
 }
 
-pub fn join(chans: &[&ChanNameRef]) -> String {
-    let chans = chans.iter().map(|c| c.display()).collect::<Vec<_>>();
+pub fn join<'a, I>(chans: I) -> String
+where
+    I: Iterator<Item = &'a ChanNameRef> + 'a,
+{
+    let chans = chans.map(|c| c.display()).collect::<Vec<_>>();
     format!("JOIN {}\r\n", chans.join(","))
 }
 
-pub fn part(chan: &ChanNameRef) -> String {
-    format!("PART {}\r\n", chan.display())
+pub fn part(chan: &ChanNameRef, reason: Option<String>) -> String {
+    match reason {
+        None => format!("PART {}\r\n", chan.display()),
+        Some(reason) => format!("PART {} :{}\r\n", chan.display(), reason),
+    }
 }
 
 pub fn privmsg(msgtarget: &str, msg: &str) -> String {
@@ -145,8 +153,8 @@ impl Pfx {
 fn parse_pfx(pfx: &str) -> Pfx {
     match pfx.find(&['!', '@'][..]) {
         Some(idx) => Pfx::User {
-            nick: (&pfx[0..idx]).to_owned(),
-            user: (&pfx[idx + 1..]).to_owned(),
+            nick: pfx[0..idx].to_owned(),
+            user: pfx[idx + 1..].to_owned(),
         },
         None => {
             // Chars that nicks can have but servernames cannot
@@ -191,7 +199,7 @@ pub struct Msg {
     pub cmd: Cmd,
 }
 
-/// A client-to-client protocol message. See https://defs.ircdocs.horse/defs/ctcp.html
+/// A client-to-client protocol message. See <https://defs.ircdocs.horse/defs/ctcp.html>.
 #[derive(Debug, PartialEq, Eq)]
 pub enum CTCP {
     Version,
@@ -511,7 +519,7 @@ fn parse_params(chrs: &str) -> Vec<&str> {
 
 /// Nicks may have prefixes, indicating it is a operator, founder, or something else.
 ///
-/// Channel Membership Prefixes: http://modern.ircdocs.horse/#channel-membership-prefixes
+/// Channel membership prefixes: <http://modern.ircdocs.horse/#channel-membership-prefixes>
 ///
 /// Returns the nick without prefix.
 pub fn drop_nick_prefix(nick: &str) -> &str {

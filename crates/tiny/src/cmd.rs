@@ -1,18 +1,13 @@
-// I think borrowed boxing is necessary for objekt::clone_box to work
-#![allow(clippy::borrowed_box)]
-
 use crate::config;
 use crate::ui::UI;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
-use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
+use libtiny_common::{ChanName, ChanNameRef, MsgSource, MsgTarget};
 
 use std::borrow::Borrow;
-use std::path::Path;
 
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
-    pub config_path: &'a Path,
     pub defaults: &'a config::Defaults,
     pub ui: &'a UI,
     pub clients: &'a mut Vec<Client>,
@@ -91,7 +86,7 @@ fn find_client_idx(clients: &[Client], serv_name: &str) -> Option<usize> {
     None
 }
 
-fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a mut Client> {
+fn find_client<'a>(clients: &'a mut [Client], serv_name: &str) -> Option<&'a mut Client> {
     match find_client_idx(clients, serv_name) {
         None => None,
         Some(idx) => Some(&mut clients[idx]),
@@ -118,7 +113,7 @@ static AWAY_CMD: Cmd = Cmd {
     name: "away",
     cmd_fn: away,
     description: "Sets/removes away message",
-    usage: "/away [msg]",
+    usage: "`/away` or `/away <message>`",
 };
 
 fn away(args: CmdArgs) {
@@ -138,12 +133,16 @@ static CLOSE_CMD: Cmd = Cmd {
     name: "close",
     cmd_fn: close,
     description: "Closes current tab",
-    usage: "/close",
+    usage: "`/close` or `/close <reason>`",
 };
 
 fn close(args: CmdArgs) {
     let CmdArgs {
-        ui, clients, src, ..
+        args,
+        ui,
+        clients,
+        src,
+        ..
     } = args;
     match src {
         MsgSource::Serv { ref serv } if serv == "mentions" => {
@@ -151,15 +150,23 @@ fn close(args: CmdArgs) {
         }
         MsgSource::Serv { serv } => {
             ui.close_server_tab(&serv);
-            let client_idx = find_client_idx(&clients, &serv).unwrap();
+            let client_idx = find_client_idx(clients, &serv).unwrap();
             // TODO: this probably won't close the connection?
             let mut client = clients.remove(client_idx);
-            client.quit(None);
+            if args.is_empty() {
+                client.quit(None);
+            } else {
+                client.quit(Some(args.to_string()));
+            }
         }
         MsgSource::Chan { serv, chan } => {
             ui.close_chan_tab(&serv, chan.borrow());
-            let client_idx = find_client_idx(&clients, &serv).unwrap();
-            clients[client_idx].part(&chan);
+            let client_idx = find_client_idx(clients, &serv).unwrap();
+            if args.is_empty() {
+                clients[client_idx].part(&chan, None);
+            } else {
+                clients[client_idx].part(&chan, Some(args.to_string()));
+            }
         }
         MsgSource::User { serv, nick } => {
             ui.close_user_tab(&serv, &nick);
@@ -173,7 +180,7 @@ static CONNECT_CMD: Cmd = Cmd {
     name: "connect",
     cmd_fn: connect,
     description: "Connects to a server",
-    usage: "/connect <host>:<port> or /connect (to reconnect)",
+    usage: "`/connect <host>:<port>` or `/connect` to reconnect",
 };
 
 fn connect(args: CmdArgs) {
@@ -191,15 +198,14 @@ fn connect(args: CmdArgs) {
         0 => reconnect(ui, clients, src),
         1 => connect_(words[0], None, defaults, ui, clients),
         2 => connect_(words[0], Some(words[1]), defaults, ui, clients),
-        _ =>
-        // wat
-        {
-            ui.add_client_err_msg(CONNECT_CMD.usage, &MsgTarget::CurrentTab)
-        }
+        _ => ui.add_client_err_msg(
+            &format!("Usage: {}", CONNECT_CMD.usage),
+            &MsgTarget::CurrentTab,
+        ),
     }
 }
 
-fn reconnect(ui: &UI, clients: &mut Vec<Client>, src: MsgSource) {
+fn reconnect(ui: &UI, clients: &mut [Client], src: MsgSource) {
     if let Some(client) = find_client(clients, src.serv_name()) {
         ui.add_client_msg(
             "Reconnecting...",
@@ -286,7 +292,7 @@ static JOIN_CMD: Cmd = Cmd {
     name: "join",
     cmd_fn: join,
     description: "Joins a channel",
-    usage: "/join chan1[,chan2...]",
+    usage: "`/join <chan1>,<chan2>,...` or `/join` in a channel tab to rejoin",
 };
 
 fn join(args: CmdArgs) {
@@ -297,18 +303,42 @@ fn join(args: CmdArgs) {
         src,
         ..
     } = args;
-    let words = args
-        .split_whitespace()
-        .map(|c| ChanNameRef::new(c))
-        .collect::<Vec<_>>();
-    if words.is_empty() {
-        return ui.add_client_err_msg(JOIN_CMD.usage, &MsgTarget::CurrentTab);
+
+    if let MsgSource::Serv { serv } = &src {
+        if serv == "mentions" {
+            return ui.add_client_err_msg(
+                "Switch to a server tab to join a channel",
+                &MsgTarget::CurrentTab,
+            );
+        }
     }
 
+    let words = args
+        .split_whitespace()
+        .map(|c| ChanName::new(c.to_owned()))
+        .collect::<Vec<_>>();
+
+    let chans: Vec<ChanName> = if words.is_empty() {
+        match ui.current_tab() {
+            None => return,
+            Some(MsgSource::Chan { serv: _, chan }) => {
+                vec![chan]
+            }
+            Some(_) => {
+                return ui.add_client_err_msg(
+                    &format!("Usage: {}", JOIN_CMD.usage),
+                    &MsgTarget::CurrentTab,
+                )
+            }
+        }
+    } else {
+        words
+    };
+
     match find_client(clients, src.serv_name()) {
-        Some(client) => client.join(&words),
+        Some(client) => client.join(chans.iter().map(ChanName::as_ref)),
         None => ui.add_client_err_msg(
-            &format!("Can't JOIN: Not connected to server {}", src.serv_name()),
+            &format!("Can't join: Not connected to server {}", src.serv_name()),
             &MsgTarget::CurrentTab,
         ),
     }
@@ -320,7 +350,7 @@ static ME_CMD: Cmd = Cmd {
     name: "me",
     cmd_fn: me,
     description: "Sends emote message",
-    usage: "/me message",
+    usage: "`/me <message>`",
 };
 
 fn me(args: CmdArgs) {
@@ -332,7 +362,7 @@ fn me(args: CmdArgs) {
         ..
     } = args;
     if args.is_empty() {
-        return ui.add_client_err_msg(ME_CMD.usage, &MsgTarget::CurrentTab);
+        return ui.add_client_err_msg(&format!("Usage: {}", ME_CMD.usage), &MsgTarget::CurrentTab);
     }
     crate::ui::send_msg(ui, clients, &src, args.to_string(), true);
 }
@@ -343,7 +373,7 @@ static MSG_CMD: Cmd = Cmd {
     name: "msg",
     cmd_fn: msg,
     description: "Sends a message to a user",
-    usage: "/msg nick message",
+    usage: "`/msg <nick> <message>`",
 };
 
 fn split_msg_args(args: &str) -> Option<(&str, &str)> {
@@ -381,7 +411,7 @@ fn msg(args: CmdArgs) {
         ..
     } = args;
     let fail = || {
-        ui.add_client_err_msg(MSG_CMD.usage, &MsgTarget::CurrentTab);
+        ui.add_client_err_msg(&format!("Usage: {}", MSG_CMD.usage), &MsgTarget::CurrentTab);
     };
 
     let (target, msg) = match split_msg_args(args) {
@@ -419,7 +449,7 @@ static NAMES_CMD: Cmd = Cmd {
     name: "names",
     cmd_fn: names,
     description: "Shows users in channel",
-    usage: "/names",
+    usage: "`/names`",
 };
 
 fn names(args: CmdArgs) {
@@ -466,7 +496,7 @@ static NICK_CMD: Cmd = Cmd {
     name: "nick",
     cmd_fn: nick,
     description: "Sets your nick",
-    usage: "/nick <nick>",
+    usage: "`/nick <nick>`",
 };
 
 fn nick(args: CmdArgs) {
@@ -484,7 +514,10 @@ fn nick(args: CmdArgs) {
             client.nick(new_nick);
         }
     } else {
-        ui.add_client_err_msg(NICK_CMD.usage, &MsgTarget::CurrentTab);
+        ui.add_client_err_msg(
+            &format!("Usage: {}", NICK_CMD.usage),
+            &MsgTarget::CurrentTab,
+        );
     }
 }
 
@@ -492,7 +525,7 @@ static HELP_CMD: Cmd = Cmd {
     name: "help",
     cmd_fn: help,
     description: "Displays this message",
-    usage: "/help",
+    usage: "`/help`",
 };
 
 fn help(args: CmdArgs) {

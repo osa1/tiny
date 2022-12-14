@@ -3,7 +3,13 @@
 use crate::config::Style;
 use termbox_simple::Termbox;
 
-pub(crate) fn print_chars<C>(tb: &mut Termbox, mut pos_x: i32, pos_y: i32, style: Style, chars: C)
+pub(crate) fn print_chars<C>(
+    tb: &mut Termbox,
+    mut pos_x: i32,
+    pos_y: i32,
+    style: Style,
+    chars: C,
+) -> i32
 where
     C: Iterator<Item = char>,
 {
@@ -11,4 +17,6 @@ where
         tb.change_cell(pos_x, pos_y, char, style.fg, style.bg);
         pos_x += 1;
     }
+
+    pos_x
 }

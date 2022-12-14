@@ -5,12 +5,13 @@ authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "Input handling for xterm-compatible terminals"
 repository = "https://github.com/osa1/tiny"
 license = "MIT"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 libc = "0.2"
 log = "0.4"
-mio = "0.7"
-nix = "0.19"
+mio = "0.8"
+nix = "0.23"
 term_input_macros = { path = "../term_input_macros" }
-tokio = { version = "0.3.6", default-features = false, features = ["rt", "net", "stream"] }
+tokio = { version = "1.17", default-features = false, features = ["net", "rt"] }
+tokio-stream = "0.1"

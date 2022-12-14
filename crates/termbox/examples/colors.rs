@@ -1,6 +1,7 @@
 use term_input::{Event, Input, Key};
 use termbox_simple::*;
-use tokio::stream::StreamExt;
+
+use tokio_stream::StreamExt;
 
 fn main() {
     let mut tui = Termbox::init().unwrap();
@@ -54,7 +55,7 @@ fn draw_range(tui: &mut Termbox, begin: u16, end: u16, mut row: i32, fg: bool) -
         let string = format!("{:>3}", i);
         let fg_ = if fg { i } else { 0 };
         let bg_ = if fg { 0 } else { i };
-        tui.change_cell(col, row, string.chars().nth(0).unwrap(), fg_, bg_);
+        tui.change_cell(col, row, string.chars().next().unwrap(), fg_, bg_);
         tui.change_cell(col + 2, row, string.chars().nth(2).unwrap(), fg_, bg_);
         tui.change_cell(col + 1, row, string.chars().nth(1).unwrap(), fg_, bg_);
         col += 4;

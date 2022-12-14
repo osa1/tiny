@@ -2,7 +2,7 @@
 name = "libtiny_tui"
 version = "0.1.0"
 description = "A terminal UI for tiny"
-edition = "2018"
+edition = "2021"
 
 [[bench]]
 name = "bench"
@@ -13,20 +13,21 @@ default = []
 desktop-notifications = ["notify-rust"]
 
 [dependencies]
-futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 libtiny_common = { path = "../libtiny_common" }
+libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
-notify-rust = { version = "3", optional = true }
+notify-rust = { version = "4", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 tempfile = "3.1"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
 time = "0.1"
-tokio = { version = "0.3.6", default-features = false, features = ["sync", "signal", "stream", "time"] }
+tokio = { version = "1.17", default-features = false, features = ["signal", "macros"] }
+tokio-stream = { version = "0.1", features = ["signal"] }
 unicode-width = "0.1"
 
 [dev-dependencies]
 bencher = "0.1"
 libc = "0.2"
-mio = "0.7"
+mio = "0.8"

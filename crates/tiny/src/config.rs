@@ -1,17 +1,18 @@
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) struct SASLAuth<P> {
     pub(crate) username: String,
     pub(crate) password: P,
 }
 
 #[derive(Clone, Deserialize)]
+#[serde(bound(deserialize = "P: Deserialize<'de>"))]
 pub(crate) struct Server<P> {
     /// Address of the server
     pub(crate) addr: String,
@@ -32,10 +33,12 @@ pub(crate) struct Server<P> {
     pub(crate) pass: Option<P>,
 
     /// Real name to be used in connection registration
+    #[serde(deserialize_with = "deser_trimmed_str")]
     pub(crate) realname: String,
 
     /// Nicks to try when connecting to this server. tiny tries these sequentially, and starts
     /// adding trailing underscores to the last one if none of the nicks are available.
+    #[serde(deserialize_with = "deser_trimmed_str_vec")]
     pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
@@ -43,7 +46,6 @@ pub(crate) struct Server<P> {
     pub(crate) join: Vec<String>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
-    #[serde(default)]
     pub(crate) nickserv_ident: Option<P>,
 
     /// Authenication method
@@ -54,7 +56,9 @@ pub(crate) struct Server<P> {
 /// Similar to `Server`, but used when connecting via the `/connect` command.
 #[derive(Clone, Deserialize)]
 pub(crate) struct Defaults {
+    #[serde(deserialize_with = "deser_trimmed_str_vec")]
     pub(crate) nicks: Vec<String>,
+    #[serde(deserialize_with = "deser_trimmed_str")]
     pub(crate) realname: String,
     #[serde(default)]
     pub(crate) join: Vec<String>,
@@ -62,12 +66,27 @@ pub(crate) struct Defaults {
     pub(crate) tls: bool,
 }
 
-// TODO FIXME: I don't understand why we need `Default` bound here on `P`
 #[derive(Deserialize)]
-pub(crate) struct Config<P: Default> {
+pub(crate) struct Config<P> {
     pub(crate) servers: Vec<Server<P>>,
     pub(crate) defaults: Defaults,
     pub(crate) log_dir: Option<PathBuf>,
+}
+
+fn deser_trimmed_str<'de, D>(d: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let str = String::deserialize(d)?;
+    Ok(str.trim().to_owned())
+}
+
+fn deser_trimmed_str_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let strs: Vec<String> = Vec::deserialize(d)?;
+    Ok(strs.into_iter().map(|s| s.trim().to_owned()).collect())
 }
 
 /// A password, or a shell command to run the obtain a password. Used for password (server
@@ -86,14 +105,6 @@ impl PassOrCmd {
             PassOrCmd::Cmd(cmd) => cmd.is_empty(),
             PassOrCmd::Pass(_) => false,
         }
-    }
-}
-
-impl Default for PassOrCmd {
-    fn default() -> Self {
-        // HACK FIXME TODO - For some reason we need `Default` for `PassOrCmd` to be able to
-        // deserialize `Config`. No idea why.
-        panic!("default() called for PassOrCmd");
     }
 }
 
@@ -177,12 +188,23 @@ impl Config<PassOrCmd> {
             );
         }
 
+        for (nick_idx, nick) in self.defaults.nicks.iter().enumerate() {
+            if nick.is_empty() {
+                errors.push(format!("Default nick {} is empty", nick_idx));
+            }
+        }
+
         for server in &self.servers {
-            // TODO: Empty nick strings
-            // TODO: Empty realname strings
             if server.nicks.is_empty() {
                 errors.push(format!(
                     "Nick list for server '{}' is empty, please add at least one nick",
+                    server.addr
+                ));
+            }
+
+            if server.realname.is_empty() {
+                errors.push(format!(
+                    "'realname' can't be empty, please update 'realname' field of '{}'",
                     server.addr
                 ));
             }
@@ -363,19 +385,62 @@ fn get_default_config_yaml() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_yaml;
 
     #[test]
     fn parse_default_config() {
-        match serde_yaml::from_str::<Config<PassOrCmd>>(&get_default_config_yaml()) {
+        match serde_yaml::from_str(&get_default_config_yaml()) {
             Err(yaml_err) => {
                 println!("{}", yaml_err);
                 panic!();
             }
             Ok(Config { servers, .. }) => {
                 assert_eq!(servers[0].join, vec!["#tiny".to_owned()]);
-                assert_eq!(servers[0].tls, true);
+                assert!(servers[0].tls);
             }
         }
+    }
+
+    #[test]
+    fn validation() {
+        // We trim the string fields when deserializing, so `validate` doesn't consider non-empty
+        // strings as empty even if they have only spaces, it assumes spaces should be trimmed
+        let config = Config {
+            servers: vec![Server {
+                addr: "my_server".to_owned(),
+                alias: None,
+                port: 123,
+                tls: false,
+                pass: None,
+                realname: "".to_owned(),
+                nicks: vec!["".to_owned()],
+                join: vec![],
+                nickserv_ident: None,
+                sasl_auth: None,
+            }],
+            defaults: Defaults {
+                nicks: vec!["".to_owned()],
+                realname: "".to_owned(),
+                join: vec![],
+                tls: false,
+            },
+            log_dir: None,
+        };
+
+        let errors = config.validate();
+        assert_eq!(errors.len(), 4);
+
+        assert_eq!(
+            &errors[0],
+            "realname can't be empty, please update 'realname' field of 'defaults'"
+        );
+        assert_eq!(&errors[1], "Default nick 0 is empty");
+        assert_eq!(
+            &errors[2],
+            "Nicks can't be empty, please update nick 0 for 'my_server'"
+        );
+        assert_eq!(
+            &errors[3],
+            "'realname' can't be empty, please update 'realname' field of 'my_server'"
+        );
     }
 }

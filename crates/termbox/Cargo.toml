@@ -5,7 +5,7 @@ authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "An implementation of termbox API"
 repository = "https://github.com/osa1/tiny"
 license = "MIT"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 libc = "0.2"
@@ -13,6 +13,7 @@ termion = "1.5"
 unicode-width = "0.1"
 
 [dev-dependencies]
-mio = "0.7"
+mio = "0.8"
 term_input = { path = "../term_input" }
-tokio = { version = "0.3.6", default-features = false, features = ["rt", "stream"] }
+tokio = { version = "1.17", default-features = false, features = [] }
+tokio-stream = "0.1"

@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub(crate) struct Tab {
-    pub(crate) alias: Option<String>,
+    pub(crate) visible_name: String,
     pub(crate) widget: MessagingUI,
     pub(crate) src: MsgSource,
     pub(crate) style: TabStyle,
@@ -30,10 +30,7 @@ fn tab_style(style: TabStyle, colors: &Colors) -> Style {
 
 impl Tab {
     pub(crate) fn visible_name(&self) -> &str {
-        match self.alias {
-            Some(ref alias) => &alias,
-            None => self.src.visible_name(),
-        }
+        &self.visible_name
     }
 
     pub(crate) fn set_style(&mut self, style: TabStyle) {

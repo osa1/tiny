@@ -1,4 +1,4 @@
-#![allow(clippy::new_without_default)]
+#![allow(clippy::new_without_default, clippy::collapsible_match)]
 
 //! Interprets the terminal events we care about (keyboard input).
 //!
@@ -8,7 +8,10 @@
 #[cfg(test)]
 mod tests;
 
+use term_input_macros::byte_seq_parser;
+
 use std::char;
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
 use std::pin::Pin;
@@ -17,9 +20,7 @@ use std::task::{Context, Poll};
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use tokio::io::unix::AsyncFd;
 use tokio::io::Interest;
-use tokio::stream::Stream;
-
-use term_input_macros::byte_seq_parser;
+use tokio_stream::Stream;
 
 #[macro_use]
 extern crate log;
@@ -28,32 +29,51 @@ extern crate log;
 // Public types
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
 pub enum Key {
     AltArrow(Arrow),
     AltChar(char),
+    AltF(FKey),
     Arrow(Arrow),
     Backspace,
     Char(char),
     Ctrl(char),
     CtrlArrow(Arrow),
+    CtrlF(FKey),
     Del,
     End,
     Esc,
+    FKey(FKey),
     Home,
     PageDown,
     PageUp,
-    ShiftDown,
-    ShiftUp,
+    ShiftArrow(Arrow),
+    ShiftF(FKey),
     Tab,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
 pub enum Arrow {
     Left,
     Right,
     Up,
     Down,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
+pub enum FKey {
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,6 +96,7 @@ pub enum Event {
 // Byte sequences of key presses we want to capture
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Note: `showkey -a` is an easy way to get these bytes
 byte_seq_parser! {
     parse_key_bytes -> Key, // Function name. Generation function type is
                             // fn(&[u8]) -> Option<(Key, usize)>.
@@ -84,6 +105,18 @@ byte_seq_parser! {
     [27, 91, 49, 59, 51, 68] => Key::AltArrow(Arrow::Left),
     [27, 91, 49, 59, 51, 67] => Key::AltArrow(Arrow::Right),
     [27, 91, 49, 59, 51, 65] => Key::AltArrow(Arrow::Up),
+    [27, 91, 49, 59, 51, 80] => Key::AltF(FKey::F1),
+    [27, 91, 49, 59, 51, 81] => Key::AltF(FKey::F2),
+    [27, 91, 49, 59, 51, 82] => Key::AltF(FKey::F3),
+    [27, 91, 49, 59, 51, 83] => Key::AltF(FKey::F4),
+    [27, 91, 49, 53, 59, 51, 126] => Key::AltF(FKey::F5),
+    [27, 91, 49, 55, 59, 51, 126] => Key::AltF(FKey::F6),
+    [27, 91, 49, 56, 59, 51, 126] => Key::AltF(FKey::F7),
+    [27, 91, 49, 57, 59, 51, 126] => Key::AltF(FKey::F8),
+    [27, 91, 50, 48, 59, 51, 126] => Key::AltF(FKey::F9),
+    [27, 91, 50, 49, 59, 51, 126] => Key::AltF(FKey::F10),
+    [27, 91, 50, 51, 59, 51, 126] => Key::AltF(FKey::F11),
+    [27, 91, 50, 52, 59, 51, 126] => Key::AltF(FKey::F12),
     [27, 91, 66] => Key::Arrow(Arrow::Down),
     [27, 79, 66] => Key::Arrow(Arrow::Down),
     [27, 91, 68] => Key::Arrow(Arrow::Left),
@@ -96,34 +129,92 @@ byte_seq_parser! {
     [27, 91, 49, 59, 53, 68] => Key::CtrlArrow(Arrow::Left),
     [27, 91, 49, 59, 53, 67] => Key::CtrlArrow(Arrow::Right),
     [27, 91, 49, 59, 53, 65] => Key::CtrlArrow(Arrow::Up),
+    [27, 91, 49, 59, 53, 80] => Key::CtrlF(FKey::F1),
+    [27, 91, 49, 59, 53, 81] => Key::CtrlF(FKey::F2),
+    [27, 91, 49, 59, 53, 82] => Key::CtrlF(FKey::F3),
+    [27, 91, 49, 59, 53, 83] => Key::CtrlF(FKey::F4),
+    [27, 91, 49, 53, 59, 53, 126] => Key::CtrlF(FKey::F5),
+    [27, 91, 49, 55, 59, 53, 126] => Key::CtrlF(FKey::F6),
+    [27, 91, 49, 56, 59, 53, 126] => Key::CtrlF(FKey::F7),
+    [27, 91, 49, 57, 59, 53, 126] => Key::CtrlF(FKey::F8),
+    [27, 91, 50, 48, 59, 53, 126] => Key::CtrlF(FKey::F9),
+    [27, 91, 50, 49, 59, 53, 126] => Key::CtrlF(FKey::F10),
+    [27, 91, 50, 51, 59, 53, 126] => Key::CtrlF(FKey::F11),
+    [27, 91, 50, 52, 59, 53, 126] => Key::CtrlF(FKey::F12),
     [27, 91, 51, 126] => Key::Del,
     [27, 91, 54, 126] => Key::PageDown,
     [27, 91, 53, 126] => Key::PageUp,
-    [27, 91, 49, 59, 50, 65] => Key::ShiftUp,
-    [27, 91, 49, 59, 50, 66] => Key::ShiftDown,
+    [27, 91, 49, 59, 50, 65] => Key::ShiftArrow(Arrow::Up),
+    [27, 91, 49, 59, 50, 66] => Key::ShiftArrow(Arrow::Down),
+    [27, 91, 49, 59, 50, 68] => Key::ShiftArrow(Arrow::Left),
+    [27, 91, 49, 59, 50, 67] => Key::ShiftArrow(Arrow::Right),
+    [27, 91, 49, 59, 50, 80] => Key::ShiftF(FKey::F1),
+    [27, 91, 49, 59, 50, 81] => Key::ShiftF(FKey::F2),
+    [27, 91, 49, 59, 50, 82] => Key::ShiftF(FKey::F3),
+    [27, 91, 49, 59, 50, 83] => Key::ShiftF(FKey::F4),
+    [27, 91, 49, 53, 59, 50, 126] => Key::ShiftF(FKey::F5),
+    [27, 91, 49, 55, 59, 50, 126] => Key::ShiftF(FKey::F6),
+    [27, 91, 49, 56, 59, 50, 126] => Key::ShiftF(FKey::F7),
+    [27, 91, 49, 57, 59, 50, 126] => Key::ShiftF(FKey::F8),
+    [27, 91, 50, 48, 59, 50, 126] => Key::ShiftF(FKey::F9),
+    [27, 91, 50, 49, 59, 50, 126] => Key::ShiftF(FKey::F10),
+    [27, 91, 50, 51, 59, 50, 126] => Key::ShiftF(FKey::F11),
+    [27, 91, 50, 52, 59, 50, 126] => Key::ShiftF(FKey::F12),
     [27, 91, 72] => Key::Home,
     [27, 91, 70] => Key::End,
     [27, 79, 72] => Key::Home,
     [27, 79, 70] => Key::End,
     [27, 91, 52, 126] => Key::End,
+    [27, 79, 80] => Key::FKey(FKey::F1),
+    [27, 79, 81] => Key::FKey(FKey::F2),
+    [27, 79, 82] => Key::FKey(FKey::F3),
+    [27, 79, 83] => Key::FKey(FKey::F4),
+    [27, 91, 49, 53, 126] => Key::FKey(FKey::F5),
+    [27, 91, 49, 55, 126] => Key::FKey(FKey::F6),
+    [27, 91, 49, 56, 126] => Key::FKey(FKey::F7),
+    [27, 91, 49, 57, 126] => Key::FKey(FKey::F8),
+    [27, 91, 50, 48, 126] => Key::FKey(FKey::F9),
+    [27, 91, 50, 49, 126] => Key::FKey(FKey::F10),
+    [27, 91, 50, 51, 126] => Key::FKey(FKey::F11),
+    [27, 91, 50, 52, 126] => Key::FKey(FKey::F12),
     [9] => Key::Tab,
     [8] => Key::Backspace,
     [127] => Key::Backspace,
     [1] => Key::Ctrl('a'),
-    [5] => Key::Ctrl('e'),
-    [23] => Key::Ctrl('w'),
-    [11] => Key::Ctrl('k'),
-    [4] => Key::Ctrl('d'),
+    [2] => Key::Ctrl('b'),
     [3] => Key::Ctrl('c'),
-    [17] => Key::Ctrl('q'),
-    [16] => Key::Ctrl('p'),
+    [4] => Key::Ctrl('d'),
+    [5] => Key::Ctrl('e'),
+    [6] => Key::Ctrl('f'),
+    [7] => Key::Ctrl('g'),
+    [10] => Key::Ctrl('j'),
+    [11] => Key::Ctrl('k'),
+    [12] => Key::Ctrl('l'),
+    [13] => Key::Ctrl('m'),
     [14] => Key::Ctrl('n'),
+    [15] => Key::Ctrl('o'),
+    [16] => Key::Ctrl('p'),
+    [17] => Key::Ctrl('q'),
+    [18] => Key::Ctrl('r'),
+    [19] => Key::Ctrl('s'),
+    [20] => Key::Ctrl('t'),
     [21] => Key::Ctrl('u'),
+    [22] => Key::Ctrl('v'),
+    [23] => Key::Ctrl('w'),
     [24] => Key::Ctrl('x'),
+    [25] => Key::Ctrl('y'),
+    [26] => Key::Ctrl('z'),
+    [28] => Key::Ctrl('\\'),
+    [29] => Key::Ctrl(']'),
+    [31] => Key::Ctrl('/'),
 }
 
 // static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];
 // static XTERM_FOCUS_LOST: [u8; 3] = [27, 91, 79];
+
+pub fn is_valid_key(key: Key) -> bool {
+    parse_key_bytes_is_valid_key(key) | matches!(key, Key::AltChar(_) | Key::Char(_))
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -142,11 +233,8 @@ pub struct Input {
 impl Drop for Input {
     fn drop(&mut self) {
         if let Some(old_flags) = self.old_stdin_flags.take() {
-            match fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
-                Err(err) => {
-                    error!("Unable to restore stdin flags: {:?}", err);
-                }
-                Ok(_) => {}
+            if let Err(err) = fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
+                error!("Unable to restore stdin flags: {:?}", err);
             }
         }
     }
@@ -208,7 +296,7 @@ impl Stream for Input {
     type Item = std::io::Result<Event>;
 
     fn poll_next(mut self: Pin<&mut Input>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let self_: &mut Input = &mut *self;
+        let self_: &mut Input = &mut self;
 
         'main: loop {
             // Try to parse any bytes in the input buffer from the last poll
@@ -241,8 +329,7 @@ impl Stream for Input {
                                 // NOTE: `poll_ret` is ignored here but I think that's OK?
                                 // TODO: Contents of `buf` is ignored here until `poll_next` is
                                 // called again.
-                                let err =
-                                    std::io::Error::from(err.as_errno().expect("Weird nix error"));
+                                let err = std::io::Error::from(err);
                                 return Poll::Ready(Some(Err(err)));
                             }
                         }
@@ -381,6 +468,9 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
     char::from_u32(codepoint).unwrap()
 }
 
+/// How many bytes to read from `stdin` in a single `read()`
+const STDIN_READ_SIZE: u8 = 100;
+
 /// Read `stdin` until `read` fails with `EWOULDBLOCK` (happens in non-canonical mode, when `stdin`
 /// is set to non-blocking mode) or returns 0 (happens in non-canonical mode when `VMIN` and
 /// `VTIME` are 0). If you are using `term_input` with `termbox` then you don't need to set `stdin`
@@ -388,36 +478,32 @@ fn get_utf8_char(buf: &[u8], len: u8) -> char {
 ///
 /// See also:
 ///
-/// - https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html
-/// - https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html
+/// - <https://www.gnu.org/software/libc/manual/html_node/Canonical-or-Not.html>
+/// - <https://www.gnu.org/software/libc/manual/html_node/Noncanonical-Input.html>
 pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
     loop {
         let old_len = buf.len();
-        buf.reserve(100);
-        unsafe {
-            buf.set_len(old_len + 100);
-        }
+        buf.reserve(usize::from(STDIN_READ_SIZE));
 
-        match nix::unistd::read(libc::STDIN_FILENO, &mut buf[old_len..]) {
-            Ok(n_read) => {
-                unsafe { buf.set_len(old_len + n_read) };
-                if n_read == 0 {
-                    // We're in non-canonical mode, or stdin is closed. We can't distinguish the
-                    // two here but I think it's fine to return OK when stdin is closed.
-                    return Ok(());
-                }
+        let read_ptr = unsafe { buf.as_mut_ptr().add(old_len) };
+
+        let n_read = unsafe { libc::read(libc::STDIN_FILENO, read_ptr as *mut libc::c_void, 100) };
+
+        assert!(n_read <= isize::from(STDIN_READ_SIZE));
+
+        match n_read.cmp(&0) {
+            Ordering::Equal => {
+                // We're in non-canonical mode, or stdin is closed. We can't distinguish the two
+                // here but I think it's fine to return OK when stdin is closed.
+                return Ok(());
             }
-            Err(err) => {
-                unsafe { buf.set_len(old_len) };
-                match err {
-                    nix::Error::Sys(nix::errno::EWOULDBLOCK) => {
-                        return Ok(());
-                    }
-                    _ => {
-                        return Err(err);
-                    }
-                }
+            Ordering::Greater => {
+                unsafe { buf.set_len(old_len + n_read as usize) };
             }
+            Ordering::Less => match nix::Error::last() {
+                nix::Error::EWOULDBLOCK => return Ok(()),
+                other => return Err(other),
+            },
         }
     }
 }

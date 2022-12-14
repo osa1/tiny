@@ -4,8 +4,10 @@ use libtiny_client::{Client, Event, ServerInfo};
 use libtiny_common::ChanNameRef;
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 
-use futures::stream::StreamExt;
 use std::process::exit;
+
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 fn main() {
     // echo <nick> <server> <port> [<chan_1> ... <chan_N>]
@@ -39,7 +41,7 @@ fn main() {
         pass: None,
         realname: "tiny echo bot".to_owned(),
         nicks: vec![nick],
-        auto_join: chans.to_owned(),
+        auto_join: chans,
         nickserv_ident: None,
         sasl_auth: None,
     };
@@ -61,8 +63,9 @@ fn show_usage() {
 static NICK_SEP: [&str; 4] = [": ", ", ", ":", ","];
 
 async fn echo_bot_task(server_info: ServerInfo) {
-    let (mut client, mut rcv_ev) = Client::new(server_info);
+    let (mut client, rcv_ev) = Client::new(server_info);
 
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
         println!("Client event: {:?}", ev);
         if let Event::Msg(Msg {

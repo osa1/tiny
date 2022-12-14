@@ -10,9 +10,10 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use futures::StreamExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{timeout, Duration};
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 #[derive(Clone)]
 pub struct State {
@@ -69,8 +70,15 @@ impl State {
         self.inner.borrow().get_chan_nicks(chan)
     }
 
-    pub(crate) fn leave_channel(&self, msg_chan: &mut Sender<Cmd>, chan: &ChanNameRef) {
-        self.inner.borrow_mut().leave_channel(msg_chan, chan)
+    pub(crate) fn leave_channel(
+        &self,
+        msg_chan: &mut Sender<Cmd>,
+        chan: &ChanNameRef,
+        reason: Option<String>,
+    ) {
+        self.inner
+            .borrow_mut()
+            .leave_channel(msg_chan, chan, reason)
     }
 
     pub(crate) fn kill_join_tasks(&self) {
@@ -479,7 +487,7 @@ impl StateInner {
                         {
                             i += 1;
                         }
-                        let usermask = (&param[i..]).trim();
+                        let usermask = param[i..].trim();
                         self.usermask = Some(usermask.to_owned());
                     }
                 }
@@ -582,9 +590,9 @@ impl StateInner {
 
             // RPL_ENDOFMOTD: Join channels, set away status
             Reply { num: 376, .. } => {
-                let chans: Vec<&ChanNameRef> = self.chans.iter().map(|c| c.name.as_ref()).collect();
-                if !chans.is_empty() {
-                    snd_irc_msg.try_send(wire::join(&chans)).unwrap();
+                if !self.chans.is_empty() {
+                    let chans = self.chans.iter().map(|c| c.name.as_ref());
+                    snd_irc_msg.try_send(wire::join(chans)).unwrap();
                 }
                 if self.away_status.is_some() {
                     snd_irc_msg
@@ -686,7 +694,12 @@ impl StateInner {
     }
 
     /// If channel is in Joining state cancel Joining task, otherwise sent part message
-    fn leave_channel(&mut self, msg_chan: &mut Sender<Cmd>, chan: &ChanNameRef) {
+    fn leave_channel(
+        &mut self,
+        msg_chan: &mut Sender<Cmd>,
+        chan: &ChanNameRef,
+        reason: Option<String>,
+    ) {
         if let Some(idx) = utils::find_idx(&self.chans, |c| c.name == *chan) {
             match &mut self.chans[idx].join_state {
                 JoinState::NotJoined => {}
@@ -694,7 +707,9 @@ impl StateInner {
                     debug!("Aborting task to retry joining {}", chan.display());
                     let _ = stop_task.try_send(());
                 }
-                JoinState::Joined => msg_chan.try_send(Cmd::Msg(wire::part(chan))).unwrap(),
+                JoinState::Joined => msg_chan
+                    .try_send(Cmd::Msg(wire::part(chan, reason)))
+                    .unwrap(),
             }
         }
     }
@@ -716,16 +731,17 @@ async fn retry_channel_join(
 ) {
     debug!("Attempting to re-join channel {}", channel.display());
 
-    let mut rcv_abort = rcv_abort.fuse();
+    let mut rcv_abort = ReceiverStream::new(rcv_abort).fuse();
 
-    match timeout(Duration::from_secs(10), rcv_abort.next()).await {
-        Err(_) => {
-            // Send join message
-            snd_irc_msg.try_send(wire::join(&[&channel])).unwrap();
-        }
-        Ok(_) => {
-            // Channel tab was closed
-        }
+    // Send join message after timeout. Ok means channel tab was closed.
+    if timeout(Duration::from_secs(10), rcv_abort.next())
+        .await
+        .is_err()
+    {
+        // Send join message
+        snd_irc_msg
+            .try_send(wire::join(std::iter::once(channel.as_ref())))
+            .unwrap();
     }
 }
 
@@ -735,7 +751,7 @@ const SERVERNAME_PREFIX_LEN: usize = SERVERNAME_PREFIX.len();
 /// Parse server name from RPL_YOURHOST reply or fallback to using the server name inside
 /// Pfx::Server. See https://www.irc.com/dev/docs/refs/numerics/002.html for more info.
 fn parse_servername(pfx: Option<&Pfx>, params: &[String]) -> Option<String> {
-    parse_yourhost_msg(&params).or_else(|| parse_server_pfx(pfx))
+    parse_yourhost_msg(params).or_else(|| parse_server_pfx(pfx))
 }
 
 /// Try to parse servername in a 002 RPL_YOURHOST reply params.
@@ -744,7 +760,7 @@ fn parse_yourhost_msg(params: &[String]) -> Option<String> {
     if msg.len() >= SERVERNAME_PREFIX_LEN && &msg[..SERVERNAME_PREFIX_LEN] == SERVERNAME_PREFIX {
         let slice1 = &msg[SERVERNAME_PREFIX_LEN..];
         let servername_ends = slice1.find('[').or_else(|| slice1.find(','))?;
-        Some((&slice1[..servername_ends]).to_owned())
+        Some(slice1[..servername_ends].to_owned())
     } else {
         None
     }

@@ -1,8 +1,9 @@
-use term_input::Key;
 use termbox_simple::Termbox;
 
+use crate::key_map::KeyAction;
 use crate::{config::Colors, widget::WidgetRet};
 
+#[derive(Debug)]
 pub(crate) struct ExitDialogue {
     width: i32,
 }
@@ -13,7 +14,7 @@ impl ExitDialogue {
     }
 }
 
-static MSG: &str = "Really quit?";
+static MSG: &str = "Really quit? (Enter for yes, Esc to cancel)";
 
 impl ExitDialogue {
     pub(crate) fn resize(&mut self, width: i32) {
@@ -47,9 +48,9 @@ impl ExitDialogue {
         }
     }
 
-    pub(crate) fn keypressed(&self, key: Key) -> WidgetRet {
-        match key {
-            Key::Char('y') | Key::Char('\r') => WidgetRet::Abort,
+    pub(crate) fn keypressed(&self, key_action: KeyAction) -> WidgetRet {
+        match key_action {
+            KeyAction::Input('y') | KeyAction::InputSend => WidgetRet::Abort,
             _ => WidgetRet::Remove,
         }
     }

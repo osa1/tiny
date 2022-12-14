@@ -1,4 +1,3 @@
-#![recursion_limit = "512"]
 #![allow(clippy::unneeded_field_pattern)]
 #![allow(clippy::cognitive_complexity)]
 
@@ -14,13 +13,15 @@ use pinger::Pinger;
 use state::State;
 use stream::{Stream, StreamError};
 
-use futures::future::FutureExt;
-use futures::stream::{Fuse, StreamExt};
-use futures::{pin_mut, select};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::time::Duration;
+
+use futures_util::future::FutureExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
+use tokio::{pin, select};
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 #[macro_use]
 extern crate log;
@@ -155,7 +156,6 @@ impl Client {
     }
 
     /// Is current nick accepted by the server?
-    // TODO: Do we really need this?
     pub fn is_nick_accepted(&self) -> bool {
         self.state.is_nick_accepted()
     }
@@ -214,15 +214,16 @@ impl Client {
     }
 
     /// Join the given list of channels.
-    pub fn join(&mut self, chans: &[&ChanNameRef]) {
-        self.msg_chan
-            .try_send(Cmd::Msg(wire::join(&chans)))
-            .unwrap()
+    pub fn join<'a, I>(&mut self, chans: I)
+    where
+        I: Iterator<Item = &'a ChanNameRef> + 'a,
+    {
+        self.msg_chan.try_send(Cmd::Msg(wire::join(chans))).unwrap()
     }
 
     /// Leave a channel.
-    pub fn part(&mut self, chan: &ChanNameRef) {
-        self.state.leave_channel(&mut self.msg_chan, chan)
+    pub fn part(&mut self, chan: &ChanNameRef, reason: Option<String>) {
+        self.state.leave_channel(&mut self.msg_chan, chan, reason)
     }
 
     /// Set away status. `None` means not away.
@@ -310,7 +311,7 @@ async fn main_loop(
     mut snd_ev: mpsc::Sender<Event>,
     rcv_cmd: mpsc::Receiver<Cmd>,
 ) {
-    let mut rcv_cmd = rcv_cmd.fuse();
+    let mut rcv_cmd = ReceiverStream::new(rcv_cmd).fuse();
 
     // We allow changing ports when reconnecting, so `mut`
     let mut port = server_info.port;
@@ -336,7 +337,7 @@ async fn main_loop(
 
         // Channel for the sender task. Messages are complete IRC messages (including the
         // trailing "\r\n") and the task directly sends them to the server.
-        let (mut snd_msg, mut rcv_msg) = mpsc::channel::<String>(100);
+        let (mut snd_msg, rcv_msg) = mpsc::channel::<String>(100);
 
         //
         // Resolve IP address
@@ -434,6 +435,7 @@ async fn main_loop(
         // Spawn a task for outgoing messages.
         let snd_ev_clone = snd_ev.clone();
         tokio::task::spawn_local(async move {
+            let mut rcv_msg = ReceiverStream::new(rcv_msg);
             while let Some(msg) = rcv_msg.next().await {
                 if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
                     debug!("IO error when writing: {:?}", io_err);
@@ -445,7 +447,7 @@ async fn main_loop(
 
         // Spawn pinger task
         let (mut pinger, rcv_ping_evs) = Pinger::new();
-        let mut rcv_ping_evs = rcv_ping_evs.fuse();
+        let mut rcv_ping_evs = ReceiverStream::new(rcv_ping_evs).fuse();
 
         let mut parse_buf: Vec<u8> = Vec::with_capacity(1024);
 
@@ -543,13 +545,13 @@ enum TaskResult<A> {
     Reconnect(Option<u16>),
 }
 
-async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
+async fn wait_<S: StreamExt<Item = Cmd> + Unpin>(rcv_cmd: &mut S) -> TaskResult<()> {
     let delay = tokio::time::sleep(Duration::from_secs(RECONNECT_SECS)).fuse();
-    pin_mut!(delay);
+    pin!(delay);
 
     loop {
         select! {
-            () = delay => {
+            () = &mut delay => {
                 return TaskResult::Done(());
             }
             cmd = rcv_cmd.next() => {
@@ -575,17 +577,17 @@ async fn wait_(rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>) -> TaskResult<()> {
     }
 }
 
-async fn resolve_addr(
+async fn resolve_addr<S: StreamExt<Item = Cmd> + Unpin>(
     serv_name: String,
     port: u16,
-    rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>,
+    rcv_cmd: &mut S,
 ) -> TaskResult<Result<::std::vec::IntoIter<SocketAddr>, ::std::io::Error>> {
     let mut addr_iter_task =
         tokio::task::spawn_blocking(move || (serv_name.as_str(), port).to_socket_addrs()).fuse();
 
     loop {
         select! {
-            addr_iter = addr_iter_task => {
+            addr_iter = &mut addr_iter_task => {
                 match addr_iter {
                     Err(join_err) => {
                         // TODO (osa): Not sure about this
@@ -617,18 +619,18 @@ async fn resolve_addr(
     }
 }
 
-async fn try_connect(
+async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
     addrs: Vec<SocketAddr>,
     serv_name: &str,
     use_tls: bool,
-    rcv_cmd: &mut Fuse<mpsc::Receiver<Cmd>>,
+    rcv_cmd: &mut S,
     snd_ev: &mut mpsc::Sender<Event>,
 ) -> TaskResult<Option<Stream>> {
     let connect_task = async move {
         for addr in addrs {
             snd_ev.send(Event::Connecting(addr)).await.unwrap();
             let mb_stream = if use_tls {
-                Stream::new_tls(addr, &serv_name).await
+                Stream::new_tls(addr, serv_name).await
             } else {
                 Stream::new_tcp(addr).await
             };
@@ -646,11 +648,11 @@ async fn try_connect(
     };
 
     let connect_task = connect_task.fuse();
-    pin_mut!(connect_task);
+    pin!(connect_task);
 
     loop {
         select! {
-            stream = connect_task => {
+            stream = &mut connect_task => {
                 return TaskResult::Done(stream);
             }
             cmd = rcv_cmd.next() => {

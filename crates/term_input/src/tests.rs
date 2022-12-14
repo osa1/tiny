@@ -46,3 +46,9 @@ fn test_utf8_char() {
 fn test_tab_key() {
     assert_eq!(parse_single_event("\t".as_bytes()), Event::Key(Key::Tab));
 }
+
+#[test]
+fn test_is_valid() {
+    assert!(is_valid_key(Key::AltArrow(Arrow::Left)));
+    assert!(!is_valid_key(Key::Ctrl('h')));
+}

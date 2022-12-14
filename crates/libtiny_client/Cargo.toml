@@ -3,7 +3,7 @@ name = "libtiny_client"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "An IRC client library, mainly to be used in tiny"
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["tls-rustls"]
@@ -12,13 +12,14 @@ tls-rustls = ["rustls-native-certs", "tokio-rustls"]
 
 [dependencies]
 base64 = "0.13"
-futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+futures-util = { version = "0.3", default-features = false }
 lazy_static = "1.4"
 libtiny_common = { path = "../libtiny_common" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = { version = "0.2", optional = true }
-rustls-native-certs = { version = "0.5", optional = true }
-tokio = { version = "0.3.6", default-features = false, features = ["rt", "sync", "stream", "time", "io-util", "net"] }
-tokio-native-tls = { version = "0.2", optional = true }
-tokio-rustls = { version = "0.21", optional = true }
+rustls-native-certs = { version = "0.6", optional = true }
+tokio = { version = "1.17", default-features = false, features = ["net", "rt", "io-util", "macros"] }
+tokio-native-tls = { version = "0.3", optional = true }
+tokio-rustls = { version = "0.23", optional = true }
+tokio-stream = { version = "0.1" }

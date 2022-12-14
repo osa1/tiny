@@ -3,13 +3,13 @@
 
 //! IRC event handling
 
-use futures::stream::StreamExt;
-use tokio::sync::mpsc;
-
+use crate::ui::UI;
 use libtiny_common::{ChanNameRef, MsgTarget, TabStyle};
 use libtiny_wire as wire;
 
-use crate::ui::UI;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 pub(crate) trait Client {
     fn get_serv_name(&self) -> &str;
@@ -34,10 +34,11 @@ impl Client for libtiny_client::Client {
 }
 
 pub(crate) async fn task(
-    mut rcv_ev: mpsc::Receiver<libtiny_client::Event>,
+    rcv_ev: mpsc::Receiver<libtiny_client::Event>,
     ui: UI,
     client: Box<dyn Client>,
 ) {
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
         handle_conn_ev(&ui, &*client, ev);
         ui.draw();
@@ -64,9 +65,8 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
             );
         }
         Connected => {
-            ui.add_msg(
+            ui.add_client_msg(
                 "Connected.",
-                time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
                 },
@@ -192,7 +192,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 wire::MsgTarget::Chan(chan) => {
                     let ui_msg_target = MsgTarget::Chan { serv, chan: &chan };
                     // highlight the message if it mentions us
-                    if msg.find(&client.get_nick()).is_some() {
+                    if msg.contains(&client.get_nick()) {
                         ui.add_privmsg(sender, &msg, ts, &ui_msg_target, true, is_action);
                         ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
                         let mentions_target = MsgTarget::Server { serv: "mentions" };
@@ -232,8 +232,8 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                                 } else {
                                     MsgTarget::User { serv, nick }
                                 };
-                                ui.set_tab_style(TabStyle::Highlight, &msg_target);
                                 ui.add_privmsg(nick, &msg, ts, &msg_target, false, is_action);
+                                ui.set_tab_style(TabStyle::Highlight, &msg_target);
                             } else {
                                 // PRIVMSG not sent to us. This case can happen in a few cases:
                                 //
@@ -420,9 +420,10 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
         }
 
         Reply { num: 433, .. } => {
-            // ERR_NICKNAMEINUSE
+            // ERR_NICKNAMEINUSE. If the nick is accepted once then the error is for a nick change
+            // request from the user, so show an error message. Otherwise don't show an error
+            // message, the client will be silently searching for an available nick.
             if client.is_nick_accepted() {
-                // Nick change request from user failed. Just show an error message.
                 ui.add_err_msg(
                     "Nickname is already in use",
                     time::now(),
@@ -494,7 +495,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 ui.add_msg(msg, time::now(), &MsgTarget::Server { serv });
             } else if n == 4 // RPL_MYINFO
                     || n == 5 // RPL_BOUNCE
-                    || (n >= 252 && n <= 254)
+                    || (252..=254).contains(&n)
             // RPL_LUSEROP, RPL_LUSERUNKNOWN, RPL_LUSERCHANNELS
             {
                 let msg = params.into_iter().collect::<Vec<String>>().join(" ");

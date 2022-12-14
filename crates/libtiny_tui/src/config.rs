@@ -9,21 +9,43 @@ use std::path::Path;
 
 pub use termbox_simple::*;
 
+use crate::key_map::KeyMap;
+
 #[derive(Deserialize)]
 pub(crate) struct Config {
     #[serde(default)]
     pub(crate) colors: Colors,
+
     #[serde(default = "usize::max_value")]
     pub(crate) scrollback: usize,
+
+    pub(crate) layout: Option<Layout>,
+
+    #[serde(default = "default_max_nick_length")]
+    pub(crate) max_nick_length: usize,
+
+    #[serde(default)]
+    pub(crate) key_map: Option<KeyMap>,
+}
+
+fn default_max_nick_length() -> usize {
+    12
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Style {
-    /// Termbox fg.
+    /// Termbox fg
     pub fg: u16,
 
-    /// Termbox bg.
+    /// Termbox bg
     pub bg: u16,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Layout {
+    Compact,
+    Aligned,
 }
 
 #[derive(Debug, Deserialize)]

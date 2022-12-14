@@ -6,6 +6,8 @@ use termbox_simple::Termbox;
 
 pub(crate) use self::line::{Line, SegStyle};
 use crate::config::Colors;
+use crate::line_split::LineType;
+use crate::messaging::{Timestamp, MSG_NICK_SUFFIX_LEN};
 
 pub(crate) struct MsgArea {
     lines: VecDeque<Line>,
@@ -25,10 +27,29 @@ pub(crate) struct MsgArea {
     /// Cached total rendered height of all lines. Invalidate on resize, update
     /// when adding new lines.
     lines_height: Option<i32>,
+
+    layout: Layout,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Layout {
+    Compact,
+    Aligned { max_nick_len: usize },
+}
+
+impl Layout {
+    fn msg_padding(&self) -> usize {
+        match self {
+            Layout::Compact => 0,
+            Layout::Aligned { max_nick_len } => {
+                Timestamp::WIDTH + max_nick_len + MSG_NICK_SUFFIX_LEN
+            }
+        }
+    }
 }
 
 impl MsgArea {
-    pub(crate) fn new(width: i32, height: i32, scrollback: usize) -> MsgArea {
+    pub(crate) fn new(width: i32, height: i32, scrollback: usize, layout: Layout) -> MsgArea {
         MsgArea {
             lines: VecDeque::with_capacity(512.min(scrollback)),
             scrollback,
@@ -37,6 +58,7 @@ impl MsgArea {
             scroll: 0,
             line_buf: Line::new(),
             lines_height: Some(0),
+            layout,
         }
     }
 
@@ -46,8 +68,23 @@ impl MsgArea {
 
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
         self.width = width;
+        let old_height = self.height;
         self.height = height;
+        let old_total_lines = self.lines_height;
         self.lines_height = None;
+
+        self.update_total_visible_lines();
+        self.recalculate_scroll(old_height, old_total_lines.unwrap());
+    }
+
+    pub(crate) fn layout(&self) -> Layout {
+        self.layout
+    }
+
+    /// Used to force a line to be aligned.
+    pub(crate) fn set_current_line_alignment(&mut self) {
+        let msg_padding = self.layout.msg_padding();
+        self.line_buf.set_type(LineType::AlignedMsg { msg_padding });
     }
 
     pub(crate) fn draw(&mut self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
@@ -96,7 +133,8 @@ impl MsgArea {
 // Scrolling
 
 impl MsgArea {
-    fn lines_height(&mut self) -> i32 {
+    /// The total number of visible lines if each Line was rendered at the current screen width
+    fn update_total_visible_lines(&mut self) -> i32 {
         match self.lines_height {
             Some(height) => height,
             None => {
@@ -111,7 +149,7 @@ impl MsgArea {
     }
 
     pub(crate) fn scroll_up(&mut self) {
-        if self.scroll < max(0, self.lines_height() - self.height) {
+        if self.scroll < max(0, self.update_total_visible_lines() - self.height) {
             self.scroll += 1;
         }
     }
@@ -123,7 +161,7 @@ impl MsgArea {
     }
 
     pub(crate) fn scroll_top(&mut self) {
-        self.scroll = max(0, self.lines_height() - self.height);
+        self.scroll = max(0, self.update_total_visible_lines() - self.height);
     }
 
     pub(crate) fn scroll_bottom(&mut self) {
@@ -139,22 +177,22 @@ impl MsgArea {
     pub(crate) fn page_down(&mut self) {
         self.scroll = max(0, self.scroll - 10);
     }
+
+    /// Recalculate the scroll offset due to resizing of the window
+    fn recalculate_scroll(&mut self, old_height: i32, old_total_lines: i32) {
+        if self.scroll > 0 {
+            let ratio = (self.scroll as f32 + old_height as f32) / old_total_lines as f32;
+            let total_lines = self.update_total_visible_lines();
+            self.scroll = max(0, ((ratio * total_lines as f32) as i32) - self.height);
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Adding/removing text
-
 impl MsgArea {
-    pub(crate) fn set_style(&mut self, style: SegStyle) {
-        self.line_buf.set_style(style);
-    }
-
-    pub(crate) fn add_text(&mut self, str: &str) {
-        self.line_buf.add_text(str);
-    }
-
-    pub(crate) fn add_char(&mut self, char: char) {
-        self.line_buf.add_char(char);
+    pub(crate) fn add_text(&mut self, str: &str, style: SegStyle) {
+        self.line_buf.add_text(str, style);
     }
 
     pub(crate) fn flush_line(&mut self) -> usize {
@@ -190,7 +228,7 @@ impl MsgArea {
     pub(crate) fn clear(&mut self) {
         self.lines.clear();
         self.scroll = 0;
-        self.lines_height = None;
+        self.lines_height = Some(0);
     }
 }
 
@@ -201,20 +239,20 @@ mod tests {
 
     #[test]
     fn newline_scrolling() {
-        let mut msg_area = MsgArea::new(100, 1, usize::MAX);
+        let mut msg_area = MsgArea::new(100, 1, usize::MAX, Layout::Compact);
         // Adding a new line when scroll is 0 should not change it
         assert_eq!(msg_area.scroll, 0);
-        msg_area.add_text("line1");
+        msg_area.add_text("line1", SegStyle::UserMsg);
         msg_area.flush_line();
         assert_eq!(msg_area.scroll, 0);
 
-        msg_area.add_text("line2");
+        msg_area.add_text("line2", SegStyle::UserMsg);
         msg_area.flush_line();
         assert_eq!(msg_area.scroll, 0);
 
         msg_area.scroll_up();
         assert_eq!(msg_area.scroll, 1);
-        msg_area.add_text("line3");
+        msg_area.add_text("line3", SegStyle::UserMsg);
         msg_area.flush_line();
         assert_eq!(msg_area.scroll, 2);
     }
@@ -222,18 +260,18 @@ mod tests {
     #[test]
     fn test_max_lines() {
         // Can't show more than 3 lines.
-        let mut msg_area = MsgArea::new(100, 1, 3);
-        msg_area.add_text("first");
+        let mut msg_area = MsgArea::new(100, 1, 3, Layout::Compact);
+        msg_area.add_text("first", SegStyle::UserMsg);
         msg_area.flush_line();
-        msg_area.add_text("second");
+        msg_area.add_text("second", SegStyle::UserMsg);
         msg_area.flush_line();
-        msg_area.add_text("third");
+        msg_area.add_text("third", SegStyle::UserMsg);
         msg_area.flush_line();
         assert_eq!(msg_area.lines.len(), 3);
-        msg_area.add_text("fourth");
+        msg_area.add_text("fourth", SegStyle::UserMsg);
         // Will pop out "first" line
         msg_area.flush_line();
         assert_eq!(msg_area.lines.len(), 3);
-        assert_eq!(msg_area.lines_height(), 3);
+        assert_eq!(msg_area.update_total_visible_lines(), 3);
     }
 }

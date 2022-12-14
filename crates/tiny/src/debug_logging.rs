@@ -12,7 +12,7 @@
 use env_logger::filter::{self, Filter};
 use log::{Log, Record};
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::mem::replace;
 use std::path::PathBuf;
@@ -73,12 +73,22 @@ impl LazyFile {
         F: Fn(&mut File),
     {
         let mut file = match replace(self, LazyFile::Error) {
-            LazyFile::NotOpen(path) => match File::create(path) {
-                Ok(file) => file,
-                Err(_) => {
-                    return;
+            LazyFile::NotOpen(path) => {
+                match OpenOptions::new().create(true).append(true).open(path) {
+                    Ok(mut file) => {
+                        // Same format used in libtiny_logger
+                        let _ = writeln!(
+                            file,
+                            "\n*** Logging started at {}\n",
+                            time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap()
+                        );
+                        file
+                    }
+                    Err(_) => {
+                        return;
+                    }
                 }
-            },
+            }
             LazyFile::Open(file) => file,
             LazyFile::Error => {
                 return;

@@ -1,22 +1,29 @@
-#![allow(clippy::cognitive_complexity)]
-#![allow(clippy::new_without_default)]
-#![allow(clippy::too_many_arguments)]
+#![allow(
+    clippy::cognitive_complexity,
+    clippy::new_without_default,
+    clippy::too_many_arguments
+)]
+// https://github.com/rust-lang/rust-clippy/issues/7526
+#![allow(clippy::needless_collect)]
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style};
 use crate::editor;
+use crate::key_map::{KeyAction, KeyMap};
 use crate::messaging::{MessagingUI, Timestamp};
+use crate::msg_area::Layout;
 use crate::notifier::Notifier;
 use crate::tab::Tab;
 use crate::widget::WidgetRet;
 
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
-use term_input::{Arrow, Event, Key};
+use term_input::{Event, Key};
 pub use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
@@ -54,18 +61,22 @@ impl CmdUsage {
     }
 }
 
-const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "/clear");
-const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "/ignore");
+const QUIT_CMD: CmdUsage = CmdUsage::new("quit", "Quit tiny", "`/quit` or `/quit <reason>`");
+const CLEAR_CMD: CmdUsage = CmdUsage::new("clear", "Clears current tab", "`/clear`");
+const IGNORE_CMD: CmdUsage = CmdUsage::new("ignore", "Ignore join/quit messages", "`/ignore`");
 const NOTIFY_CMD: CmdUsage = CmdUsage::new(
     "notify",
     "Set channel notifications",
-    "/notify [off|mentions|messages]",
+    "`/notify [off|mentions|messages]`",
 );
-const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "/switch <tab name>");
-const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "/reload");
+const SWITCH_CMD: CmdUsage = CmdUsage::new("switch", "Switches to tab", "`/switch <tab name>`");
+const RELOAD_CMD: CmdUsage = CmdUsage::new("reload", "Reloads config file", "`/reload`");
 
-const TUI_COMMANDS: [CmdUsage; 5] = [CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD];
+const TUI_COMMANDS: [CmdUsage; 6] = [
+    QUIT_CMD, CLEAR_CMD, IGNORE_CMD, NOTIFY_CMD, SWITCH_CMD, RELOAD_CMD,
+];
 
+// Public for benchmarks
 pub struct TUI {
     /// Termbox instance
     tb: Termbox,
@@ -76,14 +87,28 @@ pub struct TUI {
     /// Max number of message lines
     scrollback: usize,
 
+    /// Messaging area layout: aligned or compact
+    msg_layout: Layout,
+
     tabs: Vec<Tab>,
     active_idx: usize,
     width: i32,
     height: i32,
     h_scroll: i32,
 
+    key_map: KeyMap,
+
     /// Config file path
     config_path: Option<PathBuf>,
+}
+
+pub(crate) enum CmdResult {
+    /// Command executed successfully
+    Ok,
+    /// Pass command through to cmd.rs for further handling
+    Continue,
+    /// Quit command was executed, with the payload as a quit message
+    Quit(Option<String>),
 }
 
 impl TUI {
@@ -108,6 +133,20 @@ impl TUI {
         self.tb.activate()
     }
 
+    #[cfg(test)]
+    pub(crate) fn set_layout(&mut self, layout: Layout) {
+        self.msg_layout = layout
+    }
+
+    pub(crate) fn current_tab(&self) -> &MsgSource {
+        &self.tabs[self.active_idx].src
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_tabs(&self) -> &[Tab] {
+        &self.tabs
+    }
+
     fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
         // This is now done in reload_config() below
         // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
@@ -119,11 +158,13 @@ impl TUI {
             tb,
             colors: Colors::default(),
             scrollback: usize::MAX,
+            msg_layout: Layout::Compact,
             tabs: Vec::new(),
             active_idx: 0,
             width,
             height,
             h_scroll: 0,
+            key_map: KeyMap::default(),
             config_path,
         };
 
@@ -142,19 +183,13 @@ impl TUI {
     fn ignore(&mut self, src: &MsgSource) {
         match src {
             MsgSource::Serv { serv } => {
-                self.toggle_ignore(&MsgTarget::AllServTabs { serv: &serv });
+                self.toggle_ignore(&MsgTarget::AllServTabs { serv });
             }
             MsgSource::Chan { serv, chan } => {
-                self.toggle_ignore(&MsgTarget::Chan {
-                    serv: &serv,
-                    chan: chan.borrow(),
-                });
+                self.toggle_ignore(&MsgTarget::Chan { serv, chan });
             }
             MsgSource::User { serv, nick } => {
-                self.toggle_ignore(&MsgTarget::User {
-                    serv: &serv,
-                    nick: &nick,
-                });
+                self.toggle_ignore(&MsgTarget::User { serv, nick });
             }
         }
     }
@@ -173,7 +208,12 @@ impl TUI {
 
         let words: Vec<&str> = words.collect();
 
-        let mut show_usage = || self.add_client_err_msg(NOTIFY_CMD.usage, &MsgTarget::CurrentTab);
+        let mut show_usage = || {
+            self.add_client_err_msg(
+                &format!("Usage: {}", NOTIFY_CMD.usage),
+                &MsgTarget::CurrentTab,
+            )
+        };
 
         if words.is_empty() {
             self.show_notify_mode(&MsgTarget::CurrentTab);
@@ -216,31 +256,34 @@ impl TUI {
         }
     }
 
-    pub(crate) fn try_handle_cmd(&mut self, cmd: &str, src: &MsgSource) -> bool {
+    pub(crate) fn try_handle_cmd(&mut self, cmd: &str, src: &MsgSource) -> CmdResult {
         let mut words = cmd.split_whitespace();
         match words.next() {
             Some("clear") => {
                 self.clear(&src.to_target());
-                true
+                CmdResult::Ok
             }
             Some("ignore") => {
                 self.ignore(src);
-                true
+                CmdResult::Ok
             }
             Some("notify") => {
                 self.notify(&mut words, src);
-                true
+                CmdResult::Ok
             }
             Some("switch") => {
                 match words.next() {
                     Some(s) => self.switch(s),
-                    None => self.add_client_err_msg(SWITCH_CMD.usage, &MsgTarget::CurrentTab),
+                    None => self.add_client_err_msg(
+                        &format!("Usage: {}", SWITCH_CMD.usage),
+                        &MsgTarget::CurrentTab,
+                    ),
                 }
-                true
+                CmdResult::Ok
             }
             Some("reload") => {
                 self.reload_config();
-                true
+                CmdResult::Ok
             }
             Some("help") => {
                 self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
@@ -253,10 +296,20 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                // false to fall through to print help for cmd.rs commands
-                false
+                // Fall through to print help for cmd.rs commands
+                CmdResult::Continue
             }
-            _ => false,
+            Some("quit") => {
+                // Note: `SplitWhitespace::as_str` could be used here instead, when it gets stabilized.
+                let reason: String = cmd.chars().skip("quit ".len()).collect();
+
+                if reason.is_empty() {
+                    CmdResult::Quit(None)
+                } else {
+                    CmdResult::Quit(Some(reason))
+                }
+            }
+            _ => CmdResult::Continue,
         }
     }
 
@@ -269,9 +322,26 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     );
                 }
-                Ok(Config { colors, scrollback }) => {
+                Ok(Config {
+                    colors,
+                    scrollback,
+                    layout,
+                    max_nick_length,
+                    key_map,
+                }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
+                    self.key_map.load(&key_map.unwrap_or_default());
+                    if let Some(layout) = layout {
+                        match layout {
+                            crate::config::Layout::Compact => self.msg_layout = Layout::Compact,
+                            crate::config::Layout::Aligned => {
+                                self.msg_layout = Layout::Aligned {
+                                    max_nick_len: max_nick_length,
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -291,47 +361,59 @@ impl TUI {
         notifier: Notifier,
         alias: Option<String>,
     ) {
-        use std::collections::HashMap;
-
-        let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
-        for tab in &self.tabs {
-            if let Some(key) = tab.switch {
-                switch_keys.entry(key).and_modify(|e| *e += 1).or_insert(1);
-            }
-        }
+        let visible_name = alias.unwrap_or_else(|| match &src {
+            MsgSource::Serv { serv } => serv.to_owned(),
+            MsgSource::Chan { chan, .. } => chan.display().to_owned(),
+            MsgSource::User { nick, .. } => nick.to_owned(),
+        });
 
         let switch = {
-            let mut ret = None;
-            let mut n = 0;
-            let visible_name = match alias.as_ref() {
-                None => src.visible_name(),
-                Some(ref alias) => alias,
-            };
+            // Maps a switch key to number of times it's used
+            let mut switch_keys: HashMap<char, u16> = HashMap::with_capacity(self.tabs.len());
+
+            for tab in &self.tabs {
+                if let Some(key) = tab.switch {
+                    *switch_keys.entry(key).or_default() += 1;
+                }
+            }
+
+            // From the characters in tab name, find the one that is used the least
+            let mut new_tab_switch_char: Option<(char, u16)> = None;
             for ch in visible_name.chars() {
                 if !ch.is_alphabetic() {
                     continue;
                 }
-                match switch_keys.get(&ch) {
+                match switch_keys.get(&ch).copied() {
                     None => {
-                        ret = Some(ch);
+                        new_tab_switch_char = Some((ch, 0));
                         break;
                     }
-                    Some(n_) => {
-                        if ret == None || n > *n_ {
-                            ret = Some(ch);
-                            n = *n_;
+                    Some(n_uses) => match new_tab_switch_char {
+                        None => {
+                            new_tab_switch_char = Some((ch, n_uses));
                         }
-                    }
+                        Some((_, new_tab_switch_char_n_uses)) => {
+                            if new_tab_switch_char_n_uses > n_uses {
+                                new_tab_switch_char = Some((ch, n_uses));
+                            }
+                        }
+                    },
                 }
             }
-            ret
+            new_tab_switch_char.map(|(ch, _)| ch)
         };
 
         self.tabs.insert(
             idx,
             Tab {
-                alias,
-                widget: MessagingUI::new(self.width, self.height - 1, status, self.scrollback),
+                visible_name,
+                widget: MessagingUI::new(
+                    self.width,
+                    self.height - 1,
+                    status,
+                    self.scrollback,
+                    self.msg_layout,
+                ),
                 src,
                 style: TabStyle::Normal,
                 switch,
@@ -575,87 +657,57 @@ impl TUI {
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        match self.tabs[self.active_idx].widget.keypressed(key) {
-            WidgetRet::KeyHandled => TUIRet::KeyHandled,
-            WidgetRet::KeyIgnored => self.handle_keypress(key, rcv_editor_ret),
-            WidgetRet::Input(input) => TUIRet::Input {
-                msg: input,
-                from: self.tabs[self.active_idx].src.clone(),
-            },
-            WidgetRet::Remove => unimplemented!(),
-            WidgetRet::Abort => TUIRet::Abort,
+        let key_action = self.key_map.get(&key).or(match key {
+            Key::Char(c) => Some(KeyAction::Input(c)),
+            Key::AltChar(c) => Some(KeyAction::TabGoto(c)),
+            _ => None,
+        });
+
+        if let Some(key_action) = key_action {
+            match self.tabs[self.active_idx].widget.keypressed(key_action) {
+                WidgetRet::KeyHandled => TUIRet::KeyHandled,
+                WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
+                WidgetRet::Input(input) => TUIRet::Input {
+                    msg: input,
+                    from: self.tabs[self.active_idx].src.clone(),
+                },
+                WidgetRet::Remove => unimplemented!(),
+                WidgetRet::Abort => TUIRet::Abort,
+            }
+        } else {
+            TUIRet::KeyIgnored(key)
         }
     }
 
     fn handle_keypress(
         &mut self,
         key: Key,
+        key_action: KeyAction,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
     ) -> TUIRet {
-        match key {
-            Key::Ctrl('n') => {
-                self.next_tab();
-                TUIRet::KeyHandled
-            }
-
-            Key::Ctrl('p') => {
-                self.prev_tab();
-                TUIRet::KeyHandled
-            }
-
-            Key::Ctrl('x') => {
+        match key_action {
+            KeyAction::RunEditor => {
                 self.run_editor("", rcv_editor_ret);
                 TUIRet::KeyHandled
             }
-
-            Key::AltChar(c) => match c.to_digit(10) {
-                Some(i) => {
-                    let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
-                        self.tabs.len() - 1
-                    } else {
-                        i as usize - 1
-                    };
-                    match new_tab_idx.cmp(&self.active_idx) {
-                        Ordering::Greater => {
-                            for _ in 0..new_tab_idx - self.active_idx {
-                                self.next_tab_();
-                            }
-                        }
-                        Ordering::Less => {
-                            for _ in 0..self.active_idx - new_tab_idx {
-                                self.prev_tab_();
-                            }
-                        }
-                        Ordering::Equal => {}
-                    }
-                    self.tabs[self.active_idx].set_style(TabStyle::Normal);
-                    TUIRet::KeyHandled
-                }
-                None => {
-                    // multiple tabs can have same switch character so scan
-                    // forwards instead of starting from the first tab
-                    for i in 1..=self.tabs.len() {
-                        let idx = (self.active_idx + i) % self.tabs.len();
-                        if self.tabs[idx].switch == Some(c) {
-                            self.select_tab(idx);
-                            break;
-                        }
-                    }
-                    TUIRet::KeyHandled
-                }
-            },
-
-            Key::AltArrow(Arrow::Left) => {
+            KeyAction::TabNext => {
+                self.next_tab();
+                TUIRet::KeyHandled
+            }
+            KeyAction::TabPrev => {
+                self.prev_tab();
+                TUIRet::KeyHandled
+            }
+            KeyAction::TabMoveLeft => {
                 self.move_tab_left();
                 TUIRet::KeyHandled
             }
-
-            Key::AltArrow(Arrow::Right) => {
+            KeyAction::TabMoveRight => {
                 self.move_tab_right();
                 TUIRet::KeyHandled
             }
-
-            key => TUIRet::KeyIgnored(key),
+            KeyAction::TabGoto(c) => self.go_to_tab(c),
+            _ => TUIRet::KeyIgnored(key),
         }
     }
 
@@ -801,7 +853,7 @@ impl TUI {
                 width_left -= 2;
             }
             // drop any tabs that overflows from the screen
-            for (tab_idx, tab) in (&self.tabs[i..]).iter().enumerate() {
+            for (tab_idx, tab) in self.tabs[i..].iter().enumerate() {
                 if tab.width() > width_left {
                     break;
                 } else {
@@ -851,7 +903,7 @@ impl TUI {
         // debug!("left_arr: {}, right_arr: {}", left_arr, right_arr);
 
         // finally draw the tabs
-        for (tab_idx, tab) in (&self.tabs[tab_left..tab_right]).iter().enumerate() {
+        for (tab_idx, tab) in self.tabs[tab_left..tab_right].iter().enumerate() {
             tab.draw(
                 &mut self.tb,
                 &self.colors,
@@ -1063,10 +1115,49 @@ impl TUI {
         }
     }
 
+    fn go_to_tab(&mut self, c: char) -> TUIRet {
+        match c.to_digit(10) {
+            Some(i) => {
+                let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
+                    self.tabs.len() - 1
+                } else {
+                    i as usize - 1
+                };
+                match new_tab_idx.cmp(&self.active_idx) {
+                    Ordering::Greater => {
+                        for _ in 0..new_tab_idx - self.active_idx {
+                            self.next_tab_();
+                        }
+                    }
+                    Ordering::Less => {
+                        for _ in 0..self.active_idx - new_tab_idx {
+                            self.prev_tab_();
+                        }
+                    }
+                    Ordering::Equal => {}
+                }
+                self.tabs[self.active_idx].set_style(TabStyle::Normal);
+                TUIRet::KeyHandled
+            }
+            None => {
+                // multiple tabs can have same switch character so scan
+                // forwards instead of starting from the first tab
+                for i in 1..=self.tabs.len() {
+                    let idx = (self.active_idx + i) % self.tabs.len();
+                    if self.tabs[idx].switch == Some(c) {
+                        self.select_tab(idx);
+                        break;
+                    }
+                }
+                TUIRet::KeyHandled
+            }
+        }
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     // Interfacing with tabs
 
-    fn apply_to_target<F>(&mut self, target: &MsgTarget, f: &F)
+    fn apply_to_target<F>(&mut self, target: &MsgTarget, can_create_tab: bool, f: &F)
     where
         F: Fn(&mut Tab, bool),
     {
@@ -1131,7 +1222,7 @@ impl TUI {
         }
 
         // Create server/chan/user tab when necessary
-        if target_idxs.is_empty() {
+        if target_idxs.is_empty() && can_create_tab {
             if let Some(idx) = self.maybe_create_tab(target) {
                 target_idxs.push(idx);
             }
@@ -1157,10 +1248,10 @@ impl TUI {
     }
 
     pub(crate) fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, is_active: bool| {
-            if !is_active
+        self.apply_to_target(target, false, &|tab: &mut Tab, is_active: bool| {
+            if (tab.widget.is_showing_status() || style != TabStyle::JoinOrPart)
                 && tab.style < style
-                && !(style == TabStyle::JoinOrPart && !tab.widget.is_showing_status())
+                && !is_active
             {
                 tab.set_style(style);
             }
@@ -1170,7 +1261,7 @@ impl TUI {
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
     pub(crate) fn add_client_err_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.add_client_err_msg(msg);
         });
     }
@@ -1178,7 +1269,7 @@ impl TUI {
     /// A notify message coming from tiny, usually shows a response of a command
     /// e.g. "Notifications enabled".
     pub(crate) fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.add_client_notify_msg(msg);
         });
     }
@@ -1186,7 +1277,7 @@ impl TUI {
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
     pub(crate) fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.add_client_msg(msg);
         });
     }
@@ -1202,7 +1293,7 @@ impl TUI {
         highlight: bool,
         is_action: bool,
     ) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget
                 .add_privmsg(sender, msg, Timestamp::from(ts), highlight, is_action);
             let nick = tab.widget.get_nick();
@@ -1216,7 +1307,7 @@ impl TUI {
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
     pub fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget.add_msg(msg, Timestamp::from(ts));
         });
     }
@@ -1224,33 +1315,33 @@ impl TUI {
     /// Error messages related with the protocol - e.g. can't join a channel,
     /// nickname is in use etc. Timestamped and logged.
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget.add_err_msg(msg, Timestamp::from(ts));
         });
     }
 
     pub(crate) fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &ChanNameRef) {
         let target = MsgTarget::Chan { serv, chan };
-        self.apply_to_target(&target, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
             tab.widget.show_topic(title, Timestamp::from(ts));
         });
     }
 
     pub(crate) fn clear_nicks(&mut self, serv: &str) {
         let target = MsgTarget::AllServTabs { serv };
-        self.apply_to_target(&target, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
             tab.widget.clear_nicks();
         });
     }
 
     pub(crate) fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.join(nick, ts.map(Timestamp::from));
         });
     }
 
     pub(crate) fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.part(nick, ts.map(Timestamp::from));
         });
     }
@@ -1262,7 +1353,7 @@ impl TUI {
         ts: Tm,
         target: &MsgTarget,
     ) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, Timestamp::from(ts));
             // TODO: Does this actually rename the tab?
             tab.update_source(&|src: &mut MsgSource| {
@@ -1276,13 +1367,13 @@ impl TUI {
 
     pub(crate) fn set_nick(&mut self, serv: &str, new_nick: &str) {
         let target = MsgTarget::AllServTabs { serv };
-        self.apply_to_target(&target, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
             tab.widget.set_nick(new_nick.to_owned())
         });
     }
 
     pub(crate) fn clear(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| tab.widget.clear());
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| tab.widget.clear());
     }
 
     pub(crate) fn toggle_ignore(&mut self, target: &MsgTarget) {
@@ -1296,11 +1387,11 @@ impl TUI {
                     }
                 }
             }
-            self.apply_to_target(target, &|tab: &mut Tab, _| {
+            self.apply_to_target(target, false, &|tab: &mut Tab, _| {
                 tab.widget.set_or_toggle_ignore(Some(!status_val));
             });
         } else {
-            self.apply_to_target(target, &|tab: &mut Tab, _| {
+            self.apply_to_target(target, false, &|tab: &mut Tab, _| {
                 tab.widget.set_or_toggle_ignore(None);
             });
         }
@@ -1319,13 +1410,13 @@ impl TUI {
     }
 
     pub(crate) fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             tab.notifier = notifier;
         });
     }
 
     pub(crate) fn show_notify_mode(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
             let msg = match tab.notifier {
                 Notifier::Off => "Notifications are off",
                 Notifier::Mentions => "Notifications enabled for mentions",

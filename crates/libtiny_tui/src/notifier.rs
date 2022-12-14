@@ -1,4 +1,6 @@
-use crate::{utils::remove_irc_control_chars, MsgTarget};
+use crate::MsgTarget;
+
+use libtiny_wire::formatting::remove_irc_control_chars;
 
 #[cfg(feature = "desktop-notifications")]
 use notify_rust::Notification;

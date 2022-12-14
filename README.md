@@ -32,8 +32,8 @@ tiny is an IRC client written in Rust.
 - Disconnect detection and automatic reconnects. You can keep tiny running on
   your laptop and it automatically reconnects after a sleep etc.
 
-- Key bindings inspired by terminal emulators and vim. See [key bindings
-  section](#key-bindings) below.
+- Configurable key bindings inspired by terminal emulators and vim. See [key
+  bindings section](#key-bindings) below.
 
 - Configurable colors
 
@@ -90,13 +90,14 @@ tiny is tested on Linux and OSX.
 
 tiny looks for these places for a config file:
 
-- `$XDG_CONFIG_HOME/tiny/config.yml`
-- (when `$XDG_CONFIG_HOME` is not defined) `$HOME/.config/tiny/config.yml`
-- (deprecated) `$HOME/.tinyrc.yml`
+- On Linux: `$XDG_CONFIG_HOME/tiny/config.yml`, on macOS:
+  `$HOME/Library/Application Support/tiny/config.yml`
+- (when not found) `$HOME/.config/tiny/config.yml`
+- (when not found, deprecated) `$HOME/.tinyrc.yml`
 
-when a config file is not found in one of these locations tiny creates one with
-defaults and exists, printing path to the config file. Edit that file before
-re-running tiny to change the defaults.
+When a config file is not found in one of these locations tiny creates one in
+the first path above with defaults and exits, printing path to the config file.
+Edit that file before re-running tiny to change the defaults.
 
 **A note on nick identification:** Some IRC servers such as ircd-seven (used by
 Freenode) and InspIRCd (used by Mozilla) support identification via the `PASS`
@@ -129,6 +130,11 @@ You can use `--config <path>` to specify your config file location.
 
 ## Key bindings
 
+Key bindings can be configured in the config file, see the [wiki
+page][key-bindings-wiki] for details.
+
+Default key bindings:
+
 - `C-a`/`C-e` move cursor to beginning/end in the input field
 
 - `C-k` delete rest of the line
@@ -153,6 +159,8 @@ You can use `--config <path>` to specify your config file location.
 
 - `C-x` edit current message in `$EDITOR`
 
+[key-bindings-wiki]: https://github.com/osa1/tiny/wiki/Configuring-key-bindings
+
 ## Commands
 
 Commands start with `/` character.
@@ -164,7 +172,7 @@ Commands start with `/` character.
 - `/join <channel>`: Join to a channel
 
 - `/close`: Close the current tab. Leaves the channel if the current tab is a
-  channel. Leaves the server if the tab is a server.
+  channel. Leaves the server if the tab is a server. You can use `/close <reason>` to send a goodbye message.
 
 - `/connect <hostname>:<port>`: Connect to a server. Uses `defaults` in the
   config file for nick, realname, hostname and auto cmds.
@@ -181,7 +189,7 @@ Commands start with `/` character.
 - `/names`: List all nicks in the current channel. You can use `/names <nick>` to
   check if a specific nick is in the channel.
 
-- `/reload`: Reload configuration
+- `/reload`: Reload TUI configuration
 
 - `/clear`: Clears tab contents
 
@@ -194,6 +202,8 @@ Commands start with `/` character.
 - `/notify [off|mentions|messages]`: Enable and disable desktop notifications.
   Running this command in a server tab applies it to all channels of that
   server. You can check your notify state in the status line.
+
+- `/quit`: Quit. You can use `/quit <reason>` to send a goodbye message.
 
 ## Server commands
 

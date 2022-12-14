@@ -5,6 +5,7 @@ mod config;
 mod editor;
 mod exit_dialogue;
 mod input_area;
+mod key_map;
 mod line_split;
 mod messaging;
 #[doc(hidden)]
@@ -22,20 +23,21 @@ mod widget;
 #[cfg(test)]
 mod tests;
 
-use crate::tui::TUIRet;
-use libtiny_common::{ChanNameRef, Event, MsgTarget, TabStyle};
+use crate::tui::{CmdResult, TUIRet};
+use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
+use term_input::Input;
 
-use futures::select;
-use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
-use term_input::Input;
+
 use time::Tm;
+use tokio::select;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::stream::Stream;
 use tokio::sync::mpsc;
 use tokio::task::spawn_local;
+use tokio_stream::wrappers::{ReceiverStream, SignalStream};
+use tokio_stream::{Stream, StreamExt};
 
 #[macro_use]
 extern crate log;
@@ -100,8 +102,8 @@ async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receive
         Ok(stream) => stream,
     };
 
-    let mut stream_fused = stream.fuse();
-    let mut rcv_abort_fused = rcv_abort.fuse();
+    let mut stream_fused = SignalStream::new(stream).fuse();
+    let mut rcv_abort_fused = ReceiverStream::new(rcv_abort).fuse();
 
     loop {
         select! {
@@ -169,7 +171,7 @@ async fn input_handler<S>(
                 let tui_ret = tui.borrow_mut().handle_input_event(ev, &mut rcv_editor_ret);
                 match tui_ret {
                     TUIRet::Abort => {
-                        snd_ev.try_send(Event::Abort).unwrap();
+                        snd_ev.try_send(Event::Abort { msg: None }).unwrap();
                         let _ = snd_abort.try_send(());
                         return;
                     }
@@ -177,10 +179,18 @@ async fn input_handler<S>(
                     TUIRet::Input { msg, from } => {
                         if msg[0] == '/' {
                             // Handle TUI commands, send others to downstream
-                            let cmd: String = (&msg[1..]).iter().collect();
-                            let handled = tui.borrow_mut().try_handle_cmd(&cmd, &from);
-                            if !handled {
-                                snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap();
+                            let cmd: String = msg[1..].iter().collect();
+                            let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
+                            match result {
+                                CmdResult::Ok => {}
+                                CmdResult::Continue => {
+                                    snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap()
+                                }
+                                CmdResult::Quit(msg) => {
+                                    snd_ev.try_send(Event::Abort { msg }).unwrap();
+                                    let _ = snd_abort.try_send(());
+                                    return;
+                                }
                             }
                         } else {
                             snd_ev
@@ -251,5 +261,11 @@ impl TUI {
             Some(tui) => tui.borrow().user_tab_exists(serv_name, nick),
             None => false,
         }
+    }
+
+    pub fn current_tab(&self) -> Option<MsgSource> {
+        self.inner
+            .upgrade()
+            .map(|tui| tui.borrow().current_tab().clone())
     }
 }

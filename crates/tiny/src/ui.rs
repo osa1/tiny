@@ -1,18 +1,16 @@
-// I think borrowed boxing is necessary for objekt::clone_box to work
-#![allow(clippy::borrowed_box)]
-
 //! UI event handling
 
 use crate::cmd::{parse_cmd, CmdArgs, ParseCmdResult};
 use crate::config;
-use futures::stream::StreamExt;
 use libtiny_client::Client;
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use libtiny_logger::Logger;
 use libtiny_tui::TUI;
-use std::path::{Path, PathBuf};
+
 use time::Tm;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* )) => {
@@ -87,23 +85,26 @@ impl UI {
     delegate_ui!(set_nick(serv: &str, nick: &str,));
     delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
+
+    pub(crate) fn current_tab(&self) -> Option<MsgSource> {
+        self.ui.current_tab()
+    }
 }
 
 pub(crate) async fn task(
-    config_path: PathBuf,
     defaults: config::Defaults,
     ui: UI,
     mut clients: Vec<Client>,
-    mut rcv_ev: mpsc::Receiver<libtiny_common::Event>,
+    rcv_ev: mpsc::Receiver<libtiny_common::Event>,
 ) {
+    let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
-        handle_input_ev(&config_path, &defaults, &ui, &mut clients, ev);
+        handle_input_ev(&defaults, &ui, &mut clients, ev);
         ui.draw();
     }
 }
 
 fn handle_input_ev(
-    config_path: &Path,
     defaults: &config::Defaults,
     ui: &UI,
     clients: &mut Vec<Client>,
@@ -111,9 +112,9 @@ fn handle_input_ev(
 ) {
     use libtiny_common::Event::*;
     match ev {
-        Abort => {
+        Abort { msg } => {
             for client in clients {
-                client.quit(None);
+                client.quit(msg.clone());
             }
         }
         Msg { msg, source } => {
@@ -124,12 +125,11 @@ fn handle_input_ev(
                 send_msg(ui, clients, &source, line, false)
             }
         }
-        Cmd { cmd, source } => handle_cmd(config_path, defaults, ui, clients, source, &cmd),
+        Cmd { cmd, source } => handle_cmd(defaults, ui, clients, source, &cmd),
     }
 }
 
 fn handle_cmd(
-    config_path: &Path,
     defaults: &config::Defaults,
     ui: &UI,
     clients: &mut Vec<Client>,
@@ -140,7 +140,6 @@ fn handle_cmd(
         ParseCmdResult::Ok { cmd, rest } => {
             let cmd_args = CmdArgs {
                 args: rest,
-                config_path,
                 defaults,
                 ui,
                 clients,
@@ -174,10 +173,17 @@ pub(crate) fn send_msg(
     is_action: bool,
 ) {
     if src.serv_name() == "mentions" {
-        ui.add_client_err_msg(
-            "Use `/connect <server>` to connect to a server",
-            &MsgTarget::CurrentTab,
-        );
+        if clients.is_empty() {
+            ui.add_client_err_msg(
+                "No connected server found, please use `/connect <server>` to connect to a server",
+                &MsgTarget::CurrentTab,
+            );
+        } else {
+            ui.add_client_err_msg(
+                "You are on the mentions tab, please use `/switch <tab name>` to switch to a tab",
+                &MsgTarget::CurrentTab,
+            );
+        }
         return;
     }
 
