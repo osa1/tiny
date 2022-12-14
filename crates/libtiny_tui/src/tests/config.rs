@@ -80,7 +80,7 @@ fn parsing_tab_configs() {
 
     assert_eq!(
         tab_configs.chan_conf("server", ChanNameRef::new("#tiny")),
-        Some(&TabConfig {
+        Some(TabConfig {
             ignore: Some(true),                 // configured
             notifier: Some(Notifier::Messages)  // configured
         })
@@ -93,7 +93,7 @@ fn parsing_tab_configs() {
 
     assert_eq!(
         tab_configs.chan_conf("server2", ChanNameRef::new("#tiny2")),
-        Some(&TabConfig {
+        Some(TabConfig {
             ignore: Some(true),            // overwritten by server
             notifier: Some(Notifier::Off)  // overwritten by defaults
         })
