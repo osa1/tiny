@@ -211,9 +211,12 @@ fn connect(args: CmdArgs) {
 
 fn reconnect(ui: &UI, clients: &mut [Client], src: MsgSource) {
     if let Some(client) = find_client(clients, src.serv_name()) {
-        ui.add_client_msg("Reconnecting...", &MsgTarget::AllServTabs {
-            serv: src.serv_name(),
-        });
+        ui.add_client_msg(
+            "Reconnecting...",
+            &MsgTarget::AllServTabs {
+                serv: src.serv_name(),
+            },
+        );
         client.reconnect(None);
     }
 }
@@ -356,10 +359,13 @@ fn join(args: CmdArgs) {
             let iter_ref = chans.iter().map(|c| c.name.as_ref());
             // set tab configs of new channel tabs (creates new tab)
             for chan in &chans {
-                ui.set_tab_config(chan.config, &MsgTarget::Chan {
-                    chan: &chan.name,
-                    serv: serv_name,
-                })
+                ui.set_tab_config(
+                    chan.config,
+                    &MsgTarget::Chan {
+                        chan: &chan.name,
+                        serv: serv_name,
+                    },
+                )
             }
             client.join(iter_ref);
         }

@@ -444,20 +444,23 @@ impl TUI {
         };
         let status = !ignore.unwrap_or_default();
 
-        self.tabs.insert(idx, Tab {
-            visible_name,
-            widget: MessagingUI::new(
-                self.width,
-                self.height - 1,
-                status,
-                self.scrollback,
-                self.msg_layout,
-            ),
-            src,
-            style: TabStyle::Normal,
-            switch,
-            notifier: notifier.unwrap_or_default(),
-        });
+        self.tabs.insert(
+            idx,
+            Tab {
+                visible_name,
+                widget: MessagingUI::new(
+                    self.width,
+                    self.height - 1,
+                    status,
+                    self.scrollback,
+                    self.msg_layout,
+                ),
+                src,
+                style: TabStyle::Normal,
+                switch,
+                notifier: notifier.unwrap_or_default(),
+            },
+        );
     }
 
     /// Returns index of the new tab if a new tab is created.

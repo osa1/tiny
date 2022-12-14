@@ -232,10 +232,13 @@ mod tests {
                 panic!();
             }
             Ok(Config { servers, .. }) => {
-                assert_eq!(servers[0].join, vec![Chan {
-                    name: ChanName::new("#tiny".to_string()),
-                    config: TabConfig::default(),
-                }]);
+                assert_eq!(
+                    servers[0].join,
+                    vec![Chan {
+                        name: ChanName::new("#tiny".to_string()),
+                        config: TabConfig::default(),
+                    }]
+                );
                 assert_eq!(servers[0].tls, true);
             }
         }
@@ -292,12 +295,15 @@ mod tests {
             &get_default_config_yaml().replace("#tiny", "#tiny -ignore -notify off"),
         )
         .expect("parsed config");
-        assert_eq!(config.servers[0].join, vec![Chan {
-            name: ChanName::new("#tiny".to_string()),
-            config: TabConfig {
-                ignore: Some(true),
-                notifier: Some(Notifier::Off)
-            }
-        }]);
+        assert_eq!(
+            config.servers[0].join,
+            vec![Chan {
+                name: ChanName::new("#tiny".to_string()),
+                config: TabConfig {
+                    ignore: Some(true),
+                    notifier: Some(Notifier::Off)
+                }
+            }]
+        );
     }
 }
