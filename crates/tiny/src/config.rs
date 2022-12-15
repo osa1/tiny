@@ -156,7 +156,12 @@ fn run_command(command_name: &str, server_addr: &str, args: &[String]) -> Option
     };
 
     if !output.status.success() {
-        println!("Command returned non-zero: {:?}", output.status);
+        print!("Command returned non-zero");
+        if let Some(code) = output.status.code() {
+            println!(": {}", code);
+        } else {
+            println!();
+        }
         if output.stdout.is_empty() {
             println!("stdout is empty");
         } else {
