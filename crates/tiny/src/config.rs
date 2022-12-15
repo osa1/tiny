@@ -91,7 +91,7 @@ where
 
 /// A password, or a shell command to run the obtain a password. Used for password (server
 /// password, SASL, NickServ) fields of `Config`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PassOrCmd {
     /// Password is given directly as plain text
     Pass(String),
@@ -116,10 +116,12 @@ impl<'de> Deserialize<'de> for PassOrCmd {
         let str = String::deserialize(deserializer)?;
         let trimmed = str.trim();
         if let Some(trimmed) = trimmed.strip_prefix('$') {
-            let rest = trimmed[1..].trim(); // drop '$'
+            let rest = trimmed[1..].trim();
             Ok(PassOrCmd::Cmd(
                 rest.split_whitespace().map(str::to_owned).collect(),
             ))
+        } else if let Some(without_dollar) = trimmed.strip_prefix("\\$") {
+            Ok(PassOrCmd::Pass(format!("${}", without_dollar)))
         } else {
             Ok(PassOrCmd::Pass(str))
         }
@@ -128,7 +130,7 @@ impl<'de> Deserialize<'de> for PassOrCmd {
 
 fn run_command(command_name: &str, server_addr: &str, args: &[String]) -> Option<String> {
     println!(
-        "Running {} command for server {} ({:?}) ...",
+        "Running {} command for server {} ({:?})",
         command_name, server_addr, args
     );
 
@@ -455,6 +457,27 @@ mod tests {
         assert_eq!(
             &errors[3],
             "'realname' can't be empty, please update 'realname' field of 'my_server'"
+        );
+    }
+
+    #[test]
+    fn parse_password_field() {
+        let field = "$ my pass cmd";
+        assert_eq!(
+            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            PassOrCmd::Cmd(vec!["my".to_owned(), "pass".to_owned(), "cmd".to_owned()])
+        );
+
+        let field = "my password";
+        assert_eq!(
+            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            PassOrCmd::Pass(field.to_string())
+        );
+
+        let field = "\\$my password";
+        assert_eq!(
+            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            PassOrCmd::Pass("$my password".to_string())
         );
     }
 }
