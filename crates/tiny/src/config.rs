@@ -113,13 +113,21 @@ impl<'de> Deserialize<'de> for PassOrCmd {
     where
         D: serde::Deserializer<'de>,
     {
+        use serde::de::Error;
+
         let str = String::deserialize(deserializer)?;
         let trimmed = str.trim();
         if let Some(trimmed) = trimmed.strip_prefix('$') {
-            let rest = trimmed[1..].trim();
-            Ok(PassOrCmd::Cmd(
-                rest.split_whitespace().map(str::to_owned).collect(),
-            ))
+            let args = match shell_words::split(trimmed) {
+                Ok(args) => args,
+                Err(err) => {
+                    return Err(D::Error::custom(format!(
+                        "Unable to parse password field: {}",
+                        err
+                    )))
+                }
+            };
+            Ok(PassOrCmd::Cmd(args))
         } else if let Some(without_dollar) = trimmed.strip_prefix("\\$") {
             Ok(PassOrCmd::Pass(format!("${}", without_dollar)))
         } else {
@@ -478,6 +486,16 @@ mod tests {
         assert_eq!(
             serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
             PassOrCmd::Pass("$my password".to_string())
+        );
+
+        let field = "$ pass show \"my password\"";
+        assert_eq!(
+            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            PassOrCmd::Cmd(vec![
+                "pass".to_string(),
+                "show".to_string(),
+                "my password".to_string()
+            ])
         );
     }
 }
