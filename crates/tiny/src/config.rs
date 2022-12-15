@@ -36,17 +36,15 @@ pub(crate) struct Server {
     #[serde(deserialize_with = "deser_trimmed_str")]
     pub(crate) realname: String,
 
-    /// Nicks to try when connecting to this server. tiny tries these
-    /// sequentially, and starts adding trailing underscores to the last one
-    /// if none of the nicks are available.
+    /// Nicks to try when connecting to this server. tiny tries these sequentially, and starts
+    /// adding trailing underscores to the last one if none of the nicks are available.
     #[serde(deserialize_with = "deser_trimmed_str_vec")]
     pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
     pub(crate) join: Vec<Chan>,
 
-    /// NickServ identification password. Used on connecting to the server and
-    /// nick change.
+    /// NickServ identification password. Used on connecting to the server and nick change.
     pub(crate) nickserv_ident: Option<String>,
 
     /// Authenication method
