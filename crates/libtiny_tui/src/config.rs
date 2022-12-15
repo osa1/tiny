@@ -162,6 +162,16 @@ impl TabConfigs {
         };
         self.0.insert(key, config);
     }
+
+    pub(crate) fn set_by_server(&mut self, serv_name: &str, config: TabConfig) {
+        for c in self
+            .0
+            .iter_mut()
+            .filter(|entry| entry.0.starts_with(serv_name))
+        {
+            *c.1 = config;
+        }
+    }
 }
 
 impl From<&Config> for TabConfigs {
@@ -207,6 +217,12 @@ impl TabConfig {
             ignore: self.ignore.or(config.ignore),
             notify: self.notify.or(config.notify),
         }
+    }
+
+    pub(crate) fn toggle_ignore(&mut self) -> bool {
+        let ignore = self.ignore.get_or_insert(false);
+        *ignore = !&*ignore;
+        *ignore
     }
 }
 

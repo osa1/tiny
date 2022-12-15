@@ -185,17 +185,33 @@ impl TUI {
     }
 
     fn ignore(&mut self, src: &MsgSource) {
-        match src {
+        let (target, ignore) = match src {
             MsgSource::Serv { serv } => {
-                self.toggle_ignore(&MsgTarget::AllServTabs { serv });
+                let mut config = self.get_tab_config(serv, None);
+                let new_ignore = config.toggle_ignore();
+                self.tab_configs.set_by_server(serv, config);
+                (MsgTarget::AllServTabs { serv }, new_ignore)
             }
             MsgSource::Chan { serv, chan } => {
-                self.toggle_ignore(&MsgTarget::Chan { serv, chan });
+                let mut config = self.get_tab_config(serv, Some(chan));
+                let new_ignore = config.toggle_ignore();
+                self.tab_configs.set(serv, Some(chan), config);
+                (MsgTarget::Chan { serv, chan }, new_ignore)
             }
             MsgSource::User { serv, nick } => {
-                self.toggle_ignore(&MsgTarget::User { serv, nick });
+                let nick_chan = ChanNameRef::new(nick);
+                let mut config = self.get_tab_config(serv, Some(nick_chan));
+                let new_ignore = config.toggle_ignore();
+                self.tab_configs.set(serv, Some(nick_chan), config);
+                (MsgTarget::User { serv, nick }, new_ignore)
             }
-        }
+        };
+        let msg = if ignore {
+            "Ignore enabled"
+        } else {
+            "Ignore disabled"
+        };
+        self.add_client_notify_msg(msg, &target);
     }
 
     fn notify(&mut self, words: &mut SplitWhitespace, src: &MsgSource) {
@@ -1261,7 +1277,10 @@ impl TUI {
 
     pub(crate) fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
         let ignore = self
-            .get_tab_config(target.serv_name().unwrap_or_default(), target.chan_name())
+            .get_tab_config(
+                target.serv_name().unwrap_or_default(),
+                target.chan_or_user_name(),
+            )
             .ignore
             .unwrap_or_default();
         self.apply_to_target(target, false, &mut |tab: &mut Tab, is_active: bool| {
@@ -1307,7 +1326,7 @@ impl TUI {
         is_action: bool,
     ) {
         let mut notifier = if let Some(serv) = target.serv_name() {
-            self.get_tab_config(serv, target.chan_name())
+            self.get_tab_config(serv, target.chan_or_user_name())
                 .notify
                 .unwrap_or_default()
         } else {
@@ -1355,7 +1374,10 @@ impl TUI {
 
     pub(crate) fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         let ignore = self
-            .get_tab_config(target.serv_name().unwrap_or_default(), target.chan_name())
+            .get_tab_config(
+                target.serv_name().unwrap_or_default(),
+                target.chan_or_user_name(),
+            )
             .ignore
             .unwrap_or_default();
 
@@ -1366,7 +1388,10 @@ impl TUI {
 
     pub(crate) fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
         let ignore = self
-            .get_tab_config(target.serv_name().unwrap_or_default(), target.chan_name())
+            .get_tab_config(
+                target.serv_name().unwrap_or_default(),
+                target.chan_or_user_name(),
+            )
             .ignore
             .unwrap_or_default();
 
@@ -1405,15 +1430,6 @@ impl TUI {
         self.apply_to_target(target, false, &mut |tab: &mut Tab, _| tab.widget.clear());
     }
 
-    pub(crate) fn toggle_ignore(&mut self, target: &MsgTarget) {
-        let serv = target.serv_name().unwrap_or_default();
-        let chan = target.chan_name();
-        let mut config = self.get_tab_config(serv, chan);
-        let ignore = config.ignore.get_or_insert(false);
-        *ignore = !&*ignore;
-        self.set_tab_config(serv, chan, config)
-    }
-
     // TODO: Maybe remove this and add a `create: bool` field to MsgTarget::User
     pub(crate) fn user_tab_exists(&self, serv_: &str, nick_: &str) -> bool {
         for tab in &self.tabs {
@@ -1428,7 +1444,7 @@ impl TUI {
 
     pub(crate) fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
         if let Some(serv) = target.serv_name() {
-            if let Some(config) = self.tab_configs.get_mut(serv, target.chan_name()) {
+            if let Some(config) = self.tab_configs.get_mut(serv, target.chan_or_user_name()) {
                 config.notify = Some(notifier);
             }
         }

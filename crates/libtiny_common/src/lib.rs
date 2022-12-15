@@ -175,9 +175,10 @@ impl<'a> MsgTarget<'a> {
         }
     }
 
-    pub fn chan_name(&self) -> Option<&ChanNameRef> {
+    pub fn chan_or_user_name(&self) -> Option<&ChanNameRef> {
         match self {
             MsgTarget::Chan { chan, .. } => Some(chan),
+            MsgTarget::User { nick, .. } => Some(ChanNameRef::new(nick)),
             _ => None,
         }
     }
