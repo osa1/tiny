@@ -138,7 +138,7 @@ impl<'de> Deserialize<'de> for PassOrCmd {
 
 fn run_command(command_name: &str, server_addr: &str, args: &[String]) -> Option<String> {
     println!(
-        "Running {} command for server {} (`{}`)",
+        "Running {} command for {} (`{}`)",
         command_name,
         server_addr,
         shell_words::join(args)
