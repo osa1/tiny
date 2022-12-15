@@ -190,7 +190,8 @@ fn run_command(command_name: &str, server_addr: &str, args: &[String]) -> Option
         return None;
     }
 
-    Some(String::from_utf8_lossy(&output.stdout).into_owned())
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    Some(stdout.lines().last().unwrap().to_owned())
 }
 
 impl Config<PassOrCmd> {
