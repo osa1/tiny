@@ -149,7 +149,7 @@ fn run(
                 pass: server.pass,
                 realname: server.realname,
                 nicks: server.nicks,
-                auto_join: server.join.iter().map(|c| c.name.to_owned()).collect(),
+                auto_join: server.join.iter().map(|c| c.name().to_owned()).collect(),
                 nickserv_ident: server.nickserv_ident,
                 sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {
                     username: auth.username,

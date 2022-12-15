@@ -23,13 +23,16 @@ mod widget;
 #[cfg(test)]
 mod tests;
 
+use crate::tui::{CmdResult, TUIRet};
+use config::TabConfig;
+use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
+pub use notifier::Notifier;
+use term_input::Input;
+
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 
-use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
-pub use notifier::Notifier;
-use term_input::Input;
 use time::Tm;
 use tokio::select;
 use tokio::signal::unix::{signal, SignalKind};
@@ -37,9 +40,6 @@ use tokio::sync::mpsc;
 use tokio::task::spawn_local;
 use tokio_stream::wrappers::{ReceiverStream, SignalStream};
 use tokio_stream::{Stream, StreamExt};
-
-use crate::config::TabConfig;
-use crate::tui::{CmdResult, TUIRet};
 
 #[macro_use]
 extern crate log;
@@ -69,9 +69,8 @@ impl TUI {
         (TUI { inner }, rcv_ev)
     }
 
-    /// Create a test instance that doesn't render to the terminal, just updates
-    /// the termbox buffer. Useful for testing. See also
-    /// [`get_front_buffer`](TUI::get_front_buffer).
+    /// Create a test instance that doesn't render to the terminal, just updates the termbox
+    /// buffer. Useful for testing. See also [`get_front_buffer`](TUI::get_front_buffer).
     pub fn run_test<S>(width: u16, height: u16, input_stream: S) -> (TUI, mpsc::Receiver<Event>)
     where
         S: Stream<Item = std::io::Result<term_input::Event>> + Unpin + 'static,
@@ -258,7 +257,25 @@ impl TUI {
         chan_name: &ChanNameRef,
     ));
     delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
-    delegate!(set_tab_config(config: TabConfig, target: &MsgTarget,));
+
+    pub fn get_tab_config(&self, serv_name: &str, chan_name: Option<&ChanNameRef>) -> TabConfig {
+        self.inner
+            .upgrade()
+            .map(|tui| tui.borrow().get_tab_config(serv_name, chan_name))
+            .unwrap_or_default()
+    }
+
+    pub fn set_tab_config(
+        &self,
+        serv_name: &str,
+        chan_name: Option<&ChanNameRef>,
+        config: TabConfig,
+    ) {
+        if let Some(tui) = self.inner.upgrade() {
+            tui.borrow_mut()
+                .set_tab_config(serv_name, chan_name, config);
+        }
+    }
 
     pub fn user_tab_exists(&self, serv_name: &str, nick: &str) -> bool {
         match self.inner.upgrade() {

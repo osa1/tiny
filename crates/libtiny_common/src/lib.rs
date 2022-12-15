@@ -164,6 +164,25 @@ pub enum MsgTarget<'a> {
     CurrentTab,
 }
 
+impl<'a> MsgTarget<'a> {
+    pub fn serv_name(&self) -> Option<&str> {
+        match self {
+            MsgTarget::Server { serv }
+            | MsgTarget::Chan { serv, .. }
+            | MsgTarget::User { serv, .. }
+            | MsgTarget::AllServTabs { serv } => Some(serv),
+            _ => None,
+        }
+    }
+
+    pub fn chan_name(&self) -> Option<&ChanNameRef> {
+        match self {
+            MsgTarget::Chan { chan, .. } => Some(chan),
+            _ => None,
+        }
+    }
+}
+
 /// Source of a message from the user.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MsgSource {
@@ -183,6 +202,13 @@ impl MsgSource {
             MsgSource::Serv { serv }
             | MsgSource::Chan { serv, .. }
             | MsgSource::User { serv, .. } => serv,
+        }
+    }
+
+    pub fn chan_name(&self) -> Option<&ChanNameRef> {
+        match self {
+            MsgSource::Chan { chan, .. } => Some(chan),
+            _ => None,
         }
     }
 

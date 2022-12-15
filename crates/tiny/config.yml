@@ -10,13 +10,15 @@ servers:
       # alias: OFTC
 
       # Channels to automatically join
-      # Can include channel config arguments
-      # -ignore: ignores join/part messages
-      # -notify [off | mentions | messages]: sets notifier
-      # join:
-      #   - "#tiny -ignore -notify off"
+      # Can include tab config arguments
+      # -ignore: [true | false] -- ignores join/part messages
+      # -notify: [off | mentions | messages] -- sets notifications
       join:
           - "#tiny"
+      # join:
+      #   - name: "#tiny"
+      #     ignore: true
+      #     notify: "mentions"
 
       # Three authentication methods: pass, sasl, and nickserv_ident
       # These are optional and you probably only need one of these, delete
@@ -37,8 +39,8 @@ servers:
       # Set /ignore for this server and all its tabs, default: false
       # ignore: true  
 
-      # Set notifier for this server and all its tabs, default: mentions
-      # notifier: [off | mentions | messages]
+      # Set notifications for this server and all its tabs, default: mentions
+      # notify: [off | mentions | messages]
 
 # Defaults used when connecting to servers via the /connect command
 defaults:
@@ -50,8 +52,8 @@ defaults:
     # Set /ignore as the default for all servers and all its tabs, default: false
     # ignore: true 
 
-    # Set notifier as the default for all servers and all its tabs, default: mentions
-    # notifier: [off | mentions | messages]
+    # Set default notifications for all servers and all its tabs, default: mentions
+    # notify: [off | mentions | messages]
 
 # Where to put log files
 log_dir: "{}"

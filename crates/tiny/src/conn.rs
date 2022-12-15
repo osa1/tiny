@@ -545,37 +545,6 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                     &format!("{} is away: {}", nick, msg),
                     &MsgTarget::User { serv, nick },
                 );
-            }
-            // ERR_BADCHANNAME
-            else if n == 479 && n_params > 2 {
-                let chan = &params[1];
-                let msg = &params[2];
-                ui.add_client_err_msg(
-                    &format!("Unable to join {}: {}", chan, msg),
-                    &MsgTarget::Chan {
-                        chan: ChanNameRef::new(chan),
-                        serv,
-                    },
-                );
-            }
-            // ERR_CHANNELISFULL    471
-            // ERR_INVITEONLYCHAN   473
-            // ERR_BANNEDFROMCHAN   474
-            // ERR_BADCHANNELKEY    475
-            // ERR_NEEDREGGEDNICK   477
-            // ERR_THROTTLE         480
-            else if (n == 471 || n == 473 || n == 474 || n == 475 || n == 477 || n == 480)
-                && n_params == 3
-            {
-                let chan = &params[1];
-                let msg = &params[2];
-                ui.add_client_err_msg(
-                    msg,
-                    &MsgTarget::Chan {
-                        chan: ChanNameRef::new(chan),
-                        serv,
-                    },
-                );
             } else {
                 match pfx {
                     Some(Server(msg_serv)) | Some(Ambiguous(msg_serv)) => {

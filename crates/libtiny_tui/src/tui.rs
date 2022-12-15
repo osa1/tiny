@@ -11,10 +11,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
-
-use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
-use term_input::{Event, Key};
-pub use termbox_simple::{CellBuf, Termbox};
 use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style, TabConfig, TabConfigs};
@@ -25,6 +21,10 @@ use crate::msg_area::Layout;
 use crate::notifier::Notifier;
 use crate::tab::Tab;
 use crate::widget::WidgetRet;
+
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
+use term_input::{Event, Key};
+pub use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
@@ -120,9 +120,8 @@ impl TUI {
         TUI::new_tb(Some(config_path), tb)
     }
 
-    /// Create a test instance. Does not render to the screen, just updates the
-    /// termbox buffer. Useful for testing rendering. See also
-    /// [`get_front_buffer`](TUI::get_front_buffer).
+    /// Create a test instance. Does not render to the screen, just updates the termbox buffer.
+    /// Useful for testing rendering. See also [`get_front_buffer`](TUI::get_front_buffer).
     pub fn new_test(w: u16, h: u16) -> TUI {
         let tb = Termbox::init_test(w, h);
         TUI::new_tb(None, tb)
@@ -173,8 +172,8 @@ impl TUI {
             tab_configs: TabConfigs::default(),
         };
 
-        // Init "mentions" tab. This needs to happen right after creating the TUI to be
-        // able to show any errors in TUI.
+        // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
+        // show any errors in TUI.
         tui.new_server_tab("mentions", None);
         tui.add_client_msg(
             "Any mentions to you will be listed here.",
@@ -221,7 +220,7 @@ impl TUI {
         };
 
         if words.is_empty() {
-            self.show_notify_mode(&MsgTarget::CurrentTab);
+            self.show_notify_mode(src);
         } else if words.len() != 1 {
             show_usage();
         } else {
@@ -306,8 +305,7 @@ impl TUI {
                 CmdResult::Continue
             }
             Some("quit") => {
-                // Note: `SplitWhitespace::as_str` could be used here instead, when it gets
-                // stabilized.
+                // Note: `SplitWhitespace::as_str` could be used here instead, when it gets stabilized.
                 let reason: String = cmd.chars().skip("quit ".len()).collect();
 
                 if reason.is_empty() {
@@ -340,9 +338,6 @@ impl TUI {
     fn apply_config(&mut self, config: Option<Config>) {
         if let Some(config) = config {
             self.tab_configs = config.borrow().into();
-            for tab in &mut self.tabs {
-                tab.update_config(&self.tab_configs);
-            }
             let Config {
                 colors,
                 scrollback,
@@ -421,29 +416,6 @@ impl TUI {
             new_tab_switch_char.map(|(ch, _)| ch)
         };
 
-        // Get tab configs for the type of tab being created
-        let TabConfig { ignore, notifier } = match &src {
-            MsgSource::Serv { serv } => self.tab_configs.serv_conf(serv).unwrap_or_default(),
-            MsgSource::Chan { serv, chan } => {
-                let tab_configs = self.tab_configs.chan_conf(serv, chan);
-                // Prioritize config file but fallback to current server tab settings (when
-                // Defaults are not set)
-                let server_tab_config = self
-                    .tabs
-                    .iter()
-                    .find(|tab| tab.src.serv_name() == serv)
-                    .map(|tab| TabConfig {
-                        ignore: Some(!tab.widget.is_showing_status()),
-                        notifier: Some(tab.notifier),
-                    })
-                    .expect("Creating a channel or user tab, but the server tab doesn't exist");
-                debug!("{visible_name} tab conf: {tab_configs:?}");
-                tab_configs.unwrap_or(server_tab_config)
-            }
-            MsgSource::User { .. } => TabConfig::user_tab_config(),
-        };
-        let status = !ignore.unwrap_or_default();
-
         self.tabs.insert(
             idx,
             Tab {
@@ -451,14 +423,12 @@ impl TUI {
                 widget: MessagingUI::new(
                     self.width,
                     self.height - 1,
-                    status,
                     self.scrollback,
                     self.msg_layout,
                 ),
                 src,
                 style: TabStyle::Normal,
                 switch,
-                notifier: notifier.unwrap_or_default(),
             },
         );
     }
@@ -553,7 +523,7 @@ impl TUI {
                     if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
                         self.tabs[tab_idx + 1].widget.set_nick(nick);
                     }
-                    self.tabs[tab_idx + 1].widget.join(nick, None);
+                    self.tabs[tab_idx + 1].widget.join(nick, None, false);
                     Some(tab_idx + 1)
                 }
             },
@@ -804,6 +774,28 @@ impl TUI {
         // redraw after resize
         self.draw()
     }
+
+    pub(crate) fn get_tab_config(
+        &self,
+        serv_name: &str,
+        chan_name: Option<&ChanNameRef>,
+    ) -> TabConfig {
+        let configs = &self.tab_configs;
+        configs
+            .get(serv_name, chan_name) // tries to get
+            .or_else(|| configs.get(serv_name, None))
+            .or_else(|| configs.get("_defaults", None))
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn set_tab_config(
+        &mut self,
+        serv_name: &str,
+        chan_name: Option<&ChanNameRef>,
+        config: TabConfig,
+    ) {
+        self.tab_configs.set(serv_name, chan_name, config)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -969,9 +961,8 @@ impl TUI {
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
 
-    /// After closing a tab scroll left if there is space on the right and we
-    /// can fit more tabs from the left into the visible part of the tab
-    /// bar.
+    /// After closing a tab scroll left if there is space on the right and we can fit more tabs
+    /// from the left into the visible part of the tab bar.
     fn fix_scroll_after_close(&mut self) {
         let (tab_left, tab_right) = self.rendered_tabs();
 
@@ -995,8 +986,8 @@ impl TUI {
         // How much to scroll left
         let mut scroll_left = 0;
 
-        // Start iterating tabs on the left, add the tab size to `scroll_left` as long
-        // as scrolling doesn't make the right-most tab go out of bounds
+        // Start iterating tabs on the left, add the tab size to `scroll_left` as long as scrolling
+        // doesn't make the right-most tab go out of bounds
         for left_tab_idx in (0..tab_left).rev() {
             let tab_width = self.tabs[left_tab_idx].width() + 1; // 1 for space
             let draw_arrow = left_tab_idx != 0;
@@ -1178,13 +1169,13 @@ impl TUI {
     ////////////////////////////////////////////////////////////////////////////
     // Interfacing with tabs
 
-    fn apply_to_target<F>(&mut self, target: &MsgTarget, can_create_tab: bool, f: &F)
+    fn apply_to_target<F>(&mut self, target: &MsgTarget, can_create_tab: bool, f: &mut F)
     where
-        F: Fn(&mut Tab, bool),
+        F: FnMut(&mut Tab, bool),
     {
-        // Creating a vector just to make borrow checker happy (I can't have a Vec<&mut
-        // Tab>) I need to collect tabs here because of the "create if not
-        // exists" logic. (see `target_idxs.is_empty()` below)
+        // Creating a vector just to make borrow checker happy (I can't have a Vec<&mut Tab>)
+        // I need to collect tabs here because of the "create if not exists" logic.
+        // (see `target_idxs.is_empty()` below)
         let mut target_idxs: Vec<usize> = Vec::with_capacity(1);
 
         match *target {
@@ -1269,27 +1260,21 @@ impl TUI {
     }
 
     pub(crate) fn set_tab_style(&mut self, style: TabStyle, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, is_active: bool| {
-            if (tab.widget.is_showing_status() || style != TabStyle::JoinOrPart)
-                && tab.style < style
-                && !is_active
-            {
+        let ignore = self
+            .get_tab_config(target.serv_name().unwrap_or_default(), target.chan_name())
+            .ignore
+            .unwrap_or_default();
+        self.apply_to_target(target, false, &mut |tab: &mut Tab, is_active: bool| {
+            if (!ignore || style != TabStyle::JoinOrPart) && tab.style < style && !is_active {
                 tab.set_style(style);
             }
-        });
-    }
-
-    pub(crate) fn set_tab_config(&mut self, config: TabConfig, target: &MsgTarget) {
-        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
-            tab.widget.set_or_toggle_status(config.ignore.map(|i| !i));
-            tab.notifier = config.notifier.unwrap_or_default();
         });
     }
 
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
     pub(crate) fn add_client_err_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &mut |tab: &mut Tab, _| {
             tab.widget.add_client_err_msg(msg);
         });
     }
@@ -1297,7 +1282,7 @@ impl TUI {
     /// A notify message coming from tiny, usually shows a response of a command
     /// e.g. "Notifications enabled".
     pub(crate) fn add_client_notify_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &mut |tab: &mut Tab, _| {
             tab.widget.add_client_notify_msg(msg);
         });
     }
@@ -1305,7 +1290,7 @@ impl TUI {
     /// A message from client, usually just to indidate progress, e.g.
     /// "Connecting...". Not timestamed and not logged.
     pub(crate) fn add_client_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &mut |tab: &mut Tab, _| {
             tab.widget.add_client_msg(msg);
         });
     }
@@ -1321,13 +1306,19 @@ impl TUI {
         highlight: bool,
         is_action: bool,
     ) {
-        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
+        let mut notifier = if let Some(serv) = target.serv_name() {
+            self.get_tab_config(serv, target.chan_name())
+                .notify
+                .unwrap_or_default()
+        } else {
+            Notifier::default()
+        };
+        self.apply_to_target(target, true, &mut |tab: &mut Tab, _| {
             tab.widget
                 .add_privmsg(sender, msg, Timestamp::from(ts), highlight, is_action);
             let nick = tab.widget.get_nick();
             if let Some(nick_) = nick {
-                tab.notifier
-                    .notify_privmsg(sender, msg, target, &nick_, highlight);
+                notifier.notify_privmsg(sender, msg, target, &nick_, highlight);
             }
         });
     }
@@ -1335,7 +1326,7 @@ impl TUI {
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
     pub fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &mut |tab: &mut Tab, _| {
             tab.widget.add_msg(msg, Timestamp::from(ts));
         });
     }
@@ -1343,34 +1334,44 @@ impl TUI {
     /// Error messages related with the protocol - e.g. can't join a channel,
     /// nickname is in use etc. Timestamped and logged.
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
-        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &mut |tab: &mut Tab, _| {
             tab.widget.add_err_msg(msg, Timestamp::from(ts));
         });
     }
 
     pub(crate) fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &ChanNameRef) {
         let target = MsgTarget::Chan { serv, chan };
-        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &mut |tab: &mut Tab, _| {
             tab.widget.show_topic(title, Timestamp::from(ts));
         });
     }
 
     pub(crate) fn clear_nicks(&mut self, serv: &str) {
         let target = MsgTarget::AllServTabs { serv };
-        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &mut |tab: &mut Tab, _| {
             tab.widget.clear_nicks();
         });
     }
 
     pub(crate) fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-            tab.widget.join(nick, ts.map(Timestamp::from));
+        let ignore = self
+            .get_tab_config(target.serv_name().unwrap_or_default(), target.chan_name())
+            .ignore
+            .unwrap_or_default();
+
+        self.apply_to_target(target, false, &mut |tab: &mut Tab, _| {
+            tab.widget.join(nick, ts.map(Timestamp::from), ignore);
         });
     }
 
     pub(crate) fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-            tab.widget.part(nick, ts.map(Timestamp::from));
+        let ignore = self
+            .get_tab_config(target.serv_name().unwrap_or_default(), target.chan_name())
+            .ignore
+            .unwrap_or_default();
+
+        self.apply_to_target(target, false, &mut |tab: &mut Tab, _| {
+            tab.widget.part(nick, ts.map(Timestamp::from), ignore);
         });
     }
 
@@ -1381,7 +1382,7 @@ impl TUI {
         ts: Tm,
         target: &MsgTarget,
     ) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, false, &mut |tab: &mut Tab, _| {
             tab.widget.nick(old_nick, new_nick, Timestamp::from(ts));
             // TODO: Does this actually rename the tab?
             tab.update_source(&|src: &mut MsgSource| {
@@ -1395,34 +1396,22 @@ impl TUI {
 
     pub(crate) fn set_nick(&mut self, serv: &str, new_nick: &str) {
         let target = MsgTarget::AllServTabs { serv };
-        self.apply_to_target(&target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(&target, false, &mut |tab: &mut Tab, _| {
             tab.widget.set_nick(new_nick.to_owned())
         });
     }
 
     pub(crate) fn clear(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| tab.widget.clear());
+        self.apply_to_target(target, false, &mut |tab: &mut Tab, _| tab.widget.clear());
     }
 
     pub(crate) fn toggle_ignore(&mut self, target: &MsgTarget) {
-        if let MsgTarget::AllServTabs { serv } = *target {
-            let mut status_val: bool = false;
-            for tab in &self.tabs {
-                if let MsgSource::Serv { serv: ref serv_ } = tab.src {
-                    if serv == serv_ {
-                        status_val = tab.widget.is_showing_status();
-                        break;
-                    }
-                }
-            }
-            self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-                tab.widget.set_or_toggle_status(Some(!status_val));
-            });
-        } else {
-            self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-                tab.widget.set_or_toggle_status(None);
-            });
-        }
+        let serv = target.serv_name().unwrap_or_default();
+        let chan = target.chan_name();
+        let mut config = self.get_tab_config(serv, chan);
+        let ignore = config.ignore.get_or_insert(false);
+        *ignore = !&*ignore;
+        self.set_tab_config(serv, chan, config)
     }
 
     // TODO: Maybe remove this and add a `create: bool` field to MsgTarget::User
@@ -1438,14 +1427,20 @@ impl TUI {
     }
 
     pub(crate) fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-            tab.notifier = notifier;
-        });
+        if let Some(serv) = target.serv_name() {
+            if let Some(config) = self.tab_configs.get_mut(serv, target.chan_name()) {
+                config.notify = Some(notifier);
+            }
+        }
     }
 
-    pub(crate) fn show_notify_mode(&mut self, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-            let msg = match tab.notifier {
+    pub(crate) fn show_notify_mode(&mut self, src: &MsgSource) {
+        let notifier = self
+            .get_tab_config(src.serv_name(), src.chan_name())
+            .notify
+            .unwrap_or_default();
+        self.apply_to_target(&src.to_target(), false, &mut |tab: &mut Tab, _| {
+            let msg = match notifier {
                 Notifier::Off => "Notifications are off",
                 Notifier::Mentions => "Notifications enabled for mentions",
                 Notifier::Messages => "Notifications enabled for all messages",

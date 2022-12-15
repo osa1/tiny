@@ -1,13 +1,12 @@
-use std::borrow::Borrow;
-use std::str::FromStr;
-
-use libtiny_client::{Client, ServerInfo};
-use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
-use libtiny_tui::config::{Chan, TabConfig};
-
 use crate::config::Defaults;
 use crate::ui::UI;
 use crate::utils;
+use libtiny_client::{Client, ServerInfo};
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
+use libtiny_tui::config::Chan;
+
+use std::borrow::Borrow;
+use std::str::FromStr;
 
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
@@ -18,8 +17,7 @@ pub(crate) struct CmdArgs<'a> {
 }
 
 pub(crate) struct Cmd {
-    /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this
-    /// command.
+    /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
     pub(crate) name: &'static str,
     /// Command function.
     pub(crate) cmd_fn: fn(CmdArgs),
@@ -75,8 +73,8 @@ pub(crate) fn parse_cmd(cmd: &str) -> ParseCmdResult {
             //             rest,
             //         },
             //     _ =>
-            //         ParseCmdResult::Ambiguous(possibilities.into_iter().
-            // map(|cmd| cmd.name).collect()), }
+            //         ParseCmdResult::Ambiguous(possibilities.into_iter().map(|cmd| cmd.name).collect()),
+            // }
         }
     }
 }
@@ -335,12 +333,10 @@ fn join(args: CmdArgs) {
     let chans = if chans.is_empty() {
         match ui.current_tab() {
             None => return,
-            // rejoin current tab channel
-            Some(MsgSource::Chan { serv: _, chan }) => {
-                vec![Chan {
-                    name: chan,
-                    config: TabConfig::user_tab_config(),
-                }]
+            // rejoin current tab's channel
+            Some(MsgSource::Chan { serv, chan }) => {
+                let config = ui.get_tab_config(&serv, Some(chan.as_ref()));
+                vec![Chan::WithConfig { name: chan, config }]
             }
             Some(_) => {
                 return ui.add_client_err_msg(
@@ -353,19 +349,21 @@ fn join(args: CmdArgs) {
         chans
     };
 
-    let serv_name = src.serv_name();
-    match find_client(clients, serv_name) {
+    let serv = src.serv_name();
+    match find_client(clients, serv) {
         Some(client) => {
-            let iter_ref = chans.iter().map(|c| c.name.as_ref());
+            let iter_ref = chans.iter().map(|c| c.name());
             // set tab configs of new channel tabs (creates new tab)
             for chan in &chans {
-                ui.set_tab_config(
-                    chan.config,
-                    &MsgTarget::Chan {
-                        chan: &chan.name,
-                        serv: serv_name,
-                    },
-                )
+                match chan {
+                    Chan::Name(name) => {
+                        let config = ui.get_tab_config(serv, Some(name.as_ref()));
+                        ui.set_tab_config(serv, Some(name), config)
+                    }
+                    Chan::WithConfig { name, config } => {
+                        ui.set_tab_config(serv, Some(name), config.to_owned())
+                    }
+                }
             }
             client.join(iter_ref);
         }
@@ -411,10 +409,9 @@ static MSG_CMD: Cmd = Cmd {
 fn split_msg_args(args: &str) -> Option<(&str, &str)> {
     let mut char_indices = args.char_indices();
 
-    // We could check for validity of the nick according to RFC 2812 but we do the
-    // simple thing for now and and only check the first character, to avoid
-    // confusing the UI by returning a `MsgSource::User` with a channel name as
-    // `nick`.
+    // We could check for validity of the nick according to RFC 2812 but we do the simple thing for
+    // now and and only check the first character, to avoid confusing the UI by returning a
+    // `MsgSource::User` with a channel name as `nick`.
     match char_indices.next() {
         None => {
             return None;

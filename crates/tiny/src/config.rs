@@ -43,7 +43,6 @@ pub(crate) struct Server {
     pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
-    // #[serde(default, deserialize_with = "deser_chans")]
     pub(crate) join: Vec<Chan>,
 
     /// NickServ identification password. Used on connecting to the server and
@@ -151,8 +150,7 @@ impl Config {
 /// - $HOME/.config/tiny/config.yml
 /// - $HOME/.tinyrc.yml (old, for backward compat)
 ///
-/// Panics when none of $XDG_CONFIG_HOME or $HOME can be found (using the `dirs`
-/// crate).
+/// Panics when none of $XDG_CONFIG_HOME or $HOME can be found (using the `dirs` crate).
 pub(crate) fn get_config_path() -> PathBuf {
     let xdg_config_path = dirs::config_dir().map(|mut xdg_config_home| {
         xdg_config_home.push("tiny");
@@ -218,8 +216,6 @@ fn get_default_config_yaml() -> String {
 #[cfg(test)]
 mod tests {
     use libtiny_common::ChanName;
-    use libtiny_tui::config::TabConfig;
-    use libtiny_tui::Notifier;
     use serde_yaml;
 
     use super::*;
@@ -234,10 +230,7 @@ mod tests {
             Ok(Config { servers, .. }) => {
                 assert_eq!(
                     servers[0].join,
-                    vec![Chan {
-                        name: ChanName::new("#tiny".to_string()),
-                        config: TabConfig::default(),
-                    }]
+                    vec![Chan::Name(ChanName::new("#tiny".to_string()))]
                 );
                 assert_eq!(servers[0].tls, true);
             }
@@ -246,9 +239,8 @@ mod tests {
 
     #[test]
     fn validation() {
-        // We trim the string fields when deserializing, so `validate` doesn't consider
-        // non-empty strings as empty even if they have only spaces, it assumes
-        // spaces should be trimmed
+        // We trim the string fields when deserializing, so `validate` doesn't consider non-empty
+        // strings as empty even if they have only spaces, it assumes spaces should be trimmed
         let config = Config {
             servers: vec![Server {
                 addr: "my_server".to_owned(),
@@ -286,24 +278,6 @@ mod tests {
         assert_eq!(
             &errors[3],
             "'realname' can't be empty, please update 'realname' field of 'my_server'"
-        );
-    }
-
-    #[test]
-    fn parse_chan_with_args() {
-        let config: Config = serde_yaml::from_str(
-            &get_default_config_yaml().replace("#tiny", "#tiny -ignore -notify off"),
-        )
-        .expect("parsed config");
-        assert_eq!(
-            config.servers[0].join,
-            vec![Chan {
-                name: ChanName::new("#tiny".to_string()),
-                config: TabConfig {
-                    ignore: Some(true),
-                    notifier: Some(Notifier::Off)
-                }
-            }]
         );
     }
 }
