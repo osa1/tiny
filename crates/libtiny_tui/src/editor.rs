@@ -20,7 +20,7 @@
 use termbox_simple::Termbox;
 use tokio::sync::oneshot;
 
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::Write;
 use std::process::Command;
 
 #[derive(Debug)]
@@ -82,8 +82,8 @@ pub(crate) fn run(
         }
     };
 
-    let mut tmp_file = match tempfile::NamedTempFile::new() {
-        Ok(tmp_file) => tmp_file,
+    let (mut tmp_file, tmp_file_path) = match tempfile::NamedTempFile::new() {
+        Ok(tmp_file) => tmp_file.into_parts(),
         Err(err) => {
             return Err(Error::new(text_field_contents, cursor, err.into()));
         }
@@ -106,7 +106,10 @@ pub(crate) fn run(
         before_paste,
         pasted_text.replace('\r', "\n"),
         after_paste,
-    );
+    )
+    .and_then(|_| tmp_file.sync_all());
+
+    drop(tmp_file);
 
     if let Err(err) = write_ret {
         return Err(Error::new(text_field_contents, cursor, err.into()));
@@ -140,7 +143,7 @@ pub(crate) fn run(
             _ => {}
         }
 
-        let ret = cmd.arg(tmp_file.path()).status();
+        let ret = cmd.arg(&tmp_file_path).status();
         let ret = match ret {
             Err(io_err) => {
                 snd_editor_ret
@@ -157,21 +160,17 @@ pub(crate) fn run(
             return;
         }
 
-        let mut tmp_file = tmp_file.into_file();
-        if let Err(io_err) = tmp_file.seek(SeekFrom::Start(0)) {
-            snd_editor_ret
-                .send(Err(Error::new(text_field_contents, cursor, io_err.into())))
-                .unwrap();
-            return;
-        }
-
-        let mut file_contents = String::new();
-        if let Err(io_err) = tmp_file.read_to_string(&mut file_contents) {
-            snd_editor_ret
-                .send(Err(Error::new(text_field_contents, cursor, io_err.into())))
-                .unwrap();
-            return;
-        }
+        let file_contents = {
+            match std::fs::read_to_string(tmp_file_path) {
+                Ok(file_contents) => file_contents,
+                Err(io_err) => {
+                    snd_editor_ret
+                        .send(Err(Error::new(text_field_contents, cursor, io_err.into())))
+                        .unwrap();
+                    return;
+                }
+            }
+        };
 
         let mut filtered_lines = vec![];
         for s in file_contents.lines() {
