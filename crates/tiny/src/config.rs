@@ -95,6 +95,7 @@ where
 pub(crate) enum PassOrCmd {
     /// Password is given directly as plain text
     Pass(String),
+
     /// A shell command to run to get the password
     Cmd(Vec<String>),
 }
@@ -114,24 +115,23 @@ impl<'de> Deserialize<'de> for PassOrCmd {
         D: serde::Deserializer<'de>,
     {
         use serde::de::Error;
+        use serde_yaml::Value;
 
-        let str = String::deserialize(deserializer)?;
-        let trimmed = str.trim();
-        if let Some(trimmed) = trimmed.strip_prefix('$') {
-            let args = match shell_words::split(trimmed) {
-                Ok(args) => args,
-                Err(err) => {
-                    return Err(D::Error::custom(format!(
+        match Value::deserialize(deserializer)? {
+            Value::String(str) => Ok(PassOrCmd::Pass(str)),
+            Value::Mapping(map) => match map.get(&Value::String("cmd".to_owned())) {
+                Some(Value::String(cmd)) => match shell_words::split(cmd) {
+                    Ok(cmd_parts) => Ok(PassOrCmd::Cmd(cmd_parts)),
+                    Err(err) => Err(D::Error::custom(format!(
                         "Unable to parse password field: {}",
                         err
-                    )))
-                }
-            };
-            Ok(PassOrCmd::Cmd(args))
-        } else if let Some(without_dollar) = trimmed.strip_prefix("\\$") {
-            Ok(PassOrCmd::Pass(format!("${}", without_dollar)))
-        } else {
-            Ok(PassOrCmd::Pass(str))
+                    ))),
+                },
+                _ => Err(D::Error::custom(
+                    "Expeted a 'cmd' key in password map with string value",
+                )),
+            },
+            _ => Err(D::Error::custom("Password field must be a string or map")),
         }
     }
 }
@@ -478,7 +478,7 @@ mod tests {
 
     #[test]
     fn parse_password_field() {
-        let field = "$ my pass cmd";
+        let field = "cmd: my pass cmd";
         assert_eq!(
             serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
             PassOrCmd::Cmd(vec!["my".to_owned(), "pass".to_owned(), "cmd".to_owned()])
@@ -490,13 +490,7 @@ mod tests {
             PassOrCmd::Pass(field.to_string())
         );
 
-        let field = "\\$my password";
-        assert_eq!(
-            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
-            PassOrCmd::Pass("$my password".to_string())
-        );
-
-        let field = "$ pass show \"my password\"";
+        let field = "cmd: \"pass show 'my password'\"";
         assert_eq!(
             serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
             PassOrCmd::Cmd(vec![
