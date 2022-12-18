@@ -3,11 +3,10 @@
 Thanks to @ALEX11BR for contributing to this release.
 
 - Fixed handling of CR, LF, and tab characters in IRC format parser. IRC RFCs
-  don't allow standalone CR and LF characters, but some servers still them.
-  tiny now shows those characters as single space. Tab characters are shown as
-  8 spaces, as in tiny 0.9.0.
-
-  This bug was introduced in 0.10.0 with 33df77e. (#366)
+  don't allow standalone CR and LF characters, but some servers still send
+  them. tiny now shows those characters as single space. Tab characters are
+  shown as 8 spaces, as in tiny 0.9.0. This bug was introduced in 0.10.0 with
+  33df77e. (#366)
 - `/close` and `/quit` commands now take optional message parameters to be sent
   with PART and QUIT messages to the server. (#365, #395)
 - Fixed running `$EDITOR` on macOS 12. Previously, on macOS 12, changes in the
@@ -36,7 +35,7 @@ Thanks to @trevarj for contributing to this release.
 - Minor improvements in logging (d0505f2, bbb4b81)
 - `/join` (without arguments) now rejoins the current channel. (#334)
 - Handling of IRC formatting characters (colors etc.) in TUI and logger
-  improved: 
+  improved:
   - TUI now handles "reset" control character, to reset the text style to the
     default.
   - Logger now filters out all control characters before writing to the file.
