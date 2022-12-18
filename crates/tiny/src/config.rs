@@ -480,19 +480,19 @@ mod tests {
     fn parse_password_field() {
         let field = "command: my pass cmd";
         assert_eq!(
-            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            serde_yaml::from_str::<PassOrCmd>(field).unwrap(),
             PassOrCmd::Cmd(vec!["my".to_owned(), "pass".to_owned(), "cmd".to_owned()])
         );
 
         let field = "my password";
         assert_eq!(
-            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            serde_yaml::from_str::<PassOrCmd>(field).unwrap(),
             PassOrCmd::Pass(field.to_string())
         );
 
         let field = "command: \"pass show 'my password'\"";
         assert_eq!(
-            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            serde_yaml::from_str::<PassOrCmd>(field).unwrap(),
             PassOrCmd::Cmd(vec![
                 "pass".to_string(),
                 "show".to_string(),

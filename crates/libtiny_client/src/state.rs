@@ -657,7 +657,7 @@ impl StateInner {
                             auth.username, auth.username, auth.password
                         );
                         snd_irc_msg
-                            .try_send(wire::authenticate(&base64::encode(&msg)))
+                            .try_send(wire::authenticate(&base64::encode(msg)))
                             .unwrap();
                     }
                 }

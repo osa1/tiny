@@ -464,7 +464,7 @@ fn num_to_buf(buf: &mut Vec<u8>, mut num: u16) {
         }
     }
 
-    let swap_len = start_len + (chars_len / 2) as usize;
+    let swap_len = start_len + (chars_len / 2);
 
     for (c, i) in (start_len..swap_len).enumerate() {
         let next_swap_idx = start_len + chars_len - c - 1;
