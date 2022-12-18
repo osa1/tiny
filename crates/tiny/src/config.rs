@@ -7,7 +7,7 @@ use std::process::Command;
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 #[serde(untagged, rename_all = "snake_case")]
-pub(crate) enum SASLAuth {
+pub(crate) enum SASLAuth<P> {
     Plain {
         /// Registered username
         username: String,
@@ -266,8 +266,8 @@ impl Config<PassOrCmd> {
                 }
             }
 
-            if let Some(ref sasl_auth) = server.sasl_auth {
-                if sasl_auth.password.is_empty_cmd() {
+            if let Some(SASLAuth::Plain { password, .. }) = &server.sasl_auth {
+                if password.is_empty_cmd() {
                     errors.push(format!("Empty SASL password command for '{}'", server.addr));
                 }
             }
@@ -315,20 +315,21 @@ impl Config<PassOrCmd> {
 
             let sasl_auth = match sasl_auth {
                 None => None,
-                Some(SASLAuth {
+                Some(SASLAuth::Plain {
                     username,
                     password: PassOrCmd::Pass(pass),
-                }) => Some(SASLAuth {
+                }) => Some(SASLAuth::Plain {
                     username,
                     password: pass,
                 }),
-                Some(SASLAuth {
+                Some(SASLAuth::Plain {
                     username,
                     password: PassOrCmd::Cmd(cmd),
                 }) => {
                     let password = run_command("SASL password", &addr, &cmd)?;
-                    Some(SASLAuth { username, password })
+                    Some(SASLAuth::Plain { username, password })
                 }
+                Some(SASLAuth::External { pem }) => Some(SASLAuth::External { pem }),
             };
 
             servers_.push(Server {

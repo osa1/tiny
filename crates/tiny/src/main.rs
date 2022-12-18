@@ -200,7 +200,7 @@ fn run(
 }
 
 // Helper to parse SASL config into a libtiny_client SASL struct
-fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth) -> Result<SASLAuth, String> {
+fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth<String>) -> Result<SASLAuth, String> {
     match sasl_config {
         config::SASLAuth::Plain { username, password } => Ok(SASLAuth::Plain {
             username: username.clone(),
