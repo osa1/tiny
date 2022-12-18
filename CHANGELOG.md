@@ -12,6 +12,8 @@ Thanks to @ALEX11BR for contributing to this release.
   with PART and QUIT messages to the server. (#365, #395)
 - Fixed running `$EDITOR` on macOS 12. Previously, on macOS 12, changes in the
   temporary file would not be read properly when `$EDITOR` is closed.
+- Passwords can now be read from external commands (e.g. a password manager).
+  See README for details. (#246, #315)
 
 # 2021/11/07: 0.10.0
 

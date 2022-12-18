@@ -54,6 +54,11 @@ fn main() {
                     exit(1);
                 }
 
+                let config = match config.read_passwords() {
+                    None => exit(1),
+                    Some(config) => config,
+                };
+
                 let config::Config {
                     servers,
                     defaults,
@@ -78,7 +83,7 @@ fn main() {
 const DEBUG_LOG_FILE: &str = "tiny_debug_logs.txt";
 
 fn run(
-    servers: Vec<config::Server>,
+    servers: Vec<config::Server<String>>,
     defaults: config::Defaults,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,

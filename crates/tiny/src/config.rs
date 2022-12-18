@@ -3,15 +3,17 @@ use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct SASLAuth {
+pub(crate) struct SASLAuth<P> {
     pub(crate) username: String,
-    pub(crate) password: String,
+    pub(crate) password: P,
 }
 
 #[derive(Clone, Deserialize)]
-pub(crate) struct Server {
+#[serde(bound(deserialize = "P: Deserialize<'de>"))]
+pub(crate) struct Server<P> {
     /// Address of the server
     pub(crate) addr: String,
 
@@ -28,7 +30,7 @@ pub(crate) struct Server {
 
     /// Server password (optional)
     #[serde(default)]
-    pub(crate) pass: Option<String>,
+    pub(crate) pass: Option<P>,
 
     /// Real name to be used in connection registration
     #[serde(deserialize_with = "deser_trimmed_str")]
@@ -44,11 +46,11 @@ pub(crate) struct Server {
     pub(crate) join: Vec<String>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
-    pub(crate) nickserv_ident: Option<String>,
+    pub(crate) nickserv_ident: Option<P>,
 
     /// Authenication method
     #[serde(rename = "sasl")]
-    pub(crate) sasl_auth: Option<SASLAuth>,
+    pub(crate) sasl_auth: Option<SASLAuth<P>>,
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
@@ -65,8 +67,8 @@ pub(crate) struct Defaults {
 }
 
 #[derive(Deserialize)]
-pub(crate) struct Config {
-    pub(crate) servers: Vec<Server>,
+pub(crate) struct Config<P> {
+    pub(crate) servers: Vec<Server<P>>,
     pub(crate) defaults: Defaults,
     pub(crate) log_dir: Option<PathBuf>,
 }
@@ -87,8 +89,113 @@ where
     Ok(strs.into_iter().map(|s| s.trim().to_owned()).collect())
 }
 
-impl Config {
-    /// Returns error descriptions
+/// A password, or a shell command to run the obtain a password. Used for password (server
+/// password, SASL, NickServ) fields of `Config`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PassOrCmd {
+    /// Password is given directly as plain text
+    Pass(String),
+
+    /// A shell command to run to get the password
+    Cmd(Vec<String>),
+}
+
+impl PassOrCmd {
+    fn is_empty_cmd(&self) -> bool {
+        match self {
+            PassOrCmd::Cmd(cmd) => cmd.is_empty(),
+            PassOrCmd::Pass(_) => false,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for PassOrCmd {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use serde_yaml::Value;
+
+        match Value::deserialize(deserializer)? {
+            Value::String(str) => Ok(PassOrCmd::Pass(str)),
+            Value::Mapping(map) => match map.get(&Value::String("command".to_owned())) {
+                Some(Value::String(cmd)) => match shell_words::split(cmd) {
+                    Ok(cmd_parts) => Ok(PassOrCmd::Cmd(cmd_parts)),
+                    Err(err) => Err(D::Error::custom(format!(
+                        "Unable to parse password field: {}",
+                        err
+                    ))),
+                },
+                _ => Err(D::Error::custom(
+                    "Expeted a 'cmd' key in password map with string value",
+                )),
+            },
+            _ => Err(D::Error::custom("Password field must be a string or map")),
+        }
+    }
+}
+
+fn run_command(command_name: &str, server_addr: &str, args: &[String]) -> Option<String> {
+    println!(
+        "Running {} command for {} (`{}`)",
+        command_name,
+        server_addr,
+        shell_words::join(args)
+    );
+
+    assert!(!args.is_empty()); // should be checked in `validate`
+
+    let mut cmd = Command::new(&args[0]);
+    cmd.args(args[1..].iter());
+
+    let output = match cmd.output() {
+        Err(err) => {
+            println!("Command failed: {:?}", err);
+            return None;
+        }
+        Ok(output) => output,
+    };
+
+    if !output.status.success() {
+        print!("Command returned non-zero");
+        if let Some(code) = output.status.code() {
+            println!(": {}", code);
+        } else {
+            println!();
+        }
+        if output.stdout.is_empty() {
+            println!("stdout is empty");
+        } else {
+            println!("stdout:");
+            println!("--------------------------------------");
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+            println!("--------------------------------------");
+        }
+
+        if output.stderr.is_empty() {
+            println!("stderr is empty");
+        } else {
+            println!("stderr:");
+            println!("--------------------------------------");
+            println!("{}", String::from_utf8_lossy(&output.stderr));
+            println!("--------------------------------------");
+        }
+
+        return None;
+    }
+
+    if output.stdout.is_empty() {
+        println!("Command returned zero, but stdout is empty. Aborting.");
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    Some(stdout.lines().last().unwrap().to_owned())
+}
+
+impl Config<PassOrCmd> {
+    /// Returns error descriptions.
     pub(crate) fn validate(&self) -> Vec<String> {
         let mut errors = vec![];
 
@@ -133,9 +240,106 @@ impl Config {
                     server.addr
                 ));
             }
+
+            if let Some(ref pass) = server.pass {
+                if pass.is_empty_cmd() {
+                    errors.push(format!("Empty PASS command for '{}'", server.addr));
+                }
+            }
+
+            if let Some(ref nickserv_ident) = server.nickserv_ident {
+                if nickserv_ident.is_empty_cmd() {
+                    errors.push(format!(
+                        "Empty NickServ password command for '{}'",
+                        server.addr
+                    ));
+                }
+            }
+
+            if let Some(ref sasl_auth) = server.sasl_auth {
+                if sasl_auth.password.is_empty_cmd() {
+                    errors.push(format!("Empty SASL password command for '{}'", server.addr));
+                }
+            }
         }
 
         errors
+    }
+
+    /// Runs password commands and updates the config with plain passwords obtained from the
+    /// commands.
+    pub(crate) fn read_passwords(self) -> Option<Config<String>> {
+        let Config {
+            servers,
+            defaults,
+            log_dir,
+        } = self;
+
+        let mut servers_: Vec<Server<String>> = Vec::with_capacity(servers.len());
+
+        for server in servers {
+            let Server {
+                addr,
+                alias,
+                port,
+                tls,
+                pass,
+                realname,
+                nicks,
+                join,
+                nickserv_ident,
+                sasl_auth,
+            } = server;
+
+            let pass = match pass {
+                None => None,
+                Some(PassOrCmd::Pass(pass)) => Some(pass),
+                Some(PassOrCmd::Cmd(cmd)) => Some(run_command("server password", &addr, &cmd)?),
+            };
+
+            let nickserv_ident = match nickserv_ident {
+                None => None,
+                Some(PassOrCmd::Pass(pass)) => Some(pass),
+                Some(PassOrCmd::Cmd(cmd)) => Some(run_command("NickServ password", &addr, &cmd)?),
+            };
+
+            let sasl_auth = match sasl_auth {
+                None => None,
+                Some(SASLAuth {
+                    username,
+                    password: PassOrCmd::Pass(pass),
+                }) => Some(SASLAuth {
+                    username,
+                    password: pass,
+                }),
+                Some(SASLAuth {
+                    username,
+                    password: PassOrCmd::Cmd(cmd),
+                }) => {
+                    let password = run_command("SASL password", &addr, &cmd)?;
+                    Some(SASLAuth { username, password })
+                }
+            };
+
+            servers_.push(Server {
+                addr,
+                alias,
+                port,
+                tls,
+                pass,
+                realname,
+                nicks,
+                join,
+                nickserv_ident,
+                sasl_auth,
+            });
+        }
+
+        Some(Config {
+            servers: servers_,
+            defaults,
+            log_dir,
+        })
     }
 }
 
@@ -175,7 +379,7 @@ pub(crate) fn get_config_path() -> PathBuf {
     }
 }
 
-pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
+pub(crate) fn parse_config(config_path: &Path) -> Result<Config<PassOrCmd>, serde_yaml::Error> {
     let contents = {
         let mut str = String::new();
         let mut file = File::open(config_path).unwrap();
@@ -216,7 +420,7 @@ mod tests {
 
     #[test]
     fn parse_default_config() {
-        match serde_yaml::from_str(&get_default_config_yaml()) {
+        match serde_yaml::from_str::<Config<String>>(&get_default_config_yaml()) {
             Err(yaml_err) => {
                 println!("{}", yaml_err);
                 panic!();
@@ -269,6 +473,31 @@ mod tests {
         assert_eq!(
             &errors[3],
             "'realname' can't be empty, please update 'realname' field of 'my_server'"
+        );
+    }
+
+    #[test]
+    fn parse_password_field() {
+        let field = "command: my pass cmd";
+        assert_eq!(
+            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            PassOrCmd::Cmd(vec!["my".to_owned(), "pass".to_owned(), "cmd".to_owned()])
+        );
+
+        let field = "my password";
+        assert_eq!(
+            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            PassOrCmd::Pass(field.to_string())
+        );
+
+        let field = "command: \"pass show 'my password'\"";
+        assert_eq!(
+            serde_yaml::from_str::<PassOrCmd>(&field).unwrap(),
+            PassOrCmd::Cmd(vec![
+                "pass".to_string(),
+                "show".to_string(),
+                "my password".to_string()
+            ])
         );
     }
 }
