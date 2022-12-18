@@ -108,8 +108,8 @@ join require identification. To use this method enter your nick password to the
 
 ### Using external commands for passwords
 
-When a password field in the config file is a map with a `cmd` key, the value
-is used as the shell command to run to get the password.
+When a password field in the config file is a map with a `command` key, the
+value is used as the shell command to run to get the password.
 
 For example, in this config:
 
@@ -117,7 +117,7 @@ For example, in this config:
 sasl:
   username: osa1
   password:
-    cmd: 'pass show "my irc password"'
+    command: 'pass show "my irc password"'
 ```
 
 tiny runs the `pass ...` command and uses last line printed by the command as

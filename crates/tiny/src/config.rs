@@ -119,7 +119,7 @@ impl<'de> Deserialize<'de> for PassOrCmd {
 
         match Value::deserialize(deserializer)? {
             Value::String(str) => Ok(PassOrCmd::Pass(str)),
-            Value::Mapping(map) => match map.get(&Value::String("cmd".to_owned())) {
+            Value::Mapping(map) => match map.get(&Value::String("command".to_owned())) {
                 Some(Value::String(cmd)) => match shell_words::split(cmd) {
                     Ok(cmd_parts) => Ok(PassOrCmd::Cmd(cmd_parts)),
                     Err(err) => Err(D::Error::custom(format!(
