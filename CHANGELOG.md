@@ -10,6 +10,8 @@ Thanks to @ALEX11BR for contributing to this release.
   This bug was introduced in 0.10.0 with 33df77e. (#366)
 - `/close` and `/quit` commands now take optional message parameters to be sent
   with PART and QUIT messages to the server. (#365, #395)
+- Fixed running `$EDITOR` on macOS 12. Previously, on macOS 12, changes in the
+  temporary file would not be read properly when `$EDITOR` is closed.
 - Passwords can now be read from external commands (e.g. a password manager).
   See README for details. (#246, #315)
 
