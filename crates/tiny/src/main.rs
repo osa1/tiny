@@ -209,8 +209,8 @@ fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth<String>) -> Result
         config::SASLAuth::External { pem } => {
             // TLS must be on for EXTERNAL
             if !tls {
-                Err("TLS is not enabled for this server, but SASL EXTERNAL authentication requires SASL. \
-                Please enable SASL for this server in the config file.".to_string())
+                Err("TLS is not enabled for this server, but SASL EXTERNAL authentication requires TLS. \
+                Please enable TLS for this server in the config file.".to_string())
             } else {
                 // load in a cert and private key for TLS client auth
                 match File::open(pem) {
