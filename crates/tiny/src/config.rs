@@ -1,3 +1,4 @@
+use libtiny_client::SASLAuth as ClientSASLAuth;
 use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::fs::File;
@@ -19,6 +20,19 @@ pub(crate) enum SASLAuth<P> {
         /// A fingerprint of the certificate should be registered with NickServ
         pem: PathBuf,
     },
+}
+
+impl TryFrom<SASLAuth<String>> for ClientSASLAuth {
+    type Error = String;
+
+    fn try_from(sasl: SASLAuth<String>) -> Result<Self, Self::Error> {
+        Ok(match sasl {
+            SASLAuth::Plain { username, password } => ClientSASLAuth::Plain { username, password },
+            SASLAuth::External { pem } => ClientSASLAuth::External {
+                pem: std::fs::read(pem).map_err(|e| format!("Could not read PEM file: {}", e))?,
+            },
+        })
+    }
 }
 
 #[derive(Clone, Deserialize)]
@@ -269,6 +283,13 @@ impl Config<PassOrCmd> {
             if let Some(SASLAuth::Plain { password, .. }) = &server.sasl_auth {
                 if password.is_empty_cmd() {
                     errors.push(format!("Empty SASL password command for '{}'", server.addr));
+                }
+            }
+
+            if let Some(SASLAuth::External { .. }) = &server.sasl_auth {
+                if !server.tls {
+                    errors.push(format!("TLS is not enabled for '{}', but SASL EXTERNAL authentication requires TLS. \
+                                        Please enable TLS for this server in the config file.", server.addr));
                 }
             }
         }

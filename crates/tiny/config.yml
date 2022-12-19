@@ -21,18 +21,9 @@ servers:
       # pass: 'hunter2'
 
       # SASL authentication
-      # We currently support SASL PLAIN or SASL EXTERNAL
-      # Providing a username and password you will configure SASL PLAIN
-      # Providing a path to a PEM file will configure SASL EXTERNAL
-      # For SASL EXTERNAL certificate and fingerprint generation, see server documentation.
-      # You will need to register the cert's fingerprint with NickServ
-      # ex. https://www.oftc.net/NickServ/CertFP/
-      
       # sasl:
       #   username: 'tiny_user'
       #   password: 'hunter2'
-      # OR
-      #   pem: "/home/user/.config/tiny/oftc.pem"
 
       # Identify nick by sending a message to NickServ:
       # (useful when `pass` or `sasl` fields above are not used)

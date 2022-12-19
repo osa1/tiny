@@ -17,8 +17,6 @@ use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
 use ui::UI;
 
-use std::fs::File;
-use std::io::Read;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -150,20 +148,15 @@ fn run(
             tui.new_server_tab(&server.addr, server.alias);
 
             let tls = server.tls;
-            let sasl_auth = if let Some(sasl_auth) = &server.sasl_auth {
-                match sasl_from_config(tls, sasl_auth) {
+            let sasl_auth = server.sasl_auth.and_then(|sasl| -> Option<SASLAuth> {
+                match sasl.try_into() {
                     Ok(sasl) => Some(sasl),
                     Err(e) => {
-                        tui.add_client_err_msg(
-                            &format!("SASL error: {}", e),
-                            &MsgTarget::Server { serv: &server.addr },
-                        );
+                        tui.add_client_err_msg(&e, &MsgTarget::Server { serv: &server.addr });
                         None
                     }
                 }
-            } else {
-                None
-            };
+            });
 
             let server_info = ServerInfo {
                 addr: server.addr,
@@ -197,31 +190,4 @@ fn run(
     });
 
     runtime.block_on(local);
-}
-
-// Helper to parse SASL config into a libtiny_client SASL struct
-fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth<String>) -> Result<SASLAuth, String> {
-    match sasl_config {
-        config::SASLAuth::Plain { username, password } => Ok(SASLAuth::Plain {
-            username: username.clone(),
-            password: password.clone(),
-        }),
-        config::SASLAuth::External { pem } => {
-            // TLS must be on for EXTERNAL
-            if !tls {
-                Err("TLS is not enabled for this server, but SASL EXTERNAL authentication requires TLS. \
-                Please enable TLS for this server in the config file.".to_string())
-            } else {
-                // load in a cert and private key for TLS client auth
-                match File::open(pem) {
-                    Ok(mut file) => {
-                        let mut pem = Vec::new();
-                        let _ = file.read_to_end(&mut pem);
-                        Ok(SASLAuth::External { pem })
-                    }
-                    Err(e) => Err(format!("Could not open PEM file: {}", e)),
-                }
-            }
-        }
-    }
 }
