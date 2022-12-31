@@ -8,7 +8,7 @@ edition = "2021"
 [features]
 default = ["tls-rustls"]
 tls-native = ["native-tls", "tokio-native-tls"]
-tls-rustls = ["rustls-native-certs", "tokio-rustls"]
+tls-rustls = ["rustls-native-certs", "tokio-rustls", "rustls-pemfile"]
 
 [dependencies]
 base64 = "0.13"
@@ -19,6 +19,7 @@ libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = { version = "0.2", optional = true }
 rustls-native-certs = { version = "0.6", optional = true }
+rustls-pemfile = { version = "0.3", optional = true }
 tokio = { version = "1.17", default-features = false, features = ["net", "rt", "io-util", "macros"] }
 tokio-native-tls = { version = "0.3", optional = true }
 tokio-rustls = { version = "0.23", optional = true }

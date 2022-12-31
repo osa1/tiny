@@ -11,7 +11,7 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-use libtiny_client::{Client, ServerInfo};
+use libtiny_client::{Client, SASLAuth, ServerInfo};
 use libtiny_common::{ChanNameRef, MsgTarget};
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
@@ -147,10 +147,21 @@ fn run(
         for server in servers.iter().cloned() {
             tui.new_server_tab(&server.addr, server.alias);
 
+            let tls = server.tls;
+            let sasl_auth = server.sasl_auth.and_then(|sasl| -> Option<SASLAuth> {
+                match sasl.try_into() {
+                    Ok(sasl) => Some(sasl),
+                    Err(e) => {
+                        tui.add_client_err_msg(&e, &MsgTarget::Server { serv: &server.addr });
+                        None
+                    }
+                }
+            });
+
             let server_info = ServerInfo {
                 addr: server.addr,
                 port: server.port,
-                tls: server.tls,
+                tls,
                 pass: server.pass,
                 realname: server.realname,
                 nicks: server.nicks,
@@ -160,10 +171,7 @@ fn run(
                     .map(|c| ChanNameRef::new(c).to_owned())
                     .collect(),
                 nickserv_ident: server.nickserv_ident,
-                sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {
-                    username: auth.username,
-                    password: auth.password,
-                }),
+                sasl_auth,
             };
 
             let (client, rcv_conn_ev) = Client::new(server_info);

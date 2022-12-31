@@ -1,3 +1,4 @@
+use libtiny_client::SASLAuth as ClientSASLAuth;
 use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::fs::File;
@@ -6,9 +7,32 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct SASLAuth<P> {
-    pub(crate) username: String,
-    pub(crate) password: P,
+#[serde(untagged, rename_all = "snake_case")]
+pub(crate) enum SASLAuth<P> {
+    Plain {
+        /// Registered username
+        username: String,
+        /// Password
+        password: P,
+    },
+    External {
+        /// Path to PEM file with private key and certificate (PKCS8 format).
+        /// A fingerprint of the certificate should be registered with NickServ
+        pem: PathBuf,
+    },
+}
+
+impl TryFrom<SASLAuth<String>> for ClientSASLAuth {
+    type Error = String;
+
+    fn try_from(sasl: SASLAuth<String>) -> Result<Self, Self::Error> {
+        Ok(match sasl {
+            SASLAuth::Plain { username, password } => ClientSASLAuth::Plain { username, password },
+            SASLAuth::External { pem } => ClientSASLAuth::External {
+                pem: std::fs::read(pem).map_err(|e| format!("Could not read PEM file: {}", e))?,
+            },
+        })
+    }
 }
 
 #[derive(Clone, Deserialize)]
@@ -256,9 +280,16 @@ impl Config<PassOrCmd> {
                 }
             }
 
-            if let Some(ref sasl_auth) = server.sasl_auth {
-                if sasl_auth.password.is_empty_cmd() {
+            if let Some(SASLAuth::Plain { password, .. }) = &server.sasl_auth {
+                if password.is_empty_cmd() {
                     errors.push(format!("Empty SASL password command for '{}'", server.addr));
+                }
+            }
+
+            if let Some(SASLAuth::External { .. }) = &server.sasl_auth {
+                if !server.tls {
+                    errors.push(format!("TLS is not enabled for '{}', but SASL EXTERNAL authentication requires TLS. \
+                                        Please enable TLS for this server in the config file.", server.addr));
                 }
             }
         }
@@ -305,20 +336,21 @@ impl Config<PassOrCmd> {
 
             let sasl_auth = match sasl_auth {
                 None => None,
-                Some(SASLAuth {
+                Some(SASLAuth::Plain {
                     username,
                     password: PassOrCmd::Pass(pass),
-                }) => Some(SASLAuth {
+                }) => Some(SASLAuth::Plain {
                     username,
                     password: pass,
                 }),
-                Some(SASLAuth {
+                Some(SASLAuth::Plain {
                     username,
                     password: PassOrCmd::Cmd(cmd),
                 }) => {
                     let password = run_command("SASL password", &addr, &cmd)?;
-                    Some(SASLAuth { username, password })
+                    Some(SASLAuth::Plain { username, password })
                 }
+                Some(SASLAuth::External { pem }) => Some(SASLAuth::External { pem }),
             };
 
             servers_.push(Server {
