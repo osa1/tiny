@@ -1,6 +1,6 @@
 # Unreleased
 
-Thanks to @ALEX11BR for contributing to this release.
+Thanks to @ALEX11BR and @trevarj for contributing to this release.
 
 - Fixed handling of CR, LF, and tab characters in IRC format parser. IRC RFCs
   don't allow standalone CR and LF characters, but some servers still send
@@ -13,6 +13,10 @@ Thanks to @ALEX11BR for contributing to this release.
   temporary file would not be read properly when `$EDITOR` is closed.
 - Passwords can now be read from external commands (e.g. a password manager).
   See README for details. (#246, #315)
+- Added support for SASL EXTERNAL authentication. See the
+  [wiki page][sasl-wiki] for more details. (#196, #363)
+
+[sasl-wiki]: https://github.com/osa1/tiny/wiki/SASL-EXTERNAL
 
 # 2021/11/07: 0.10.0
 
@@ -228,7 +232,7 @@ release.
 # 2019/10/05: 0.5.0
 
 Starting with this release tiny is no longer distributed on crates.io. Please
-get it from the git repo at https://github.com/osa1/tiny.
+get it from the git repo at <https://github.com/osa1/tiny>.
 
 - With the exception of TUI most of tiny is rewritten for this release. See #138
   for the details. The TLDR is that the code should now be easier to hack on.
