@@ -63,11 +63,19 @@ pub struct ServerInfo {
     pub sasl_auth: Option<SASLAuth>,
 }
 
-/// SASL authentication credentials
+/// SASL authentication mechanisms
+/// - <https://ircv3.net/docs/sasl-mechs>
+/// - <https://www.alphachat.net/sasl.xhtml>
 #[derive(Debug, Clone)]
-pub struct SASLAuth {
-    pub username: String,
-    pub password: String,
+pub enum SASLAuth {
+    Plain {
+        username: String,
+        password: String,
+    },
+    External {
+        /// PEM-encoded X509 private cert and private key file
+        pem: Vec<u8>,
+    },
 }
 
 /// IRC client events. Returned by `Client` to the users via a channel.
@@ -387,10 +395,17 @@ async fn main_loop(
         // Establish TCP connection to the server
         //
 
+        let sasl_pem = if let Some(SASLAuth::External { pem }) = &server_info.sasl_auth {
+            Some(pem)
+        } else {
+            None
+        };
+
         let stream = match try_connect(
             addrs,
             &serv_name,
             server_info.tls,
+            sasl_pem,
             &mut rcv_cmd,
             &mut snd_ev,
         )
@@ -623,6 +638,7 @@ async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
     addrs: Vec<SocketAddr>,
     serv_name: &str,
     use_tls: bool,
+    sasl_pem: Option<&Vec<u8>>,
     rcv_cmd: &mut S,
     snd_ev: &mut mpsc::Sender<Event>,
 ) -> TaskResult<Option<Stream>> {
@@ -630,7 +646,7 @@ async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
         for addr in addrs {
             snd_ev.send(Event::Connecting(addr)).await.unwrap();
             let mb_stream = if use_tls {
-                Stream::new_tls(addr, serv_name).await
+                Stream::new_tls(addr, serv_name, sasl_pem).await
             } else {
                 Stream::new_tcp(addr).await
             };

@@ -106,6 +106,23 @@ like `NickServ`) is better when some of the channels that you automatically
 join require identification. To use this method enter your nick password to the
 `pass` field in servers.
 
+### Using external commands for passwords
+
+When a password field in the config file is a map with a `command` key, the
+value is used as the shell command to run to get the password.
+
+For example, in this config:
+
+```yaml
+sasl:
+  username: osa1
+  password:
+    command: 'pass show "my irc password"'
+```
+
+tiny runs the `pass ...` command and uses last line printed by the command as
+the password.
+
 ## Command line arguments
 
 By default (i.e. when no command line arguments passed) tiny connects to all

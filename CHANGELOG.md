@@ -1,15 +1,22 @@
 # Unreleased
 
-Thanks to @ALEX11BR for contributing to this release.
+Thanks to @ALEX11BR and @trevarj for contributing to this release.
 
 - Fixed handling of CR, LF, and tab characters in IRC format parser. IRC RFCs
-  don't allow standalone CR and LF characters, but some servers still them.
-  tiny now shows those characters as single space. Tab characters are shown as
-  8 spaces, as in tiny 0.9.0.
-
-  This bug was introduced in 0.10.0 with 33df77e. (#366)
+  don't allow standalone CR and LF characters, but some servers still send
+  them. tiny now shows those characters as single space. Tab characters are
+  shown as 8 spaces, as in tiny 0.9.0. This bug was introduced in 0.10.0 with
+  33df77e. (#366)
 - `/close` and `/quit` commands now take optional message parameters to be sent
   with PART and QUIT messages to the server. (#365, #395)
+- Fixed running `$EDITOR` on macOS 12. Previously, on macOS 12, changes in the
+  temporary file would not be read properly when `$EDITOR` is closed.
+- Passwords can now be read from external commands (e.g. a password manager).
+  See README for details. (#246, #315)
+- Added support for SASL EXTERNAL authentication. See the
+  [wiki page][sasl-wiki] for more details. (#196, #363)
+
+[sasl-wiki]: https://github.com/osa1/tiny/wiki/SASL-EXTERNAL
 
 # 2021/11/07: 0.10.0
 
@@ -32,7 +39,7 @@ Thanks to @trevarj for contributing to this release.
 - Minor improvements in logging (d0505f2, bbb4b81)
 - `/join` (without arguments) now rejoins the current channel. (#334)
 - Handling of IRC formatting characters (colors etc.) in TUI and logger
-  improved: 
+  improved:
   - TUI now handles "reset" control character, to reset the text style to the
     default.
   - Logger now filters out all control characters before writing to the file.
@@ -225,7 +232,7 @@ release.
 # 2019/10/05: 0.5.0
 
 Starting with this release tiny is no longer distributed on crates.io. Please
-get it from the git repo at https://github.com/osa1/tiny.
+get it from the git repo at <https://github.com/osa1/tiny>.
 
 - With the exception of TUI most of tiny is rewritten for this release. See #138
   for the details. The TLDR is that the code should now be easier to hack on.

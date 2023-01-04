@@ -11,7 +11,7 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-use libtiny_client::{Client, ServerInfo};
+use libtiny_client::{Client, SASLAuth, ServerInfo};
 use libtiny_common::MsgTarget;
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
@@ -54,6 +54,11 @@ fn main() {
                     exit(1);
                 }
 
+                let config = match config.read_passwords() {
+                    None => exit(1),
+                    Some(config) => config,
+                };
+
                 let config::Config {
                     servers,
                     defaults,
@@ -78,7 +83,7 @@ fn main() {
 const DEBUG_LOG_FILE: &str = "tiny_debug_logs.txt";
 
 fn run(
-    servers: Vec<config::Server>,
+    servers: Vec<config::Server<String>>,
     defaults: config::Defaults,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
@@ -142,19 +147,27 @@ fn run(
         for server in servers.iter().cloned() {
             tui.new_server_tab(&server.addr, server.alias);
 
+            let tls = server.tls;
+            let sasl_auth = server.sasl_auth.and_then(|sasl| -> Option<SASLAuth> {
+                match sasl.try_into() {
+                    Ok(sasl) => Some(sasl),
+                    Err(e) => {
+                        tui.add_client_err_msg(&e, &MsgTarget::Server { serv: &server.addr });
+                        None
+                    }
+                }
+            });
+
             let server_info = ServerInfo {
                 addr: server.addr,
                 port: server.port,
-                tls: server.tls,
+                tls,
                 pass: server.pass,
                 realname: server.realname,
                 nicks: server.nicks,
                 auto_join: server.join.iter().map(|c| c.name().to_owned()).collect(),
                 nickserv_ident: server.nickserv_ident,
-                sasl_auth: server.sasl_auth.map(|auth| libtiny_client::SASLAuth {
-                    username: auth.username,
-                    password: auth.password,
-                }),
+                sasl_auth,
             };
 
             let (client, rcv_conn_ev) = Client::new(server_info);

@@ -1,6 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::utils;
+use crate::{utils, SASLAuth};
 use crate::{Cmd, Event, ServerInfo};
 use libtiny_common::{ChanName, ChanNameRef};
 use libtiny_wire as wire;
@@ -630,7 +630,15 @@ impl StateInner {
                 match subcommand.as_ref() {
                     "ACK" => {
                         if params.iter().any(|cap| cap.as_str() == "sasl") {
-                            snd_irc_msg.try_send(wire::authenticate("PLAIN")).unwrap();
+                            if let Some(sasl) = &self.server_info.sasl_auth {
+                                let msg = match sasl {
+                                    SASLAuth::Plain { .. } => "PLAIN",
+                                    SASLAuth::External { .. } => "EXTERNAL",
+                                };
+                                snd_irc_msg.try_send(wire::authenticate(msg)).unwrap();
+                            } else {
+                                warn!("SASL AUTH not set but got SASL ACK");
+                            }
                         }
                     }
                     "NAK" => {
@@ -647,18 +655,20 @@ impl StateInner {
                 }
             }
 
+            // https://ircv3.net/specs/extensions/sasl-3.1.html
             AUTHENTICATE { ref param } => {
                 if param.as_str() == "+" {
                     // Empty AUTHENTICATE response; server accepted the specified SASL mechanism
-                    // (PLAIN)
                     if let Some(ref auth) = self.server_info.sasl_auth {
-                        let msg = format!(
-                            "{}\x00{}\x00{}",
-                            auth.username, auth.username, auth.password
-                        );
-                        snd_irc_msg
-                            .try_send(wire::authenticate(&base64::encode(&msg)))
-                            .unwrap();
+                        let msg = match auth {
+                            SASLAuth::Plain { username, password } => {
+                                let msg = format!("{}\x00{}\x00{}", username, username, password);
+                                base64::encode(&msg)
+                            }
+                            // Reply with an empty response (Empty responses are sent as "AUTHENTICATE +")
+                            SASLAuth::External { .. } => "+".to_string(),
+                        };
+                        snd_irc_msg.try_send(wire::authenticate(&msg)).unwrap();
                     }
                 }
             }

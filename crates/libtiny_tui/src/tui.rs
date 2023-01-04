@@ -154,8 +154,8 @@ impl TUI {
         // This is now done in reload_config() below
         // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
 
-        let width = tb.width() as i32;
-        let height = tb.height() as i32;
+        let width = tb.width();
+        let height = tb.height();
 
         let mut tui = TUI {
             tb,
@@ -939,7 +939,7 @@ impl TUI {
                 self.height - 1,
                 self.active_idx == tab_idx + tab_left,
             );
-            pos_x += tab.width() as i32 + 1; // +1 for margin
+            pos_x += tab.width() + 1; // +1 for margin
         }
 
         if right_arr {

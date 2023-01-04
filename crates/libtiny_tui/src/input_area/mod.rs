@@ -358,7 +358,7 @@ impl InputArea {
     }
 
     pub(crate) fn set_cursor(&mut self, cursor: i32) {
-        self.cursor = std::cmp::min(std::cmp::max(0, cursor), self.current_buffer_len());
+        self.cursor = cursor.clamp(0, self.current_buffer_len());
     }
 
     fn consume_word_before_curs(&mut self) {
