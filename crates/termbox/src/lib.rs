@@ -18,6 +18,8 @@ use unicode_width::UnicodeWidthChar;
 pub const TB_DEFAULT: u16 = 0x0000;
 pub const TB_BOLD: u16 = 0x0100;
 pub const TB_UNDERLINE: u16 = 0x0200;
+pub const TB_ITALIC: u16 = 0x0400;
+pub const TB_STRIKETHROUGH: u16 = 0x0800;
 
 pub struct Termbox {
     // Not available in test instances
@@ -396,6 +398,8 @@ impl Termbox {
 
         let bold = fg & TB_BOLD != 0;
         let underline = fg & TB_UNDERLINE != 0;
+        let italic = fg & TB_ITALIC != 0;
+        let strikethrough = fg & TB_STRIKETHROUGH != 0;
 
         self.last_fg = fg;
         self.last_bg = bg;
@@ -414,6 +418,16 @@ impl Termbox {
         if bold {
             self.output_buffer
                 .extend_from_slice(termion::style::Bold.as_ref());
+        }
+
+        if italic {
+            self.output_buffer
+                .extend_from_slice(termion::style::Italic.as_ref());
+        }
+
+        if strikethrough {
+            self.output_buffer
+                .extend_from_slice(termion::style::CrossedOut.as_ref());
         }
 
         if fg != 0 {
