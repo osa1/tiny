@@ -15,6 +15,8 @@ Thanks to @ALEX11BR and @trevarj for contributing to this release.
   See README for details. (#246, #315)
 - Added support for SASL EXTERNAL authentication. See the
   [wiki page][sasl-wiki] for more details. (#196, #363)
+- Implemented rendering italic, bold, underline, strikethrough text. (#364,
+  #403)
 
 [sasl-wiki]: https://github.com/osa1/tiny/wiki/SASL-EXTERNAL
 
