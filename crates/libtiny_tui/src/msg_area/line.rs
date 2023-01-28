@@ -109,14 +109,29 @@ impl Line {
         }
     }
 
+    fn add_attr(&mut self, attr: u16) {
+        if let SegStyle::Fixed(style) = self.current_seg.style {
+            self.set_message_style(SegStyle::Fixed(Style {
+                fg: style.fg | attr,
+                bg: style.bg,
+            }))
+        } else {
+            let style = SegStyle::Fixed(Style {
+                fg: termbox_simple::TB_DEFAULT | attr,
+                bg: termbox_simple::TB_DEFAULT,
+            });
+            self.set_message_style(style)
+        }
+    }
+
     fn add_text_inner(&mut self, str: &str) {
         for format_event in parse_irc_formatting(str) {
             match format_event {
-                IrcFormatEvent::Bold
-                | IrcFormatEvent::Italic
-                | IrcFormatEvent::Underline
-                | IrcFormatEvent::Strikethrough
-                | IrcFormatEvent::Monospace => {
+                IrcFormatEvent::Bold => self.add_attr(termbox_simple::TB_BOLD),
+                IrcFormatEvent::Italic => self.add_attr(termbox_simple::TB_ITALIC),
+                IrcFormatEvent::Underline => self.add_attr(termbox_simple::TB_UNDERLINE),
+                IrcFormatEvent::Strikethrough => self.add_attr(termbox_simple::TB_STRIKETHROUGH),
+                IrcFormatEvent::Monospace => {
                     // TODO
                 }
                 IrcFormatEvent::Text(text) => {
