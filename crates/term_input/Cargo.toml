@@ -11,7 +11,7 @@ edition = "2021"
 libc = "0.2"
 log = "0.4"
 mio = "0.8"
-nix = "0.23"
+nix = "0.26"
 term_input_macros = { path = "../term_input_macros" }
 tokio = { version = "1.17", default-features = false, features = ["net", "rt"] }
 tokio-stream = "0.1"
