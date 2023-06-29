@@ -17,8 +17,12 @@ Thanks to @ALEX11BR and @trevarj for contributing to this release.
   [wiki page][sasl-wiki] for more details. (#196, #363)
 - Implemented rendering italic, bold, underline, strikethrough text. (#364,
   #403)
+- You can now specify "notify" and "ignore" settings of tabs in the config file
+  and when running the `/join` command. See the [example config
+  file][example-config] for details. (#344, #118)
 
 [sasl-wiki]: https://github.com/osa1/tiny/wiki/SASL-EXTERNAL
+[example-config]: https://github.com/osa1/tiny/blob/master/crates/tiny/config.yml
 
 # 2021/11/07: 0.10.0
 
