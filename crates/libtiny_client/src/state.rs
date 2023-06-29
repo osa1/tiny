@@ -663,7 +663,8 @@ impl StateInner {
                         let msg = match auth {
                             SASLAuth::Plain { username, password } => {
                                 let msg = format!("{}\x00{}\x00{}", username, username, password);
-                                base64::encode(&msg)
+                                use base64::engine::Engine;
+                                base64::engine::general_purpose::STANDARD.encode(&msg)
                             }
                             // Reply with an empty response (Empty responses are sent as "AUTHENTICATE +")
                             SASLAuth::External { .. } => "+".to_string(),
