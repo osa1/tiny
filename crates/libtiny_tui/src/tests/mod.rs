@@ -9,6 +9,8 @@ use crate::tui::TUI;
 mod layout;
 mod resize;
 
+mod config;
+
 fn enter_string(tui: &mut TUI, s: &str) {
     for c in s.chars() {
         tui.handle_input_event(Event::Key(Key::Char(c)), &mut None);

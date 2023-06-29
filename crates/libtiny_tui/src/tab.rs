@@ -6,7 +6,6 @@ use unicode_width::UnicodeWidthStr;
 use crate::{
     config::{Colors, Style},
     messaging::MessagingUI,
-    notifier::Notifier,
 };
 
 pub(crate) struct Tab {
@@ -16,7 +15,6 @@ pub(crate) struct Tab {
     pub(crate) style: TabStyle,
     /// Alt-character to use to switch to this tab.
     pub(crate) switch: Option<char>,
-    pub(crate) notifier: Notifier,
 }
 
 fn tab_style(style: TabStyle, colors: &Colors) -> Style {

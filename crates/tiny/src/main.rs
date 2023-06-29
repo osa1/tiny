@@ -12,7 +12,7 @@ mod utils;
 mod tests;
 
 use libtiny_client::{Client, SASLAuth, ServerInfo};
-use libtiny_common::{ChanNameRef, MsgTarget};
+use libtiny_common::MsgTarget;
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
 use ui::UI;
@@ -165,11 +165,7 @@ fn run(
                 pass: server.pass,
                 realname: server.realname,
                 nicks: server.nicks,
-                auto_join: server
-                    .join
-                    .iter()
-                    .map(|c| ChanNameRef::new(c).to_owned())
-                    .collect(),
+                auto_join: server.join.iter().map(|c| c.name().to_owned()).collect(),
                 nickserv_ident: server.nickserv_ident,
                 sasl_auth,
             };

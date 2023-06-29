@@ -27,9 +27,6 @@ pub(crate) struct MessagingUI {
     width: i32,
     height: i32,
 
-    // Option to disable status messages ( join/part )
-    show_status: bool,
-
     // All nicks in the channel. Need to keep this up-to-date to be able to
     // properly highlight mentions.
     nicks: Trie,
@@ -91,7 +88,6 @@ impl MessagingUI {
     pub(crate) fn new(
         width: i32,
         height: i32,
-        status: bool,
         scrollback: usize,
         msg_layout: Layout,
     ) -> MessagingUI {
@@ -101,7 +97,6 @@ impl MessagingUI {
             exit_dialogue: None,
             width,
             height,
-            show_status: status,
             nicks: Trie::new(),
             last_activity_line: None,
             last_activity_ts: None,
@@ -385,8 +380,8 @@ impl MessagingUI {
         self.nicks.clear();
     }
 
-    pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>) {
-        if self.show_status {
+    pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
+        if !ignore {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
                 self.msg_area.modify_line(line_idx, |line| {
@@ -399,10 +394,10 @@ impl MessagingUI {
         self.nicks.insert(nick);
     }
 
-    pub(crate) fn part(&mut self, nick: &str, ts: Option<Timestamp>) {
+    pub(crate) fn part(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
         self.nicks.remove(nick);
 
-        if self.show_status {
+        if !ignore {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
                 self.msg_area.modify_line(line_idx, |line| {
@@ -411,21 +406,6 @@ impl MessagingUI {
                 });
             }
         }
-    }
-
-    /// `state` == `None` means toggle
-    /// `state` == `Some(state)` means set it to `state`
-    pub(crate) fn set_or_toggle_ignore(&mut self, state: Option<bool>) {
-        self.show_status = state.unwrap_or(!self.show_status);
-        if self.show_status {
-            self.add_client_notify_msg("Ignore disabled");
-        } else {
-            self.add_client_notify_msg("Ignore enabled");
-        }
-    }
-
-    pub(crate) fn is_showing_status(&self) -> bool {
-        self.show_status
     }
 
     pub(crate) fn nick(&mut self, old_nick: &str, new_nick: &str, ts: Timestamp) {

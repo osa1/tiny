@@ -1,10 +1,13 @@
 use libtiny_client::SASLAuth as ClientSASLAuth;
 use serde::{Deserialize, Deserializer};
+
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use libtiny_tui::config::Chan;
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
 #[serde(untagged, rename_all = "snake_case")]
@@ -66,8 +69,7 @@ pub(crate) struct Server<P> {
     pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
-    #[serde(default)]
-    pub(crate) join: Vec<String>,
+    pub(crate) join: Vec<Chan>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
     pub(crate) nickserv_ident: Option<P>,
@@ -448,6 +450,9 @@ fn get_default_config_yaml() -> String {
 
 #[cfg(test)]
 mod tests {
+    use libtiny_common::ChanName;
+    use serde_yaml;
+
     use super::*;
 
     #[test]
@@ -458,8 +463,11 @@ mod tests {
                 panic!();
             }
             Ok(Config { servers, .. }) => {
-                assert_eq!(servers[0].join, vec!["#tiny".to_owned()]);
-                assert!(servers[0].tls);
+                assert_eq!(
+                    servers[0].join,
+                    vec![Chan::Name(ChanName::new("#tiny".to_string()))]
+                );
+                assert_eq!(servers[0].tls, true);
             }
         }
     }

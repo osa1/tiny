@@ -1,19 +1,46 @@
+use std::str::FromStr;
+
 use crate::MsgTarget;
 
 use libtiny_wire::formatting::remove_irc_control_chars;
 
 #[cfg(feature = "desktop-notifications")]
 use notify_rust::Notification;
+use serde::Deserialize;
 
 /// Destktop notification handler
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum Notifier {
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
+pub enum Notifier {
     /// Notifications are disabled.
     Off,
     /// Generate notifications only for mentions.
     Mentions,
-    /// Generate notificastions for all messages.
+    /// Generate notifications for all messages.
     Messages,
+}
+
+impl Default for Notifier {
+    fn default() -> Self {
+        if cfg!(feature = "desktop-notifications") {
+            Notifier::Mentions
+        } else {
+            Notifier::Off
+        }
+    }
+}
+
+impl FromStr for Notifier {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "off" => Ok(Notifier::Off),
+            "mentions" => Ok(Notifier::Mentions),
+            "messages" => Ok(Notifier::Messages),
+            _ => Err(format!("Unknown Notifier variant: {}", s)),
+        }
+    }
 }
 
 #[cfg(feature = "desktop-notifications")]

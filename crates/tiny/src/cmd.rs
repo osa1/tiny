@@ -1,14 +1,16 @@
-use crate::config;
+use crate::config::Defaults;
 use crate::ui::UI;
 use crate::utils;
 use libtiny_client::{Client, ServerInfo};
-use libtiny_common::{ChanName, ChanNameRef, MsgSource, MsgTarget};
+use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
+use libtiny_tui::config::Chan;
 
 use std::borrow::Borrow;
+use std::str::FromStr;
 
 pub(crate) struct CmdArgs<'a> {
     pub args: &'a str,
-    pub defaults: &'a config::Defaults,
+    pub defaults: &'a Defaults,
     pub ui: &'a UI,
     pub clients: &'a mut Vec<Client>,
     pub src: MsgSource,
@@ -220,7 +222,7 @@ fn reconnect(ui: &UI, clients: &mut [Client], src: MsgSource) {
 fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
-    defaults: &config::Defaults,
+    defaults: &Defaults,
     ui: &UI,
     clients: &mut Vec<Client>,
 ) {
@@ -292,7 +294,7 @@ static JOIN_CMD: Cmd = Cmd {
     name: "join",
     cmd_fn: join,
     description: "Joins a channel",
-    usage: "`/join <chan1>,<chan2>,...` or `/join` in a channel tab to rejoin",
+    usage: "`/join <chan1> [-ignore] [-notify [off|mentions|messages]],<chan2>...` or `/join` in a channel tab to rejoin",
 };
 
 fn join(args: CmdArgs) {
@@ -313,16 +315,28 @@ fn join(args: CmdArgs) {
         }
     }
 
-    let words = args
-        .split_whitespace()
-        .map(|c| ChanName::new(c.to_owned()))
-        .collect::<Vec<_>>();
+    let chans = args
+        .split(',')
+        .map(str::trim)
+        .filter_map(|c| match Chan::from_str(c) {
+            Ok(c) => Some(c),
+            Err(err) => {
+                ui.add_client_err_msg(
+                    &format!("{}, Usage: {}", err, JOIN_CMD.usage),
+                    &MsgTarget::CurrentTab,
+                );
+                None
+            }
+        })
+        .collect::<Vec<Chan>>();
 
-    let chans: Vec<ChanName> = if words.is_empty() {
+    let chans = if chans.is_empty() {
         match ui.current_tab() {
             None => return,
-            Some(MsgSource::Chan { serv: _, chan }) => {
-                vec![chan]
+            // rejoin current tab's channel
+            Some(MsgSource::Chan { serv, chan }) => {
+                let config = ui.get_tab_config(&serv, Some(chan.as_ref()));
+                vec![Chan::WithConfig { name: chan, config }]
             }
             Some(_) => {
                 return ui.add_client_err_msg(
@@ -332,11 +346,27 @@ fn join(args: CmdArgs) {
             }
         }
     } else {
-        words
+        chans
     };
 
-    match find_client(clients, src.serv_name()) {
-        Some(client) => client.join(chans.iter().map(ChanName::as_ref)),
+    let serv = src.serv_name();
+    match find_client(clients, serv) {
+        Some(client) => {
+            let iter_ref = chans.iter().map(|c| c.name());
+            // set tab configs of new channel tabs (creates new tab)
+            for chan in &chans {
+                match chan {
+                    Chan::Name(name) => {
+                        let config = ui.get_tab_config(serv, Some(name.as_ref()));
+                        ui.set_tab_config(serv, Some(name), config)
+                    }
+                    Chan::WithConfig { name, config } => {
+                        ui.set_tab_config(serv, Some(name), config.to_owned())
+                    }
+                }
+            }
+            client.join(iter_ref);
+        }
         None => ui.add_client_err_msg(
             &format!("Can't join: Not connected to server {}", src.serv_name()),
             &MsgTarget::CurrentTab,
