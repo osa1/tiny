@@ -1,20 +1,13 @@
-# Unreleased
+# 2023/07/16: 0.11.0
 
 Thanks to @ALEX11BR and @trevarj for contributing to this release.
 
-- Fixed handling of CR, LF, and tab characters in IRC format parser. IRC RFCs
-  don't allow standalone CR and LF characters, but some servers still send
-  them. tiny now shows those characters as single space. Tab characters are
-  shown as 8 spaces, as in tiny 0.9.0. This bug was introduced in 0.10.0 with
-  33df77e. (#366)
+## New features
+
 - `/close` and `/quit` commands now take optional message parameters to be sent
   with PART and QUIT messages to the server. (#365, #395)
-- Fixed running `$EDITOR` on macOS 12. Previously, on macOS 12, changes in the
-  temporary file would not be read properly when `$EDITOR` is closed.
-- Passwords can now be read from external commands (e.g. a password manager).
-  See README for details. (#246, #315)
-- Added support for SASL EXTERNAL authentication. See the
-  [wiki page][sasl-wiki] for more details. (#196, #363)
+- Added support for SASL EXTERNAL authentication. See the [wiki
+  page][sasl-wiki] for more details. (#196, #363)
 - Implemented rendering italic, bold, underline, strikethrough text. (#364,
   #403)
 - You can now specify "notify" and "ignore" settings of tabs in the config file
@@ -23,6 +16,18 @@ Thanks to @ALEX11BR and @trevarj for contributing to this release.
 
 [sasl-wiki]: https://github.com/osa1/tiny/wiki/SASL-EXTERNAL
 [example-config]: https://github.com/osa1/tiny/blob/master/crates/tiny/config.yml
+
+## Bug fixes and other improvements
+
+- Fixed handling of CR, LF, and tab characters in IRC format parser. IRC RFCs
+  don't allow standalone CR and LF characters, but some servers still send
+  them. tiny now shows those characters as single space. Tab characters are
+  shown as 8 spaces, as in tiny 0.9.0. This bug was introduced in 0.10.0 with
+  33df77e. (#366)
+- Fixed running `$EDITOR` on macOS 12. Previously, on macOS 12, changes in the
+  temporary file would not be read properly when `$EDITOR` is closed.
+- Passwords can now be read from external commands (e.g. a password manager).
+  See README for details. (#246, #315)
 
 # 2021/11/07: 0.10.0
 
