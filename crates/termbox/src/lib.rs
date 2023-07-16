@@ -298,7 +298,7 @@ impl Termbox {
                     // buffer so that if we put a non-wide character lto this cell later next
                     // columns won't be bogus.
                     for i in 1..cw {
-                        let mut front_cell = &mut self.front_buffer.cells
+                        let front_cell = &mut self.front_buffer.cells
                             [(y * usize::from(self.term_width)) + x + i];
                         front_cell.ch = ' ';
                         front_cell.fg = back_cell.fg;
@@ -356,7 +356,7 @@ impl Termbox {
     pub fn change_cell(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
         debug_assert!(x >= 0);
         debug_assert!(y >= 0);
-        let mut cell =
+        let cell =
             &mut self.back_buffer.cells[(y as usize) * (self.term_width as usize) + (x as usize)];
         cell.ch = ch;
         cell.fg = fg;

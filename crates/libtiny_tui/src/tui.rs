@@ -353,7 +353,7 @@ impl TUI {
 
     fn apply_config(&mut self, config: Option<Config>) {
         if let Some(config) = config {
-            self.tab_configs = config.borrow().into();
+            self.tab_configs = TabConfigs::from(&config);
             let Config {
                 colors,
                 scrollback,

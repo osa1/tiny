@@ -1,4 +1,4 @@
-# Servers to auto-connect
+# Servers to automatically connect.
 servers:
     - addr: irc.oftc.net
       port: 6697
@@ -6,72 +6,77 @@ servers:
       realname: yourname
       nicks: [tiny_user]
 
-      # (optional) Server alias for display in tab line
+      # Server alias to show in the tab line.
       # alias: OFTC
 
-      # Channels to automatically join
-      # Can include tab config arguments
-      # -ignore: [true | false] -- ignores join/part messages
-      # -notify: [off | mentions | messages] -- sets notifications
+      # Channels to automatically join.
       join:
           - "#tiny"
+
+      # You can specify channel settings:
+      #
+      # - `ignore: true` for disabling join/part lines.
+      # - `notify: [off|mentions|messages]` for the notification setting.
+      #
+      # Example:
+      #
       # join:
       #   - name: "#tiny"
       #     ignore: true
-      #     notify: "mentions"
+      #     notify: mentions
 
-      # Three authentication methods: pass, sasl, and nickserv_ident
-      # These are optional and you probably only need one of these, delete
-      # others.
+      # tiny supports three authentication methods.
+      #
+      # - `pass`: Sends `PASS` IRC command when connecting.
+      # - `sasl`: For SASL authentication.
+      # - `nickserv_ident`: Sends command `PRIVMSG NickServ identify ...` after
+      #   connecting, before joining channels.
+      #
+      # All of these are optional and you probably need only one of these.
+      # Examples for each below.
 
-      # Server or nick password
-      # pass: 'hunter2'
+      # pass: hunter2
 
-      # SASL authentication
       # sasl:
-      #   username: 'tiny_user'
-      #   password: 'hunter2'
+      #   username: tiny_user
+      #   password: hunter2
 
-      # Identify nick by sending a message to NickServ:
-      # (useful when `pass` or `sasl` fields above are not used)
-      # nickserv_ident: 'hunter2'
+      # nickserv_ident: hunter2
 
-      # Set /ignore for this server and all its tabs, default: false
-      # ignore: true  
+      # Sets /ignore for this server and all its tabs. Default is false.
+      # ignore: true
 
-      # Set notifications for this server and all its tabs, default: mentions
-      # notify: [off | mentions | messages]
+      # Sets notifications for this server and all its tabs, Default is
+      # mentions.
+      # notify: [off|mentions|messages]
 
-# Defaults used when connecting to servers via the /connect command
+# Defaults used when connecting to a server with the `/connect` command.
 defaults:
     nicks: [tiny_user]
     realname: yourname
     join: []
     tls: false
+    # ignore: true
+    # notify: [off|mentions|messages]
 
-    # Set /ignore as the default for all servers and all its tabs, default: false
-    # ignore: true 
-
-    # Set default notifications for all servers and all its tabs, default: mentions
-    # notify: [off | mentions | messages]
-
-# Where to put log files
+# Location for chat logs.
 log_dir: "{}"
 
-# (Optional) Limits the maximum number of messages stored for each UI tab. Defaults to unlimited.
+# Limits the maximum number of messages stored in each tab. Default is
+# unlimited.
 # scrollback: 512
 
-# (Optional) UI layout: 'compact' or 'aligned'. Defaults to 'compact'.
+# UI layout: `compact` or `aligned`. Default is `compact`.
 # layout: compact
 
-# (Optional) Nick length in 'aligned' layout. Default is 12.
+# Nick length in 'aligned' layout. Default is 12.
 # max_nick_length: 12
 
 # Color theme based on 256 colors. Colors can be defined as color indices
 # (0-255) or with their names.
 #
-# Below are the defaults. You can delete them if you don't want to change
-# anything.
+# Below are the defaults. You can delete them if you don't want to change any
+# colors.
 #
 # Accepted color names are:
 # default (0), black (0), maroon (1), green (2), olive (3), navy (4),
@@ -159,33 +164,38 @@ colors:
         bg: default
         attrs: [bold]
 
-# Custom key mappings (optional)
+# Custom key mappings. Syntax is:
+#
 # [key_name]: [key_action]
-# Set a key to "disable" to disable it
+#
+# Set a key to `disable` to disable it.
+#
+# See also: https://github.com/osa1/tiny/wiki/Configuring-key-bindings.
+#
 # key_map:
     ### Defaults ###
     # ctrl_c: exit
     # ctrl_x: run_editor
 
-    # alt_1: 
+    # alt_1:
     #     tab_goto: 1
-    # alt_2: 
+    # alt_2:
     #     tab_goto: 2
-    # alt_3: 
+    # alt_3:
     #     tab_goto: 3
-    # alt_4: 
+    # alt_4:
     #     tab_goto: 4
-    # alt_5: 
+    # alt_5:
     #     tab_goto: 5
-    # alt_6: 
+    # alt_6:
     #     tab_goto: 6
-    # alt_7: 
+    # alt_7:
     #     tab_goto: 7
-    # alt_8: 
+    # alt_8:
     #     tab_goto: 8
-    # alt_9: 
+    # alt_9:
     #     tab_goto: 9
-    # alt_0: 
+    # alt_0:
     #     tab_goto: 0
     # ctrl_n:     tab_next
     # ctrl_p:     tab_prev

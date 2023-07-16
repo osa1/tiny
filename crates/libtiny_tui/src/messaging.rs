@@ -222,8 +222,7 @@ impl MessagingUI {
     }
 
     fn toggle_exit_dialogue(&mut self) {
-        let exit_dialogue = ::std::mem::replace(&mut self.exit_dialogue, None);
-        if exit_dialogue.is_none() {
+        if self.exit_dialogue.take().is_none() {
             // We don't show the nick in exit dialogue, so it has the full width
             self.exit_dialogue = Some(ExitDialogue::new(self.width));
         }
