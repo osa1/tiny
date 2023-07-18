@@ -34,14 +34,14 @@ jobs:
       - name: Build
         run: cargo build
 
-      - name: Run tests
+      - name: Test
         run: cargo test --all
 
       - name: Build examples and benches
         run: cargo build --examples --benches
 
   Linux_native_tls_notif:
-    name: '[Linux, native TLS + notifications] Build'
+    name: '[Linux, native TLS + notifications] Build and test'
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -57,14 +57,18 @@ jobs:
             toolchain: stable
             override: true
 
-      - name: Build with rustls and dbus
+      - name: Build
         run: |
-          cd crates/tiny
           cargo build --no-default-features \
             --features "tls-native desktop-notifications"
 
-  OSX_default:
-    name: '[OSX, default] Build and test'
+      - name: Test
+        run: |
+          cargo test --no-default-features \
+            --features "tls-native desktop-notifications"
+
+  macOS_default:
+    name: '[macOS, default] Build and test'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
@@ -75,17 +79,17 @@ jobs:
             toolchain: stable
             override: true
 
-      - name: Build tiny
+      - name: Build
         run: cargo build
 
-      - name: Run tests
+      - name: Test
         run: cargo test
 
       - name: Build examples and benches
         run: cargo build --examples --benches
 
-  OSX_native_tls_notif:
-    name: '[OSX, native TLS + notifications] Build'
+  macOS_native_tls_notif:
+    name: '[macOS, native TLS + notifications] Build and test'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
@@ -98,6 +102,10 @@ jobs:
 
       - name: Build
         run: |
-          cd crates/tiny
           cargo build --no-default-features \
+            --features "tls-native desktop-notifications"
+
+      - name: Test
+        run: |
+          cargo test --no-default-features \
             --features "tls-native desktop-notifications"

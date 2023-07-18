@@ -70,8 +70,8 @@ fn parsing_tab_configs() {
     assert_eq!(
         tab_configs.get("server2", None),
         Some(TabConfig {
-            ignore: Some(true),                // configured
-            notify: Some(Notifier::default())  // overwritten by defaults
+            ignore: Some(true),          // configured
+            notify: Some(Notifier::Off)  // overwritten by defaults
         })
     );
 
