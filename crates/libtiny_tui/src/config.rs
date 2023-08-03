@@ -389,7 +389,12 @@ const COLORS: [(&str, u16); 17] = [
     ("white", 15),
 ];
 
-const ATTRS: [(&str, u16); 2] = [("bold", TB_BOLD), ("underline", TB_UNDERLINE)];
+const ATTRS: [(&str, u16); 4] = [
+    ("bold", TB_BOLD),
+    ("underline", TB_UNDERLINE),
+    ("italic", TB_ITALIC),
+    ("strikethrough", TB_STRIKETHROUGH),
+];
 
 fn parse_color(val: String) -> Option<u16> {
     for &(name, color) in &COLORS {
