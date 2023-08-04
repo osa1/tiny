@@ -178,6 +178,20 @@ async fn input_handler<S>(
                         return;
                     }
                     TUIRet::KeyHandled | TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
+                    TUIRet::KeyCommand{cmd, from} => {
+                        let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
+                        match result {
+                            CmdResult::Ok => {}
+                            CmdResult::Continue => {
+                                snd_ev.try_send(Event::Cmd { cmd, source: from }).unwrap()
+                            }
+                            CmdResult::Quit(msg) => {
+                                snd_ev.try_send(Event::Abort { msg }).unwrap();
+                                let _ = snd_abort.try_send(());
+                                return;
+                            }
+                        }
+                    }
                     TUIRet::Input { msg, from } => {
                         if msg[0] == '/' {
                             // Handle TUI commands, send others to downstream

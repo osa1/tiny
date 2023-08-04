@@ -8,7 +8,7 @@ use term_input::{Arrow, FKey, Key};
 #[derive(Debug, PartialEq)]
 pub(crate) struct KeyMap(HashMap<Key, KeyAction>);
 
-#[derive(Debug, Copy, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum KeyAction {
     Cancel,
@@ -31,6 +31,7 @@ pub(crate) enum KeyAction {
     MessagesScrollBottom,
 
     Input(char),
+    RunIrcCommand(String),
     InputAutoComplete,
     InputNextEntry,
     InputPrevEntry,
@@ -67,6 +68,7 @@ impl Display for KeyAction {
             KeyAction::MessagesScrollTop => "messages_scroll_top",
             KeyAction::MessagesScrollBottom => "messages_scroll_bottom",
             KeyAction::Input(c) => return writeln!(f, "input_{}", c),
+            KeyAction::RunIrcCommand(string) => return writeln!(f, "run_irc_command_{}", string),
             KeyAction::InputAutoComplete => "input_auto_complete",
             KeyAction::InputNextEntry => "input_next_entry",
             KeyAction::InputPrevEntry => "input_prev_entry",
@@ -150,7 +152,7 @@ impl KeyMap {
     }
 
     pub(crate) fn load(&mut self, key_map: &KeyMap) {
-        self.0.extend(key_map.0.iter())
+        self.0.extend(key_map.0.clone().into_iter())
     }
 }
 
@@ -357,6 +359,8 @@ fn deser_keymap() {
       tab_goto: 1
     a: 
       input: b
+    b:
+      run_irc_command: clear
     "#;
     let mut expect = KeyMap(HashMap::new());
     expect
@@ -364,6 +368,10 @@ fn deser_keymap() {
         .insert(Key::Ctrl('a'), KeyAction::InputMoveCursStart);
     expect.0.insert(Key::Ctrl('e'), KeyAction::TabGoto('1'));
     expect.0.insert(Key::Char('a'), KeyAction::Input('b'));
+    expect.0.insert(
+        Key::Char('b'),
+        KeyAction::RunIrcCommand("clear".to_string()),
+    );
 
     let key_map: KeyMap = serde_yaml::from_str(s).unwrap();
     assert_eq!(expect, key_map);
