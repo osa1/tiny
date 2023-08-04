@@ -178,7 +178,7 @@ async fn input_handler<S>(
                         return;
                     }
                     TUIRet::KeyHandled | TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
-                    TUIRet::KeyCommand{cmd, from} => {
+                    TUIRet::KeyCommand { cmd, from } => {
                         let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
                         match result {
                             CmdResult::Ok => {}
