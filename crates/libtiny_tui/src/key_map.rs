@@ -31,7 +31,7 @@ pub(crate) enum KeyAction {
     MessagesScrollBottom,
 
     Input(char),
-    RunIrcCommand(String),
+    RunCommand(String),
     InputAutoComplete,
     InputNextEntry,
     InputPrevEntry,
@@ -68,7 +68,7 @@ impl Display for KeyAction {
             KeyAction::MessagesScrollTop => "messages_scroll_top",
             KeyAction::MessagesScrollBottom => "messages_scroll_bottom",
             KeyAction::Input(c) => return writeln!(f, "input_{}", c),
-            KeyAction::RunIrcCommand(string) => return writeln!(f, "run_irc_command_{}", string),
+            KeyAction::RunCommand(string) => return writeln!(f, "run_command_{}", string),
             KeyAction::InputAutoComplete => "input_auto_complete",
             KeyAction::InputNextEntry => "input_next_entry",
             KeyAction::InputPrevEntry => "input_prev_entry",
@@ -360,7 +360,7 @@ fn deser_keymap() {
     a: 
       input: b
     b:
-      run_irc_command: clear
+      run_command: clear
     "#;
     let mut expect = KeyMap(HashMap::new());
     expect
@@ -370,7 +370,7 @@ fn deser_keymap() {
     expect.0.insert(Key::Char('a'), KeyAction::Input('b'));
     expect.0.insert(
         Key::Char('b'),
-        KeyAction::RunIrcCommand("clear".to_string()),
+        KeyAction::RunCommand("clear".to_string()),
     );
 
     let key_map: KeyMap = serde_yaml::from_str(s).unwrap();

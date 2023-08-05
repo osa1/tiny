@@ -334,7 +334,7 @@ impl InputArea {
                 self.inc_cursor();
                 WidgetRet::KeyHandled
             }
-            KeyAction::RunIrcCommand(cmd) => WidgetRet::Command(cmd.to_owned()),
+            KeyAction::RunCommand(cmd) => WidgetRet::Command(cmd.to_owned()),
             _ => WidgetRet::KeyIgnored,
         }
     }
