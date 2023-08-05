@@ -130,7 +130,7 @@ impl MessagingUI {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
     }
 
-    pub(crate) fn keypressed(&mut self, key_action: KeyAction) -> WidgetRet {
+    pub(crate) fn keypressed(&mut self, key_action: &KeyAction) -> WidgetRet {
         match key_action {
             KeyAction::Exit => {
                 self.toggle_exit_dialogue();

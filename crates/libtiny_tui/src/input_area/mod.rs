@@ -211,7 +211,7 @@ impl InputArea {
         }
     }
 
-    pub(crate) fn keypressed(&mut self, key_action: KeyAction) -> WidgetRet {
+    pub(crate) fn keypressed(&mut self, key_action: &KeyAction) -> WidgetRet {
         match key_action {
             KeyAction::InputSend => {
                 if self.current_buffer_len() > 0 {
@@ -330,10 +330,11 @@ impl InputArea {
             }
             KeyAction::Input(ch) => {
                 self.modify();
-                self.buffer.insert(self.cursor as usize, ch);
+                self.buffer.insert(self.cursor as usize, *ch);
                 self.inc_cursor();
                 WidgetRet::KeyHandled
             }
+            KeyAction::RunCommand(cmd) => WidgetRet::Command(cmd.to_owned()),
             _ => WidgetRet::KeyIgnored,
         }
     }
@@ -777,18 +778,18 @@ mod tests {
     #[test]
     fn text_field_bug() {
         let mut text_field = InputArea::new(10, 50);
-        text_field.keypressed(KeyAction::Input('a'));
-        text_field.keypressed(KeyAction::Input(' '));
-        text_field.keypressed(KeyAction::Input('b'));
-        text_field.keypressed(KeyAction::Input(' '));
-        text_field.keypressed(KeyAction::Input('c'));
-        text_field.keypressed(KeyAction::InputSend);
-        text_field.keypressed(KeyAction::InputPrevEntry);
+        text_field.keypressed(&KeyAction::Input('a'));
+        text_field.keypressed(&KeyAction::Input(' '));
+        text_field.keypressed(&KeyAction::Input('b'));
+        text_field.keypressed(&KeyAction::Input(' '));
+        text_field.keypressed(&KeyAction::Input('c'));
+        text_field.keypressed(&KeyAction::InputSend);
+        text_field.keypressed(&KeyAction::InputPrevEntry);
         // this panics:
-        text_field.keypressed(KeyAction::InputMoveWordLeft);
+        text_field.keypressed(&KeyAction::InputMoveWordLeft);
         // a b ^c
         assert_eq!(text_field.cursor, 4);
-        text_field.keypressed(KeyAction::InputMoveWordRight);
+        text_field.keypressed(&KeyAction::InputMoveWordRight);
         assert_eq!(text_field.cursor, 5);
     }
 

@@ -33,6 +33,11 @@ pub(crate) enum TUIRet {
     KeyIgnored(Key),
     EventIgnored(Event),
 
+    KeyCommand {
+        cmd: String,
+        from: MsgSource,
+    },
+
     /// INVARIANT: The vec will have at least one char.
     // Can't make MsgSource a ref because of this weird error:
     // https://users.rust-lang.org/t/borrow-checker-bug/5165
@@ -670,9 +675,13 @@ impl TUI {
         });
 
         if let Some(key_action) = key_action {
-            match self.tabs[self.active_idx].widget.keypressed(key_action) {
+            match self.tabs[self.active_idx].widget.keypressed(&key_action) {
                 WidgetRet::KeyHandled => TUIRet::KeyHandled,
                 WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
+                WidgetRet::Command(cmd) => TUIRet::KeyCommand {
+                    cmd,
+                    from: self.tabs[self.active_idx].src.clone(),
+                },
                 WidgetRet::Input(input) => TUIRet::Input {
                     msg: input,
                     from: self.tabs[self.active_idx].src.clone(),
