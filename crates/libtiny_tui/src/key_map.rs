@@ -368,10 +368,9 @@ fn deser_keymap() {
         .insert(Key::Ctrl('a'), KeyAction::InputMoveCursStart);
     expect.0.insert(Key::Ctrl('e'), KeyAction::TabGoto('1'));
     expect.0.insert(Key::Char('a'), KeyAction::Input('b'));
-    expect.0.insert(
-        Key::Char('b'),
-        KeyAction::RunCommand("clear".to_string()),
-    );
+    expect
+        .0
+        .insert(Key::Char('b'), KeyAction::RunCommand("clear".to_string()));
 
     let key_map: KeyMap = serde_yaml::from_str(s).unwrap();
     assert_eq!(expect, key_map);
