@@ -212,10 +212,6 @@ byte_seq_parser! {
 // static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];
 // static XTERM_FOCUS_LOST: [u8; 3] = [27, 91, 79];
 
-pub fn is_valid_key(key: Key) -> bool {
-    parse_key_bytes_is_valid_key(key) | matches!(key, Key::AltChar(_) | Key::Char(_))
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Input {

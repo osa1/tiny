@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 
 use serde::de::{MapAccess, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer};
@@ -47,46 +47,6 @@ pub(crate) enum KeyAction {
     InputMoveCursRight,
     InputMoveWordLeft,
     InputMoveWordRight,
-}
-
-impl Display for KeyAction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            KeyAction::Cancel => "cancel",
-            KeyAction::Disable => "disable",
-            KeyAction::Exit => "exit",
-            KeyAction::RunEditor => "run_editor",
-            KeyAction::TabNext => "tab_next",
-            KeyAction::TabPrev => "tab_prev",
-            KeyAction::TabMoveLeft => "tab_move_left",
-            KeyAction::TabMoveRight => "tab_move_right",
-            KeyAction::TabGoto(c) => return writeln!(f, "tab_goto: {}", c),
-            KeyAction::MessagesPageUp => "messages_page_up",
-            KeyAction::MessagesPageDown => "messages_page_down",
-            KeyAction::MessagesScrollUp => "messages_scroll_up",
-            KeyAction::MessagesScrollDown => "messages_scroll_down",
-            KeyAction::MessagesScrollTop => "messages_scroll_top",
-            KeyAction::MessagesScrollBottom => "messages_scroll_bottom",
-            KeyAction::Input(c) => return writeln!(f, "input_{}", c),
-            KeyAction::Command(string) => return writeln!(f, "command_{}", string),
-            KeyAction::InputAutoComplete => "input_auto_complete",
-            KeyAction::InputNextEntry => "input_next_entry",
-            KeyAction::InputPrevEntry => "input_prev_entry",
-            KeyAction::InputSend => "input_send",
-            KeyAction::InputDeletePrevChar => "input_delete_prev_char",
-            KeyAction::InputDeleteNextChar => "input_delete_next_char",
-            KeyAction::InputDeleteToStart => "input_delete_to_start",
-            KeyAction::InputDeleteToEnd => "input_delete_to_end",
-            KeyAction::InputDeletePrevWord => "input_delete_prev_word",
-            KeyAction::InputMoveCursEnd => "input_move_curs_end",
-            KeyAction::InputMoveCursStart => "input_move_curs_start",
-            KeyAction::InputMoveCursLeft => "input_move_curs_left",
-            KeyAction::InputMoveCursRight => "input_move_curs_right",
-            KeyAction::InputMoveWordLeft => "input_move_word_left",
-            KeyAction::InputMoveWordRight => "input_move_word_right",
-        };
-        writeln!(f, "{}", s)
-    }
 }
 
 impl Default for KeyMap {
@@ -137,15 +97,6 @@ impl Default for KeyMap {
     }
 }
 
-impl Display for KeyMap {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (key, action) in self.0.iter() {
-            writeln!(f, "key: {:?}, action: {}", key, action)?;
-        }
-        Ok(())
-    }
-}
-
 impl KeyMap {
     pub(crate) fn get(&self, key: &Key) -> Option<KeyAction> {
         self.0.get(key).cloned()
@@ -166,12 +117,12 @@ impl<'de> Deserialize<'de> for KeyMap {
         impl<'de> Visitor<'de> for KeyMapVisitor {
             type Value = KeyMap;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(
                     formatter,
                     "a map of key bindings. ex. 'ctrl_a: input_move_curs_start'"
                 )?;
-                write!(formatter, "defaults: \n{}", KeyMap::default())
+                write!(formatter, "defaults:\n{}", KeyMap::default())
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -202,7 +153,7 @@ impl<'de> Deserialize<'de> for MappedKey {
         impl<'de> Visitor<'de> for MappedKeyVisitor {
             type Value = MappedKey;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9], [f1-f12]. ")?;
                 write!(
                     formatter,
@@ -234,6 +185,7 @@ impl<'de> Deserialize<'de> for MappedKey {
                         "pgdown" => Key::PageDown,
                         "pgup" => Key::PageUp,
                         "tab" => Key::Tab,
+                        "enter" => Key::Char('\r'),
                         other => {
                             if let Some(arrow) = parse_arrow(other) {
                                 Key::Arrow(arrow)
@@ -276,11 +228,7 @@ impl<'de> Deserialize<'de> for MappedKey {
                     },
                 };
 
-                if term_input::is_valid_key(key) {
-                    Ok(MappedKey(key))
-                } else {
-                    Err(E::invalid_value(Unexpected::Str(v), &Self))
-                }
+                Ok(MappedKey(key))
             }
         }
 
@@ -313,6 +261,135 @@ fn parse_f_key(s: &str) -> Option<FKey> {
         "f11" => Some(FKey::F11),
         "f12" => Some(FKey::F12),
         _ => None,
+    }
+}
+
+//
+// Display implementations, used in error messages.
+//
+
+impl Display for KeyAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            KeyAction::Cancel => "cancel",
+            KeyAction::Disable => "disable",
+            KeyAction::Exit => "exit",
+            KeyAction::RunEditor => "run_editor",
+            KeyAction::TabNext => "tab_next",
+            KeyAction::TabPrev => "tab_prev",
+            KeyAction::TabMoveLeft => "tab_move_left",
+            KeyAction::TabMoveRight => "tab_move_right",
+            KeyAction::TabGoto(c) => return writeln!(f, "tab_goto: {}", c),
+            KeyAction::MessagesPageUp => "messages_page_up",
+            KeyAction::MessagesPageDown => "messages_page_down",
+            KeyAction::MessagesScrollUp => "messages_scroll_up",
+            KeyAction::MessagesScrollDown => "messages_scroll_down",
+            KeyAction::MessagesScrollTop => "messages_scroll_top",
+            KeyAction::MessagesScrollBottom => "messages_scroll_bottom",
+            KeyAction::Input(c) => return writeln!(f, "input_{}", c),
+            KeyAction::Command(string) => return writeln!(f, "command_{}", string),
+            KeyAction::InputAutoComplete => "input_auto_complete",
+            KeyAction::InputNextEntry => "input_next_entry",
+            KeyAction::InputPrevEntry => "input_prev_entry",
+            KeyAction::InputSend => "input_send",
+            KeyAction::InputDeletePrevChar => "input_delete_prev_char",
+            KeyAction::InputDeleteNextChar => "input_delete_next_char",
+            KeyAction::InputDeleteToStart => "input_delete_to_start",
+            KeyAction::InputDeleteToEnd => "input_delete_to_end",
+            KeyAction::InputDeletePrevWord => "input_delete_prev_word",
+            KeyAction::InputMoveCursEnd => "input_move_curs_end",
+            KeyAction::InputMoveCursStart => "input_move_curs_start",
+            KeyAction::InputMoveCursLeft => "input_move_curs_left",
+            KeyAction::InputMoveCursRight => "input_move_curs_right",
+            KeyAction::InputMoveWordLeft => "input_move_word_left",
+            KeyAction::InputMoveWordRight => "input_move_word_right",
+        };
+        writeln!(f, "{}", s)
+    }
+}
+
+struct KeyDisplay(Key);
+
+struct ArrowDisplay(Arrow);
+
+struct FKeyDisplay(FKey);
+
+impl Display for ArrowDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self.0 {
+                Arrow::Left => "left",
+                Arrow::Right => "right",
+                Arrow::Up => "up",
+                Arrow::Down => "down",
+            }
+        )
+    }
+}
+
+impl Display for FKeyDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self.0 {
+                FKey::F1 => "f1",
+                FKey::F2 => "f2",
+                FKey::F3 => "f3",
+                FKey::F4 => "f4",
+                FKey::F5 => "f5",
+                FKey::F6 => "f6",
+                FKey::F7 => "f7",
+                FKey::F8 => "f8",
+                FKey::F9 => "f9",
+                FKey::F10 => "f10",
+                FKey::F11 => "f11",
+                FKey::F12 => "f12",
+            }
+        )
+    }
+}
+
+impl Display for KeyDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Key::AltArrow(arrow) => write!(f, "alt_{}", ArrowDisplay(arrow)),
+            Key::AltChar(char) => write!(f, "alt_{}", char),
+            Key::AltF(fkey) => write!(f, "alt_{}", FKeyDisplay(fkey)),
+            Key::Arrow(arrow) => write!(f, "{}", ArrowDisplay(arrow)),
+            Key::Backspace => write!(f, "backspace"),
+            Key::Char('\r') => write!(f, "enter"),
+            Key::Char(char) => write!(f, "{}", char),
+            Key::Ctrl(char) => write!(f, "ctrl_{}", char),
+            Key::CtrlArrow(arrow) => write!(f, "ctrl_{}", ArrowDisplay(arrow)),
+            Key::CtrlF(fkey) => write!(f, "ctrl_{}", FKeyDisplay(fkey)),
+            Key::Del => write!(f, "del"),
+            Key::End => write!(f, "end"),
+            Key::Esc => write!(f, "esc"),
+            Key::FKey(fkey) => write!(f, "{}", FKeyDisplay(fkey)),
+            Key::Home => write!(f, "home"),
+            Key::PageDown => write!(f, "pgdown"),
+            Key::PageUp => write!(f, "pgup"),
+            Key::ShiftArrow(arrow) => write!(f, "shift_{}", ArrowDisplay(arrow)),
+            Key::ShiftF(fkey) => write!(f, "shift_{}", FKeyDisplay(fkey)),
+            Key::Tab => write!(f, "tab"),
+        }
+    }
+}
+
+impl Display for KeyMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (key, action) in self.0.iter() {
+            if let KeyAction::TabGoto(_) = action {
+                writeln!(f, "{}:", KeyDisplay(*key))?;
+                writeln!(f, "  {}", action)?;
+            } else {
+                writeln!(f, "{}: {}", KeyDisplay(*key), action)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -355,9 +432,9 @@ fn deser_key_action_goto_tab() {
 fn deser_keymap() {
     let s = r#"
     ctrl_a: input_move_curs_start
-    ctrl_e: 
+    ctrl_e:
       tab_goto: 1
-    a: 
+    a:
       input: b
     b:
       command: clear
@@ -374,4 +451,23 @@ fn deser_keymap() {
 
     let key_map: KeyMap = serde_yaml::from_str(s).unwrap();
     assert_eq!(expect, key_map);
+}
+
+#[test]
+fn deser_defaults() {
+    // Check that the defaults we show in errors can be parsed.
+    let defaults = KeyMap::default();
+    let defaults_str = defaults.to_string();
+    let defaults_deser: KeyMap = serde_yaml::from_str(&defaults_str).unwrap();
+    assert_eq!(defaults, defaults_deser);
+}
+
+#[test]
+fn deser_enter() {
+    let key: MappedKey = serde_yaml::from_str("enter").unwrap();
+    assert_eq!(key.0, Key::Char('\r'));
+
+    // It's not possible to parse enter with modifiers.
+    let key: Result<MappedKey, _> = serde_yaml::from_str("ctrl_enter");
+    assert!(key.is_err());
 }
