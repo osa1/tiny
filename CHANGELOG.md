@@ -1,3 +1,18 @@
+# Unreleased
+
+Thanks to @nate-sys for contributing to this release.
+
+- New TUI text attributes `italic` and `strikethrough` added to the config file
+  parser. These can be combined with the existing `bold` and `underline`
+  attributes. (#409, #404)
+- Added support for key bindings that run commands. Example:
+  ```yaml
+  key_map:
+    ctrl_d:
+      command: quit
+  ```
+  (#403, #410)
+
 # 2023/07/16: 0.11.0
 
 Thanks to @ALEX11BR and @trevarj for contributing to this release.

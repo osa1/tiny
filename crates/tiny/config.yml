@@ -83,8 +83,8 @@ log_dir: "{}"
 # purple (5), teal (6), silver (7), gray (8), red (9), lime (10),
 # yellow (11), blue (12), magenta (13), cyan (14), white (15)
 #
-# Attributes can be combined (e.g [bold, underline]), and valid values are bold
-# and underline.
+# Attributes can be combined (e.g [bold, underline]). valid values are: bold,
+# underline, italic, strikethrough.
 colors:
     nick: [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14]
 
