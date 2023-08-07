@@ -15,7 +15,6 @@ tls-rustls = ["libtiny_client/tls-rustls"]
 desktop-notifications = ["libtiny_tui/desktop-notifications"]
 
 [dependencies]
-clap = { version = "3.1", features = ["cargo"] }
 dirs = "4.0"
 env_logger = { version = "0.9", default-features = false }
 libtiny_client = { path = "../libtiny_client", default-features = false }
