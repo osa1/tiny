@@ -46,6 +46,13 @@ pub(crate) fn parse() -> Args {
             }
         }
 
+        if arg.starts_with('-') {
+            eprintln!("Error: Found argument '{arg}' which wasn't expected");
+            eprintln!();
+            eprintln!("For more information try --help");
+            std::process::exit(1);
+        }
+
         servers.push(arg);
     }
 
