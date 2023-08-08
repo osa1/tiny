@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, Command};
-
 /// Command line arguments.
 #[derive(Debug)]
 pub(crate) struct Args {
@@ -15,48 +13,80 @@ pub(crate) struct Args {
     pub(crate) config_path: Option<PathBuf>,
 }
 
-/// Parses command line arguments.
+/// Parses command line arguments and handles `--version` and `--help`.
 pub(crate) fn parse() -> Args {
-    let mut version = crate_version!().to_owned();
-    let commit_hash = env!("GIT_HASH");
-    if !commit_hash.is_empty() {
-        version = format!("{} ({})", version, commit_hash);
+    let mut servers: Vec<String> = Vec::new();
+    let mut config_path: Option<PathBuf> = None;
+
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if arg == "-V" || arg == "--version" {
+            print_version();
+            std::process::exit(0);
+        }
+
+        if arg == "-h" || arg == "--help" {
+            print_help();
+            std::process::exit(0);
+        }
+
+        if arg == "-c" || arg == "--config" {
+            match args.next() {
+                Some(path) => {
+                    config_path = Some(path.into());
+                    continue;
+                }
+
+                None => {
+                    eprintln!("Error: The argument '--config <FILE>' requires a file path but none was supplied");
+                    eprintln!();
+                    eprintln!("For more information try --help");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        if arg.starts_with('-') {
+            eprintln!("Error: Found argument '{arg}' which wasn't expected");
+            eprintln!();
+            eprintln!("For more information try --help");
+            std::process::exit(1);
+        }
+
+        servers.push(arg);
     }
-
-    let m = Command::new(crate_name!())
-        .version(version.as_str())
-        .about(crate_description!())
-        .author(crate_authors!())
-        .arg(
-            Arg::new("config")
-                .short('c')
-                .long("config")
-                .value_name("FILE")
-                .help("Use this config file")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("servers")
-                .multiple_values(true)
-                .takes_value(true)
-                .help(
-                    "Servers to connect. For example, `tiny foo bar` \
-                     connects to servers whose names contain \"foo\" OR \
-                     \"bar\".",
-                )
-                .next_line_help(false),
-        )
-        .get_matches();
-
-    let servers = match m.values_of("servers") {
-        None => vec![],
-        Some(vals) => vals.map(str::to_owned).collect(),
-    };
-
-    let config_path = m.value_of("config").map(PathBuf::from);
 
     Args {
         servers,
         config_path,
     }
+}
+
+fn print_version() {
+    let crate_version = env!("CARGO_PKG_VERSION");
+    let commit_hash = env!("GIT_HASH");
+    println!("tiny {crate_version} ({commit_hash})");
+}
+
+fn print_help() {
+    print_version();
+    let crate_authors = env!("CARGO_PKG_AUTHORS");
+    let crate_description = env!("CARGO_PKG_DESCRIPTION");
+    println!(
+        "\
+{crate_authors}
+{crate_description}
+
+USAGE:
+    tiny [OPTIONS] [servers]
+
+ARGS:
+    <servers>       Servers to connect. For example, `tiny foo bar` connects to servers whose
+                    names contain \"foo\" OR \"bar\".
+
+OPTIONS:
+    -c, --config <FILE>    Use this config file
+    -h, --help             Print help information
+    -V, --version          Print version information",
+    )
 }
