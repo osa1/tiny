@@ -29,6 +29,9 @@ servers:
       #
       # - `pass`: Sends `PASS` IRC command when connecting.
       # - `sasl`: For SASL authentication.
+      #    You can either authenticate using a password or use a certificate
+      #    with SASL EXTERNAL. Choose either `username` and `password`
+      #    _or_ `pem`.
       # - `nickserv_ident`: Sends command `PRIVMSG NickServ identify ...` after
       #   connecting, before joining channels.
       #
@@ -40,6 +43,7 @@ servers:
       # sasl:
       #   username: tiny_user
       #   password: hunter2
+      #   pem: "/home/user/.config/tiny/oftc.pem"
 
       # nickserv_ident: hunter2
 
@@ -163,6 +167,10 @@ colors:
         fg: red
         bg: default
         attrs: [bold]
+
+    tab_joinpart:
+        fg: 11
+        bg: default
 
 # Custom key mappings. Syntax is:
 #
