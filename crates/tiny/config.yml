@@ -164,6 +164,10 @@ colors:
         bg: default
         attrs: [bold]
 
+    tab_joinpart:
+        fg: 11
+        bg: default
+
 # Custom key mappings. Syntax is:
 #
 # [key_name]: [key_action]
