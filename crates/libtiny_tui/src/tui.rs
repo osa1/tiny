@@ -1117,8 +1117,7 @@ impl TUI {
                     insert_idx -= 1;
                 }
                 let to_move: Vec<Tab> = self.tabs.drain(left..right).collect();
-                self.tabs
-                    .splice(insert_idx..insert_idx, to_move.into_iter());
+                self.tabs.splice(insert_idx..insert_idx, to_move);
                 self.select_tab(insert_idx);
             }
         } else if !self.is_server_tab(self.active_idx - 1) {
@@ -1140,8 +1139,7 @@ impl TUI {
                 let right_next = self.server_tab_range(right).1;
                 let insert_idx = right_next - (right - left);
                 let to_move: Vec<Tab> = self.tabs.drain(left..right).collect();
-                self.tabs
-                    .splice(insert_idx..insert_idx, to_move.into_iter());
+                self.tabs.splice(insert_idx..insert_idx, to_move);
                 self.select_tab(insert_idx);
             }
         } else if !self.is_server_tab(self.active_idx + 1) {
