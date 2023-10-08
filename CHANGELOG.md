@@ -1,6 +1,6 @@
 # Unreleased
 
-Thanks to @nate-sys for contributing to this release.
+Thanks to @nate-sys and @jubalh for contributing to this release.
 
 - New TUI text attributes `italic` and `strikethrough` added to the config file
   parser. These can be combined with the existing `bold` and `underline`
@@ -12,6 +12,8 @@ Thanks to @nate-sys for contributing to this release.
       command: quit
   ```
   (#403, #410)
+- Default config updated with better comments, color config for join/part
+  messages. (#412)
 
 # 2023/07/16: 0.11.0
 
