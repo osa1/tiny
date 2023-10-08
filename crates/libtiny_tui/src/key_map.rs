@@ -103,7 +103,7 @@ impl KeyMap {
     }
 
     pub(crate) fn load(&mut self, key_map: &KeyMap) {
-        self.0.extend(key_map.0.clone().into_iter())
+        self.0.extend(key_map.0.clone())
     }
 }
 

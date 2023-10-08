@@ -3,6 +3,8 @@ use libtiny_common::{ChanName, ChanNameRef};
 use crate::config::*;
 use crate::notifier::Notifier;
 
+use std::str::FromStr;
+
 #[test]
 fn parsing_tab_configs() {
     let config_str = r##"
@@ -96,5 +98,44 @@ fn parsing_tab_configs() {
             ignore: Some(true),          // overwritten by server
             notify: Some(Notifier::Off)  // overwritten by defaults
         })
+    );
+}
+
+#[test]
+fn tab_config_command() {
+    assert_eq!(
+        TabConfig::from_str("").unwrap(),
+        TabConfig {
+            ignore: None,
+            notify: None
+        }
+    );
+    assert_eq!(
+        TabConfig::from_str("-ignore").unwrap(),
+        TabConfig {
+            ignore: Some(true),
+            notify: None
+        }
+    );
+    assert_eq!(
+        TabConfig::from_str("-notify off").unwrap(),
+        TabConfig {
+            ignore: None,
+            notify: Some(Notifier::Off)
+        }
+    );
+    assert_eq!(
+        TabConfig::from_str("-notify off -ignore").unwrap(),
+        TabConfig {
+            ignore: Some(true),
+            notify: Some(Notifier::Off)
+        }
+    );
+    assert_eq!(
+        TabConfig::from_str("-ignore -notify off").unwrap(),
+        TabConfig {
+            ignore: Some(true),
+            notify: Some(Notifier::Off)
+        }
     );
 }
