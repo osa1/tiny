@@ -14,8 +14,10 @@ use serde::Deserialize;
 pub enum Notifier {
     /// Notifications are disabled.
     Off,
+
     /// Generate notifications only for mentions.
     Mentions,
+
     /// Generate notifications for all messages.
     Messages,
 }

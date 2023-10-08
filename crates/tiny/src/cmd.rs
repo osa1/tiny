@@ -321,10 +321,7 @@ fn join(args: CmdArgs) {
         .filter_map(|c| match Chan::from_str(c) {
             Ok(c) => Some(c),
             Err(err) => {
-                ui.add_client_err_msg(
-                    &format!("{}, Usage: {}", err, JOIN_CMD.usage),
-                    &MsgTarget::CurrentTab,
-                );
+                ui.add_client_err_msg(&err, &MsgTarget::CurrentTab);
                 None
             }
         })
@@ -333,12 +330,12 @@ fn join(args: CmdArgs) {
     let chans = if chans.is_empty() {
         match ui.current_tab() {
             None => return,
-            // rejoin current tab's channel
             Some(MsgSource::Chan { serv, chan }) => {
+                // Rejoin current tab's channel.
                 let config = ui.get_tab_config(&serv, Some(chan.as_ref()));
                 vec![Chan::WithConfig { name: chan, config }]
             }
-            Some(_) => {
+            Some(MsgSource::Serv { .. } | MsgSource::User { .. }) => {
                 return ui.add_client_err_msg(
                     &format!("Usage: {}", JOIN_CMD.usage),
                     &MsgTarget::CurrentTab,

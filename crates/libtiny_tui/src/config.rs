@@ -92,6 +92,7 @@ where
     Ok(ChanName::new(name))
 }
 
+// `FromStr` implementation used when parsing channel names in commands (not in config file).
 impl FromStr for Chan {
     type Err = String;
 
@@ -196,10 +197,11 @@ impl From<&Config> for TabConfigs {
 
 #[derive(Debug, Default, Copy, Clone, Deserialize, PartialEq, Eq)]
 pub struct TabConfig {
-    /// `true` if tab is ignoring join/part messages
+    /// Whether the join/part messages are ignored.
     #[serde(default)]
     pub ignore: Option<bool>,
-    /// Notification setting for tab
+
+    /// Notification setting for tab.
     #[serde(default)]
     pub notify: Option<Notifier>,
 }
@@ -226,28 +228,31 @@ impl TabConfig {
     }
 }
 
+// `FromStr` implementation used when parsing channel names in commands (not in config file).
 impl FromStr for TabConfig {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let config = s
-            .split('-')
-            .filter_map(|arg| (!arg.is_empty()).then(|| arg.trim()))
-            .try_fold(TabConfig::default(), |mut tc, arg| match arg {
-                // flag
-                "ignore" => {
-                    tc.ignore = Some(true);
-                    Ok(tc)
-                }
-                arg => match arg.split_once(' ') {
-                    // arg with parameter
-                    Some(("notify", val)) => {
-                        tc.notify = Some(Notifier::from_str(val)?);
-                        Ok(tc)
+        let mut config = TabConfig::default();
+        let mut words = s.trim().split(' ').map(str::trim);
+
+        while let Some(word) = words.next() {
+            // `"".split(' ')` yields one empty string.
+            if word.is_empty() {
+                continue;
+            }
+            match word {
+                "-ignore" => config.ignore = Some(true),
+                "-notify" => match words.next() {
+                    Some(notify_setting) => {
+                        config.notify = Some(Notifier::from_str(notify_setting)?)
                     }
-                    _ => Err(format!("Unexpected argument: {:?}", arg)),
+                    None => return Err("-notify parameter missing".to_string()),
                 },
-            })?;
+                other => return Err(format!("Unexpected channel parameter: {:?}", other)),
+            }
+        }
+
         Ok(config)
     }
 }
