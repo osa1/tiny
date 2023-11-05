@@ -487,7 +487,7 @@ fn test_compact_layout_activity_timestamp() {
 
 // Test that a timestamp is printed after a `clear`.
 #[test]
-fn test_clear_timestamp() {
+fn test_clear_timestamp_aligned() {
     let (mut tui, target) = setup_aligned_tui();
 
     let ts = time::at_utc(time::Timespec::new(0, 0));
@@ -501,6 +501,28 @@ fn test_clear_timestamp() {
         "|                                        |
          |                                        |
          |00:00               +test2              |
+         |osa1:                                   |
+         |mentions irc.server_1.org #chan         |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+}
+
+// Same as `test_clear_timestamp_aligned`, but for compact layout.
+#[test]
+fn test_clear_timestamp_compact() {
+    let (mut tui, target) = setup_compact_tui();
+
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+    tui.add_nick("test1", Some(ts), &target);
+    tui.clear(&target);
+    tui.add_nick("test2", Some(ts), &target);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|                                        |
+         |                                        |
+         |00:00 +test2                            |
          |osa1:                                   |
          |mentions irc.server_1.org #chan         |";
 
