@@ -261,26 +261,18 @@ impl MessagingUI {
     }
 
     pub(crate) fn add_client_err_msg(&mut self, msg: &str) {
-        self.reset_activity_line();
-
         self.msg_area.add_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_client_notify_msg(&mut self, msg: &str) {
-        self.reset_activity_line();
-
         self.msg_area.add_text(msg, SegStyle::Faded);
         self.msg_area.flush_line();
-        self.reset_activity_line();
     }
 
     pub(crate) fn add_client_msg(&mut self, msg: &str) {
-        self.reset_activity_line();
-
         self.msg_area.add_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
-        self.reset_activity_line();
     }
 
     pub(crate) fn add_privmsg(
@@ -297,7 +289,6 @@ impl MessagingUI {
         // #253 for details.
         self.nicks.insert(sender);
 
-        self.reset_activity_line();
         self.add_timestamp(ts);
 
         let nick_color = self.get_nick_color(sender);
@@ -343,16 +334,12 @@ impl MessagingUI {
     }
 
     pub(crate) fn add_msg(&mut self, msg: &str, ts: Timestamp) {
-        self.reset_activity_line();
-
         self.add_timestamp(ts);
         self.msg_area.add_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
-        self.reset_activity_line();
-
         self.add_timestamp(ts);
         self.msg_area.add_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
@@ -420,13 +407,9 @@ impl MessagingUI {
         });
     }
 
-    fn reset_activity_line(&mut self) {
-        self.last_activity_line = None;
-    }
-
     fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
         match &self.last_activity_line {
-            Some(l) if l.ts == ts => {
+            Some(l) if l.ts == ts && l.line_idx == self.msg_area.num_lines() - 1 => {
                 let line_idx = l.line_idx;
                 // FIXME: It's a bit hacky to add a space in this function which from the name
                 // looks like a getter.

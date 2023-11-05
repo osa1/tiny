@@ -70,6 +70,10 @@ impl MsgArea {
         self.height
     }
 
+    pub(crate) fn num_lines(&self) -> usize {
+        self.lines.len()
+    }
+
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
         self.width = width;
         let old_height = self.height;
