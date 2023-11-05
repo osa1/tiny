@@ -51,19 +51,14 @@ static WHITESPACE: &str =
     "                                                                                ";
 
 impl Timestamp {
-    /// The width of the timestamp plus a space
+    /// The width of a timestamp plus a space.
     pub(crate) const WIDTH: usize = 6;
 
-    fn stamp(self, msg_area: &mut MsgArea) {
-        msg_area.add_text(
-            &format!("{:02}:{:02} ", self.hour, self.min),
-            SegStyle::Timestamp,
-        );
-    }
+    /// Spaces for a timestamp slot in aligned layout.
+    pub(crate) const BLANK: &'static str = "      ";
 
-    /// Inserts spaces for a timestamp slot. Used in aligned layout.
-    fn blank(msg_area: &mut MsgArea) {
-        msg_area.add_text(&WHITESPACE[..Timestamp::WIDTH], SegStyle::Timestamp);
+    fn stamp(&self) -> String {
+        format!("{:02}:{:02} ", self.hour, self.min)
     }
 }
 
@@ -238,15 +233,18 @@ fn get_input_field_max_height(window_height: i32) -> i32 {
 // Adding new messages
 
 impl MessagingUI {
+    /// Add a new line with the given timestamp (`ts`) if we don't already have a line for the
+    /// timestamp already.
     fn add_timestamp(&mut self, ts: Timestamp) {
         if let Some(ts_) = self.last_activity_ts {
             if ts_ != ts {
-                ts.stamp(&mut self.msg_area);
-            } else if matches!(self.msg_area.layout(), Layout::Aligned { .. }) {
-                Timestamp::blank(&mut self.msg_area)
+                self.msg_area.add_text(&ts.stamp(), SegStyle::Timestamp);
+            } else if self.msg_area.layout().is_aligned() {
+                self.msg_area
+                    .add_text(Timestamp::BLANK, SegStyle::Timestamp);
             }
         } else {
-            ts.stamp(&mut self.msg_area);
+            self.msg_area.add_text(&ts.stamp(), SegStyle::Timestamp);
         }
         self.last_activity_ts = Some(ts);
     }

@@ -38,6 +38,10 @@ pub(crate) enum Layout {
 }
 
 impl Layout {
+    pub(crate) fn is_aligned(&self) -> bool {
+        matches!(self, Layout::Aligned { .. })
+    }
+
     fn msg_padding(&self) -> usize {
         match self {
             Layout::Compact => 0,
