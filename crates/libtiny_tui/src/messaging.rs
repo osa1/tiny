@@ -13,26 +13,32 @@ use crate::msg_area::{Layout, MsgArea};
 use crate::trie::Trie;
 use crate::widget::WidgetRet;
 
-/// A messaging screen is just a text field to type messages and msg area to
-/// show incoming/sent messages.
+/// An input field and an area for showing messages and activities of a tab (channel, server,
+/// mentions tab).
 pub(crate) struct MessagingUI {
-    /// Incoming and sent messages appear
+    /// The area showing the messages and activities.
     msg_area: MsgArea,
 
-    // exit_dialogue handles input when available.
-    // two fields (instead of an enum etc.) to avoid borrowchk problems
+    /// The input field. `exit_dialogue` handles the input when available.
+    // Two fields (instead of an enum) to avoid borrowchk problems.
     input_field: InputArea,
+
     exit_dialogue: Option<ExitDialogue>,
 
+    /// Width of the UI, in characters.
     width: i32,
+
+    /// Height of the UI, in lines.
     height: i32,
 
-    // All nicks in the channel. Need to keep this up-to-date to be able to
-    // properly highlight mentions.
+    /// All nicks in the channel. Used in autocompletion.
     nicks: Trie,
 
+    /// The last line in `msg_area` that shows join, leave, disconnect activities.
     last_activity_line: Option<ActivityLine>,
-    last_activity_ts: Option<Timestamp>,
+
+    /// Last timestamp added to the UI.
+    last_ts: Option<Timestamp>,
 }
 
 /// Length of ": " suffix of nicks in messages
@@ -51,19 +57,14 @@ static WHITESPACE: &str =
     "                                                                                ";
 
 impl Timestamp {
-    /// The width of the timestamp plus a space
+    /// The width of a timestamp plus a space.
     pub(crate) const WIDTH: usize = 6;
 
-    fn stamp(self, msg_area: &mut MsgArea) {
-        msg_area.add_text(
-            &format!("{:02}:{:02} ", self.hour, self.min),
-            SegStyle::Timestamp,
-        );
-    }
+    /// Spaces for a timestamp slot in aligned layout.
+    pub(crate) const BLANK: &'static str = "      ";
 
-    /// Inserts spaces for a timestamp slot. Used in aligned layout.
-    fn blank(msg_area: &mut MsgArea) {
-        msg_area.add_text(&WHITESPACE[..Timestamp::WIDTH], SegStyle::Timestamp);
+    fn stamp(&self) -> String {
+        format!("{:02}:{:02} ", self.hour, self.min)
     }
 }
 
@@ -76,11 +77,12 @@ impl From<Tm> for Timestamp {
     }
 }
 
-/// An activity line is just a line that we update on joins / leaves /
-/// disconnects. We group activities that happen in the same minute to avoid
-/// redundantly showing lines.
+/// A line showing joins, leaves, and disconnects.
 struct ActivityLine {
+    /// Timestamp of the line.
     ts: Timestamp,
+
+    /// Index of the line in its `MsgArea`.
     line_idx: usize,
 }
 
@@ -99,7 +101,7 @@ impl MessagingUI {
             height,
             nicks: Trie::new(),
             last_activity_line: None,
-            last_activity_ts: None,
+            last_ts: None,
         }
     }
 
@@ -238,17 +240,22 @@ fn get_input_field_max_height(window_height: i32) -> i32 {
 // Adding new messages
 
 impl MessagingUI {
+    /// Add a new line with the given timestamp (`ts`) if we're not already showing the timestamp.
+    ///
+    /// In compact layout this adds the indentation for the timestamp column if we're already
+    /// showing the timestamp.
     fn add_timestamp(&mut self, ts: Timestamp) {
-        if let Some(ts_) = self.last_activity_ts {
+        if let Some(ts_) = self.last_ts {
             if ts_ != ts {
-                ts.stamp(&mut self.msg_area);
-            } else if matches!(self.msg_area.layout(), Layout::Aligned { .. }) {
-                Timestamp::blank(&mut self.msg_area)
+                self.msg_area.add_text(&ts.stamp(), SegStyle::Timestamp);
+            } else if self.msg_area.layout().is_aligned() {
+                self.msg_area
+                    .add_text(Timestamp::BLANK, SegStyle::Timestamp);
             }
         } else {
-            ts.stamp(&mut self.msg_area);
+            self.msg_area.add_text(&ts.stamp(), SegStyle::Timestamp);
         }
-        self.last_activity_ts = Some(ts);
+        self.last_ts = Some(ts);
     }
 
     pub(crate) fn show_topic(&mut self, topic: &str, ts: Timestamp) {
@@ -260,26 +267,18 @@ impl MessagingUI {
     }
 
     pub(crate) fn add_client_err_msg(&mut self, msg: &str) {
-        self.reset_activity_line();
-
         self.msg_area.add_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_client_notify_msg(&mut self, msg: &str) {
-        self.reset_activity_line();
-
         self.msg_area.add_text(msg, SegStyle::Faded);
         self.msg_area.flush_line();
-        self.reset_activity_line();
     }
 
     pub(crate) fn add_client_msg(&mut self, msg: &str) {
-        self.reset_activity_line();
-
         self.msg_area.add_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
-        self.reset_activity_line();
     }
 
     pub(crate) fn add_privmsg(
@@ -296,7 +295,6 @@ impl MessagingUI {
         // #253 for details.
         self.nicks.insert(sender);
 
-        self.reset_activity_line();
         self.add_timestamp(ts);
 
         let nick_color = self.get_nick_color(sender);
@@ -342,16 +340,12 @@ impl MessagingUI {
     }
 
     pub(crate) fn add_msg(&mut self, msg: &str, ts: Timestamp) {
-        self.reset_activity_line();
-
         self.add_timestamp(ts);
         self.msg_area.add_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
-        self.reset_activity_line();
-
         self.add_timestamp(ts);
         self.msg_area.add_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
@@ -359,6 +353,8 @@ impl MessagingUI {
 
     pub(crate) fn clear(&mut self) {
         self.msg_area.clear();
+        self.last_activity_line = None;
+        self.last_ts = None;
     }
 
     fn get_nick_color(&self, sender: &str) -> usize {
@@ -380,6 +376,8 @@ impl MessagingUI {
     }
 
     pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
+        self.nicks.insert(nick);
+
         if !ignore {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
@@ -389,8 +387,6 @@ impl MessagingUI {
                 });
             }
         }
-
-        self.nicks.insert(nick);
     }
 
     pub(crate) fn part(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
@@ -419,13 +415,11 @@ impl MessagingUI {
         });
     }
 
-    fn reset_activity_line(&mut self) {
-        self.last_activity_line = None;
-    }
-
     fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
-        match self.last_activity_line {
-            Some(ref l) if l.ts == ts => {
+        match &self.last_activity_line {
+            Some(l)
+                if l.ts == ts && Some(l.line_idx) == self.msg_area.num_lines().checked_sub(1) =>
+            {
                 let line_idx = l.line_idx;
                 // FIXME: It's a bit hacky to add a space in this function which from the name
                 // looks like a getter.

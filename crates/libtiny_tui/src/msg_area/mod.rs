@@ -38,6 +38,10 @@ pub(crate) enum Layout {
 }
 
 impl Layout {
+    pub(crate) fn is_aligned(&self) -> bool {
+        matches!(self, Layout::Aligned { .. })
+    }
+
     fn msg_padding(&self) -> usize {
         match self {
             Layout::Compact => 0,
@@ -64,6 +68,10 @@ impl MsgArea {
 
     pub(crate) fn get_height(&self) -> i32 {
         self.height
+    }
+
+    pub(crate) fn num_lines(&self) -> usize {
+        self.lines.len()
     }
 
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
