@@ -31,6 +31,7 @@ pub(crate) struct MessagingUI {
     // properly highlight mentions.
     nicks: Trie,
 
+    /// The last line in `msg_area` that shows join, leave, disconnect activities.
     last_activity_line: Option<ActivityLine>,
 
     /// Last timestamp added to the UI.
@@ -236,8 +237,10 @@ fn get_input_field_max_height(window_height: i32) -> i32 {
 // Adding new messages
 
 impl MessagingUI {
-    /// Add a new line with the given timestamp (`ts`) if we don't already have a line for the
-    /// timestamp already.
+    /// Add a new line with the given timestamp (`ts`) if we're not already showing the timestamp.
+    ///
+    /// In compact layout this adds the indentation for the timestamp column if we're already
+    /// showing the timestamp.
     fn add_timestamp(&mut self, ts: Timestamp) {
         if let Some(ts_) = self.last_ts {
             if ts_ != ts {
@@ -347,6 +350,8 @@ impl MessagingUI {
 
     pub(crate) fn clear(&mut self) {
         self.msg_area.clear();
+        self.last_activity_line = None;
+        self.last_ts = None;
     }
 
     fn get_nick_color(&self, sender: &str) -> usize {
@@ -368,6 +373,8 @@ impl MessagingUI {
     }
 
     pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
+        self.nicks.insert(nick);
+
         if !ignore {
             if let Some(ts) = ts {
                 let line_idx = self.get_activity_line_idx(ts);
@@ -377,8 +384,6 @@ impl MessagingUI {
                 });
             }
         }
-
-        self.nicks.insert(nick);
     }
 
     pub(crate) fn part(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
@@ -409,7 +414,7 @@ impl MessagingUI {
 
     fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
         match &self.last_activity_line {
-            Some(l) if l.ts == ts && l.line_idx == self.msg_area.num_lines() - 1 => {
+            Some(l) if l.ts == ts && Some(l.line_idx) == self.msg_area.num_lines().checked_sub(1) => {
                 let line_idx = l.line_idx;
                 // FIXME: It's a bit hacky to add a space in this function which from the name
                 // looks like a getter.

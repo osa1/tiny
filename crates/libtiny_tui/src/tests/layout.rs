@@ -84,47 +84,46 @@ fn test_mnemonic_generation() {
     assert_eq!(tabs[8].switch, Some('b'));
 }
 
+fn setup_tui() -> (TUI, MsgTarget<'static>) {
+    let mut tui = TUI::new_test(40, 5);
+    tui.set_layout(Layout::Aligned { max_nick_len: 12 });
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab(); // mentions -> server
+    tui.next_tab(); // server -> channel
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+       "|                                        |
+        |                                        |
+        |                                        |
+        |osa1:                                   |
+        |mentions irc.server_1.org #chan         |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+
+    (tui, MsgTarget::Chan { serv, chan })
+}
+
+// Test all combinations of
+//
+// 1.1 Message followed by activity
+// 1.2 Message followed by message
+// 1.3 Activity followed by message
+// 1.4 Activity followed by activity
+//
+// and
+//
+// 2.1 Same timestamps
+// 2.2 Different timestamps
+//
+// In total 8 scenarios.
 #[test]
 fn test_compact_layout_activity_timestamp() {
-    // Test all combinations of
-    //
-    // 1.1 Message followed by activity
-    // 1.2 Message followed by message
-    // 1.3 Activity followed by message
-    // 1.4 Activity followed by activity
-    //
-    // and
-    //
-    // 2.1 Same timestamps
-    // 2.2 Different timestamps
-    //
-    // In total 8 scenarios.
-
-    fn setup_tui() -> (TUI, MsgTarget<'static>) {
-        let mut tui = TUI::new_test(40, 5);
-        tui.set_layout(Layout::Aligned { max_nick_len: 12 });
-        let serv = "irc.server_1.org";
-        let chan = ChanNameRef::new("#chan");
-        tui.new_server_tab(serv, None);
-        tui.set_nick(serv, "osa1");
-        tui.new_chan_tab(serv, chan);
-        tui.next_tab(); // mentions -> server
-        tui.next_tab(); // server -> channel
-        tui.draw();
-
-        #[rustfmt::skip]
-        let screen =
-           "|                                        |
-            |                                        |
-            |                                        |
-            |osa1:                                   |
-            |mentions irc.server_1.org #chan         |";
-
-        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
-
-        (tui, MsgTarget::Chan { serv, chan })
-    }
-
     // 1.1 - 2.1
     {
         let (mut tui, target) = setup_tui();
@@ -298,4 +297,26 @@ fn test_compact_layout_activity_timestamp() {
 
         expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
     }
+}
+
+// Test that a timestamp is printed after a `clear`.
+#[test]
+fn test_clear_timestamp() {
+    let (mut tui, target) = setup_tui();
+
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+    tui.add_nick("test1", Some(ts), &target);
+    tui.clear(&target);
+    tui.add_nick("test2", Some(ts), &target);
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|                                        |
+         |                                        |
+         |00:00               +test2              |
+         |osa1:                                   |
+         |mentions irc.server_1.org #chan         |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
 }
