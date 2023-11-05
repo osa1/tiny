@@ -13,22 +13,25 @@ use crate::msg_area::{Layout, MsgArea};
 use crate::trie::Trie;
 use crate::widget::WidgetRet;
 
-/// A messaging screen is just a text field to type messages and msg area to
-/// show incoming/sent messages.
+/// An input field and an area for showing messages and activities of a tab (channel, server,
+/// mentions tab).
 pub(crate) struct MessagingUI {
-    /// Incoming and sent messages appear
+    /// The area showing the messages and activities.
     msg_area: MsgArea,
 
-    // exit_dialogue handles input when available.
-    // two fields (instead of an enum etc.) to avoid borrowchk problems
+    /// The input field. `exit_dialogue` handles the input when available.
+    // Two fields (instead of an enum) to avoid borrowchk problems.
     input_field: InputArea,
+
     exit_dialogue: Option<ExitDialogue>,
 
+    /// Width of the UI, in characters.
     width: i32,
+
+    /// Height of the UI, in lines.
     height: i32,
 
-    // All nicks in the channel. Need to keep this up-to-date to be able to
-    // properly highlight mentions.
+    /// All nicks in the channel. Used in autocompletion.
     nicks: Trie,
 
     /// The last line in `msg_area` that shows join, leave, disconnect activities.
