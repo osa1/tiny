@@ -425,8 +425,8 @@ impl MessagingUI {
     }
 
     fn get_activity_line_idx(&mut self, ts: Timestamp) -> usize {
-        match self.last_activity_line {
-            Some(ref l) if l.ts == ts => {
+        match &self.last_activity_line {
+            Some(l) if l.ts == ts => {
                 let line_idx = l.line_idx;
                 // FIXME: It's a bit hacky to add a space in this function which from the name
                 // looks like a getter.
