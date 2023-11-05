@@ -85,7 +85,7 @@ fn test_mnemonic_generation() {
 }
 
 #[test]
-fn test_activity_timestamp() {
+fn test_compact_layout_activity_timestamp() {
     // Test all combinations of
     //
     // 1.1 Message followed by activity
