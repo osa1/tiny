@@ -32,7 +32,9 @@ pub(crate) struct MessagingUI {
     nicks: Trie,
 
     last_activity_line: Option<ActivityLine>,
-    last_activity_ts: Option<Timestamp>,
+
+    /// Last timestamp added to the UI.
+    last_ts: Option<Timestamp>,
 }
 
 /// Length of ": " suffix of nicks in messages
@@ -94,7 +96,7 @@ impl MessagingUI {
             height,
             nicks: Trie::new(),
             last_activity_line: None,
-            last_activity_ts: None,
+            last_ts: None,
         }
     }
 
@@ -236,7 +238,7 @@ impl MessagingUI {
     /// Add a new line with the given timestamp (`ts`) if we don't already have a line for the
     /// timestamp already.
     fn add_timestamp(&mut self, ts: Timestamp) {
-        if let Some(ts_) = self.last_activity_ts {
+        if let Some(ts_) = self.last_ts {
             if ts_ != ts {
                 self.msg_area.add_text(&ts.stamp(), SegStyle::Timestamp);
             } else if self.msg_area.layout().is_aligned() {
@@ -246,7 +248,7 @@ impl MessagingUI {
         } else {
             self.msg_area.add_text(&ts.stamp(), SegStyle::Timestamp);
         }
-        self.last_activity_ts = Some(ts);
+        self.last_ts = Some(ts);
     }
 
     pub(crate) fn show_topic(&mut self, topic: &str, ts: Timestamp) {
