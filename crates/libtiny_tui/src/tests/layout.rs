@@ -84,9 +84,9 @@ fn test_mnemonic_generation() {
     assert_eq!(tabs[8].switch, Some('b'));
 }
 
-fn setup_tui() -> (TUI, MsgTarget<'static>) {
+fn setup_tui(layout: Layout) -> (TUI, MsgTarget<'static>) {
     let mut tui = TUI::new_test(40, 5);
-    tui.set_layout(Layout::Aligned { max_nick_len: 12 });
+    tui.set_layout(layout);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
     tui.new_server_tab(serv, None);
@@ -109,6 +109,14 @@ fn setup_tui() -> (TUI, MsgTarget<'static>) {
     (tui, MsgTarget::Chan { serv, chan })
 }
 
+fn setup_aligned_tui() -> (TUI, MsgTarget<'static>) {
+    setup_tui(Layout::Aligned { max_nick_len: 12 })
+}
+
+fn setup_compact_tui() -> (TUI, MsgTarget<'static>) {
+    setup_tui(Layout::Compact)
+}
+
 // Test all combinations of
 //
 // 1.1 Message followed by activity
@@ -123,10 +131,10 @@ fn setup_tui() -> (TUI, MsgTarget<'static>) {
 //
 // In total 8 scenarios.
 #[test]
-fn test_compact_layout_activity_timestamp() {
+fn test_aligned_layout_activity_timestamp() {
     // 1.1 - 2.1
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_privmsg(
             "osa1", "hi", ts, &target, false, // highlight
@@ -148,7 +156,7 @@ fn test_compact_layout_activity_timestamp() {
 
     // 1.1 - 2.2
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_privmsg(
             "osa1", "hi", ts, &target, false, // highlight
@@ -171,7 +179,7 @@ fn test_compact_layout_activity_timestamp() {
 
     // 1.2 - 2.1
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_privmsg(
             "osa1", "hi", ts, &target, false, // highlight
@@ -193,7 +201,7 @@ fn test_compact_layout_activity_timestamp() {
 
     // 1.2 - 2.2
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_privmsg(
             "osa1", "hi", ts, &target, false, // highlight
@@ -216,7 +224,7 @@ fn test_compact_layout_activity_timestamp() {
 
     // 1.3 - 2.1
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_nick("test", Some(ts), &target);
         tui.add_privmsg(
@@ -238,7 +246,7 @@ fn test_compact_layout_activity_timestamp() {
 
     // 1.3 - 2.2
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_nick("test", Some(ts), &target);
         let ts = time::at_utc(time::Timespec::new(60, 0));
@@ -261,7 +269,7 @@ fn test_compact_layout_activity_timestamp() {
 
     // 1.4 - 2.1
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_nick("test1", Some(ts), &target);
         tui.add_nick("test2", Some(ts), &target);
@@ -280,7 +288,7 @@ fn test_compact_layout_activity_timestamp() {
 
     // 1.4 - 2.2
     {
-        let (mut tui, target) = setup_tui();
+        let (mut tui, target) = setup_aligned_tui();
         let ts = time::at_utc(time::Timespec::new(0, 0));
         tui.add_nick("test1", Some(ts), &target);
         let ts = time::at_utc(time::Timespec::new(60, 0));
@@ -299,10 +307,188 @@ fn test_compact_layout_activity_timestamp() {
     }
 }
 
+// Same as `test_compact_layout_activity_timestamp`, but tests compact layout.
+#[test]
+fn test_compact_layout_activity_timestamp() {
+    // 1.1 - 2.1
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_privmsg(
+            "osa1", "hi", ts, &target, false, // highlight
+            false, // is_action
+        );
+        tui.add_nick("test", Some(ts), &target);
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |00:00 osa1: hi                          |
+             |+test                                   |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+
+    // 1.1 - 2.2
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_privmsg(
+            "osa1", "hi", ts, &target, false, // highlight
+            false, // is_action
+        );
+        let ts = time::at_utc(time::Timespec::new(60, 0));
+        tui.add_nick("test", Some(ts), &target);
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |00:00 osa1: hi                          |
+             |00:01 +test                             |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+
+    // 1.2 - 2.1
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_privmsg(
+            "osa1", "hi", ts, &target, false, // highlight
+            false, // is_action
+        );
+        tui.add_privmsg("osa1", "test", ts, &target, false, false);
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |00:00 osa1: hi                          |
+             |osa1: test                              |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+
+    // 1.2 - 2.2
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_privmsg(
+            "osa1", "hi", ts, &target, false, // highlight
+            false, // is_action
+        );
+        let ts = time::at_utc(time::Timespec::new(60, 0));
+        tui.add_privmsg("osa1", "test", ts, &target, false, false);
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |00:00 osa1: hi                          |
+             |00:01 osa1: test                        |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+
+    // 1.3 - 2.1
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_nick("test", Some(ts), &target);
+        tui.add_privmsg(
+            "osa1", "hi", ts, &target, false, // highlight
+            false, // is_action
+        );
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |00:00 +test                             |
+             |osa1: hi                                |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+
+    // 1.3 - 2.2
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_nick("test", Some(ts), &target);
+        let ts = time::at_utc(time::Timespec::new(60, 0));
+        tui.add_privmsg(
+            "osa1", "hi", ts, &target, false, // highlight
+            false, // is_action
+        );
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |00:00 +test                             |
+             |00:01 osa1: hi                          |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+
+    // 1.4 - 2.1
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_nick("test1", Some(ts), &target);
+        tui.add_nick("test2", Some(ts), &target);
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |                                        |
+             |00:00 +test1 +test2                     |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+
+    // 1.4 - 2.2
+    {
+        let (mut tui, target) = setup_compact_tui();
+        let ts = time::at_utc(time::Timespec::new(0, 0));
+        tui.add_nick("test1", Some(ts), &target);
+        let ts = time::at_utc(time::Timespec::new(60, 0));
+        tui.add_nick("test2", Some(ts), &target);
+        tui.draw();
+
+        #[rustfmt::skip]
+        let screen =
+            "|                                        |
+             |00:00 +test1                            |
+             |00:01 +test2                            |
+             |osa1:                                   |
+             |mentions irc.server_1.org #chan         |";
+
+        expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    }
+}
+
 // Test that a timestamp is printed after a `clear`.
 #[test]
 fn test_clear_timestamp() {
-    let (mut tui, target) = setup_tui();
+    let (mut tui, target) = setup_aligned_tui();
 
     let ts = time::at_utc(time::Timespec::new(0, 0));
     tui.add_nick("test1", Some(ts), &target);
