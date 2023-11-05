@@ -73,11 +73,12 @@ impl From<Tm> for Timestamp {
     }
 }
 
-/// An activity line is just a line that we update on joins / leaves /
-/// disconnects. We group activities that happen in the same minute to avoid
-/// redundantly showing lines.
+/// A line showing joins, leaves, and disconnects.
 struct ActivityLine {
+    /// Timestamp of the line.
     ts: Timestamp,
+
+    /// Index of the line in its `MsgArea`.
     line_idx: usize,
 }
 
