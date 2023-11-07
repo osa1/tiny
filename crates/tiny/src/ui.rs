@@ -1,6 +1,6 @@
 //! UI event handling
 
-use crate::cmd::{parse_cmd, CmdArgs, ParseCmdResult};
+use crate::cmd::run_cmd;
 use crate::config;
 use libtiny_client::Client;
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
@@ -124,54 +124,23 @@ fn handle_input_ev(
                 client.quit(msg.clone());
             }
         }
+
         Msg { msg, source } => {
             send_msg(ui, clients, &source, msg, false);
         }
+
         Lines { lines, source } => {
             for line in lines.into_iter() {
                 send_msg(ui, clients, &source, line, false)
             }
         }
-        Cmd { cmd, source } => handle_cmd(defaults, ui, clients, source, &cmd),
-    }
-}
 
-fn handle_cmd(
-    defaults: &config::Defaults,
-    ui: &UI,
-    clients: &mut Vec<Client>,
-    src: MsgSource,
-    cmd: &str,
-) {
-    match parse_cmd(cmd) {
-        ParseCmdResult::Ok { cmd, rest } => {
-            let cmd_args = CmdArgs {
-                args: rest,
-                defaults,
-                ui,
-                clients,
-                src,
-            };
-            (cmd.cmd_fn)(cmd_args);
+        Cmd { cmd, source } => {
+            run_cmd(&cmd, source, defaults, ui, clients);
         }
-        // ParseCmdResult::Ambiguous(vec) => {
-        //     self.ui.add_client_err_msg(
-        //         &format!("Unsupported command: \"/{}\"", msg),
-        //         &MsgTarget::CurrentTab,
-        //     );
-        //     self.ui.add_client_err_msg(
-        //         &format!("Did you mean one of {:?} ?", vec),
-        //         &MsgTarget::CurrentTab,
-        //     );
-        // },
-        ParseCmdResult::Unknown => ui.add_client_err_msg(
-            &format!("Unsupported command: \"/{}\"", cmd),
-            &MsgTarget::CurrentTab,
-        ),
     }
 }
 
-// TODO: move this somewhere else
 pub(crate) fn send_msg(
     ui: &UI,
     clients: &mut Vec<Client>,
@@ -194,24 +163,19 @@ pub(crate) fn send_msg(
         return;
     }
 
+    // We only remove a client when its server tab is closed (which also closes its channel tabs),
+    // so if a tab exists its client must also be available.
     let client = clients
         .iter_mut()
         .find(|client| client.get_serv_name() == src.serv_name())
         .unwrap();
 
-    // TODO: For errors:
-    //
-    // ui.add_client_err_msg(
-    //     &format!("Can't find server: {}", serv),
-    //     &MsgTarget::CurrentTab,
-    // );
-
-    // `ui_target`: Where to show the message on ui
-    // `msg_target`: Actual PRIVMSG target to send to the server
+    // `ui_target`: Where to show the message on ui.
+    // `msg_target`: Actual PRIVMSG target to send to the server.
     let (ui_target, msg_target): (MsgTarget, &str) = {
         match src {
             MsgSource::Serv { .. } => {
-                // we don't split raw messages to 512-bytes long chunks
+                // We don't split raw messages to 512-bytes long chunks.
                 client.raw_msg(&msg);
                 return;
             }

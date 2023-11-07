@@ -8,75 +8,77 @@ use libtiny_tui::config::Chan;
 use std::borrow::Borrow;
 use std::str::FromStr;
 
-pub(crate) struct CmdArgs<'a> {
-    pub args: &'a str,
-    pub defaults: &'a Defaults,
-    pub ui: &'a UI,
-    pub clients: &'a mut Vec<Client>,
-    pub src: MsgSource,
-}
-
-pub(crate) struct Cmd {
-    /// Command name. E.g. if this is `"cmd"`, `/cmd ...` will call this command.
-    pub(crate) name: &'static str,
-    /// Command function.
-    pub(crate) cmd_fn: fn(CmdArgs),
-    /// Command description
-    description: &'static str,
-    /// Command usage
-    usage: &'static str,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) enum ParseCmdResult<'a> {
-    /// Command name parsing successful
-    Ok {
-        cmd: &'static Cmd,
-
-        /// Rest of the command after extracting command name
-        rest: &'a str,
-    },
-
-    // Command name is ambiguous, here are possible values
-    // Ambiguous(Vec<&'static str>),
-    /// Unknown command
-    Unknown,
-}
-
-pub(crate) fn parse_cmd(cmd: &str) -> ParseCmdResult {
-    match cmd.split_whitespace().next() {
-        None => ParseCmdResult::Unknown,
-        Some(cmd_name) => {
-            let mut ws_idxs = utils::split_whitespace_indices(cmd);
-            ws_idxs.next(); // cmd_name
-            let rest = {
-                match ws_idxs.next() {
-                    None => "",
-                    Some(rest_idx) => &cmd[rest_idx..],
-                }
+pub(crate) fn run_cmd(
+    cmd: &str,
+    src: MsgSource,
+    defaults: &Defaults,
+    ui: &UI,
+    clients: &mut Vec<Client>,
+) {
+    match parse_cmd(cmd) {
+        Some(ParsedCmd { cmd, args }) => {
+            let cmd_args = CmdArgs {
+                args,
+                defaults,
+                ui,
+                clients,
+                src,
             };
-            // let mut possibilities: Vec<&'static Cmd> = vec![];
-            for cmd in &CMDS {
-                if cmd_name == cmd.name {
-                    // exact match, return
-                    return ParseCmdResult::Ok { cmd, rest };
-                }
-            }
-            ParseCmdResult::Unknown
-            // match possibilities.len() {
-            //     0 =>
-            //         ParseCmdResult::Unknown,
-            //     1 =>
-            //         ParseCmdResult::Ok {
-            //             cmd: possibilities[0],
-            //             rest,
-            //         },
-            //     _ =>
-            //         ParseCmdResult::Ambiguous(possibilities.into_iter().map(|cmd| cmd.name).collect()),
-            // }
+            (cmd.cmd_fn)(cmd_args);
+        }
+
+        None => {
+            ui.add_client_err_msg(
+                &format!("Unsupported command: \"/{}\"", cmd),
+                &MsgTarget::CurrentTab,
+            );
         }
     }
+}
+
+struct ParsedCmd<'a> {
+    cmd: &'static Cmd,
+
+    /// Rest of the command after extracting command name.
+    args: &'a str,
+}
+
+fn parse_cmd(cmd: &str) -> Option<ParsedCmd> {
+    let cmd_name = cmd.split_whitespace().next()?;
+    let mut ws_idxs = utils::split_whitespace_indices(cmd);
+    ws_idxs.next(); // cmd_name
+    let rest = match ws_idxs.next() {
+        None => "",
+        Some(rest_idx) => &cmd[rest_idx..],
+    };
+    for cmd in &CMDS {
+        if cmd_name == cmd.name {
+            return Some(ParsedCmd { cmd, args: rest });
+        }
+    }
+    None
+}
+
+struct CmdArgs<'a> {
+    args: &'a str,
+    defaults: &'a Defaults,
+    ui: &'a UI,
+    clients: &'a mut Vec<Client>,
+    src: MsgSource,
+}
+
+struct Cmd {
+    /// Command name. If this is `"cmd"`, `/cmd ...` will call this command.
+    name: &'static str,
+
+    /// Command function.
+    cmd_fn: fn(CmdArgs),
+
+    /// Command description. Shown in `/help` and error messages.
+    description: &'static str,
+
+    /// Command usage. Shown in `/help` and error messages.
+    usage: &'static str,
 }
 
 fn find_client_idx(clients: &[Client], serv_name: &str) -> Option<usize> {
@@ -573,27 +575,13 @@ fn help(args: CmdArgs) {
 
 #[test]
 fn test_parse_cmd() {
-    let ret = parse_cmd("msg NickServ identify notMyPassword");
-    match ret {
-        ParseCmdResult::Ok { cmd, rest } => {
-            assert_eq!(cmd.name, "msg");
-            assert_eq!(rest, "NickServ identify notMyPassword");
-        }
-        _ => {
-            panic!("Can't parse cmd");
-        }
-    }
+    let ParsedCmd { cmd, args } = parse_cmd("msg NickServ identify notMyPassword").unwrap();
+    assert_eq!(cmd.name, "msg");
+    assert_eq!(args, "NickServ identify notMyPassword");
 
-    let ret = parse_cmd("join #foo");
-    match ret {
-        ParseCmdResult::Ok { cmd, rest } => {
-            assert_eq!(cmd.name, "join");
-            assert_eq!(rest, "#foo");
-        }
-        _ => {
-            panic!("Can't parse cmd");
-        }
-    }
+    let ParsedCmd { cmd, args } = parse_cmd("join #foo").unwrap();
+    assert_eq!(cmd.name, "join");
+    assert_eq!(args, "#foo");
 }
 
 #[test]
