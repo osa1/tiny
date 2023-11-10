@@ -133,7 +133,7 @@ this config:
 
 ```yaml
 servers:
-    - addr: chat.freenode.net
+    - addr: irc.libera.chat
       ...
 
     - addr: irc.gnome.org
@@ -141,7 +141,7 @@ servers:
 ```
 
 By default tiny connects to both servers. You can connect to only the first
-server by passing `freenode` as a command line argument.
+server by passing `libera` as a command line argument.
 
 You can use `--config <path>` to specify your config file location.
 
