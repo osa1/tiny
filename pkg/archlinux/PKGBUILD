@@ -8,7 +8,7 @@ arch=('x86_64')
 provides=('tiny')
 url="https://github.com/osa1/tiny"
 license=('MIT')
-depends=('openssl' 'dbus')
+depends=('openssl' 'openssl-1.1' 'dbus')
 makedepends=('git' 'rust' 'cargo')
 source=("git+$url#commit=5e5c90c8f6b85b5ba38c974ed8113beef0e916ed") # tag: v0.9.0
 sha512sums=(SKIP)
