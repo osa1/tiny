@@ -3,7 +3,7 @@
 # Contributor: Nick Econopouly <wry at mm dot st>
 
 pkgname=tiny-irc-client-git
-pkgver=0.10.0
+pkgver=0.11.0.r18.e125c77
 pkgrel=1
 pkgdesc='A terminal IRC client written in Rust'
 arch=(x86_64)
