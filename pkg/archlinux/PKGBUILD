@@ -1,25 +1,27 @@
-# Maintainer: Eduardo Flores <edfloreshz@gmail.com>
-
+# Maintainer: Nick Econopouly <wry at mm dot st>
 pkgname=tiny-irc-client-git
-pkgver="0.9.0"
+pkgver="0.10.0"
 pkgrel=1
-pkgdesc="A console IRC client written in Rust"
+pkgdesc="A console IRC client"
 arch=('x86_64')
-provides=('tiny')
+provides=('tiny-irc-client')
+conflicts=('tiny-irc-client')
 url="https://github.com/osa1/tiny"
 license=('MIT')
 depends=('openssl' 'dbus')
-makedepends=('git' 'rust' 'cargo')
-source=("git+$url#commit=5e5c90c8f6b85b5ba38c974ed8113beef0e916ed") # tag: v0.9.0
+makedepends=('git' 'rust')
+source=(git+$url)
 sha512sums=(SKIP)
 
 build() {
-          cargo build \
-            --manifest-path "$srcdir/tiny/Cargo.toml" \
-            --release
+
+    # build tiny
+    cd tiny
+    cargo install --path crates/tiny --features=desktop-notifications
 }
 
 package() {
-          install -Dm755 tiny/target/release/tiny "$pkgdir/usr/bin/tiny"
-          install -Dm644 tiny/LICENSE "$pkgdir/usr/share/licenses/tiny/LICENSE"
+    cd tiny
+    install -Dm755 target/release/tiny "$pkgdir/usr/bin/tiny"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/tiny/LICENSE"
 }
