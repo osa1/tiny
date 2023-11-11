@@ -1,4 +1,7 @@
-# Maintainer: Nick Econopouly <wry at mm dot st>
+# Maintainer: Jonathan Kirszling <jonathan.kirszling at runbox dot com>
+# Maintainer: Ralph Torres <mail at ralphptorr dot es>
+# Contributor: Nick Econopouly <wry at mm dot st>
+
 pkgname=tiny-irc-client-git
 pkgver="0.10.0"
 pkgrel=1
