@@ -28,4 +28,9 @@ package() {
     cd $_pkgname
     install -Dm755 target/release/$_pkgname "$pkgdir"/usr/bin/$_pkgname
     install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$_pkgname/LICENSE
+    install -Dm644 crates/$_pkgname/config.yml \
+        "$pkgdir"/usr/share/$_pkgname/config.yml
+    mkdir -p "$pkgdir"/usr/share/doc/$_pkgname
+    install -Dm644 ARCHITECTURE.md CHANGELOG.md README.md \
+        "$pkgdir"/usr/share/doc/$_pkgname
 }
