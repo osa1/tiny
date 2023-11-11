@@ -19,6 +19,12 @@ sha512sums=(SKIP)
 
 _pkgname=${pkgname%-irc-client-git}
 
+pkgver() {
+    cd $_pkgname
+    git describe --tags --long | \
+        sed -e 's/\([^-]*-\)g/r\1/' -e 's/-/./g' -e 's/^v//'
+}
+
 build() {
     cd $_pkgname
     cargo install --path crates/$_pkgname --features=desktop-notifications
