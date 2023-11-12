@@ -130,13 +130,13 @@ jobs:
             target: x86_64-unknown-linux-musl
             override: true
 
-      - name: Make statically linked executable
+      - name: '[Linux] Make statically linked executable'
         run: |
           RUST_BACKTRACE=1 \
             cargo build --release --verbose --target=x86_64-unknown-linux-musl
 
   Linux_static_build_desktop_notifications:
-    name: Make statically linked executable (desktop notifications)
+    name: '[Linux] Make statically linked executable (desktop notifications)'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
