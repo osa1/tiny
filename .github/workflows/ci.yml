@@ -123,6 +123,13 @@ jobs:
             sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
                 musl musl-dev musl-tools
 
+      - name: Get stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            target: x86_64-unknown-linux-musl
+            override: true
+
       - name: Make statically linked executable
         run: |
           RUST_BACKTRACE=1 \
@@ -139,6 +146,13 @@ jobs:
             sudo apt-get update
             sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
                 musl musl-dev musl-tools
+
+      - name: Get stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            target: x86_64-unknown-linux-musl
+            override: true
 
       - name: Make statically linked executable
         run: |
