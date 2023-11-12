@@ -109,3 +109,39 @@ jobs:
         run: |
           cargo test --no-default-features \
             --features "tls-native desktop-notifications"
+
+  # Updating dependencies can break the static build.
+  Linux_static_build_default:
+    name: Make statically linked executable (default)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install native dependencies
+        run: |
+            sudo apt-get update
+            sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
+                musl musl-dev musl-tools
+
+      - name: Make statically linked executable
+        run: |
+          RUST_BACKTRACE=1 \
+            cargo build --release --verbose --target=x86_64-unknown-linux-musl
+
+  Linux_static_build_desktop_notifications:
+    name: Make statically linked executable (desktop notifications)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install native dependencies
+        run: |
+            sudo apt-get update
+            sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
+                musl musl-dev musl-tools
+
+      - name: Make statically linked executable
+        run: |
+          RUST_BACKTRACE=1 \
+            cargo build --release --verbose --target=x86_64-unknown-linux-musl \
+              --features=desktop-notifications
