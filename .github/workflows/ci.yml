@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   Check_formatting:
     name: 'Check formatting'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
 
@@ -21,7 +21,7 @@ jobs:
 
   Linux_default:
     name: '[Linux, default] Build and test'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
 
@@ -42,7 +42,7 @@ jobs:
 
   Linux_native_tls_notif:
     name: '[Linux, native TLS + notifications] Build and test'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
 
