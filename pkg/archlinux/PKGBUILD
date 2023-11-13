@@ -10,8 +10,8 @@ arch=(x86_64)
 url=https://github.com/osa1/tiny
 license=(MIT)
 
-depends=(openssl dbus)
-makedepends=(git rust)
+depends=(dbus)
+makedepends=(git cargo)
 provides=(${pkgname%-git})
 conflicts=(${pkgname%-git})
 source=(git+$url)
