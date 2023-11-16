@@ -1,25 +1,42 @@
-# Maintainer: Eduardo Flores <edfloreshz@gmail.com>
+# Maintainer: Jonathan Kirszling <jonathan.kirszling at runbox dot com>
+# Maintainer: Ralph Torres <mail at ralphptorr dot es>
+# Contributor: Nick Econopouly <wry at mm dot st>
 
 pkgname=tiny-irc-client-git
-pkgver="0.9.0"
+pkgver=0.11.0.r18.e125c77
 pkgrel=1
-pkgdesc="A console IRC client written in Rust"
-arch=('x86_64')
-provides=('tiny')
-url="https://github.com/osa1/tiny"
-license=('MIT')
-depends=('openssl' 'dbus')
-makedepends=('git' 'rust' 'cargo')
-source=("git+$url#commit=5e5c90c8f6b85b5ba38c974ed8113beef0e916ed") # tag: v0.9.0
+pkgdesc='A terminal IRC client written in Rust'
+arch=(x86_64)
+url=https://github.com/osa1/tiny
+license=(MIT)
+
+depends=(dbus)
+makedepends=(git cargo)
+provides=(${pkgname%-git})
+conflicts=(${pkgname%-git})
+source=(git+$url)
 sha512sums=(SKIP)
 
+_pkgname=${pkgname%-irc-client-git}
+
+pkgver() {
+    cd $_pkgname
+    git describe --tags --long | \
+        sed -e 's/\([^-]*-\)g/r\1/' -e 's/-/./g' -e 's/^v//'
+}
+
 build() {
-          cargo build \
-            --manifest-path "$srcdir/tiny/Cargo.toml" \
-            --release
+    cd $_pkgname
+    cargo install --path crates/$_pkgname --features=desktop-notifications
 }
 
 package() {
-          install -Dm755 tiny/target/release/tiny "$pkgdir/usr/bin/tiny"
-          install -Dm644 tiny/LICENSE "$pkgdir/usr/share/licenses/tiny/LICENSE"
+    cd $_pkgname
+    install -Dm755 target/release/$_pkgname "$pkgdir"/usr/bin/$_pkgname
+    install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$_pkgname/LICENSE
+    install -Dm644 crates/$_pkgname/config.yml \
+        "$pkgdir"/usr/share/$_pkgname/config.yml
+    mkdir -p "$pkgdir"/usr/share/doc/$_pkgname
+    install -Dm644 ARCHITECTURE.md CHANGELOG.md README.md \
+        "$pkgdir"/usr/share/doc/$_pkgname
 }
