@@ -80,9 +80,11 @@ cargo install --git https://github.com/osa1/tiny
 If you have an older version installed, add `--force` to the command you're
 using.
 
-Arch Linux users can install tiny from [AUR].
+Arch Linux users can install the latest [stable] and [development] versions
+of tiny through the AUR.
 
-[AUR]: https://aur.archlinux.org/packages/tiny-irc-client-git/
+[stable]: https://aur.archlinux.org/packages/tiny/
+[development]: https://aur.archlinux.org/packages/tiny-git/
 
 tiny is tested on Linux and OSX.
 
