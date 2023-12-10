@@ -1,24 +1,24 @@
-# Maintainer: Jonathan Kirszling <jonathan.kirszling at runbox dot com>
 # Maintainer: Ralph Torres <mail at ralphptorr dot es>
+# Contributor: Jonathan Kirszling <jonathan dot kirszling at runbox dot com>
 # Contributor: Nick Econopouly <wry at mm dot st>
 
-pkgname=tiny-irc-client-git
-pkgver=0.11.0.r18.e125c77
-pkgrel=1
+_pkgname=tiny
+pkgname=$_pkgname-git
+pkgver=0.11.0.r21.65f367e
+pkgrel=2
 pkgdesc='A terminal IRC client written in Rust'
 arch=(x86_64)
 url=https://github.com/osa1/tiny
 license=(MIT)
 
+provides=($_pkgname)
+conflicts=($_pkgname)
+replaces=(tiny-irc-client-git)
 depends=(dbus)
 makedepends=(git cargo)
-provides=(${pkgname%-git})
-conflicts=(${pkgname%-git})
 source=(git+$url)
 sha512sums=(SKIP)
 options=(!lto)
-
-_pkgname=${pkgname%-irc-client-git}
 
 pkgver() {
     cd "$srcdir"/$_pkgname
