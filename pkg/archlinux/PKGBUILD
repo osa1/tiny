@@ -20,23 +20,32 @@ sha512sums=(SKIP)
 _pkgname=${pkgname%-irc-client-git}
 
 pkgver() {
-    cd $_pkgname
-    git describe --tags --long | \
-        sed -e 's/\([^-]*-\)g/r\1/' -e 's/-/./g' -e 's/^v//'
+    cd "$srcdir"/$_pkgname
+    git describe --tags --long --abbrev=7 |\
+        sed 's/\([^-]*-\)g/r\1/;s/-/./g;s/^v//'
+}
+
+prepare() {
+    cd "$srcdir"/$_pkgname
+    cargo update
+    cargo fetch --locked --target $CARCH-unknown-linux-gnu
 }
 
 build() {
-    cd $_pkgname
-    cargo install --path crates/$_pkgname --features=desktop-notifications
+    cd "$srcdir"/$_pkgname
+    cargo build --frozen --release --features desktop-notifications
+}
+
+check() {
+    cd "$srcdir"/$_pkgname
+    cargo test --frozen --workspace --features desktop-notifications
 }
 
 package() {
-    cd $_pkgname
-    install -Dm755 target/release/$_pkgname "$pkgdir"/usr/bin/$_pkgname
-    install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$_pkgname/LICENSE
-    install -Dm644 crates/$_pkgname/config.yml \
-        "$pkgdir"/usr/share/$_pkgname/config.yml
-    mkdir -p "$pkgdir"/usr/share/doc/$_pkgname
-    install -Dm644 ARCHITECTURE.md CHANGELOG.md README.md \
-        "$pkgdir"/usr/share/doc/$_pkgname
+    cd "$srcdir"/$_pkgname
+    install -Dm755 -t "$pkgdir"/usr/bin target/release/$_pkgname
+    install -Dm644 -t "$pkgdir"/usr/share/licenses/$_pkgname LICENSE
+    install -Dm644 -t "$pkgdir"/usr/share/doc/$_pkgname \
+        ARCHITECTURE.md CHANGELOG.md README.md
+    install -Dm644 -t "$pkgdir"/usr/share/$_pkgname crates/$_pkgname/config.yml
 }
