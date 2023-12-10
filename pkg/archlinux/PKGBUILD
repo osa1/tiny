@@ -16,6 +16,7 @@ provides=(${pkgname%-git})
 conflicts=(${pkgname%-git})
 source=(git+$url)
 sha512sums=(SKIP)
+options=(!lto)
 
 _pkgname=${pkgname%-irc-client-git}
 
