@@ -14,10 +14,10 @@ Thanks to @nate-sys and @jubalh for contributing to this release.
   (#403, #410)
 - Default config updated with better comments, color config for join/part
   messages. (#412)
-- `/join` command errors now print usage help once instead of twice.
+- `/join` command errors now print usage help once instead of twice. (c512887)
 - Fix showing timestamp of the next message or activity after a `/clear`.
   (#417)
-- Fix a crash when the config file is deleted before a `/reload`.
+- Fix a crash when the config file is deleted before a `/reload`. (3ea5678)
 
 # 2023/07/16: 0.11.0
 
