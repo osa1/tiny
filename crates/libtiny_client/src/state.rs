@@ -1,4 +1,4 @@
-#![allow(clippy::zero_prefixed_literal)]
+#![allow(clippy::get_first, clippy::zero_prefixed_literal)]
 
 use crate::{utils, SASLAuth};
 use crate::{Cmd, Event, ServerInfo};
