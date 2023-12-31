@@ -5,8 +5,6 @@ use libtiny_common::{ChanName, ChanNameRef};
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -510,12 +508,14 @@ impl<'de> Deserialize<'de> for Style {
 }
 
 pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
-    let contents = {
-        let mut str = String::new();
-        let mut file = File::open(config_path).unwrap();
-        file.read_to_string(&mut str).unwrap();
-        str
-    };
-
+    // tiny creates a config file with the defaults when it can't find one, but the config file can
+    // be deleted before a `/reload`.
+    let contents = std::fs::read_to_string(config_path).map_err(|err| {
+        de::Error::custom(format!(
+            "Can't read config file '{}': {}",
+            config_path.to_string_lossy(),
+            err
+        ))
+    })?;
     serde_yaml::from_str(&contents)
 }

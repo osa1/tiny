@@ -17,6 +17,7 @@ Thanks to @nate-sys and @jubalh for contributing to this release.
 - `/join` command errors now print usage help once instead of twice.
 - Fix showing timestamp of the next message or activity after a `/clear`.
   (#417)
+- Fix a crash when the config file is deleted before a `/reload`.
 
 # 2023/07/16: 0.11.0
 

@@ -344,7 +344,7 @@ impl TUI {
             match parse_config(config_path) {
                 Err(err) => {
                     self.add_client_err_msg(
-                        &format!("Can't parse TUI config: {:?}", err),
+                        &format!("Can't parse TUI config: {}", err),
                         &MsgTarget::CurrentTab,
                     );
                     None
