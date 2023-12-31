@@ -6,7 +6,6 @@ use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
 use libtiny_tui::config::Chan;
 
 use std::borrow::Borrow;
-use std::str::FromStr;
 
 pub(crate) fn run_cmd(
     cmd: &str,
@@ -320,7 +319,7 @@ fn join(args: CmdArgs) {
     let chans = args
         .split(',')
         .map(str::trim)
-        .filter_map(|c| match Chan::from_str(c) {
+        .filter_map(|c| match Chan::from_cmd_args(c) {
             Ok(c) => Some(c),
             Err(err) => {
                 ui.add_client_err_msg(&err, &MsgTarget::CurrentTab);
