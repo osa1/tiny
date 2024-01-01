@@ -1,6 +1,8 @@
-# Unreleased
+# 2024/01/01: 0.12.0
 
 Thanks to @nate-sys and @jubalh for contributing to this release.
+
+## New features
 
 - New TUI text attributes `italic` and `strikethrough` added to the config file
   parser. These can be combined with the existing `bold` and `underline`
@@ -12,6 +14,9 @@ Thanks to @nate-sys and @jubalh for contributing to this release.
       command: quit
   ```
   (#403, #410)
+
+## Bug fixes and other improvements
+
 - Default config updated with better comments, color config for join/part
   messages. (#412)
 - `/join` command errors now print usage help once instead of twice. (c512887)
