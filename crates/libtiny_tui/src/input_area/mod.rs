@@ -712,7 +712,7 @@ impl InputArea {
 }
 
 impl InputArea {
-    pub(crate) fn autocomplete(&mut self, dict: &Trie) {
+    pub(crate) fn autocomplete(&mut self, dict: &Trie, completion_char: &Option<String>) {
         if self.in_autocomplete() {
             // scroll next if you hit the KeyAction::InputAutoComplete key again
             self.completion_prev_entry();
@@ -746,7 +746,17 @@ impl InputArea {
                 }
             };
 
-            dict.drop_pfx(&mut word.iter().cloned())
+            let mut completions = dict.drop_pfx(&mut word.iter().cloned());
+
+            if let Some(completion_suffix) = &completion_char {
+                if cursor_left == 0 {
+                    for completion in completions.iter_mut() {
+                        completion.push_str(&format!("{} ", completion_suffix));
+                    }
+                }
+            }
+
+            completions
         };
 
         if !completions.is_empty() {
