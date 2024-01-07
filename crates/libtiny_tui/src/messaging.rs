@@ -169,7 +169,8 @@ impl MessagingUI {
             }
             KeyAction::InputAutoComplete => {
                 if self.exit_dialogue.is_none() {
-                    self.input_field.autocomplete(&self.nicks, &self.completion_char);
+                    self.input_field
+                        .autocomplete(&self.nicks, &self.completion_char);
                 }
                 WidgetRet::KeyHandled
             }

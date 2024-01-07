@@ -403,7 +403,8 @@ impl TUI {
     fn set_completion_char(&mut self, completion_char: Option<String>) {
         self.completion_char = completion_char;
         for tab in &mut self.tabs {
-            tab.widget.set_completion_char((&self.completion_char).clone());
+            tab.widget
+                .set_completion_char((&self.completion_char).clone());
         }
     }
 
