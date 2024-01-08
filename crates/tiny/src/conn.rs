@@ -173,6 +173,18 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 User { ref nick, .. } | Ambiguous(ref nick) => nick,
             };
 
+            let sender_hostmask = match pfx {
+                User { ref user, .. } => Some(user),
+                _ => None,
+            };
+
+            if let Some(sender_hostmask_str) = sender_hostmask {
+                if ui.check_blocked(sender_hostmask_str) {
+                    // Blocked
+                    return;
+                }
+            }
+
             if ctcp == Some(wire::CTCP::Version) {
                 let msg_target = if ui.user_tab_exists(serv, sender) {
                     MsgTarget::User { serv, nick: sender }

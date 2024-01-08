@@ -31,6 +31,9 @@ pub(crate) struct Config {
 
     #[serde(default)]
     pub(crate) key_map: Option<KeyMap>,
+
+    #[serde(default)]
+    pub(crate) blocked_users: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
