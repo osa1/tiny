@@ -460,7 +460,6 @@ impl TUI {
                     self.height - 1,
                     self.scrollback,
                     self.msg_layout,
-                    self.completion_char.clone(),
                 ),
                 src,
                 style: TabStyle::Normal,

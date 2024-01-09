@@ -39,9 +39,6 @@ pub(crate) struct MessagingUI {
 
     /// Last timestamp added to the UI.
     last_ts: Option<Timestamp>,
-
-    // Autocompletion character to be used when at the start of the line. Set with `set_completion_char`.
-    completion_char: Option<String>,
 }
 
 /// Length of ": " suffix of nicks in messages
@@ -95,7 +92,6 @@ impl MessagingUI {
         height: i32,
         scrollback: usize,
         msg_layout: Layout,
-        completion_char: Option<String>,
     ) -> MessagingUI {
         MessagingUI {
             msg_area: MsgArea::new(width, height - 1, scrollback, msg_layout),
@@ -106,7 +102,6 @@ impl MessagingUI {
             nicks: Trie::new(),
             last_activity_line: None,
             last_ts: None,
-            completion_char,
         }
     }
 
@@ -169,8 +164,7 @@ impl MessagingUI {
             }
             KeyAction::InputAutoComplete => {
                 if self.exit_dialogue.is_none() {
-                    self.input_field
-                        .autocomplete(&self.nicks, &self.completion_char);
+                    self.input_field.autocomplete(&self.nicks);
                 }
                 WidgetRet::KeyHandled
             }
@@ -224,9 +218,8 @@ impl MessagingUI {
         self.input_field.set(str)
     }
 
-    /// Set completion char.
     pub(crate) fn set_completion_char(&mut self, completion_char: Option<String>) {
-        self.completion_char = completion_char;
+        self.input_field.set_completion_char(completion_char);
     }
 
     /// Set cursor location in the input field.
