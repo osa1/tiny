@@ -13,6 +13,7 @@ default = ["tls-rustls"]
 tls-native = ["libtiny_client/tls-native"]
 tls-rustls = ["libtiny_client/tls-rustls"]
 desktop-notifications = ["libtiny_tui/desktop-notifications"]
+desktop-notifications-static-linking = ["libtiny_tui/desktop-notifications", "libtiny_tui/desktop-notifications-static-linking"]
 
 [dependencies]
 dirs = "4.0"
