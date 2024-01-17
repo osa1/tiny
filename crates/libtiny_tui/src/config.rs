@@ -4,7 +4,7 @@
 use libtiny_common::{ChanName, ChanNameRef};
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use termbox_simple::*;
@@ -33,7 +33,7 @@ pub(crate) struct Config {
     pub(crate) key_map: Option<KeyMap>,
 
     #[serde(default)]
-    pub(crate) blocked_users: Vec<String>,
+    pub(crate) blocked_users: HashSet<String>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]

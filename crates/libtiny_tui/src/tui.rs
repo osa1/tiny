@@ -8,7 +8,7 @@
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
@@ -110,7 +110,7 @@ pub struct TUI {
     tab_configs: TabConfigs,
 
     /// List of blocked users
-    blocked_users: Vec<String>,
+    blocked_users: HashSet<String>,
 }
 
 pub(crate) enum CmdResult {
@@ -178,7 +178,7 @@ impl TUI {
             key_map: KeyMap::default(),
             config_path,
             tab_configs: TabConfigs::default(),
-            blocked_users: Vec::default(),
+            blocked_users: HashSet::default(),
         };
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
