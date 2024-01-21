@@ -66,6 +66,10 @@ defaults:
 # Location for chat logs.
 log_dir: "{}"
 
+# Optional character(s) that will be appended at the end of a completed
+# nick, if at the beginning of the line. Uncomment to enable.
+# completion_char: ":"
+
 # Limits the maximum number of messages stored in each tab. Default is
 # unlimited.
 # scrollback: 512
