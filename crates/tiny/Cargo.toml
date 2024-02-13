@@ -23,11 +23,11 @@ libtiny_logger = { path = "../libtiny_logger" }
 libtiny_tui = { path = "../libtiny_tui", default-features = false }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.196", features = ["derive"] }
 serde_yaml = "0.8"
 shell-words = "1.1.0"
 time = "0.1"
-tokio = { version = "1.17", default-features = false, features = [] }
+tokio = { version = "1.36", default-features = false, features = [] }
 tokio-stream = { version = "0.1", features = [] }
 
 [dev-dependencies]

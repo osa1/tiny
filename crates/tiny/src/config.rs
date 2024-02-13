@@ -451,7 +451,6 @@ fn get_default_config_yaml() -> String {
 #[cfg(test)]
 mod tests {
     use libtiny_common::ChanName;
-    use serde_yaml;
 
     use super::*;
 
@@ -467,7 +466,7 @@ mod tests {
                     servers[0].join,
                     vec![Chan::Name(ChanName::new("#tiny".to_string()))]
                 );
-                assert_eq!(servers[0].tls, true);
+                assert!(servers[0].tls);
             }
         }
     }
