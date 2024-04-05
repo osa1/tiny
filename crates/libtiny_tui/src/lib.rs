@@ -172,13 +172,13 @@ async fn input_handler<S>(
             Some(Ok(ev)) => {
                 let tui_ret = tui.borrow_mut().handle_input_event(ev, &mut rcv_editor_ret);
                 match tui_ret {
-                    TUIRet::Abort => {
+                    Some(TUIRet::Abort) => {
                         snd_ev.try_send(Event::Abort { msg: None }).unwrap();
                         let _ = snd_abort.try_send(());
                         return;
                     }
-                    TUIRet::KeyHandled | TUIRet::KeyIgnored(_) | TUIRet::EventIgnored(_) => {}
-                    TUIRet::KeyCommand { cmd, from } => {
+
+                    Some(TUIRet::KeyCommand { cmd, from }) => {
                         let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
                         match result {
                             CmdResult::Ok => {}
@@ -192,7 +192,8 @@ async fn input_handler<S>(
                             }
                         }
                     }
-                    TUIRet::Input { msg, from } => {
+
+                    Some(TUIRet::Input { msg, from }) => {
                         if msg[0] == '/' {
                             // Handle TUI commands, send others to downstream
                             let cmd: String = msg[1..].iter().collect();
@@ -217,6 +218,8 @@ async fn input_handler<S>(
                                 .unwrap();
                         }
                     }
+
+                    None => {}
                 }
             }
         }

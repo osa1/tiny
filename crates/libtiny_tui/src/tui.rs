@@ -29,9 +29,6 @@ use termbox_simple::{CellBuf, Termbox};
 #[derive(Debug)]
 pub(crate) enum TUIRet {
     Abort,
-    KeyHandled,
-    KeyIgnored(Key),
-    EventIgnored(Event),
 
     KeyCommand {
         cmd: String,
@@ -566,7 +563,7 @@ impl TUI {
         &mut self,
         ev: Event,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
-    ) -> TUIRet {
+    ) -> Option<TUIRet> {
         match ev {
             Event::Key(key) => self.keypressed(key, rcv_editor_ret),
 
@@ -582,10 +579,10 @@ impl TUI {
                         self.handle_input_event(Event::Key(Key::Char(ch)), rcv_editor_ret);
                     }
                 }
-                TUIRet::KeyHandled
+                None
             }
 
-            ev => TUIRet::EventIgnored(ev),
+            Event::Unknown(_) => None,
         }
     }
 
@@ -667,62 +664,68 @@ impl TUI {
         &mut self,
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
-    ) -> TUIRet {
+    ) -> Option<TUIRet> {
         let key_action = self.key_map.get(&key).or(match key {
             Key::Char(c) => Some(KeyAction::Input(c)),
             Key::AltChar(c) => Some(KeyAction::TabGoto(c)),
             _ => None,
         });
 
-        if let Some(key_action) = key_action {
-            match self.tabs[self.active_idx].widget.keypressed(&key_action) {
-                WidgetRet::KeyHandled => TUIRet::KeyHandled,
-                WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
-                WidgetRet::Command(cmd) => TUIRet::KeyCommand {
-                    cmd,
-                    from: self.tabs[self.active_idx].src.clone(),
-                },
-                WidgetRet::Input(input) => TUIRet::Input {
-                    msg: input,
-                    from: self.tabs[self.active_idx].src.clone(),
-                },
-                WidgetRet::Remove => unimplemented!(),
-                WidgetRet::Abort => TUIRet::Abort,
+        let key_action = key_action?;
+
+        match self.tabs[self.active_idx].widget.keypressed(&key_action) {
+            WidgetRet::KeyHandled => None,
+
+            WidgetRet::KeyIgnored => {
+                self.handle_keypress(key_action, rcv_editor_ret);
+                None
             }
-        } else {
-            TUIRet::KeyIgnored(key)
+
+            WidgetRet::Command(cmd) => Some(TUIRet::KeyCommand {
+                cmd,
+                from: self.tabs[self.active_idx].src.clone(),
+            }),
+
+            WidgetRet::Input(input) => Some(TUIRet::Input {
+                msg: input,
+                from: self.tabs[self.active_idx].src.clone(),
+            }),
+
+            WidgetRet::Remove => unimplemented!(),
+
+            WidgetRet::Abort => Some(TUIRet::Abort),
         }
     }
 
     fn handle_keypress(
         &mut self,
-        key: Key,
         key_action: KeyAction,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
-    ) -> TUIRet {
+    ) {
         match key_action {
             KeyAction::RunEditor => {
                 self.run_editor("", rcv_editor_ret);
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabNext => {
                 self.next_tab();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabPrev => {
                 self.prev_tab();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabMoveLeft => {
                 self.move_tab_left();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabMoveRight => {
                 self.move_tab_right();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabGoto(c) => self.go_to_tab(c),
-            _ => TUIRet::KeyIgnored(key),
+
+            _ => {}
         }
     }
 
@@ -1150,7 +1153,7 @@ impl TUI {
         }
     }
 
-    fn go_to_tab(&mut self, c: char) -> TUIRet {
+    fn go_to_tab(&mut self, c: char) {
         match c.to_digit(10) {
             Some(i) => {
                 let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
@@ -1172,7 +1175,6 @@ impl TUI {
                     Ordering::Equal => {}
                 }
                 self.tabs[self.active_idx].set_style(TabStyle::Normal);
-                TUIRet::KeyHandled
             }
             None => {
                 // multiple tabs can have same switch character so scan
@@ -1184,7 +1186,6 @@ impl TUI {
                         break;
                     }
                 }
-                TUIRet::KeyHandled
             }
         }
     }
