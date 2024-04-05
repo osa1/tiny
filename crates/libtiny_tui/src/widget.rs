@@ -8,12 +8,12 @@ pub(crate) enum WidgetRet {
     /// An input is submitted.
     Input(Vec<char>),
 
-    /// A command is ran
+    /// A command is ran.
     Command(String),
 
     /// Remove the widget. E.g. close the tab, hide the dialogue etc.
     Remove,
 
-    /// An exit event happened.
-    Abort,
+    /// User wants to quit, i.e. pressed `C-c <enter>` or a key bound to the `/quit` command.
+    Quit,
 }

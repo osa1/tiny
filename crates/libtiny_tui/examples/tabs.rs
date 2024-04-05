@@ -79,6 +79,6 @@ fn handle_input_ev(ui: &TUI, ev: Event) {
                 }
             }
         }
-        Abort { .. } | Msg { .. } | Lines { .. } => {}
+        Quit { .. } | Msg { .. } | Lines { .. } => {}
     }
 }

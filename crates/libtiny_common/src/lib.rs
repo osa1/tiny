@@ -236,22 +236,23 @@ pub enum TabStyle {
     Highlight,
 }
 
-/// UI events
+/// UI events.
 #[derive(Debug)]
 pub enum Event {
-    Abort {
-        msg: Option<String>,
-    },
-    Msg {
-        msg: String,
-        source: MsgSource,
-    },
+    /// User wants to quit.
+    Quit { msg: Option<String> },
+
+    /// A message was sent.
+    Msg { msg: String, source: MsgSource },
+
+    /// A multi-line message was sent.
+    ///
+    /// This can be done by pasting, or via the editor command (`C-x` by default).
     Lines {
         lines: Vec<String>,
         source: MsgSource,
     },
-    Cmd {
-        cmd: String,
-        source: MsgSource,
-    },
+
+    /// A command was submitted. `cmd` won't have an initial '/'.
+    Cmd { cmd: String, source: MsgSource },
 }

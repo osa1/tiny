@@ -28,20 +28,16 @@ use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
-    Abort,
+    /// User wants to quit.
+    Quit,
 
-    KeyCommand {
-        cmd: String,
-        from: MsgSource,
-    },
+    /// A command was submitted, either directly, or via a key bound to a command.
+    ///
+    /// `cmd` won't have an initial '/'.
+    KeyCommand { cmd: String, from: MsgSource },
 
-    /// INVARIANT: The vec will have at least one char.
-    // Can't make MsgSource a ref because of this weird error:
-    // https://users.rust-lang.org/t/borrow-checker-bug/5165
-    Input {
-        msg: Vec<char>,
-        from: MsgSource,
-    },
+    /// A message was sent. `msg` will have at least one character.
+    Input { msg: Vec<char>, from: MsgSource },
 }
 
 const LEFT_ARROW: char = '<';
@@ -108,11 +104,13 @@ pub struct TUI {
 }
 
 pub(crate) enum CmdResult {
-    /// Command executed successfully
-    Ok,
-    /// Pass command through to cmd.rs for further handling
-    Continue,
-    /// Quit command was executed, with the payload as a quit message
+    /// Command executed successfully by the TUI.
+    Handled,
+
+    /// Pass command through to the caller.
+    Pass,
+
+    /// Quit command was executed, with the payload as the quit message.
     Quit(Option<String>),
 }
 
@@ -283,15 +281,15 @@ impl TUI {
         match words.next() {
             Some("clear") => {
                 self.clear(&src.to_target());
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("ignore") => {
                 self.ignore(src);
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("notify") => {
                 self.notify(&mut words, src);
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("switch") => {
                 match words.next() {
@@ -301,12 +299,12 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     ),
                 }
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("reload") => {
                 self.reload_config();
                 self.add_client_notify_msg("Reloaded config file.", &MsgTarget::CurrentTab);
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("help") => {
                 self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
@@ -320,7 +318,7 @@ impl TUI {
                     );
                 }
                 // Fall through to print help for cmd.rs commands
-                CmdResult::Continue
+                CmdResult::Pass
             }
             Some("quit") => {
                 // Note: `SplitWhitespace::as_str` could be used here instead, when it gets stabilized.
@@ -332,7 +330,7 @@ impl TUI {
                     CmdResult::Quit(Some(reason))
                 }
             }
-            _ => CmdResult::Continue,
+            _ => CmdResult::Pass,
         }
     }
 
@@ -693,7 +691,7 @@ impl TUI {
 
             WidgetRet::Remove => unimplemented!(),
 
-            WidgetRet::Abort => Some(TUIRet::Abort),
+            WidgetRet::Quit => Some(TUIRet::Quit),
         }
     }
 
