@@ -24,7 +24,7 @@ use crate::widget::WidgetRet;
 
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use term_input::{Event, Key};
-pub use termbox_simple::{CellBuf, Termbox};
+use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
