@@ -17,7 +17,7 @@ desktop-notifications-static-linking = ["notify-rust", "notify-rust/d_vendored"]
 libtiny_common = { path = "../libtiny_common" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
-notify-rust = { git = "https://github.com/osa1/notify-rust.git", rev = "29f33f4", optional = true, default_features = false, features = ["d"] }
+notify-rust = { version = "4.11", optional = true, default_features = false, features = ["d"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 tempfile = "3.1"
