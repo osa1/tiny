@@ -13,7 +13,4 @@ pub(crate) enum WidgetRet {
 
     /// Remove the widget. E.g. close the tab, hide the dialogue etc.
     Remove,
-
-    /// User wants to quit, i.e. pressed `C-c <enter>` or a key bound to the `/quit` command.
-    Quit,
 }

@@ -172,12 +172,6 @@ async fn input_handler<S>(
             Some(Ok(ev)) => {
                 let tui_ret = tui.borrow_mut().handle_input_event(ev, &mut rcv_editor_ret);
                 match tui_ret {
-                    Some(TUIRet::Quit) => {
-                        snd_ev.try_send(Event::Quit { msg: None }).unwrap();
-                        let _ = snd_abort.try_send(());
-                        return;
-                    }
-
                     Some(TUIRet::KeyCommand { cmd, from }) => {
                         let result = tui.borrow_mut().try_handle_cmd(&cmd, &from);
                         match result {

@@ -28,9 +28,6 @@ use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
-    /// User wants to quit.
-    Quit,
-
     /// A command was submitted, either directly, or via a key bound to a command.
     ///
     /// `cmd` won't have an initial '/'.
@@ -690,8 +687,6 @@ impl TUI {
             }),
 
             WidgetRet::Remove => unimplemented!(),
-
-            WidgetRet::Quit => Some(TUIRet::Quit),
         }
     }
 
