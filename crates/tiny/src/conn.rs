@@ -191,8 +191,8 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
             match target {
                 wire::MsgTarget::Chan(chan) => {
                     let ui_msg_target = MsgTarget::Chan { serv, chan: &chan };
-                    // highlight the message if it mentions us
-                    if msg.contains(&client.get_nick()) {
+                    // Highlight the message if it mentions us.
+                    if mentions_user(&msg, &client.get_nick()) {
                         ui.add_privmsg(sender, &msg, ts, &ui_msg_target, true, is_action);
                         ui.set_tab_style(TabStyle::Highlight, &ui_msg_target);
                         let mentions_target = MsgTarget::Server { serv: "mentions" };
@@ -590,4 +590,52 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
             }
         },
     }
+}
+
+/// Whether `msg` mentions `nick`.
+///
+/// This takes IRC nick syntax into account (following [1]) when checking match boundaries, to
+/// avoid generating highlights incorrectly. For example, if the nick is "abc" and the messsage is
+/// "abcd" we don't consider that a mention, but we consider it a mention in message "abc: hi".
+///
+/// [1]: https://modern.ircdocs.horse/#clients
+fn mentions_user(msg: &str, nick: &str) -> bool {
+    for (match_idx, _) in msg.match_indices(nick) {
+        if check_nick_left_boundary(msg, match_idx)
+            && check_nick_right_boundary(msg, match_idx + nick.len())
+        {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn check_nick_left_boundary(msg: &str, idx: usize) -> bool {
+    if idx == 0 {
+        return true;
+    }
+
+    matches!(
+        msg.as_bytes()[idx - 1],
+        b' ' | b',' | b'*' | b'?' | b'!' | b'@' | b'.' | b'&' | b':' | b'#' | b'+' | b'~'
+    )
+}
+
+fn check_nick_right_boundary(msg: &str, idx: usize) -> bool {
+    matches!(
+        msg.as_bytes().get(idx),
+        None | Some(b' ' | b',' | b'*' | b'?' | b'!' | b'@' | b'.' | b':')
+    )
+}
+
+#[test]
+fn mention_check() {
+    assert!(!mentions_user("", "abc"));
+    assert!(mentions_user("abc", "abc"));
+    assert!(mentions_user("abc: hi", "abc"));
+    assert!(mentions_user(" abc", "abc"));
+    assert!(mentions_user(" abc,", "abc"));
+    assert!(!mentions_user(" aaaa ", "aa"));
+    assert!(mentions_user(" aa,aa ", "aa"));
 }

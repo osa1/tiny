@@ -1,3 +1,7 @@
+# Unreleased
+
+- Improve nick matching to avoid highlighting message incorrectly. (#430)
+
 # 2024/01/01: 0.12.0
 
 Thanks to @nate-sys and @jubalh for contributing to this release.
