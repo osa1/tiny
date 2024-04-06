@@ -24,27 +24,17 @@ use crate::widget::WidgetRet;
 
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use term_input::{Event, Key};
-pub use termbox_simple::{CellBuf, Termbox};
+use termbox_simple::{CellBuf, Termbox};
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
-    Abort,
-    KeyHandled,
-    KeyIgnored(Key),
-    EventIgnored(Event),
+    /// A command was submitted, either directly, or via a key bound to a command.
+    ///
+    /// `cmd` won't have an initial '/'.
+    KeyCommand { cmd: String, from: MsgSource },
 
-    KeyCommand {
-        cmd: String,
-        from: MsgSource,
-    },
-
-    /// INVARIANT: The vec will have at least one char.
-    // Can't make MsgSource a ref because of this weird error:
-    // https://users.rust-lang.org/t/borrow-checker-bug/5165
-    Input {
-        msg: Vec<char>,
-        from: MsgSource,
-    },
+    /// A message was sent. `msg` will have at least one character.
+    Input { msg: Vec<char>, from: MsgSource },
 }
 
 const LEFT_ARROW: char = '<';
@@ -111,11 +101,13 @@ pub struct TUI {
 }
 
 pub(crate) enum CmdResult {
-    /// Command executed successfully
-    Ok,
-    /// Pass command through to cmd.rs for further handling
-    Continue,
-    /// Quit command was executed, with the payload as a quit message
+    /// Command executed successfully by the TUI.
+    Handled,
+
+    /// Pass command through to the caller.
+    Pass,
+
+    /// Quit command was executed, with the payload as the quit message.
     Quit(Option<String>),
 }
 
@@ -286,15 +278,15 @@ impl TUI {
         match words.next() {
             Some("clear") => {
                 self.clear(&src.to_target());
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("ignore") => {
                 self.ignore(src);
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("notify") => {
                 self.notify(&mut words, src);
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("switch") => {
                 match words.next() {
@@ -304,12 +296,12 @@ impl TUI {
                         &MsgTarget::CurrentTab,
                     ),
                 }
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("reload") => {
                 self.reload_config();
                 self.add_client_notify_msg("Reloaded config file.", &MsgTarget::CurrentTab);
-                CmdResult::Ok
+                CmdResult::Handled
             }
             Some("help") => {
                 self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
@@ -323,7 +315,7 @@ impl TUI {
                     );
                 }
                 // Fall through to print help for cmd.rs commands
-                CmdResult::Continue
+                CmdResult::Pass
             }
             Some("quit") => {
                 // Note: `SplitWhitespace::as_str` could be used here instead, when it gets stabilized.
@@ -335,7 +327,7 @@ impl TUI {
                     CmdResult::Quit(Some(reason))
                 }
             }
-            _ => CmdResult::Continue,
+            _ => CmdResult::Pass,
         }
     }
 
@@ -344,7 +336,7 @@ impl TUI {
             match parse_config(config_path) {
                 Err(err) => {
                     self.add_client_err_msg(
-                        &format!("Can't parse TUI config: {:?}", err),
+                        &format!("Can't parse TUI config: {}", err),
                         &MsgTarget::CurrentTab,
                     );
                     None
@@ -566,7 +558,7 @@ impl TUI {
         &mut self,
         ev: Event,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
-    ) -> TUIRet {
+    ) -> Option<TUIRet> {
         match ev {
             Event::Key(key) => self.keypressed(key, rcv_editor_ret),
 
@@ -582,10 +574,10 @@ impl TUI {
                         self.handle_input_event(Event::Key(Key::Char(ch)), rcv_editor_ret);
                     }
                 }
-                TUIRet::KeyHandled
+                None
             }
 
-            ev => TUIRet::EventIgnored(ev),
+            Event::Unknown(_) => None,
         }
     }
 
@@ -667,62 +659,66 @@ impl TUI {
         &mut self,
         key: Key,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
-    ) -> TUIRet {
+    ) -> Option<TUIRet> {
         let key_action = self.key_map.get(&key).or(match key {
             Key::Char(c) => Some(KeyAction::Input(c)),
             Key::AltChar(c) => Some(KeyAction::TabGoto(c)),
             _ => None,
         });
 
-        if let Some(key_action) = key_action {
-            match self.tabs[self.active_idx].widget.keypressed(&key_action) {
-                WidgetRet::KeyHandled => TUIRet::KeyHandled,
-                WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
-                WidgetRet::Command(cmd) => TUIRet::KeyCommand {
-                    cmd,
-                    from: self.tabs[self.active_idx].src.clone(),
-                },
-                WidgetRet::Input(input) => TUIRet::Input {
-                    msg: input,
-                    from: self.tabs[self.active_idx].src.clone(),
-                },
-                WidgetRet::Remove => unimplemented!(),
-                WidgetRet::Abort => TUIRet::Abort,
+        let key_action = key_action?;
+
+        match self.tabs[self.active_idx].widget.keypressed(&key_action) {
+            WidgetRet::KeyHandled => None,
+
+            WidgetRet::KeyIgnored => {
+                self.handle_keypress(key_action, rcv_editor_ret);
+                None
             }
-        } else {
-            TUIRet::KeyIgnored(key)
+
+            WidgetRet::Command(cmd) => Some(TUIRet::KeyCommand {
+                cmd,
+                from: self.tabs[self.active_idx].src.clone(),
+            }),
+
+            WidgetRet::Input(input) => Some(TUIRet::Input {
+                msg: input,
+                from: self.tabs[self.active_idx].src.clone(),
+            }),
+
+            WidgetRet::Remove => unimplemented!(),
         }
     }
 
     fn handle_keypress(
         &mut self,
-        key: Key,
         key_action: KeyAction,
         rcv_editor_ret: &mut Option<editor::ResultReceiver>,
-    ) -> TUIRet {
+    ) {
         match key_action {
             KeyAction::RunEditor => {
                 self.run_editor("", rcv_editor_ret);
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabNext => {
                 self.next_tab();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabPrev => {
                 self.prev_tab();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabMoveLeft => {
                 self.move_tab_left();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabMoveRight => {
                 self.move_tab_right();
-                TUIRet::KeyHandled
             }
+
             KeyAction::TabGoto(c) => self.go_to_tab(c),
-            _ => TUIRet::KeyIgnored(key),
+
+            _ => {}
         }
     }
 
@@ -1150,7 +1146,7 @@ impl TUI {
         }
     }
 
-    fn go_to_tab(&mut self, c: char) -> TUIRet {
+    fn go_to_tab(&mut self, c: char) {
         match c.to_digit(10) {
             Some(i) => {
                 let new_tab_idx: usize = if i as usize > self.tabs.len() || i == 0 {
@@ -1172,7 +1168,6 @@ impl TUI {
                     Ordering::Equal => {}
                 }
                 self.tabs[self.active_idx].set_style(TabStyle::Normal);
-                TUIRet::KeyHandled
             }
             None => {
                 // multiple tabs can have same switch character so scan
@@ -1184,7 +1179,6 @@ impl TUI {
                         break;
                     }
                 }
-                TUIRet::KeyHandled
             }
         }
     }

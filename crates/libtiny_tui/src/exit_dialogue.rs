@@ -50,7 +50,7 @@ impl ExitDialogue {
 
     pub(crate) fn keypressed(&self, key_action: &KeyAction) -> WidgetRet {
         match key_action {
-            KeyAction::Input('y') | KeyAction::InputSend => WidgetRet::Abort,
+            KeyAction::Input('y') | KeyAction::InputSend => WidgetRet::Command("quit".to_string()),
             _ => WidgetRet::Remove,
         }
     }

@@ -119,7 +119,7 @@ fn handle_input_ev(
 ) {
     use libtiny_common::Event::*;
     match ev {
-        Abort { msg } => {
+        Quit { msg } => {
             for client in clients {
                 client.quit(msg.clone());
             }
@@ -143,7 +143,7 @@ fn handle_input_ev(
 
 pub(crate) fn send_msg(
     ui: &UI,
-    clients: &mut Vec<Client>,
+    clients: &mut [Client],
     src: &MsgSource,
     msg: String,
     is_action: bool,

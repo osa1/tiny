@@ -5,12 +5,9 @@ use libtiny_common::{ChanName, ChanNameRef};
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
 use std::path::Path;
-use std::str::FromStr;
 
-pub use termbox_simple::*;
+use termbox_simple::*;
 
 use crate::key_map::KeyMap;
 use crate::notifier::Notifier;
@@ -75,6 +72,28 @@ pub enum Chan {
 }
 
 impl Chan {
+    pub fn from_cmd_args(s: &str) -> Result<Chan, String> {
+        // Make sure channel starts with '#'
+        let s = if !s.starts_with('#') {
+            format!("#{}", s)
+        } else {
+            s.to_string()
+        };
+        // Try to split chan name and args
+        match s.split_once(' ') {
+            // with args
+            Some((name, args)) => {
+                let config = TabConfig::from_cmd_args(args)?;
+                Ok(Chan::WithConfig {
+                    name: ChanName::new(name.to_string()),
+                    config,
+                })
+            }
+            // chan name only
+            None => Ok(Chan::Name(ChanName::new(s))),
+        }
+    }
+
     pub fn name(&self) -> &ChanNameRef {
         match self {
             Chan::Name(name) => name,
@@ -90,33 +109,6 @@ where
 {
     let name: String = serde::de::Deserialize::deserialize(d)?;
     Ok(ChanName::new(name))
-}
-
-// `FromStr` implementation used when parsing channel names in commands (not in config file).
-impl FromStr for Chan {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Make sure channel starts with '#'
-        let s = if !s.starts_with('#') {
-            format!("#{}", s)
-        } else {
-            s.to_string()
-        };
-        // Try to split chan name and args
-        match s.split_once(' ') {
-            // with args
-            Some((name, args)) => {
-                let config = TabConfig::from_str(args)?;
-                Ok(Chan::WithConfig {
-                    name: ChanName::new(name.to_string()),
-                    config,
-                })
-            }
-            // chan name only
-            None => Ok(Chan::Name(ChanName::new(s))),
-        }
-    }
 }
 
 /// Map of TabConfigs by tab names
@@ -207,11 +199,28 @@ pub struct TabConfig {
 }
 
 impl TabConfig {
-    pub fn user_tab_defaults() -> TabConfig {
-        TabConfig {
-            ignore: Some(false),
-            notify: Some(Notifier::Messages),
+    pub(crate) fn from_cmd_args(s: &str) -> Result<TabConfig, String> {
+        let mut config = TabConfig::default();
+        let mut words = s.trim().split(' ').map(str::trim);
+
+        while let Some(word) = words.next() {
+            // `"".split(' ')` yields one empty string.
+            if word.is_empty() {
+                continue;
+            }
+            match word {
+                "-ignore" => config.ignore = Some(true),
+                "-notify" => match words.next() {
+                    Some(notify_setting) => {
+                        config.notify = Some(Notifier::from_cmd_args(notify_setting)?)
+                    }
+                    None => return Err("-notify parameter missing".to_string()),
+                },
+                other => return Err(format!("Unexpected channel parameter: {:?}", other)),
+            }
         }
+
+        Ok(config)
     }
 
     pub(crate) fn or_use(&self, config: &TabConfig) -> TabConfig {
@@ -225,35 +234,6 @@ impl TabConfig {
         let ignore = self.ignore.get_or_insert(false);
         *ignore = !&*ignore;
         *ignore
-    }
-}
-
-// `FromStr` implementation used when parsing channel names in commands (not in config file).
-impl FromStr for TabConfig {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut config = TabConfig::default();
-        let mut words = s.trim().split(' ').map(str::trim);
-
-        while let Some(word) = words.next() {
-            // `"".split(' ')` yields one empty string.
-            if word.is_empty() {
-                continue;
-            }
-            match word {
-                "-ignore" => config.ignore = Some(true),
-                "-notify" => match words.next() {
-                    Some(notify_setting) => {
-                        config.notify = Some(Notifier::from_str(notify_setting)?)
-                    }
-                    None => return Err("-notify parameter missing".to_string()),
-                },
-                other => return Err(format!("Unexpected channel parameter: {:?}", other)),
-            }
-        }
-
-        Ok(config)
     }
 }
 
@@ -510,12 +490,14 @@ impl<'de> Deserialize<'de> for Style {
 }
 
 pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Error> {
-    let contents = {
-        let mut str = String::new();
-        let mut file = File::open(config_path).unwrap();
-        file.read_to_string(&mut str).unwrap();
-        str
-    };
-
+    // tiny creates a config file with the defaults when it can't find one, but the config file can
+    // be deleted before a `/reload`.
+    let contents = std::fs::read_to_string(config_path).map_err(|err| {
+        de::Error::custom(format!(
+            "Can't read config file '{}': {}",
+            config_path.to_string_lossy(),
+            err
+        ))
+    })?;
     serde_yaml::from_str(&contents)
 }

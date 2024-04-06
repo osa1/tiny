@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::MsgTarget;
 
 use libtiny_wire::formatting::remove_irc_control_chars;
@@ -32,19 +30,6 @@ impl Default for Notifier {
     }
 }
 
-impl FromStr for Notifier {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "off" => Ok(Notifier::Off),
-            "mentions" => Ok(Notifier::Mentions),
-            "messages" => Ok(Notifier::Messages),
-            _ => Err(format!("Unknown Notifier variant: {}", s)),
-        }
-    }
-}
-
 #[cfg(feature = "desktop-notifications")]
 fn notify(summary: &str, body: &str) {
     // TODO: Report errors somehow
@@ -55,6 +40,15 @@ fn notify(summary: &str, body: &str) {
 fn notify(_summary: &str, _body: &str) {}
 
 impl Notifier {
+    pub(crate) fn from_cmd_args(s: &str) -> Result<Notifier, String> {
+        match s.to_lowercase().as_str() {
+            "off" => Ok(Notifier::Off),
+            "mentions" => Ok(Notifier::Mentions),
+            "messages" => Ok(Notifier::Messages),
+            _ => Err(format!("Unknown Notifier variant: {}", s)),
+        }
+    }
+
     pub(crate) fn notify_privmsg(
         &mut self,
         sender: &str,

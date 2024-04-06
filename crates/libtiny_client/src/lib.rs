@@ -452,7 +452,7 @@ async fn main_loop(
         tokio::task::spawn_local(async move {
             let mut rcv_msg = ReceiverStream::new(rcv_msg);
             while let Some(msg) = rcv_msg.next().await {
-                if let Err(io_err) = write_half.write_all(msg.as_str().as_bytes()).await {
+                if let Err(io_err) = write_half.write_all(msg.as_bytes()).await {
                     debug!("IO error when writing: {:?}", io_err);
                     snd_ev_clone.send(Event::IoErr(io_err)).await.unwrap();
                     return;
