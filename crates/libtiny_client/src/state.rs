@@ -230,9 +230,9 @@ impl StateInner {
 
     fn reset(&mut self) {
         self.nick_accepted = false;
-        self.nicks = self.server_info.nicks.clone();
+        self.nicks.clone_from(&self.server_info.nicks);
         self.current_nick_idx = 0;
-        self.current_nick = self.nicks[0].clone();
+        self.current_nick.clone_from(&self.nicks[0]);
         // Only reset the values here; the key set will be used to join channels
         for chan in &mut self.chans {
             chan.reset();
@@ -270,7 +270,8 @@ impl StateInner {
             }
             self.current_nick = new_nick;
         } else {
-            self.current_nick = self.nicks[self.current_nick_idx].clone();
+            self.current_nick
+                .clone_from(&self.nicks[self.current_nick_idx]);
         }
         &self.current_nick
     }
@@ -564,7 +565,7 @@ impl StateInner {
                                 }
                             }
 
-                            self.current_nick = new_nick.to_owned();
+                            self.current_nick.clone_from(new_nick);
 
                             if let Some(ref pwd) = self.nickserv_ident {
                                 snd_irc_msg
