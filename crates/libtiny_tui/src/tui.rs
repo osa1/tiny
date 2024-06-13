@@ -8,7 +8,7 @@
 
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
@@ -98,6 +98,9 @@ pub struct TUI {
 
     /// TabConfig settings loaded from config file
     tab_configs: TabConfigs,
+
+    /// List of blocked users
+    blocked_users: HashSet<String>,
 }
 
 pub(crate) enum CmdResult {
@@ -167,6 +170,7 @@ impl TUI {
             key_map: KeyMap::default(),
             config_path,
             tab_configs: TabConfigs::default(),
+            blocked_users: HashSet::default(),
         };
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
@@ -357,11 +361,13 @@ impl TUI {
                 max_nick_length,
                 key_map,
                 layout,
+                blocked_users,
                 ..
             } = config;
             self.set_colors(colors);
             self.scrollback = scrollback.max(1);
             self.key_map.load(&key_map.unwrap_or_default());
+            self.blocked_users = blocked_users;
             if let Some(layout) = layout {
                 match layout {
                     crate::config::Layout::Compact => self.msg_layout = Layout::Compact,
@@ -552,6 +558,11 @@ impl TUI {
             }
         }
         self.fix_scroll_after_close();
+    }
+
+    /// Checks if user is on the block list
+    pub(crate) fn check_blocked(&self, user: &String) -> bool {
+        self.blocked_users.contains(user)
     }
 
     pub(crate) fn handle_input_event(
