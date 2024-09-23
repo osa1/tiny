@@ -193,7 +193,7 @@ impl LoggerInner {
         }
 
         let mut path = self.log_dir.clone();
-        path.push(&format!("{}.txt", serv));
+        path.push(format!("{}.txt", serv));
         if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
             report_io_err!(self.report_err, print_header(&mut fd));
             self.servers.insert(
@@ -233,7 +233,7 @@ impl LoggerInner {
                 }
 
                 let mut path = self.log_dir.clone();
-                path.push(&format!(
+                path.push(format!(
                     "{}_{}.txt",
                     serv,
                     replace_forward_slash(&chan_name_normalized)
@@ -384,7 +384,7 @@ impl LoggerInner {
                         // can't reuse it because of borrowchk issues.
                         let mut path = self.log_dir.clone();
                         let chan_name_normalized = chan.normalized();
-                        path.push(&format!(
+                        path.push(format!(
                             "{}_{}.txt",
                             serv,
                             replace_forward_slash(&chan_name_normalized)
@@ -414,7 +414,7 @@ impl LoggerInner {
                                 // We don't have a `new_user_tab` trait method so user log files
                                 // are created here
                                 let mut path = self.log_dir.clone();
-                                path.push(&format!("{}_{}.txt", serv, replace_forward_slash(nick)));
+                                path.push(format!("{}_{}.txt", serv, replace_forward_slash(nick)));
                                 if let Some(mut fd) = try_open_log_file(&path, &*self.report_err) {
                                     report_io_err!(self.report_err, print_header(&mut fd));
                                     f(&mut fd, &*self.report_err);

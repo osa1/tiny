@@ -198,7 +198,7 @@ impl MessagingUI {
         self.msg_area.resize(width, msg_area_height);
 
         // We don't show the nick in exit dialogue, so it has the full width
-        for exit_dialogue in &mut self.exit_dialogue {
+        if let Some(exit_dialogue) = &mut self.exit_dialogue {
             exit_dialogue.resize(width);
         }
     }
