@@ -30,10 +30,13 @@ pub enum IrcFormatEvent<'a> {
         bg: Option<Color>,
     },
 
-    /// Reverse current background and foreground
+    /// Reverse current background and foreground colors.
     ReverseColor,
 
-    /// Reset formatting to the default
+    /// Reset background and foreground colors to the defaults.
+    ResetColors,
+
+    /// Reset formatting to the default.
     Reset,
 }
 
@@ -325,12 +328,10 @@ impl<'a> Iterator for FormatEventParser<'a> {
 
                 CHAR_COLOR => {
                     self.bump(1);
-                    match self.parse_color() {
-                        Some((fg, bg)) => return Some(IrcFormatEvent::Color { fg, bg }),
-                        None => {
-                            // Just skip the control char
-                        }
-                    }
+                    return match self.parse_color() {
+                        Some((fg, bg)) => Some(IrcFormatEvent::Color { fg, bg }),
+                        None => Some(IrcFormatEvent::ResetColors),
+                    };
                 }
 
                 CHAR_HEX_COLOR => {
@@ -389,6 +390,7 @@ pub fn remove_irc_control_chars(str: &str) -> String {
             | IrcFormatEvent::Monospace
             | IrcFormatEvent::Color { .. }
             | IrcFormatEvent::ReverseColor
+            | IrcFormatEvent::ResetColors
             | IrcFormatEvent::Reset => {}
             IrcFormatEvent::Text(text) => s.push_str(text),
         }
@@ -431,6 +433,7 @@ fn test_parse_text_2() {
     let s = "a\x03";
     let mut parser = parse_irc_formatting(s);
     assert_eq!(parser.next(), Some(IrcFormatEvent::Text("a")));
+    assert_eq!(parser.next(), Some(IrcFormatEvent::ResetColors));
     assert_eq!(parser.next(), None);
 }
 
@@ -439,6 +442,7 @@ fn test_parse_text_3() {
     let s = "a\x03b";
     let mut parser = parse_irc_formatting(s);
     assert_eq!(parser.next(), Some(IrcFormatEvent::Text("a")));
+    assert_eq!(parser.next(), Some(IrcFormatEvent::ResetColors));
     assert_eq!(parser.next(), Some(IrcFormatEvent::Text("b")));
     assert_eq!(parser.next(), None);
 }
@@ -511,6 +515,7 @@ fn test_parse_text_5() {
 
     let s = "\x03,a";
     let mut parser = parse_irc_formatting(s);
+    assert_eq!(parser.next(), Some(IrcFormatEvent::ResetColors));
     assert_eq!(parser.next(), Some(IrcFormatEvent::Text(",a")));
     assert_eq!(parser.next(), None);
 }
