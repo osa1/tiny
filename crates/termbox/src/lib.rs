@@ -16,10 +16,13 @@ use unicode_width::UnicodeWidthChar;
 // FIXME: Use enter_ca_mode(smcup)/exit_ca_mode(rmcup) from terminfo
 
 pub const TB_DEFAULT: u16 = 0x0000;
-pub const TB_BOLD: u16 = 0x0100;
-pub const TB_UNDERLINE: u16 = 0x0200;
-pub const TB_ITALIC: u16 = 0x0400;
-pub const TB_STRIKETHROUGH: u16 = 0x0800;
+
+// Each attribute is a distinct bit after the low byte, so attributes can be manipulated with
+// bitwise operations.
+pub const TB_BOLD: u16 = 1 << 8;
+pub const TB_UNDERLINE: u16 = 1 << 9;
+pub const TB_ITALIC: u16 = 1 << 10;
+pub const TB_STRIKETHROUGH: u16 = 1 << 11;
 
 pub struct Termbox {
     // Not available in test instances

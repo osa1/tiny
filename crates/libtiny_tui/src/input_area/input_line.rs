@@ -34,9 +34,9 @@ impl InputLine {
         &self.buffer
     }
 
-    /**
-     **    Functions to interface with InputLine::buffer
-     **/
+    /*
+     *    Functions to interface with InputLine::buffer
+     */
 
     /// Interface for Vec::get()
     pub(crate) fn get(&self, idx: usize) -> char {
@@ -77,9 +77,9 @@ impl InputLine {
         }
     }
 
-    /**
-     **    End of InputLine::buffer interface
-     **/
+    /*
+     *    End of InputLine::buffer interface
+     */
 
     /// Calculate hedight of the widget, taking nickname length into account. Only needed when
     /// buffer is wider than width and scrolling is off.
