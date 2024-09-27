@@ -300,4 +300,11 @@ impl TUI {
             .upgrade()
             .map(|tui| tui.borrow().current_tab().clone())
     }
+
+    pub fn check_blocked(&self, user: &String) -> bool {
+        match self.inner.upgrade() {
+            Some(tui) => tui.borrow().check_blocked(user),
+            None => false,
+        }
+    }
 }
