@@ -156,7 +156,11 @@ impl Line {
                         self.set_message_style(SegStyle::Fixed(Style { fg: bg, bg: fg }));
                     }
                 }
-                IrcFormatEvent::Reset => {
+                // TODO: ResetColors should only reset the colors and not the formatting.
+                // However we don't store the current formatting and we can't apply formatting to
+                // a color from the current color scheme (e.g. `SegStyle::UserMsg`). For now reset
+                // the colors and formatting.
+                IrcFormatEvent::ResetColors | IrcFormatEvent::Reset => {
                     self.set_message_style(SegStyle::UserMsg);
                 }
             }
