@@ -124,7 +124,11 @@ impl Line {
         }
     }
 
-    fn add_text_inner(&mut self, str: &str) {
+    /// Add the text to the line. The text can contain IRC formatting characters. The text should
+    /// not contain other control characters like '\n' or '\r'.
+    pub(crate) fn add_text(&mut self, str: &str, style: SegStyle) {
+        self.set_message_style(style);
+
         for format_event in parse_irc_formatting(str) {
             match format_event {
                 IrcFormatEvent::Bold => self.add_attr(termbox_simple::TB_BOLD),
@@ -161,20 +165,16 @@ impl Line {
                 }
             }
         }
+
+        self.line_data.set_dirty();
     }
 
-    pub(crate) fn add_text(&mut self, str: &str, style: SegStyle) {
-        self.set_message_style(style);
-        self.add_text_inner(str)
-    }
-
+    /// Add a single character to the line. The character should not be an IRC formatting character
+    /// or other control characters like '\n' and '\r'.
     pub(crate) fn add_char(&mut self, char: char, style: SegStyle) {
         self.set_message_style(style);
         self.current_seg.string.push(char);
-    }
-
-    pub(crate) fn force_recalculation(&mut self) {
-        self.line_data.set_dirty()
+        self.line_data.set_dirty();
     }
 
     /// Calculates the number of lines that this line will be.
@@ -367,7 +367,7 @@ fn align_test() {
      67
      8
     */
-    line.add_text_inner("12345678");
+    line.add_text("12345678", SegStyle::UserMsg);
 
     assert_eq!(line.rendered_height(3), 4);
 }

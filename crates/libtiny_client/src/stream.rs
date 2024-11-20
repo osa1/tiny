@@ -66,7 +66,7 @@ fn tls_connector(sasl: Option<&Vec<u8>>) -> tokio_rustls::TlsConnector {
             .expect("Cert PEM must have at least one private key");
 
         builder
-            .with_single_cert(vec![Certificate(cert)], PrivateKey(key))
+            .with_client_auth_cert(vec![Certificate(cert)], PrivateKey(key))
             .expect("Client auth cert")
     } else {
         builder.with_no_client_auth()
