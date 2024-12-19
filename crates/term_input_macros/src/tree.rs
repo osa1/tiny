@@ -1,14 +1,17 @@
 use crate::syntax::*;
 
+use indexmap::map::IndexMap;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::TokenStreamExt;
-use std::collections::HashMap;
 
 struct Node {
     idx: usize,
     value: Option<syn::Expr>,
-    next: HashMap<u8, Node>,
+
+    // Note: `IndexMap` to be able to deterministically iterate the map and generate code
+    // deterministically, which allows reproducible builds.
+    next: IndexMap<u8, Node>,
 }
 
 impl Node {
@@ -16,7 +19,7 @@ impl Node {
         Node {
             idx,
             value: None,
-            next: HashMap::new(),
+            next: IndexMap::new(),
         }
     }
 
