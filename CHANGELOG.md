@@ -1,4 +1,4 @@
-# Unreleased
+# 2025/01/01: 0.13.0
 
 - Improve nick matching to avoid highlighting message incorrectly. (#430)
 - Fix resetting message color when a color prefix (0x03) is not followed by a
