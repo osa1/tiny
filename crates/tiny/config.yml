@@ -66,6 +66,9 @@ defaults:
 # Location for chat logs.
 log_dir: "{}"
 
+# Hides incoming messages from hostmasks in the list.
+# blocked_users: []
+
 # Limits the maximum number of messages stored in each tab. Default is
 # unlimited.
 # scrollback: 512
