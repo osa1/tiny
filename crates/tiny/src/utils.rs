@@ -6,7 +6,7 @@ pub(crate) struct SplitWhitespaceIndices<'a> {
     str: &'a str,
 }
 
-impl<'a> Iterator for SplitWhitespaceIndices<'a> {
+impl Iterator for SplitWhitespaceIndices<'_> {
     type Item = usize;
 
     fn next(&mut self) -> Option<usize> {

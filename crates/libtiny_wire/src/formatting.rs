@@ -295,10 +295,7 @@ impl<'a> Iterator for FormatEventParser<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let next = match self.peek() {
-                None => return None,
-                Some(next) => next,
-            };
+            let next = self.peek()?;
 
             match next {
                 CHAR_BOLD => {

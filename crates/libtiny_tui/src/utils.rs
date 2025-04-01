@@ -5,7 +5,7 @@ pub(crate) struct InsertIterator<'iter, A: 'iter> {
     iter_insert: &'iter mut dyn Iterator<Item = A>,
 }
 
-impl<'iter, A> Iterator for InsertIterator<'iter, A> {
+impl<A> Iterator for InsertIterator<'_, A> {
     type Item = A;
 
     fn next(&mut self) -> Option<A> {

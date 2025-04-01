@@ -312,12 +312,7 @@ static CRLF: [u8; 2] = [b'\r', b'\n'];
 pub fn parse_irc_msg(buf: &mut Vec<u8>) -> Option<Result<Msg, String>> {
     // Find "\r\n" separator. We can't do this *after* generating the lossy UTF-8, as that may have
     // different size than the original buffer after inserting "REPLACEMENT CHARACTER"s.
-    let crlf_idx = {
-        match buf.windows(2).position(|sub| sub == CRLF) {
-            None => return None,
-            Some(i) => i,
-        }
-    };
+    let crlf_idx = buf.windows(2).position(|sub| sub == CRLF)?;
 
     let msg_owned: String = String::from_utf8_lossy(&buf[0..crlf_idx]).to_string();
     let msg: &str = &msg_owned;

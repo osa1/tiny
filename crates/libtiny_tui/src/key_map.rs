@@ -150,7 +150,7 @@ impl<'de> Deserialize<'de> for MappedKey {
     {
         struct MappedKeyVisitor;
 
-        impl<'de> Visitor<'de> for MappedKeyVisitor {
+        impl Visitor<'_> for MappedKeyVisitor {
             type Value = MappedKey;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

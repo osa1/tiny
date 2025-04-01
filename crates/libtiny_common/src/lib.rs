@@ -111,7 +111,7 @@ impl PartialEq for ChanNameRef {
         // https://github.com/rust-lang/rust/blob/b4acb110333392ecdaf890fce080e4b576106aae/library/core/src/slice/mod.rs#L6678-L6684
 
         // All characters in ASCII have the same encoding length so we can compare byte lenghts.
-        if self.0.as_bytes().len() != other.0.as_bytes().len() {
+        if self.0.len() != other.0.len() {
             return false;
         }
 
@@ -164,7 +164,7 @@ pub enum MsgTarget<'a> {
     CurrentTab,
 }
 
-impl<'a> MsgTarget<'a> {
+impl MsgTarget<'_> {
     pub fn serv_name(&self) -> Option<&str> {
         match self {
             MsgTarget::Server { serv }
