@@ -212,7 +212,12 @@ impl<'de> Deserialize<'de> for MappedKey {
                             } else if let Some(f_key) = parse_f_key(k2) {
                                 Key::CtrlF(f_key)
                             } else {
-                                Key::Ctrl(single_key(k2)?)
+                                match single_key(k2)? {
+                                    'h' => Key::Backspace,
+                                    'i' => Key::Tab,
+                                    '[' => Key::Esc,
+                                    other => Key::Ctrl(other),
+                                }
                             }
                         }
                         "shift" => {
