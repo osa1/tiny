@@ -82,6 +82,7 @@ impl Default for KeyMap {
             (Key::Arrow(Arrow::Down), KeyAction::InputNextEntry),
             (Key::Char('\r'), KeyAction::InputSend),
             (Key::Backspace, KeyAction::InputDeletePrevChar),
+            (Key::Ctrl('h'), KeyAction::InputDeletePrevChar),
             (Key::Del, KeyAction::InputDeleteNextChar),
             (Key::Ctrl('a'), KeyAction::InputMoveCursStart),
             (Key::Ctrl('e'), KeyAction::InputMoveCursEnd),
