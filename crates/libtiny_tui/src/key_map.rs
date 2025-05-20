@@ -213,7 +213,13 @@ impl<'de> Deserialize<'de> for MappedKey {
                                 Key::CtrlF(f_key)
                             } else {
                                 match single_key(k2)? {
-                                    'h' => Key::Backspace,
+                                    // NOTE: The following special mappings are needed
+                                    // because, e.g., `Key::Ctrl('i')` is never generated
+                                    // by `term_input` since `ctrl_i` and `tab` send
+                                    // identical bytes and hence cannot be distinguished
+                                    // in a terminal app. Having the special mapping here
+                                    // allows the user to define a working key binding for
+                                    // `ctrl_i`, which would otherwise be ignored.
                                     'i' => Key::Tab,
                                     '[' => Key::Esc,
                                     other => Key::Ctrl(other),
