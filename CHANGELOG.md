@@ -5,6 +5,10 @@
   color code. (#434)
 - Refactor an internal macro to make tiny builds deterministic, allowing
   reproducible builds. (#437)
+- Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
+  ignored and are now synonymous with `tab` and `esc`. (#444)
+- The keystrokes `ctrl_h` and `backspace` can now be distinguished, which
+  allows the user to define separate key bindings in the config tile. (#445)
 
 # 2024/01/01: 0.12.0
 
