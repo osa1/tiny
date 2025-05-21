@@ -1,3 +1,10 @@
+# Unreleased
+
+- Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
+  ignored and are now synonymous with `tab` and `esc`. (#444)
+- The keystrokes `ctrl_h` and `backspace` can now be distinguished, which
+  allows the user to define separate key bindings in the config file. (#445)
+
 # 2025/01/01: 0.13.0
 
 - Improve nick matching to avoid highlighting message incorrectly. (#430)
