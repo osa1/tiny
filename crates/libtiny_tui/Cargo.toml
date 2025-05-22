@@ -31,4 +31,4 @@ unicode-width = "0.1"
 [dev-dependencies]
 bencher = "0.1"
 libc = "0.2"
-mio = "0.8"
+mio = "1.0"

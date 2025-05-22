@@ -13,7 +13,7 @@ termion = "1.5"
 unicode-width = "0.1"
 
 [dev-dependencies]
-mio = "0.8"
+mio = "1.0"
 term_input = { path = "../term_input" }
 tokio = { version = "1.17", default-features = false, features = [] }
 tokio-stream = "0.1"
