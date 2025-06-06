@@ -98,6 +98,9 @@ pub struct TUI {
 
     /// TabConfig settings loaded from config file
     tab_configs: TabConfigs,
+
+    // Autocompletion character to be used when at the start of the line.
+    completion_char: Option<String>,
 }
 
 pub(crate) enum CmdResult {
@@ -167,6 +170,7 @@ impl TUI {
             key_map: KeyMap::default(),
             config_path,
             tab_configs: TabConfigs::default(),
+            completion_char: None,
         };
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
@@ -357,9 +361,11 @@ impl TUI {
                 max_nick_length,
                 key_map,
                 layout,
+                completion_char,
                 ..
             } = config;
             self.set_colors(colors);
+            self.set_completion_char(completion_char);
             self.scrollback = scrollback.max(1);
             self.key_map.load(&key_map.unwrap_or_default());
             if let Some(layout) = layout {
@@ -384,6 +390,14 @@ impl TUI {
         self.tb
             .set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
         self.colors = colors;
+    }
+
+    fn set_completion_char(&mut self, completion_char: Option<String>) {
+        self.completion_char = completion_char;
+        for tab in &mut self.tabs {
+            tab.widget
+                .set_completion_char((&self.completion_char).clone());
+        }
     }
 
     fn new_tab(&mut self, idx: usize, src: MsgSource, alias: Option<String>) {
