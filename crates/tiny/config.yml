@@ -208,14 +208,16 @@ colors:
     # ctrl_n:     tab_next
     # ctrl_p:     tab_prev
 
-    # shift_up:   messages_scroll_up
-    # shift_down: messages_scroll_down
-    # ctrl_u:     messages_page_up
-    # ctrl_d:     messages_page_down
-    # pgup:       messages_page_up
-    # pgdown:     messages_page_down
-    # home:       messages_scroll_top
-    # end:        messages_scroll_bottom
+    # shift_up:         messages_scroll_up
+    # shift_down:       messages_scroll_down
+    # mouse_wheel_up:   messages_scroll_up
+    # mouse_wheel_down: messages_scroll_down
+    # ctrl_u:           messages_page_up
+    # ctrl_d:           messages_page_down
+    # pgup:             messages_page_up
+    # pgdown:           messages_page_down
+    # home:             messages_scroll_top
+    # end:              messages_scroll_bottom
 
     # left:       input_move_curs_left
     # right:      input_move_curs_right

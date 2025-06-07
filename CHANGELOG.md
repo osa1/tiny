@@ -4,6 +4,9 @@
   ignored and are now synonymous with `tab` and `esc`. (#444)
 - The keystrokes `ctrl_h` and `backspace` can now be distinguished, which
   allows the user to define separate key bindings in the config file. (#445)
+- Add support for mouse wheel up down key events, with names `mouse_wheel_up`
+  and `mouse_wheel_down`. By default these keys are mapped to
+  `messages_scroll_up` and `messages_scroll_down` commands.
 
 # 2025/01/01: 0.13.0
 

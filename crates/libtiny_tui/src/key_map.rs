@@ -51,7 +51,7 @@ pub(crate) enum KeyAction {
 
 impl Default for KeyMap {
     fn default() -> Self {
-        let map = vec![
+        let map = [
             (Key::Esc, KeyAction::Cancel),
             (Key::Ctrl('c'), KeyAction::Exit),
             (Key::Ctrl('x'), KeyAction::RunEditor),
@@ -74,7 +74,9 @@ impl Default for KeyMap {
             (Key::PageUp, KeyAction::MessagesPageUp),
             (Key::PageDown, KeyAction::MessagesPageDown),
             (Key::ShiftArrow(Arrow::Up), KeyAction::MessagesScrollUp),
+            (Key::MouseWheelUp, KeyAction::MessagesScrollUp),
             (Key::ShiftArrow(Arrow::Down), KeyAction::MessagesScrollDown),
+            (Key::MouseWheelDown, KeyAction::MessagesScrollDown),
             (Key::Home, KeyAction::MessagesScrollTop),
             (Key::End, KeyAction::MessagesScrollBottom),
             (Key::Tab, KeyAction::InputAutoComplete),
@@ -93,7 +95,7 @@ impl Default for KeyMap {
             (Key::CtrlArrow(Arrow::Left), KeyAction::InputMoveWordLeft),
             (Key::CtrlArrow(Arrow::Right), KeyAction::InputMoveWordRight),
         ];
-        let hash_map = map.into_iter().collect::<HashMap<_, _>>();
+        let hash_map = map.into_iter().collect();
         KeyMap(hash_map)
     }
 }
@@ -166,6 +168,12 @@ impl<'de> Deserialize<'de> for MappedKey {
             where
                 E: serde::de::Error,
             {
+                if v == "mouse_wheel_up" {
+                    return Ok(MappedKey(Key::MouseWheelUp));
+                } else if v == "mouse_wheel_down" {
+                    return Ok(MappedKey(Key::MouseWheelDown));
+                }
+
                 let key_combo = v.split_once('_');
                 let single_key = |s: &str| {
                     let mut chars = s.chars();
@@ -387,6 +395,8 @@ impl Display for KeyDisplay {
             Key::ShiftArrow(arrow) => write!(f, "shift_{}", ArrowDisplay(arrow)),
             Key::ShiftF(fkey) => write!(f, "shift_{}", FKeyDisplay(fkey)),
             Key::Tab => write!(f, "tab"),
+            Key::MouseWheelUp => write!(f, "mouse_wheel_up"),
+            Key::MouseWheelDown => write!(f, "mouse_wheel_down"),
         }
     }
 }
@@ -450,19 +460,28 @@ fn deser_keymap() {
       input: b
     b:
       command: clear
+    mouse_wheel_up:
+      command: messages_scroll_up
+    mouse_wheel_down:
+      command: messages_scroll_down
     "#;
-    let mut expect = KeyMap(HashMap::new());
-    expect
-        .0
-        .insert(Key::Ctrl('a'), KeyAction::InputMoveCursStart);
-    expect.0.insert(Key::Ctrl('e'), KeyAction::TabGoto('1'));
-    expect.0.insert(Key::Char('a'), KeyAction::Input('b'));
-    expect
-        .0
-        .insert(Key::Char('b'), KeyAction::Command("clear".to_string()));
+    let mut expect: HashMap<Key, KeyAction> = HashMap::new();
+
+    expect.insert(Key::Ctrl('a'), KeyAction::InputMoveCursStart);
+    expect.insert(Key::Ctrl('e'), KeyAction::TabGoto('1'));
+    expect.insert(Key::Char('a'), KeyAction::Input('b'));
+    expect.insert(Key::Char('b'), KeyAction::Command("clear".to_string()));
+    expect.insert(
+        Key::MouseWheelUp,
+        KeyAction::Command("messages_scroll_up".to_string()),
+    );
+    expect.insert(
+        Key::MouseWheelDown,
+        KeyAction::Command("messages_scroll_down".to_string()),
+    );
 
     let key_map: KeyMap = serde_yaml::from_str(s).unwrap();
-    assert_eq!(expect, key_map);
+    assert_eq!(KeyMap(expect), key_map);
 }
 
 #[test]

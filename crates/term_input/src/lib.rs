@@ -50,6 +50,8 @@ pub enum Key {
     ShiftArrow(Arrow),
     ShiftF(FKey),
     Tab,
+    MouseWheelUp,
+    MouseWheelDown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Hash, Eq)]
@@ -207,6 +209,8 @@ byte_seq_parser! {
     [28] => Key::Ctrl('\\'),
     [29] => Key::Ctrl(']'),
     [31] => Key::Ctrl('/'),
+    [27, 79, 65, 27, 79, 65, 27, 79, 65] => Key::MouseWheelUp,
+    [27, 79, 66, 27, 79, 66, 27, 79, 66] => Key::MouseWheelDown,
 }
 
 // static XTERM_FOCUS_GAINED: [u8; 3] = [27, 91, 73];
