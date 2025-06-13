@@ -86,6 +86,7 @@ impl UI {
     delegate_ui!(set_nick(serv: &str, nick: &str,));
     delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
     delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
+    delegate_ui!(check_blocked(user: &String,) -> bool);
     delegate_ui!(get_tab_config(serv_name: &str, chan_name: Option<&ChanNameRef>,) -> TabConfig);
     delegate_ui!(set_tab_config(
         serv_name: &str,
