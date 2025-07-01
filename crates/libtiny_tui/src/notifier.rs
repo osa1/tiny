@@ -45,7 +45,7 @@ impl Notifier {
             "off" => Ok(Notifier::Off),
             "mentions" => Ok(Notifier::Mentions),
             "messages" => Ok(Notifier::Messages),
-            _ => Err(format!("Unknown Notifier variant: {}", s)),
+            _ => Err(format!("Unknown Notifier variant: {s}")),
         }
     }
 
@@ -74,7 +74,7 @@ impl Notifier {
                 ..
             } => {
                 if *self != Notifier::Off {
-                    notify(&format!("{} sent a private message", nick_sender), &msg)
+                    notify(&format!("{nick_sender} sent a private message"), &msg)
                 }
             }
             _ => {}

@@ -75,7 +75,7 @@ impl Chan {
     pub fn from_cmd_args(s: &str) -> Result<Chan, String> {
         // Make sure channel starts with '#'
         let s = if !s.starts_with('#') {
-            format!("#{}", s)
+            format!("#{s}")
         } else {
             s.to_string()
         };
@@ -216,7 +216,7 @@ impl TabConfig {
                     }
                     None => return Err("-notify parameter missing".to_string()),
                 },
-                other => return Err(format!("Unexpected channel parameter: {:?}", other)),
+                other => return Err(format!("Unexpected channel parameter: {other:?}")),
             }
         }
 
@@ -436,9 +436,8 @@ impl<'de> Deserialize<'de> for Style {
                     formatter,
                     "fg: 0-255 or color name\n\
                      bg: 0-255 or color name\n\
-                     attrs: [{}]\n\n\
-                     color names: {}",
-                    attrs, colors
+                     attrs: [{attrs}]\n\n\
+                     color names: {colors}"
                 )
             }
 

@@ -98,7 +98,7 @@ impl TUI {
 async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receiver<()>) {
     let stream = match signal(SignalKind::window_change()) {
         Err(err) => {
-            debug!("Can't install SIGWINCH handler: {:?}", err);
+            debug!("Can't install SIGWINCH handler: {err:?}");
             return;
         }
         Ok(stream) => stream,
@@ -142,11 +142,11 @@ async fn input_handler<S>(
             // $EDITOR running, don't read stdin, wait for $EDITOR to finish
             match editor_ret.await {
                 Err(recv_error) => {
-                    debug!("RecvError while waiting editor response: {:?}", recv_error);
+                    debug!("RecvError while waiting editor response: {recv_error:?}");
                 }
                 Ok(editor_ret) => {
                     if let Some((lines, from)) = tui.borrow_mut().handle_editor_result(editor_ret) {
-                        debug!("editor ret: {:?}", lines);
+                        debug!("editor ret: {lines:?}");
                         snd_ev
                             .try_send(Event::Lines {
                                 lines,
@@ -166,7 +166,7 @@ async fn input_handler<S>(
                 break;
             }
             Some(Err(io_err)) => {
-                debug!("term_input error: {:?}", io_err);
+                debug!("term_input error: {io_err:?}");
                 break;
             }
             Some(Ok(ev)) => {

@@ -28,7 +28,7 @@ pub(crate) fn run_cmd(
 
         None => {
             ui.add_client_err_msg(
-                &format!("Unsupported command: \"/{}\"", cmd),
+                &format!("Unsupported command: \"/{cmd}\""),
                 &MsgTarget::CurrentTab,
             );
         }
@@ -241,7 +241,7 @@ fn connect_(
             Some((serv_name, serv_port)) => match serv_port.parse::<u16>() {
                 Err(err) => {
                     return ui.add_client_err_msg(
-                        &format!("connect: Can't parse port {}: {}", serv_port, err),
+                        &format!("connect: Can't parse port {serv_port}: {err}"),
                         &MsgTarget::CurrentTab,
                     );
                 }
@@ -508,9 +508,9 @@ fn names(args: CmdArgs) {
         } else {
             let nick = words[0];
             if nicks_vec.iter().any(|v| v == nick) {
-                ui.add_client_msg(&format!("{} is online", nick), &target);
+                ui.add_client_msg(&format!("{nick} is online"), &target);
             } else {
-                ui.add_client_msg(&format!("{} is not in the channel", nick), &target);
+                ui.add_client_msg(&format!("{nick} is not in the channel"), &target);
             }
         }
     } else {

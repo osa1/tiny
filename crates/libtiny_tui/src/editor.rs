@@ -134,7 +134,7 @@ pub(crate) fn run(
                 if cursor == 0 {
                     cmd.arg("-c").arg("normal! 3j");
                 } else {
-                    cmd.arg("-c").arg(format!("normal! 3j{}l", cursor));
+                    cmd.arg("-c").arg(format!("normal! 3j{cursor}l"));
                 }
             }
             "emacs" => {

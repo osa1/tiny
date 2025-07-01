@@ -23,8 +23,8 @@ fn main() {
     let port = match port_str.parse::<u16>() {
         Ok(port) => port,
         Err(err) => {
-            println!("Can't parse port: {:?}", port_str);
-            println!("{}", err);
+            println!("Can't parse port: {port_str:?}");
+            println!("{err}");
             exit(1);
         }
     };
@@ -46,7 +46,7 @@ fn main() {
         sasl_auth: None,
     };
 
-    println!("{:?}", server_info);
+    println!("{server_info:?}");
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -67,7 +67,7 @@ async fn echo_bot_task(server_info: ServerInfo) {
 
     let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
-        println!("Client event: {:?}", ev);
+        println!("Client event: {ev:?}");
         if let Event::Msg(Msg {
             pfx: Some(Pfx::User { nick, .. }),
             cmd: Cmd::PRIVMSG { target, msg, .. },

@@ -56,15 +56,14 @@ pub fn expect_screen(
         panic!(
             "Unexpected screen\n\
             Expected:\n\
-            {}\n\
-            {}\n\
-            {}\n\
+            {line}\n\
+            {screen_filtered}\n\
+            {line}\n\
             Found:\n\
-            {}\n\
-            {}\n\
-            {}\n\
-            Called by: {}\n",
-            line, screen_filtered, line, line, found, line, caller
+            {line}\n\
+            {found}\n\
+            {line}\n\
+            Called by: {caller}\n"
         );
     }
 }

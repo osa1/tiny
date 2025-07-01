@@ -12,31 +12,31 @@ use std::str;
 use libtiny_common::{ChanName, ChanNameRef};
 
 pub fn pass(pass: &str) -> String {
-    format!("PASS {}\r\n", pass)
+    format!("PASS {pass}\r\n")
 }
 
 // FIXME: Option<String> because going from Option<String> to Option<&str> is too painful...
 pub fn quit(reason: Option<String>) -> String {
     match reason {
         None => "QUIT\r\n".to_string(),
-        Some(reason) => format!("QUIT :{}\r\n", reason),
+        Some(reason) => format!("QUIT :{reason}\r\n"),
     }
 }
 
 pub fn user(hostname: &str, realname: &str) -> String {
-    format!("USER {} 8 * :{}\r\n", hostname, realname)
+    format!("USER {hostname} 8 * :{realname}\r\n")
 }
 
 pub fn nick(arg: &str) -> String {
-    format!("NICK {}\r\n", arg)
+    format!("NICK {arg}\r\n")
 }
 
 pub fn ping(arg: &str) -> String {
-    format!("PING {}\r\n", arg)
+    format!("PING {arg}\r\n")
 }
 
 pub fn pong(arg: &str) -> String {
-    format!("PONG {}\r\n", arg)
+    format!("PONG {arg}\r\n")
 }
 
 pub fn join<'a, I>(chans: I) -> String
@@ -59,18 +59,18 @@ pub fn privmsg(msgtarget: &str, msg: &str) -> String {
     // with at call sites as we can't show how we split messages into multiple messages in the UI
     // at this point.
     assert!(msgtarget.len() + msg.len() + 12 <= 512);
-    format!("PRIVMSG {} :{}\r\n", msgtarget, msg)
+    format!("PRIVMSG {msgtarget} :{msg}\r\n")
 }
 
 pub fn action(msgtarget: &str, msg: &str) -> String {
     assert!(msgtarget.len() + msg.len() + 21 <= 512); // See comments in `privmsg`
-    format!("PRIVMSG {} :\x01ACTION {}\x01\r\n", msgtarget, msg)
+    format!("PRIVMSG {msgtarget} :\x01ACTION {msg}\x01\r\n")
 }
 
 pub fn away(msg: Option<&str>) -> String {
     match msg {
         None => "AWAY\r\n".to_string(),
-        Some(msg) => format!("AWAY :{}\r\n", msg),
+        Some(msg) => format!("AWAY :{msg}\r\n"),
     }
 }
 
@@ -87,7 +87,7 @@ pub fn cap_end() -> String {
 }
 
 pub fn authenticate(msg: &str) -> String {
-    format!("AUTHENTICATE {}\r\n", msg)
+    format!("AUTHENTICATE {msg}\r\n")
 }
 
 /// Sender of a message ("prefix" in the RFC). Instead of returning a `String` we parse prefix part
@@ -329,8 +329,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
         if let Some(':') = msg.chars().next() {
             // parse prefix
             let ws_idx = msg.find(' ').ok_or(format!(
-                "Can't find prefix terminator (' ') in msg: {:?}",
-                msg
+                "Can't find prefix terminator (' ') in msg: {msg:?}"
             ))?;
             let pfx = &msg[1..ws_idx]; // consume ':'
             msg = &msg[ws_idx + 1..]; // consume ' '
@@ -342,8 +341,7 @@ fn parse_one_message(mut msg: &str) -> Result<Msg, String> {
 
     let msg_ty: MsgType = {
         let ws_idx = msg.find(' ').ok_or(format!(
-            "Can't find message type terminator (' ') in msg: {:?}",
-            msg
+            "Can't find message type terminator (' ') in msg: {msg:?}"
         ))?;
         let cmd = &msg[..ws_idx];
         msg = &msg[ws_idx + 1..]; // Consume ' '

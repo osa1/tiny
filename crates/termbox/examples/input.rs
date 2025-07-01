@@ -24,7 +24,7 @@ fn main() {
             Ok(_) => {
                 let mut buf: Vec<u8> = vec![];
                 term_input::read_stdin(&mut buf).unwrap();
-                let string = format!("{:?}", buf);
+                let string = format!("{buf:?}");
                 termbox.clear();
                 if buf == vec![27] {
                     break 'mainloop;

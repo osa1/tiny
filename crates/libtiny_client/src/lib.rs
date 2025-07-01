@@ -147,7 +147,7 @@ impl Client {
 
     /// Reconnect to the server, possibly using a new port.
     pub fn reconnect(&mut self, port: Option<u16>) {
-        debug!("reconnect cmd received, port: {:?}", port);
+        debug!("reconnect cmd received, port: {port:?}");
         self.msg_chan.try_send(Cmd::Reconnect(port)).unwrap()
     }
 
@@ -171,7 +171,7 @@ impl Client {
     /// Send a message directly to the server. "\r\n" suffix is added by this method.
     pub fn raw_msg(&mut self, msg: &str) {
         self.msg_chan
-            .try_send(Cmd::Msg(format!("{}\r\n", msg)))
+            .try_send(Cmd::Msg(format!("{msg}\r\n")))
             .unwrap();
     }
 
@@ -365,7 +365,7 @@ async fn main_loop(
                 addr_iter
             }
             TaskResult::Done(Err(err)) => {
-                debug!("resolve_addr: {:?}", err);
+                debug!("resolve_addr: {err:?}");
                 snd_ev.send(Event::IoErr(err)).await.unwrap();
                 wait = true;
                 continue;
@@ -389,7 +389,7 @@ async fn main_loop(
             return;
         }
 
-        debug!("Address resolved: {:?}", addrs);
+        debug!("Address resolved: {addrs:?}");
 
         //
         // Establish TCP connection to the server
@@ -453,7 +453,7 @@ async fn main_loop(
             let mut rcv_msg = ReceiverStream::new(rcv_msg);
             while let Some(msg) = rcv_msg.next().await {
                 if let Err(io_err) = write_half.write_all(msg.as_bytes()).await {
-                    debug!("IO error when writing: {:?}", io_err);
+                    debug!("IO error when writing: {io_err:?}");
                     snd_ev_clone.send(Event::IoErr(io_err)).await.unwrap();
                     return;
                 }
@@ -501,7 +501,7 @@ async fn main_loop(
                 bytes = read_half.read(&mut read_buf).fuse() => {
                     match bytes {
                         Err(io_err) => {
-                            debug!("main loop: error when reading from socket: {:?}", io_err);
+                            debug!("main loop: error when reading from socket: {io_err:?}");
                             snd_ev.send(Event::IoErr(io_err)).await.unwrap();
                             snd_ev.send(Event::Disconnected).await.unwrap();
                             wait = true;
@@ -522,7 +522,7 @@ async fn main_loop(
                                         snd_ev.send(Event::WireError(err)).await.unwrap();
                                     }
                                     Ok(mut msg) => {
-                                        debug!("parsed msg: {:?}", msg);
+                                        debug!("parsed msg: {msg:?}");
                                         pinger.reset();
                                         irc_state.update(&mut msg, &mut snd_ev, &mut snd_msg);
                                         snd_ev.send(Event::Msg(msg)).await.unwrap();
@@ -606,7 +606,7 @@ async fn resolve_addr<S: StreamExt<Item = Cmd> + Unpin>(
                 match addr_iter {
                     Err(join_err) => {
                         // TODO (osa): Not sure about this
-                        panic!("DNS thread failed: {:?}", join_err);
+                        panic!("DNS thread failed: {join_err:?}");
                     }
                     Ok(ret) => {
                         return TaskResult::Done(ret);

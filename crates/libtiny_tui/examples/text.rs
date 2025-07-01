@@ -30,7 +30,7 @@ fn main() {
         tui.add_client_msg(&single_line_text, &tab);
 
         for line in text.lines() {
-            tui.add_client_msg(&format!(">>>  {}", line), &tab);
+            tui.add_client_msg(&format!(">>>  {line}"), &tab);
         }
 
         tui.draw();

@@ -52,7 +52,7 @@ fn draw_range(tui: &mut Termbox, begin: u16, end: u16, mut row: i32, fg: bool) -
             row += 1;
         }
 
-        let string = format!("{:>3}", i);
+        let string = format!("{i:>3}");
         let fg_ = if fg { i } else { 0 };
         let bg_ = if fg { 0 } else { i };
         tui.change_cell(col, row, string.chars().next().unwrap(), fg_, bg_);

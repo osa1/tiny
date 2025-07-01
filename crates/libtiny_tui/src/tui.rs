@@ -336,7 +336,7 @@ impl TUI {
             match parse_config(config_path) {
                 Err(err) => {
                     self.add_client_err_msg(
-                        &format!("Can't parse TUI config: {}", err),
+                        &format!("Can't parse TUI config: {err}"),
                         &MsgTarget::CurrentTab,
                     );
                     None
@@ -629,7 +629,7 @@ impl TUI {
         match kind {
             editor::ErrorKind::Io(err) => {
                 self.add_client_err_msg(
-                    &format!("Error while running $EDITOR: {:?}", err),
+                    &format!("Error while running $EDITOR: {err:?}"),
                     &MsgTarget::CurrentTab,
                 );
             }

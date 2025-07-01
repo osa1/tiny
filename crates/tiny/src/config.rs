@@ -32,7 +32,7 @@ impl TryFrom<SASLAuth<String>> for ClientSASLAuth {
         Ok(match sasl {
             SASLAuth::Plain { username, password } => ClientSASLAuth::Plain { username, password },
             SASLAuth::External { pem } => ClientSASLAuth::External {
-                pem: std::fs::read(pem).map_err(|e| format!("Could not read PEM file: {}", e))?,
+                pem: std::fs::read(pem).map_err(|e| format!("Could not read PEM file: {e}"))?,
             },
         })
     }
@@ -149,8 +149,7 @@ impl<'de> Deserialize<'de> for PassOrCmd {
                 Some(Value::String(cmd)) => match shell_words::split(cmd) {
                     Ok(cmd_parts) => Ok(PassOrCmd::Cmd(cmd_parts)),
                     Err(err) => Err(D::Error::custom(format!(
-                        "Unable to parse password field: {}",
-                        err
+                        "Unable to parse password field: {err}"
                     ))),
                 },
                 _ => Err(D::Error::custom(
@@ -177,7 +176,7 @@ fn run_command(command_name: &str, server_addr: &str, args: &[String]) -> Option
 
     let output = match cmd.output() {
         Err(err) => {
-            println!("Command failed: {:?}", err);
+            println!("Command failed: {err:?}");
             return None;
         }
         Ok(output) => output,
@@ -186,7 +185,7 @@ fn run_command(command_name: &str, server_addr: &str, args: &[String]) -> Option
     if !output.status.success() {
         print!("Command returned non-zero");
         if let Some(code) = output.status.code() {
-            println!(": {}", code);
+            println!(": {code}");
         } else {
             println!();
         }
@@ -239,7 +238,7 @@ impl Config<PassOrCmd> {
 
         for (nick_idx, nick) in self.defaults.nicks.iter().enumerate() {
             if nick.is_empty() {
-                errors.push(format!("Default nick {} is empty", nick_idx));
+                errors.push(format!("Default nick {nick_idx} is empty"));
             }
         }
 
@@ -433,9 +432,8 @@ pub(crate) fn generate_default_config(config_path: &Path) {
         .unwrap();
     println!(
         "\
-tiny couldn't find a config file at {0:?}, and created a config file with defaults.
-You may want to edit {0:?} before re-running tiny.",
-        config_path
+tiny couldn't find a config file at {config_path:?}, and created a config file with defaults.
+You may want to edit {config_path:?} before re-running tiny."
     );
 }
 
@@ -458,7 +456,7 @@ mod tests {
     fn parse_default_config() {
         match serde_yaml::from_str::<Config<String>>(&get_default_config_yaml()) {
             Err(yaml_err) => {
-                println!("{}", yaml_err);
+                println!("{yaml_err}");
                 panic!();
             }
             Ok(Config { servers, .. }) => {

@@ -234,7 +234,7 @@ impl Drop for Input {
     fn drop(&mut self) {
         if let Some(old_flags) = self.old_stdin_flags.take() {
             if let Err(err) = fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
-                error!("Unable to restore stdin flags: {:?}", err);
+                error!("Unable to restore stdin flags: {err:?}");
             }
         }
     }
@@ -513,12 +513,12 @@ pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
 fn set_stdin_nonblocking() -> Option<OFlag> {
     let current_stdin_flags: OFlag = match fcntl(libc::STDIN_FILENO, FcntlArg::F_GETFL) {
         Err(err) => {
-            error!("Unable to read stdin flags: {:?}", err);
+            error!("Unable to read stdin flags: {err:?}");
             return None;
         }
         Ok(flags) => match OFlag::from_bits(flags) {
             None => {
-                error!("Unable to parse stdin flags: {:x?}", flags);
+                error!("Unable to parse stdin flags: {flags:x?}");
                 return None;
             }
             Some(flags) => flags,
@@ -532,7 +532,7 @@ fn set_stdin_nonblocking() -> Option<OFlag> {
         Err(err) => {
             // On Linux we don't really need to enable non-blocking mode so things should still
             // work. On WSL things may or may not work.. see #269.
-            error!("Unable to set stdin flags: {:?}", err);
+            error!("Unable to set stdin flags: {err:?}");
             None
         }
         Ok(_) => Some(current_stdin_flags),

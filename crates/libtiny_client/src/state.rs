@@ -300,7 +300,7 @@ impl StateInner {
                 match pfx {
                     Some(Pfx::User { nick, user }) if nick == &self.current_nick => {
                         // Set usermask
-                        let usermask = format!("{}!{}", nick, user);
+                        let usermask = format!("{nick}!{user}");
                         self.usermask = Some(usermask);
                     }
                     _ => {}
@@ -333,7 +333,7 @@ impl StateInner {
                                         .insert(wire::drop_nick_prefix(nick).to_owned());
                                 }
                                 None => {
-                                    debug!("Can't find channel state for JOIN: {:?}", cmd);
+                                    debug!("Can't find channel state for JOIN: {cmd:?}");
                                 }
                             }
                         }
@@ -363,7 +363,7 @@ impl StateInner {
                                     .remove(wire::drop_nick_prefix(nick));
                             }
                             None => {
-                                debug!("Can't find channel state for PART: {:?}", cmd);
+                                debug!("Can't find channel state for PART: {cmd:?}");
                             }
                         }
                     }
@@ -463,7 +463,7 @@ impl StateInner {
                         debug!("Received 477 reply but nickserv_ident is not configured.");
                     }
                 } else {
-                    warn!("Could not parse 477 reply: {:?}", cmd);
+                    warn!("Could not parse 477 reply: {cmd:?}");
                 }
             }
 
@@ -505,7 +505,7 @@ impl StateInner {
                 self.nick_accepted = true;
                 if let Some(ref pwd) = self.nickserv_ident {
                     snd_irc_msg
-                        .try_send(wire::privmsg("NickServ", &format!("identify {}", pwd)))
+                        .try_send(wire::privmsg("NickServ", &format!("identify {pwd}")))
                         .unwrap();
                 }
             }
@@ -569,10 +569,7 @@ impl StateInner {
 
                             if let Some(ref pwd) = self.nickserv_ident {
                                 snd_irc_msg
-                                    .try_send(wire::privmsg(
-                                        "NickServ",
-                                        &format!("identify {}", pwd),
-                                    ))
+                                    .try_send(wire::privmsg("NickServ", &format!("identify {pwd}")))
                                     .unwrap();
                             }
                         }
@@ -663,7 +660,7 @@ impl StateInner {
                     if let Some(ref auth) = self.server_info.sasl_auth {
                         let msg = match auth {
                             SASLAuth::Plain { username, password } => {
-                                let msg = format!("{}\x00{}\x00{}", username, username, password);
+                                let msg = format!("{username}\x00{username}\x00{password}");
                                 use base64::engine::Engine;
                                 base64::engine::general_purpose::STANDARD.encode(msg)
                             }

@@ -299,15 +299,15 @@ impl Display for KeyAction {
             KeyAction::TabPrev => "tab_prev",
             KeyAction::TabMoveLeft => "tab_move_left",
             KeyAction::TabMoveRight => "tab_move_right",
-            KeyAction::TabGoto(c) => return writeln!(f, "tab_goto: {}", c),
+            KeyAction::TabGoto(c) => return writeln!(f, "tab_goto: {c}"),
             KeyAction::MessagesPageUp => "messages_page_up",
             KeyAction::MessagesPageDown => "messages_page_down",
             KeyAction::MessagesScrollUp => "messages_scroll_up",
             KeyAction::MessagesScrollDown => "messages_scroll_down",
             KeyAction::MessagesScrollTop => "messages_scroll_top",
             KeyAction::MessagesScrollBottom => "messages_scroll_bottom",
-            KeyAction::Input(c) => return writeln!(f, "input_{}", c),
-            KeyAction::Command(string) => return writeln!(f, "command_{}", string),
+            KeyAction::Input(c) => return writeln!(f, "input_{c}"),
+            KeyAction::Command(string) => return writeln!(f, "command_{string}"),
             KeyAction::InputAutoComplete => "input_auto_complete",
             KeyAction::InputNextEntry => "input_next_entry",
             KeyAction::InputPrevEntry => "input_prev_entry",
@@ -324,7 +324,7 @@ impl Display for KeyAction {
             KeyAction::InputMoveWordLeft => "input_move_word_left",
             KeyAction::InputMoveWordRight => "input_move_word_right",
         };
-        writeln!(f, "{}", s)
+        writeln!(f, "{s}")
     }
 }
 
@@ -376,13 +376,13 @@ impl Display for KeyDisplay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             Key::AltArrow(arrow) => write!(f, "alt_{}", ArrowDisplay(arrow)),
-            Key::AltChar(char) => write!(f, "alt_{}", char),
+            Key::AltChar(char) => write!(f, "alt_{char}"),
             Key::AltF(fkey) => write!(f, "alt_{}", FKeyDisplay(fkey)),
             Key::Arrow(arrow) => write!(f, "{}", ArrowDisplay(arrow)),
             Key::Backspace => write!(f, "backspace"),
             Key::Char('\r') => write!(f, "enter"),
-            Key::Char(char) => write!(f, "{}", char),
-            Key::Ctrl(char) => write!(f, "ctrl_{}", char),
+            Key::Char(char) => write!(f, "{char}"),
+            Key::Ctrl(char) => write!(f, "ctrl_{char}"),
             Key::CtrlArrow(arrow) => write!(f, "ctrl_{}", ArrowDisplay(arrow)),
             Key::CtrlF(fkey) => write!(f, "ctrl_{}", FKeyDisplay(fkey)),
             Key::Del => write!(f, "del"),
@@ -406,7 +406,7 @@ impl Display for KeyMap {
         for (key, action) in self.0.iter() {
             if let KeyAction::TabGoto(_) = action {
                 writeln!(f, "{}:", KeyDisplay(*key))?;
-                writeln!(f, "  {}", action)?;
+                writeln!(f, "  {action}")?;
             } else {
                 writeln!(f, "{}: {}", KeyDisplay(*key), action)?;
             }

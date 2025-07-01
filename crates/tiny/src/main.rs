@@ -38,7 +38,7 @@ fn main() {
         match config::parse_config(&config_path) {
             Err(yaml_err) => {
                 println!("Can't parse config file:");
-                println!("{}", yaml_err);
+                println!("{yaml_err}");
                 exit(1);
             }
             Ok(config) => {
@@ -49,7 +49,7 @@ fn main() {
                         if config_errors.len() > 1 { "s" } else { "" }
                     );
                     for error in config_errors {
-                        println!("- {}", error);
+                        println!("- {error}");
                     }
                     exit(1);
                 }
@@ -117,7 +117,7 @@ fn run(
             Box::new(move |err: String| {
                 // Somehwat hacky -- only tab we have is "mentions" so we show the error there
                 tui_clone.add_client_err_msg(
-                    &format!("Logger error: {}", err),
+                    &format!("Logger error: {err}"),
                     &MsgTarget::Server { serv: "mentions" },
                 )
             })
@@ -126,7 +126,7 @@ fn run(
             log_dir.and_then(|log_dir| match Logger::new(log_dir, report_logger_error) {
                 Err(LoggerInitError::CouldNotCreateDir { dir_path, err }) => {
                     tui.add_client_err_msg(
-                        &format!("Could not create log directory {:?}: {}", dir_path, err),
+                        &format!("Could not create log directory {dir_path:?}: {err}"),
                         &MsgTarget::Server { serv: "mentions" },
                     );
                     tui.draw();

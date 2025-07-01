@@ -44,13 +44,13 @@ fn main() {
         while let Some(mb_ev) = input.next().await {
             match mb_ev {
                 Ok(ev) => {
-                    println!("{:?}", ev);
+                    println!("{ev:?}");
                     if ev == Event::Key(Key::Esc) {
                         break;
                     }
                 }
                 Err(io_err) => {
-                    println!("Error: {:?}", io_err);
+                    println!("Error: {io_err:?}");
                     break;
                 }
             }

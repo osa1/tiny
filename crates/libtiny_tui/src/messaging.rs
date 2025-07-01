@@ -304,7 +304,7 @@ impl MessagingUI {
         let layout = self.msg_area.layout();
         let format_nick = |s: &str| -> String {
             if let Layout::Aligned { max_nick_len, .. } = layout {
-                let mut aligned = format!("{:>padding$.padding$}", s, padding = max_nick_len);
+                let mut aligned = format!("{s:>max_nick_len$.max_nick_len$}");
                 if s.len() > max_nick_len {
                     aligned.pop();
                     aligned.push('…');

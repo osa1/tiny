@@ -96,7 +96,7 @@ fn test_resize_scroll_stick_to_top() {
     let ts = time::at_utc(time::Timespec::new(0, 0));
 
     for i in 0..15 {
-        tui.add_privmsg("osa1", &format!("line{}", i), ts, &target, false, false);
+        tui.add_privmsg("osa1", &format!("line{i}"), ts, &target, false, false);
     }
 
     tui.draw();
@@ -158,7 +158,7 @@ fn test_resize_no_scroll_stay_on_bottom() {
     let ts = time::at_utc(time::Timespec::new(0, 0));
 
     for i in 0..15 {
-        tui.add_privmsg("osa1", &format!("line{}", i), ts, &target, false, false);
+        tui.add_privmsg("osa1", &format!("line{i}"), ts, &target, false, false);
     }
 
     tui.draw();
@@ -264,7 +264,7 @@ fn test_resize_scroll_resize() {
     for i in 0..15 {
         tui.add_privmsg(
             "osa1",
-            &format!("a long line {}", i),
+            &format!("a long line {i}"),
             ts,
             &target,
             false,

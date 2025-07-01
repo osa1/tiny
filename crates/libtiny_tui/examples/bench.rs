@@ -21,7 +21,7 @@ fn main() {
             println!("Max RSS (ru_maxrss): {} kb", rusage.ru_maxrss);
         }
         i => {
-            println!("getrusage() returned {}", i);
+            println!("getrusage() returned {i}");
         }
     }
 }

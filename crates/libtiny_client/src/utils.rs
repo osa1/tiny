@@ -51,7 +51,7 @@ impl<'a> Iterator for SplitIterator<'a> {
                     }
 
                     if split == 0 {
-                        panic!("Can't split long msg: {:?}", s);
+                        panic!("Can't split long msg: {s:?}");
                     } else {
                         let ret = Some(&s[0..split]);
                         self.s = Some(&s[split..]);

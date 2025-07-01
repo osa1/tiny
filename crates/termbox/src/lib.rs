@@ -461,7 +461,7 @@ impl Termbox {
         if self.terminal_cursor.0 != to_x || self.terminal_cursor.1 != to_y {
             goto(&mut self.output_buffer, to_x, to_y);
         }
-        write!(&mut self.output_buffer, "{}", ch).unwrap();
+        write!(&mut self.output_buffer, "{ch}").unwrap();
 
         self.terminal_cursor = (to_x + cw, to_y);
     }

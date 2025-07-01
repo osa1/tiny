@@ -58,7 +58,7 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
         }
         Connecting(sock_addr) => {
             ui.add_client_msg(
-                &format!("Connecting to {}", sock_addr),
+                &format!("Connecting to {sock_addr}"),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
                 },
@@ -86,7 +86,7 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
         }
         IoErr(err) => {
             ui.add_err_msg(
-                &format!("Connection error: {}", err),
+                &format!("Connection error: {err}"),
                 time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
@@ -104,7 +104,7 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
         }
         TlsErr(err) => {
             ui.add_err_msg(
-                &format!("TLS error: {}", err),
+                &format!("TLS error: {err}"),
                 time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
@@ -128,7 +128,7 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
         }
         WireError(err) => {
             ui.add_err_msg(
-                &format!("Wire protocol error: {}", err),
+                &format!("Wire protocol error: {err}"),
                 time::now(),
                 &MsgTarget::Server {
                     serv: client.get_serv_name(),
@@ -162,7 +162,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
             let pfx = match pfx {
                 Some(pfx) => pfx,
                 None => {
-                    debug!("PRIVMSG without prefix: {:?}", msg);
+                    debug!("PRIVMSG without prefix: {msg:?}");
                     return;
                 }
             };
@@ -180,7 +180,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                     MsgTarget::Server { serv }
                 };
                 ui.add_client_msg(
-                    &format!("Received version request from {}", sender),
+                    &format!("Received version request from {sender}"),
                     &msg_target,
                 );
                 return;
@@ -471,7 +471,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
             }
             "ACK" => {}
             cmd => {
-                debug!("Ignoring CAP subcommand {}: params={:?}", cmd, params);
+                debug!("Ignoring CAP subcommand {cmd}: params={params:?}");
             }
         },
 
@@ -542,7 +542,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 let nick = &params[1];
                 let msg = &params[2];
                 ui.add_client_msg(
-                    &format!("{} is away: {}", nick, msg),
+                    &format!("{nick} is away: {msg}"),
                     &MsgTarget::User { serv, nick },
                 );
             } else {
@@ -560,10 +560,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                         ui.set_tab_style(TabStyle::NewMsg, &msg_target);
                     }
                     Some(User { .. }) | None => {
-                        debug!(
-                            "Ignoring numeric reply {}: pfx={:?}, params={:?}",
-                            n, pfx, params
-                        );
+                        debug!("Ignoring numeric reply {n}: pfx={pfx:?}, params={params:?}");
                     }
                 }
             }
@@ -583,10 +580,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 ui.set_tab_style(TabStyle::NewMsg, &msg_target);
             }
             Some(User { .. }) | Some(Ambiguous(_)) | None => {
-                debug!(
-                    "Ignoring command {}: pfx={:?}, params={:?}",
-                    cmd, pfx, params
-                );
+                debug!("Ignoring command {cmd}: pfx={pfx:?}, params={params:?}");
             }
         },
     }
