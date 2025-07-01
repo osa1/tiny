@@ -38,7 +38,9 @@ pub(crate) fn parse() -> Args {
                 }
 
                 None => {
-                    eprintln!("Error: The argument '--config <FILE>' requires a file path but none was supplied");
+                    eprintln!(
+                        "Error: The argument '--config <FILE>' requires a file path but none was supplied"
+                    );
                     eprintln!();
                     eprintln!("For more information try --help");
                     std::process::exit(1);

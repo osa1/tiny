@@ -3,7 +3,7 @@ name = "libtiny_client"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "An IRC client library, mainly to be used in tiny"
-edition = "2021"
+edition = "2024"
 
 [features]
 default = ["tls-rustls"]

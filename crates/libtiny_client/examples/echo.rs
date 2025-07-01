@@ -6,8 +6,8 @@ use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 
 use std::process::exit;
 
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 fn main() {
     // echo <nick> <server> <port> [<chan_1> ... <chan_N>]

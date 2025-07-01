@@ -17,9 +17,9 @@ use std::os::unix::io::RawFd;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use nix::fcntl::{fcntl, FcntlArg, OFlag};
-use tokio::io::unix::AsyncFd;
+use nix::fcntl::{FcntlArg, OFlag, fcntl};
 use tokio::io::Interest;
+use tokio::io::unix::AsyncFd;
 use tokio_stream::Stream;
 
 #[macro_use]

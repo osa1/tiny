@@ -2,8 +2,8 @@ use crate::syntax::*;
 
 use indexmap::map::IndexMap;
 use proc_macro2::TokenStream;
-use quote::quote;
 use quote::TokenStreamExt;
+use quote::quote;
 
 struct Node {
     idx: usize,

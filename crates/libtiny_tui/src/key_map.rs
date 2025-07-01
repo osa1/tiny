@@ -157,7 +157,10 @@ impl<'de> Deserialize<'de> for MappedKey {
             type Value = MappedKey;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9], [f1-f12]. ")?;
+                write!(
+                    formatter,
+                    "single keys: backspace, del, end, esc, home, pgdown, pgup, tab, up, down, left right, [a-z], [0-9], [f1-f12]. "
+                )?;
                 write!(
                     formatter,
                     "modifiers with an arrow key, function key, or single characters:  alt, shift, ctrl"

@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
 
-use crate::config::{parse_config, Colors, Config, Style, TabConfig, TabConfigs};
+use crate::config::{Colors, Config, Style, TabConfig, TabConfigs, parse_config};
 use crate::editor;
 use crate::key_map::{KeyAction, KeyMap};
 use crate::messaging::{MessagingUI, Timestamp};
@@ -262,12 +262,12 @@ impl TUI {
             };
             // can't use `MsgSource::to_target` here, `Serv` case is different
             let tab_target = match src {
-                MsgSource::Serv { ref serv } => MsgTarget::AllServTabs { serv },
-                MsgSource::Chan { ref serv, ref chan } => MsgTarget::Chan {
+                MsgSource::Serv { serv } => MsgTarget::AllServTabs { serv },
+                MsgSource::Chan { serv, chan } => MsgTarget::Chan {
                     serv,
                     chan: chan.borrow(),
                 },
-                MsgSource::User { ref serv, ref nick } => MsgTarget::User { serv, nick },
+                MsgSource::User { serv, nick } => MsgTarget::User { serv, nick },
             };
             self.set_notifier(notifier, &tab_target);
         }

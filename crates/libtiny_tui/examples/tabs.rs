@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 use libtiny_common::{ChanNameRef, Event, MsgSource, MsgTarget, TabStyle};
 use libtiny_tui::TUI;

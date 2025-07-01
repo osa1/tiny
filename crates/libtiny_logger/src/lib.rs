@@ -367,7 +367,7 @@ impl LoggerInner {
                 None => {
                     info!("Can't find server: {serv:?}");
                 }
-                Some(ServerLogs { ref mut fd, .. }) => {
+                Some(ServerLogs { fd, .. }) => {
                     f(fd, &*self.report_err);
                 }
             },
@@ -375,7 +375,7 @@ impl LoggerInner {
                 None => {
                     info!("Can't find server: {serv:?}");
                 }
-                Some(ServerLogs { ref mut chans, .. }) => match chans.get_mut(chan) {
+                Some(ServerLogs { chans, .. }) => match chans.get_mut(chan) {
                     None => {
                         // Create a file for the channel. FIXME Code copied from new_chan_tab:
                         // can't reuse it because of borrowchk issues.
@@ -402,7 +402,7 @@ impl LoggerInner {
                     None => {
                         info!("Can't find server: {serv:?}");
                     }
-                    Some(ServerLogs { ref mut users, .. }) => {
+                    Some(ServerLogs { users, .. }) => {
                         match users.get_mut(nick) {
                             Some(fd) => {
                                 f(fd, &*self.report_err);
@@ -427,10 +427,7 @@ impl LoggerInner {
                     info!("Can't find server: {serv:?}");
                 }
                 Some(ServerLogs {
-                    ref mut fd,
-                    ref mut chans,
-                    ref mut users,
-                    ..
+                    fd, chans, users, ..
                 }) => {
                     f(fd, &*self.report_err);
                     for (_, fd) in chans.iter_mut() {

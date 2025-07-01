@@ -340,7 +340,7 @@ fn join(args: CmdArgs) {
                 return ui.add_client_err_msg(
                     &format!("Usage: {}", JOIN_CMD.usage),
                     &MsgTarget::CurrentTab,
-                )
+                );
             }
         }
     } else {

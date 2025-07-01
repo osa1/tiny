@@ -6,8 +6,8 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_current_thread()

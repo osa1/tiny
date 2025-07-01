@@ -1,7 +1,7 @@
 #![allow(clippy::get_first, clippy::zero_prefixed_literal)]
 
-use crate::{utils, SASLAuth};
 use crate::{Cmd, Event, ServerInfo};
+use crate::{SASLAuth, utils};
 use libtiny_common::{ChanName, ChanNameRef};
 use libtiny_wire as wire;
 use libtiny_wire::{Msg, Pfx};
@@ -11,9 +11,9 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::time::{timeout, Duration};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio::time::{Duration, timeout};
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[derive(Clone)]
 pub struct State {
@@ -282,10 +282,7 @@ impl StateInner {
         snd_ev: &mut Sender<Event>,
         snd_irc_msg: &mut Sender<String>,
     ) {
-        let Msg {
-            ref pfx,
-            ref mut cmd,
-        } = msg;
+        let Msg { pfx, cmd } = msg;
 
         use wire::Cmd::*;
         match cmd {
@@ -372,7 +369,7 @@ impl StateInner {
             },
 
             // QUIT: Update the `chans` field for the channels that the user was in
-            QUIT { ref mut chans, .. } => {
+            QUIT { chans, .. } => {
                 let nick = match pfx {
                     Some(Pfx::User { nick, .. }) | Some(Pfx::Ambiguous(nick)) => nick,
                     Some(Pfx::Server(_)) | None => {
@@ -544,7 +541,7 @@ impl StateInner {
             // NICK message sent from the server when our nick change request was successful
             NICK {
                 nick: new_nick,
-                ref mut chans,
+                chans,
             } => {
                 match pfx {
                     Some(Pfx::User { nick: old_nick, .. }) | Some(Pfx::Ambiguous(old_nick)) => {
@@ -654,7 +651,7 @@ impl StateInner {
             }
 
             // https://ircv3.net/specs/extensions/sasl-3.1.html
-            AUTHENTICATE { ref param } => {
+            AUTHENTICATE { param } => {
                 if param.as_str() == "+" {
                     // Empty AUTHENTICATE response; server accepted the specified SASL mechanism
                     if let Some(ref auth) = self.server_info.sasl_auth {

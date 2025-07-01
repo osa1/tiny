@@ -3,7 +3,7 @@ name = "libtiny_logger"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
 description = "Implements a logging UI for tiny"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 libtiny_common = { path = "../libtiny_common" }

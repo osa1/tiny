@@ -9,8 +9,8 @@ use std::path::PathBuf;
 
 use tokio::sync::mpsc;
 use tokio::time::timeout;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 static SERV: &str = "debug";
 static CHAN: &str = "chan";

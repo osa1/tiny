@@ -4,8 +4,8 @@
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 pub(crate) struct Pinger {
     snd_rst: mpsc::Sender<()>,

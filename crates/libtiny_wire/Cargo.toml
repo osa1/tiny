@@ -2,7 +2,7 @@
 name = "libtiny_wire"
 version = "0.1.0"
 authors = ["Ömer Sinan Ağacan <omeragacan@gmail.com>"]
-edition = "2021"
+edition = "2024"
 description = "IRC message parsing and generation"
 
 [dependencies]

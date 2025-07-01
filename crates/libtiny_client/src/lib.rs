@@ -20,8 +20,8 @@ use futures_util::future::FutureExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tokio::{pin, select};
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[macro_use]
 extern crate log;
@@ -183,7 +183,7 @@ impl Client {
         &self,
         extra_len: usize,
         msg: &'a str,
-    ) -> impl Iterator<Item = &'a str> {
+    ) -> impl Iterator<Item = &'a str> + 'a {
         // Max msg len calculation adapted from hexchat
         // (src/common/outbound.c:split_up_text)
         let mut max = 512; // RFC 2812
@@ -195,8 +195,8 @@ impl Client {
             None => {
                 max -= 9; // max username
                 max -= 64; // max possible hostname (63) + '@'
-                           // NOTE(osa): I think hexchat has an error here, it
-                           // uses 65
+                // NOTE(osa): I think hexchat has an error here, it
+                // uses 65
             }
             Some(ref usermask) => {
                 max -= usermask.len();

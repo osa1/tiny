@@ -2,8 +2,8 @@
 // `cargo run --example colors`. Use tab to swap fg/bg colors.
 
 use libtiny_common::{ChanName, ChanNameRef};
-use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
+use serde::de::{self, Deserializer, MapAccess, Visitor};
 use std::collections::HashMap;
 use std::path::Path;
 

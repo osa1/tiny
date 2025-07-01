@@ -12,7 +12,7 @@ use crate::utils;
 use crate::widget::WidgetRet;
 
 pub(crate) mod input_line;
-use self::input_line::{draw_line, draw_line_autocomplete, InputLine};
+use self::input_line::{InputLine, draw_line, draw_line_autocomplete};
 
 /// Inspired by vim's 'scrolloff': minimal number of characters to keep above and below the cursor.
 const SCROLL_OFF: i32 = 5;

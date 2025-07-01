@@ -2,7 +2,7 @@
 name = "libtiny_tui"
 version = "0.1.0"
 description = "A terminal UI for tiny"
-edition = "2021"
+edition = "2024"
 
 [[bench]]
 name = "bench"

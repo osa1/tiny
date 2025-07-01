@@ -7,7 +7,7 @@ use termbox_simple::Termbox;
 pub(crate) use self::line::{Line, SegStyle};
 use crate::config::Colors;
 use crate::line_split::LineType;
-use crate::messaging::{Timestamp, MSG_NICK_SUFFIX_LEN};
+use crate::messaging::{MSG_NICK_SUFFIX_LEN, Timestamp};
 
 pub(crate) struct MsgArea {
     lines: VecDeque<Line>,

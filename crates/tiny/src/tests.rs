@@ -1,8 +1,8 @@
 use crate::conn;
 use crate::ui::UI;
 use libtiny_common::ChanName;
-use libtiny_tui::test_utils::expect_screen;
 use libtiny_tui::TUI;
+use libtiny_tui::test_utils::expect_screen;
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 
 use termbox_simple::CellBuf;
@@ -14,8 +14,8 @@ use std::future::Future;
 use std::panic::Location;
 
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 struct TestClient {
     nick: String,

@@ -10,8 +10,8 @@ use libtiny_tui::TUI;
 use libtiny_tui::config::TabConfig;
 use time::Tm;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::ReceiverStream;
 
 macro_rules! delegate {
     ( $name:ident ( $( $x:ident: $t:ty, )* )) => {
@@ -180,11 +180,9 @@ pub(crate) fn send_msg(
                 return;
             }
 
-            MsgSource::Chan { ref serv, ref chan } => {
-                (MsgTarget::Chan { serv, chan }, chan.display())
-            }
+            MsgSource::Chan { serv, chan } => (MsgTarget::Chan { serv, chan }, chan.display()),
 
-            MsgSource::User { ref serv, ref nick } => {
+            MsgSource::User { serv, nick } => {
                 let msg_target = if nick.eq_ignore_ascii_case("nickserv")
                     || nick.eq_ignore_ascii_case("chanserv")
                 {

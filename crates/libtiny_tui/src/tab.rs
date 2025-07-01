@@ -1,5 +1,5 @@
 use libtiny_common::{MsgSource, TabStyle};
-use termbox_simple::{Termbox, TB_UNDERLINE};
+use termbox_simple::{TB_UNDERLINE, Termbox};
 
 use unicode_width::UnicodeWidthStr;
 

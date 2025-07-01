@@ -35,7 +35,7 @@ use std::rc::{Rc, Weak};
 
 use time::Tm;
 use tokio::select;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::mpsc;
 use tokio::task::spawn_local;
 use tokio_stream::wrappers::{ReceiverStream, SignalStream};
