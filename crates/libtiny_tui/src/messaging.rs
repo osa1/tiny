@@ -218,6 +218,10 @@ impl MessagingUI {
         self.input_field.set(str)
     }
 
+    pub(crate) fn set_completion_char(&mut self, completion_char: Option<String>) {
+        self.input_field.set_completion_char(completion_char);
+    }
+
     /// Set cursor location in the input field.
     pub(crate) fn set_cursor(&mut self, cursor: i32) {
         self.input_field.set_cursor(cursor);
