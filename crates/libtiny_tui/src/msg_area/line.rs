@@ -216,23 +216,23 @@ impl Line {
             for c in seg.string.chars() {
                 // If split_indices_iter yields we already know the indices for the start of each line. If it
                 // does not then we just continue outputting on this line.
-                if let Some(next_line_start) = split_indices_iter.peek() {
-                    if char_idx == *next_line_start as usize {
-                        // Move to next line
-                        line_num += 1;
-                        if line_num >= height {
-                            break;
-                        }
-                        // Reset column
-                        col = pos_x + self.line_data.new_line_offset();
+                if let Some(next_line_start) = split_indices_iter.peek()
+                    && char_idx == *next_line_start as usize
+                {
+                    // Move to next line
+                    line_num += 1;
+                    if line_num >= height {
+                        break;
+                    }
+                    // Reset column
+                    col = pos_x + self.line_data.new_line_offset();
 
-                        // Move to the next line start index
-                        split_indices_iter.next();
-                        // Don't draw whitespaces
-                        if c.is_whitespace() {
-                            char_idx += 1;
-                            continue;
-                        }
+                    // Move to the next line start index
+                    split_indices_iter.next();
+                    // Don't draw whitespaces
+                    if c.is_whitespace() {
+                        char_idx += 1;
+                        continue;
                     }
                 }
                 // Write out the character

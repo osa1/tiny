@@ -378,28 +378,24 @@ impl MessagingUI {
     pub(crate) fn join(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
         self.nicks.insert(nick);
 
-        if !ignore {
-            if let Some(ts) = ts {
-                let line_idx = self.get_activity_line_idx(ts);
-                self.msg_area.modify_line(line_idx, |line| {
-                    line.add_char('+', SegStyle::Join);
-                    line.add_text(nick, SegStyle::Faded);
-                });
-            }
+        if !ignore && let Some(ts) = ts {
+            let line_idx = self.get_activity_line_idx(ts);
+            self.msg_area.modify_line(line_idx, |line| {
+                line.add_char('+', SegStyle::Join);
+                line.add_text(nick, SegStyle::Faded);
+            });
         }
     }
 
     pub(crate) fn part(&mut self, nick: &str, ts: Option<Timestamp>, ignore: bool) {
         self.nicks.remove(nick);
 
-        if !ignore {
-            if let Some(ts) = ts {
-                let line_idx = self.get_activity_line_idx(ts);
-                self.msg_area.modify_line(line_idx, |line| {
-                    line.add_char('-', SegStyle::Part);
-                    line.add_text(nick, SegStyle::Faded);
-                });
-            }
+        if !ignore && let Some(ts) = ts {
+            let line_idx = self.get_activity_line_idx(ts);
+            self.msg_area.modify_line(line_idx, |line| {
+                line.add_char('-', SegStyle::Part);
+                line.add_text(nick, SegStyle::Faded);
+            });
         }
     }
 

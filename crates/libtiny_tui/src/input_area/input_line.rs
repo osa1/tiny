@@ -49,7 +49,7 @@ impl InputLine {
     }
 
     /// Interface for Vec::drain()
-    pub(crate) fn drain<R>(&mut self, range: R) -> Drain<char>
+    pub(crate) fn drain<R>(&mut self, range: R) -> Drain<'_, char>
     where
         R: RangeBounds<usize>,
     {
@@ -149,22 +149,23 @@ fn draw_line_wrapped(
     for (char_idx, c) in line.buffer.iter().enumerate() {
         let mut style = colors.user_msg;
         // for autocompletion highlighting
-        if let Some(completion_range) = completion_range {
-            if char_idx >= completion_range.start_idx && char_idx < completion_range.end_idx {
-                style = colors.completion;
-            }
+        if let Some(completion_range) = completion_range
+            && char_idx >= completion_range.start_idx
+            && char_idx < completion_range.end_idx
+        {
+            style = colors.completion;
         }
         // If split_indices_iter yields we already know the indices for the start of each line. If it
         // does not then we just continue outputting on this line.
-        if let Some(next_line_start) = split_indices_iter.peek() {
-            if char_idx == *next_line_start as usize {
-                // move to next line
-                line_num += 1;
-                // reset column
-                col = 0;
-                // move to the next line start index
-                split_indices_iter.next();
-            }
+        if let Some(next_line_start) = split_indices_iter.peek()
+            && char_idx == *next_line_start as usize
+        {
+            // move to next line
+            line_num += 1;
+            // reset column
+            col = 0;
+            // move to the next line start index
+            split_indices_iter.next();
         }
         // Write out the character
         tb.change_cell(col, pos_y + line_num, *c, style.fg, style.bg);

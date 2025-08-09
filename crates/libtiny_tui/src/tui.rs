@@ -1198,11 +1198,11 @@ impl TUI {
         match *target {
             MsgTarget::Server { serv } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if let MsgSource::Serv { serv: ref serv_ } = tab.src {
-                        if serv == serv_ {
-                            target_idxs.push(tab_idx);
-                            break;
-                        }
+                    if let MsgSource::Serv { serv: ref serv_ } = tab.src
+                        && serv == serv_
+                    {
+                        target_idxs.push(tab_idx);
+                        break;
                     }
                 }
             }
@@ -1213,11 +1213,11 @@ impl TUI {
                         serv: ref serv_,
                         chan: ref chan_,
                     } = tab.src
+                        && serv == serv_
+                        && chan == chan_
                     {
-                        if serv == serv_ && chan == chan_ {
-                            target_idxs.push(tab_idx);
-                            break;
-                        }
+                        target_idxs.push(tab_idx);
+                        break;
                     }
                 }
             }
@@ -1228,11 +1228,11 @@ impl TUI {
                         serv: ref serv_,
                         nick: ref nick_,
                     } = tab.src
+                        && serv == serv_
+                        && nick == nick_
                     {
-                        if serv == serv_ && nick == nick_ {
-                            target_idxs.push(tab_idx);
-                            break;
-                        }
+                        target_idxs.push(tab_idx);
+                        break;
                     }
                 }
             }
@@ -1251,10 +1251,11 @@ impl TUI {
         }
 
         // Create server/chan/user tab when necessary
-        if target_idxs.is_empty() && can_create_tab {
-            if let Some(idx) = self.maybe_create_tab(target) {
-                target_idxs.push(idx);
-            }
+        if target_idxs.is_empty()
+            && can_create_tab
+            && let Some(idx) = self.maybe_create_tab(target)
+        {
+            target_idxs.push(idx);
         }
 
         for tab_idx in target_idxs {
@@ -1434,20 +1435,21 @@ impl TUI {
     // TODO: Maybe remove this and add a `create: bool` field to MsgTarget::User
     pub(crate) fn user_tab_exists(&self, serv_: &str, nick_: &str) -> bool {
         for tab in &self.tabs {
-            if let MsgSource::User { ref serv, ref nick } = tab.src {
-                if serv_ == serv && nick_ == nick {
-                    return true;
-                }
+            if let MsgSource::User { ref serv, ref nick } = tab.src
+                && serv_ == serv
+                && nick_ == nick
+            {
+                return true;
             }
         }
         false
     }
 
     pub(crate) fn set_notifier(&mut self, notifier: Notifier, target: &MsgTarget) {
-        if let Some(serv) = target.serv_name() {
-            if let Some(config) = self.tab_configs.get_mut(serv, target.chan_or_user_name()) {
-                config.notify = Some(notifier);
-            }
+        if let Some(serv) = target.serv_name()
+            && let Some(config) = self.tab_configs.get_mut(serv, target.chan_or_user_name())
+        {
+            config.notify = Some(notifier);
         }
     }
 
@@ -1471,10 +1473,10 @@ impl TUI {
 
     fn find_serv_tab_idx(&self, serv_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Serv { ref serv } = tab.src {
-                if serv_ == serv {
-                    return Some(tab_idx);
-                }
+            if let MsgSource::Serv { ref serv } = tab.src
+                && serv_ == serv
+            {
+                return Some(tab_idx);
             }
         }
         None
@@ -1482,10 +1484,11 @@ impl TUI {
 
     fn find_chan_tab_idx(&self, serv_: &str, chan_: &ChanNameRef) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Chan { ref serv, ref chan } = tab.src {
-                if serv_ == serv && chan_ == chan {
-                    return Some(tab_idx);
-                }
+            if let MsgSource::Chan { ref serv, ref chan } = tab.src
+                && serv_ == serv
+                && chan_ == chan
+            {
+                return Some(tab_idx);
             }
         }
         None
@@ -1493,10 +1496,11 @@ impl TUI {
 
     fn find_user_tab_idx(&self, serv_: &str, nick_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::User { ref serv, ref nick } = tab.src {
-                if serv_ == serv && nick_ == nick {
-                    return Some(tab_idx);
-                }
+            if let MsgSource::User { ref serv, ref nick } = tab.src
+                && serv_ == serv
+                && nick_ == nick
+            {
+                return Some(tab_idx);
             }
         }
         None

@@ -42,7 +42,7 @@ struct ParsedCmd<'a> {
     args: &'a str,
 }
 
-fn parse_cmd(cmd: &str) -> Option<ParsedCmd> {
+fn parse_cmd(cmd: &str) -> Option<ParsedCmd<'_>> {
     let cmd_name = cmd.split_whitespace().next()?;
     let mut ws_idxs = utils::split_whitespace_indices(cmd);
     ws_idxs.next(); // cmd_name
@@ -307,13 +307,13 @@ fn join(args: CmdArgs) {
         ..
     } = args;
 
-    if let MsgSource::Serv { serv } = &src {
-        if serv == "mentions" {
-            return ui.add_client_err_msg(
-                "Switch to a server tab to join a channel",
-                &MsgTarget::CurrentTab,
-            );
-        }
+    if let MsgSource::Serv { serv } = &src
+        && serv == "mentions"
+    {
+        return ui.add_client_err_msg(
+            "Switch to a server tab to join a channel",
+            &MsgTarget::CurrentTab,
+        );
     }
 
     let chans = args

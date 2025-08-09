@@ -213,7 +213,7 @@ impl MsgSource {
         }
     }
 
-    pub fn to_target(&self) -> MsgTarget {
+    pub fn to_target(&self) -> MsgTarget<'_> {
         match self {
             MsgSource::Serv { serv } => MsgTarget::Server { serv },
             MsgSource::Chan { serv, chan } => MsgTarget::Chan {

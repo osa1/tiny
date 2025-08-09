@@ -266,32 +266,35 @@ impl Config<PassOrCmd> {
                 ));
             }
 
-            if let Some(ref pass) = server.pass {
-                if pass.is_empty_cmd() {
-                    errors.push(format!("Empty PASS command for '{}'", server.addr));
-                }
+            if let Some(ref pass) = server.pass
+                && pass.is_empty_cmd()
+            {
+                errors.push(format!("Empty PASS command for '{}'", server.addr));
             }
 
-            if let Some(ref nickserv_ident) = server.nickserv_ident {
-                if nickserv_ident.is_empty_cmd() {
-                    errors.push(format!(
-                        "Empty NickServ password command for '{}'",
-                        server.addr
-                    ));
-                }
+            if let Some(ref nickserv_ident) = server.nickserv_ident
+                && nickserv_ident.is_empty_cmd()
+            {
+                errors.push(format!(
+                    "Empty NickServ password command for '{}'",
+                    server.addr
+                ));
             }
 
-            if let Some(SASLAuth::Plain { password, .. }) = &server.sasl_auth {
-                if password.is_empty_cmd() {
-                    errors.push(format!("Empty SASL password command for '{}'", server.addr));
-                }
+            if let Some(SASLAuth::Plain { password, .. }) = &server.sasl_auth
+                && password.is_empty_cmd()
+            {
+                errors.push(format!("Empty SASL password command for '{}'", server.addr));
             }
 
-            if let Some(SASLAuth::External { .. }) = &server.sasl_auth {
-                if !server.tls {
-                    errors.push(format!("TLS is not enabled for '{}', but SASL EXTERNAL authentication requires TLS. \
-                                        Please enable TLS for this server in the config file.", server.addr));
-                }
+            if let Some(SASLAuth::External { .. }) = &server.sasl_auth
+                && !server.tls
+            {
+                errors.push(format!(
+                    "TLS is not enabled for '{}', but SASL EXTERNAL authentication requires TLS. \
+                     Please enable TLS for this server in the config file.",
+                    server.addr
+                ));
             }
         }
 

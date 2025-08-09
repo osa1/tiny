@@ -171,13 +171,13 @@ impl LoggerInner {
         log_dir: PathBuf,
         report_err: Box<dyn Fn(String)>,
     ) -> Result<LoggerInner, LoggerInitError> {
-        if let Err(err) = fs::create_dir_all(&log_dir) {
-            if err.kind() != io::ErrorKind::AlreadyExists {
-                return Err(LoggerInitError::CouldNotCreateDir {
-                    dir_path: log_dir,
-                    err,
-                });
-            }
+        if let Err(err) = fs::create_dir_all(&log_dir)
+            && err.kind() != io::ErrorKind::AlreadyExists
+        {
+            return Err(LoggerInitError::CouldNotCreateDir {
+                dir_path: log_dir,
+                err,
+            });
         }
 
         Ok(LoggerInner {

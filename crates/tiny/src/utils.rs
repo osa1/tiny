@@ -16,7 +16,7 @@ impl Iterator for SplitWhitespaceIndices<'_> {
     }
 }
 
-pub(crate) fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices {
+pub(crate) fn split_whitespace_indices(str: &str) -> SplitWhitespaceIndices<'_> {
     SplitWhitespaceIndices {
         inner: str.split_whitespace(),
         str,

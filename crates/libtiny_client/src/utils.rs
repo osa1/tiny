@@ -5,7 +5,7 @@ pub(crate) struct SplitIterator<'a> {
 
 /// Iterate over subslices that are at most `max` long (in bytes). Splits are
 /// made on whitespace characters when possible.
-pub(crate) fn split_iterator(s: &str, max: usize) -> SplitIterator {
+pub(crate) fn split_iterator(s: &str, max: usize) -> SplitIterator<'_> {
     SplitIterator { s: Some(s), max }
 }
 

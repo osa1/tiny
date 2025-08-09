@@ -232,10 +232,10 @@ pub struct Input {
 
 impl Drop for Input {
     fn drop(&mut self) {
-        if let Some(old_flags) = self.old_stdin_flags.take() {
-            if let Err(err) = fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
-                error!("Unable to restore stdin flags: {err:?}");
-            }
+        if let Some(old_flags) = self.old_stdin_flags.take()
+            && let Err(err) = fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags))
+        {
+            error!("Unable to restore stdin flags: {err:?}");
         }
     }
 }

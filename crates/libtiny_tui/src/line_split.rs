@@ -144,10 +144,10 @@ impl LineDataCache {
         if let Some(line_count) = self.line_count {
             temp_count = line_count;
             // If we made space for the cursor, subtract it.
-            if let LineType::Input { .. } = self.line_type {
-                if self.current_line_length == self.line_width {
-                    temp_count -= 1;
-                }
+            if let LineType::Input { .. } = self.line_type
+                && self.current_line_length == self.line_width
+            {
+                temp_count -= 1;
             }
         }
 
@@ -208,10 +208,10 @@ impl LineDataCache {
         }
 
         // Last line length is `line_width`, make room for cursor
-        if let LineType::Input { .. } = self.line_type {
-            if self.current_line_length == self.line_width {
-                temp_count += 1;
-            }
+        if let LineType::Input { .. } = self.line_type
+            && self.current_line_length == self.line_width
+        {
+            temp_count += 1;
         }
         self.line_count = Some(temp_count);
     }
