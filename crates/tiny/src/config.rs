@@ -59,6 +59,11 @@ pub(crate) struct Server<P> {
     #[serde(default)]
     pub(crate) pass: Option<P>,
 
+    /// User name to be used in connection registration
+    /// If it is not specified, the first nick will be used instead
+    #[serde(default)]
+    pub(crate) user: Option<String>,
+
     /// Real name to be used in connection registration
     #[serde(deserialize_with = "deser_trimmed_str")]
     pub(crate) realname: String,
@@ -319,6 +324,7 @@ impl Config<PassOrCmd> {
                 port,
                 tls,
                 pass,
+                user,
                 realname,
                 nicks,
                 join,
@@ -363,6 +369,7 @@ impl Config<PassOrCmd> {
                 port,
                 tls,
                 pass,
+                user,
                 realname,
                 nicks,
                 join,
@@ -483,6 +490,7 @@ mod tests {
                 port: 123,
                 tls: false,
                 pass: None,
+                user: None,
                 realname: "".to_owned(),
                 nicks: vec!["".to_owned()],
                 join: vec![],

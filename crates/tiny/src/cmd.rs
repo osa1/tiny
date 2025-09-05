@@ -269,6 +269,7 @@ fn connect_(
         addr: serv_name.to_owned(),
         port: serv_port,
         tls: defaults.tls,
+        user: None,
         realname: defaults.realname.clone(),
         pass: pass.map(str::to_owned),
         nicks: defaults.nicks.clone(),

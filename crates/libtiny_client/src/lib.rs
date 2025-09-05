@@ -47,6 +47,10 @@ pub struct ServerInfo {
     /// Server password.
     pub pass: Option<String>,
 
+    /// The username parameter of the USER command sent to the server at the beginning of the connection.
+    /// When not provided, the first nick in nicks is used as the username.
+    pub user: Option<String>,
+
     pub realname: String,
 
     /// Nicks to select when logging in.

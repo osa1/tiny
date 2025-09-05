@@ -254,8 +254,9 @@ impl StateInner {
         snd_irc_msg
             .try_send(wire::nick(&self.current_nick))
             .unwrap();
+        let user = self.server_info.user.as_ref().unwrap_or(&self.nicks[0]);
         snd_irc_msg
-            .try_send(wire::user(&self.nicks[0], &self.server_info.realname))
+            .try_send(wire::user(user, &self.server_info.realname))
             .unwrap();
     }
 

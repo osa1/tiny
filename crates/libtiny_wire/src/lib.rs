@@ -23,8 +23,8 @@ pub fn quit(reason: Option<String>) -> String {
     }
 }
 
-pub fn user(hostname: &str, realname: &str) -> String {
-    format!("USER {hostname} 8 * :{realname}\r\n")
+pub fn user(user: &str, realname: &str) -> String {
+    format!("USER {user} 8 * :{realname}\r\n")
 }
 
 pub fn nick(arg: &str) -> String {
