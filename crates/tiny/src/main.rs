@@ -163,6 +163,7 @@ fn run(
                 port: server.port,
                 tls,
                 pass: server.pass,
+                user: server.user,
                 realname: server.realname,
                 nicks: server.nicks,
                 auto_join: server.join.iter().map(|c| c.name().to_owned()).collect(),

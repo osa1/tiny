@@ -39,6 +39,7 @@ fn main() {
         port,
         tls: false,
         pass: None,
+        user: None,
         realname: "tiny echo bot".to_owned(),
         nicks: vec![nick],
         auto_join: chans,
