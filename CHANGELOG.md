@@ -6,7 +6,10 @@
   allows the user to define separate key bindings in the config file. (#445)
 - Add support for mouse wheel up down key events, with names `mouse_wheel_up`
   and `mouse_wheel_down`. By default these keys are mapped to
-  `messages_scroll_up` and `messages_scroll_down` commands.
+  `messages_scroll_up` and `messages_scroll_down` commands. (8747b6b)
+- A new optional per-server config field `user` is added to specify the
+  `username` parameter of the `USER` command sent to the server at the
+  beginning of a connection. (#448)
 
 # 2025/01/01: 0.13.0
 

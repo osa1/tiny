@@ -4,7 +4,7 @@ servers:
       port: 6697
       tls: true
       # Username parameter of USER command sent to the server at the beginning
-      # of connection. When not provided, first nick will be used instead
+      # of connection. When not provided, first nick will be used instead.
       # user: username
       realname: yourname
       nicks: [tiny_user]
