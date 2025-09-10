@@ -142,7 +142,14 @@ fn replace_forward_slash(path: &str) -> String {
 }
 
 fn try_open_log_file(path: &Path, report_err: &dyn Fn(String)) -> Option<File> {
-    match OpenOptions::new().create(true).append(true).open(path) {
+    use std::os::unix::fs::OpenOptionsExt;
+    // Create log files with just read and write permissions, and just for the owner.
+    match OpenOptions::new()
+        .create(true)
+        .append(true)
+        .mode(0o600)
+        .open(path)
+    {
         Ok(fd) => Some(fd),
         Err(err) => {
             report_err(format!("Couldn't open file {path:?}: {err}"));

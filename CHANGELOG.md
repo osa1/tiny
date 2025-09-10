@@ -10,6 +10,12 @@
 - A new optional per-server config field `user` is added to specify the
   `username` parameter of the `USER` command sent to the server at the
   beginning of a connection. (#448)
+- Create log files with permissions 600: readable and writable by only you.
+
+  Previuosly tiny created log files with the default mode in Rust which is 666:
+  readable and writable by anyone.
+
+  tiny does not update permissions of existing log files.
 
 # 2025/01/01: 0.13.0
 
