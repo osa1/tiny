@@ -1,0 +1,182 @@
+.TH TINY 1 "July 2025" "Tiny Manual" "User Commands"
+.SH NAME
+tiny \- The minimal IRC client for people who hate using the mouse
+
+.SH SYNOPSIS
+.B tiny
+[\fIoptions\fR]
+
+.SH DESCRIPTION
+.B Tiny
+Tiny is a console-based IRC client written in Rust, designed to be simple,
+
+efficient, and reliable. It features a split-view interface with channels,
+
+supports multiple servers simultaneously, and offers native TLS encryption
+
+for secure connections.
+
+It's lightweight and fast, with only standard IRC server interactions
+
+provided through hotkeys and the CLI
+
+.SH USAGE
+.B There are two ways to connect to an IRC network:
+\fB• Manual\fR
+
+To start the client, simply type:
+\fBtiny\fR
+
+Connect to a network
+\fB/connect irc.oftc.net:6697\fR
+
+Choose a nickname you want to use:
+\fB"nickname your name"\fR
+
+\fB • Automatically\fR
+
+You can configure servers \fB~/.config/tiny/config.yml:\fR, nicknames, real names
+
+and even automate channel insertions and even automate channel joins:
+
+Example:
+
+              servers:
+                libera:
+                  addr: irc.libera.chat:6697
+                  tls: true
+                  nicks: [your_nick]
+                  realname: Your Name
+                  auto_cmds:
+                    - JOIN #debian
+\fBNotes:\fR
+ If nothing happens, congratulations—you might need an internet connection.
+
+Just don't mess up the indentation—YAML is finicky.
+
+.SH KEYBOARD SHORTCUTS
+All shortcuts use the
+.B Ctrl
+key.
+If you’re reaching for the mouse, you’re already doing it wrong.
+
+.TP
+.B Ctrl + A / Ctrl + E
+Move cursor to the beginning/end of line.
+.TP
+.B Ctrl + K
+Delete everything from cursor to end of line.
+.TP
+.B Ctrl + W
+Delete previous word.
+.TP
+.B Ctrl + Left / Ctrl + Right
+Jump one word back/forward.
+.TP
+.B PageUp / PageDown, Shift + Up / Shift + Down, Ctrl + U / Ctrl + D
+Scroll the chat because apparently you missed something important.
+.TP
+.B Ctrl + N / Ctrl + P
+Switch to next/previous tab.
+.TP
+.B Ctrl + C Enter
+Exit Tiny (it will ask you first, in case you have regrets).
+.TP
+.B Alt + 1..9
+Switch to the Nth tab.
+.TP
+.B Alt + 0
+Switch to the last tab.
+.TP
+.B Alt + Left / Alt + Right
+Move tab left/right—rearrange your chaos.
+.TP
+.B Alt + \fIchar\fR
+Jump to a tab containing the underlined character.
+.TP
+.B Ctrl + X
+Edit current message in your $EDITOR, because apparently a line editor wasn’t enough.
+
+.SH COMMANDS
+All commands begin with a slash (/). If you forget that, you’ll just be talking to yourself.
+
+.TP
+.B /help
+Show this list of commands. If you’re reading this, good job.
+.TP
+.B /msg <nick> <message>
+Send a private message. Because whispering is still a thing.
+.TP
+.B /join <channel>
+Join a channel. Example: /join #debian
+.TP
+.B /close [reason]
+Close the current tab. You can even provide a dramatic exit reason.
+.TP
+.B /connect <host>:<port>
+Connect to a server. Example: /connect irc.libera.chat:6667
+.TP
+.B /connect
+Reconnect to the current server without waiting for the client to decide for you.
+.TP
+.B /away [message]
+Set your away status with a message.
+.TP
+.B /nick <nick>
+Change your nickname. Try not to choose something embarrassing.
+.TP
+.B /names [nick]
+List users in the current channel or check if a nick is present.
+.TP
+.B /reload
+Reload the TUI configuration. Magic without restarting.
+.TP
+.B /clear
+Wipe the screen. Feels good, doesn’t it?
+.TP
+.B /switch <string>
+Switch to the first tab matching the given string.
+.TP
+.B /ignore
+Toggle ignore mode for join/quit spam.
+.TP
+.B /notify [off|mentions|messages]
+Control desktop notifications: none, mentions only, or everything.
+.TP
+.B /quit [reason]
+Quit Tiny. You can say goodbye like a civilized person.
+
+.SH SERVER COMMANDS
+Some IRC commands are not built-in.
+Send them directly in a server tab and hope for the best.
+Examples:
+
+.RS
+.nf
+LIST      List available channels
+MOTD      Display message of the day
+RULES     Show server rules
+WHOIS     Query information about a user
+VERSION   Ask the server what century it’s from
+.fi
+.RE
+
+.SH TIPS
+.IP \(bu 2
+Use /reload after editing the config. Restarting is for the weak.
+.IP \(bu 2
+If Tiny freezes, hit Ctrl + C twice—it’s the Unix way of saying “wake up.”
+.IP \(bu 2
+To look extra cool, run Tiny in a tmux session and never close it again.
+
+.fi
+.RE
+
+.SH SEE ALSO
+community—of Tiny documentation:
+https://github.com/osa1/tiny
+.RE
+.SH AUTHOR
+Written by Tiny. Manual organized and compiled by the Debian maintainer
+
+by Josenison Ferreira da Silva <nilsonfsilva@hotmail.com>
