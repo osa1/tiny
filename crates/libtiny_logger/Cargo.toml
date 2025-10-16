@@ -9,4 +9,4 @@ edition = "2021"
 libtiny_common = { path = "../libtiny_common" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
-time = "0.1"
+time = { version = "0.3", features = ["macros", "formatting", "parsing"] }

@@ -19,16 +19,16 @@ libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 notify-rust = { version = "4.11", optional = true, default-features = false, features = ["d"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.8"
+serde_yaml = ">=0.8"
 tempfile = "3.1"
 term_input = { path = "../term_input" }
 termbox_simple = { path = "../termbox" }
-time = "0.1"
+time = ">=0.1"
 tokio = { version = "1.17", default-features = false, features = ["signal", "macros"] }
 tokio-stream = { version = "0.1", features = ["signal"] }
-unicode-width = "0.1"
+unicode-width = "0.2"
 
 [dev-dependencies]
 bencher = "0.1"
 libc = "0.2"
-mio = "0.8"
+mio = ">=0.8"
