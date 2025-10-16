@@ -87,7 +87,7 @@ fn small_screen_1() {
     tui.next_tab();
 
     let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
+    let ts = time::OffsetDateTime::from_unix_timestamp(0).unwrap();
     tui.add_nick("123456", Some(ts), &target);
     tui.add_nick("abcdef", Some(ts), &target);
 
@@ -136,7 +136,7 @@ fn small_screen_2() {
     tui.next_tab();
 
     let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
+    let ts = time::OffsetDateTime::from_unix_timestamp(0).unwrap();
     tui.set_topic("Blah blah blah-", ts, serv, chan);
 
     tui.draw();
@@ -243,7 +243,7 @@ fn test_text_field_wrap() {
 
     // Write some stuff
     let target = MsgTarget::CurrentTab;
-    let ts = time::empty_tm();
+    let ts = time::OffsetDateTime::UNIX_EPOCH;
     tui.add_msg("test test test", ts, &target);
 
     for _ in 0..37 {

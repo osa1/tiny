@@ -129,7 +129,7 @@ fn tui_resize(b: &mut Bencher) {
     let server = "<server>";
     tui.new_server_tab(server, None);
 
-    let ts: Tm = time::empty_tm();
+    let ts: time::OffsetDateTime = time::empty_tm();
     let target = MsgTarget::CurrentTab;
 
     let f = File::open("test/lipsum.txt").unwrap();

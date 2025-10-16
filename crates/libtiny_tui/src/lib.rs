@@ -33,7 +33,6 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 
-use time::Tm;
 use tokio::select;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
@@ -240,30 +239,30 @@ impl TUI {
     delegate!(close_chan_tab(serv_name: &str, chan: &ChanNameRef,));
     delegate!(close_user_tab(serv_name: &str, nick: &str,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
-    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
+    delegate!(add_msg(msg: &str, ts: time::OffsetDateTime, target: &MsgTarget,));
+    delegate!(add_err_msg(msg: &str, ts: time::OffsetDateTime, target: &MsgTarget,));
     delegate!(add_client_err_msg(msg: &str, target: &MsgTarget,));
     delegate!(clear_nicks(serv_name: &str,));
     delegate!(set_nick(serv_name: &str, new_nick: &str,));
     delegate!(add_privmsg(
         sender: &str,
         msg: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         target: &MsgTarget,
         highlight: bool,
         is_action: bool,
     ));
-    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
+    delegate!(add_nick(nick: &str, ts: Option<time::OffsetDateTime>, target: &MsgTarget,));
+    delegate!(remove_nick(nick: &str, ts: Option<time::OffsetDateTime>, target: &MsgTarget,));
     delegate!(rename_nick(
         old_nick: &str,
         new_nick: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         target: &MsgTarget,
     ));
     delegate!(set_topic(
         topic: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         serv_name: &str,
         chan_name: &ChanNameRef,
     ));

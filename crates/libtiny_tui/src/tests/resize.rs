@@ -20,7 +20,8 @@ fn test_resize_recalc_scroll() {
     tui.next_tab();
 
     let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
+
+    let ts = time::OffsetDateTime::from_unix_timestamp(0).unwrap();
     tui.add_privmsg(
         "osa1",
         "s 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 e",
@@ -93,7 +94,7 @@ fn test_resize_scroll_stick_to_top() {
     tui.next_tab();
 
     let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
+    let ts = time::OffsetDateTime::from_unix_timestamp(0).unwrap();
 
     for i in 0..15 {
         tui.add_privmsg("osa1", &format!("line{}", i), ts, &target, false, false);
@@ -155,7 +156,7 @@ fn test_resize_no_scroll_stay_on_bottom() {
     tui.next_tab();
 
     let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
+    let ts = time::OffsetDateTime::from_unix_timestamp(0).unwrap();
 
     for i in 0..15 {
         tui.add_privmsg("osa1", &format!("line{}", i), ts, &target, false, false);
@@ -230,7 +231,8 @@ fn test_resize() {
     let server = "<server>";
     tui.new_server_tab(server, None);
 
-    let ts = time::empty_tm();
+
+    let ts = time::OffsetDateTime::UNIX_EPOCH;
     let target = MsgTarget::CurrentTab;
 
     let f = File::open("test/lipsum.txt").unwrap();
@@ -259,7 +261,7 @@ fn test_resize_scroll_resize() {
     tui.next_tab();
 
     let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
+    let ts = time::OffsetDateTime::from_unix_timestamp(0).unwrap();
 
     for i in 0..15 {
         tui.add_privmsg(
@@ -329,7 +331,7 @@ fn test_clear_resize_recalc_scroll() {
     tui.next_tab();
 
     let target = MsgTarget::Chan { serv, chan };
-    let ts = time::at_utc(time::Timespec::new(0, 0));
+    let ts = time::OffsetDateTime::from_unix_timestamp(0).unwrap();
     for _ in 0..6 {
         tui.add_privmsg("osa1", &"1111 ".repeat(3), ts, &target, false, false);
     }

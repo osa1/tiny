@@ -20,7 +20,7 @@ fn main() {
 
         tui.add_msg(
             "Loading word list for auto-completion ...",
-            time::now(),
+            time::OffsetDateTime::now_utc(),
             &debug_tab,
         );
         tui.draw();
@@ -34,7 +34,7 @@ fn main() {
             }
         }
 
-        tui.add_msg("Done.", time::now(), &debug_tab);
+        tui.add_msg("Done.", time::OffsetDateTime::now_utc(), &debug_tab);
         tui.draw();
     });
 

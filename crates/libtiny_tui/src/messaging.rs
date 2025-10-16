@@ -2,7 +2,7 @@ use termbox_simple::Termbox;
 
 use std::convert::From;
 
-use time::{self, Tm};
+use time;
 
 use crate::config::Colors;
 use crate::exit_dialogue::ExitDialogue;
@@ -68,11 +68,11 @@ impl Timestamp {
     }
 }
 
-impl From<Tm> for Timestamp {
-    fn from(tm: Tm) -> Timestamp {
+impl From<time::OffsetDateTime> for Timestamp {
+    fn from(tm: time::OffsetDateTime) -> Timestamp {
         Timestamp {
-            hour: tm.tm_hour,
-            min: tm.tm_min,
+            hour: tm.hour() as i32,
+            min: tm.minute() as i32,
         }
     }
 }

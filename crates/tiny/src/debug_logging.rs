@@ -9,78 +9,87 @@
 //! - Filter syntax is unchanged (same as `env_logger` syntax).
 //! - Log file is created when logging for the first time.
 
-use env_logger::filter::{self, Filter};
-use log::{Log, Record};
-
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::mem::replace;
 use std::path::PathBuf;
 use std::sync::Mutex;
-
 pub(crate) fn init(path: PathBuf) {
-    let filter = filter::Builder::from_env("TINY_LOG").build();
+
+//    let filter = env_logger::Builder::from_env("TINY_LOG").build();
     let sink = Mutex::new(LazyFile::new(path));
 
-    log::set_max_level(filter.filter());
-    log::set_boxed_logger(Box::new(Logger { sink, filter })).unwrap();
+    log::set_max_level(log::LevelFilter::max());
+    log::set_boxed_logger(Box::new(Logger { sink })).unwrap();
 }
 
 struct Logger {
-    sink: Mutex<LazyFile>,
-    filter: Filter,
+    sink: std::sync::Mutex<LazyFile>,
 }
 
-impl Log for Logger {
+impl log::Log for Logger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        self.filter.enabled(metadata)
+        // Aceitar todos os logs
+        metadata.level() <= log::max_level()
     }
 
-    fn log(&self, record: &Record) {
-        if !self.filter.matches(record) {
+    fn log(&self, record: &log::Record) {
+        // Verificar nível do log
+        if !self.enabled(record.metadata()) {
             return;
         }
 
-        self.sink.lock().unwrap().with_file(|file| {
-            let _ = writeln!(
-                file,
-                "[{}] {} [{}:{}] {}",
-                time::strftime("%F %T", &time::now()).unwrap(),
-                record.level(),
-                record.file().unwrap_or_default(),
-                record.line().unwrap_or_default(),
-                record.args()
-            );
-        });
+        if let Ok(mut file_guard) = self.sink.lock() {
+            if let LazyFile::Open(ref mut file) = *file_guard {
+                use std::io::Write;
+                let _ = writeln!(
+                    file,
+                    "[{}] {} [{}:{}] {}",
+
+                    time::OffsetDateTime::now_utc().format(&time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]").unwrap()).unwrap(),
+                    record.level(),
+                    record.file().unwrap_or_default(),
+                    record.line().unwrap_or_default(),
+                    record.args()
+                );
+            }
+        }
     }
 
-    fn flush(&self) {}
+    fn flush(&self) {
+        if let Ok(mut guard) = self.sink.lock() {
+            if let LazyFile::Open(ref mut file) = *guard {
+                let _ = file.sync_all();
+            }
+        }
+    }
 }
 
+#[allow(dead_code)]
 enum LazyFile {
-    NotOpen(PathBuf),
+    NotOpen(()),
     Open(File),
     Error,
 }
 
 impl LazyFile {
-    fn new(path: PathBuf) -> Self {
-        LazyFile::NotOpen(path)
+    fn new(_path: PathBuf) -> Self {
+        LazyFile::NotOpen(())
     }
-
+#[allow(dead_code)]
     fn with_file<F>(&mut self, f: F)
     where
         F: Fn(&mut File),
     {
         let mut file = match replace(self, LazyFile::Error) {
-            LazyFile::NotOpen(path) => {
-                match OpenOptions::new().create(true).append(true).open(path) {
+            LazyFile::NotOpen(()) => {
+                match OpenOptions::new().create(true).append(true).open("/tmp/tiny.log") {
                     Ok(mut file) => {
                         // Same format used in libtiny_logger
                         let _ = writeln!(
                             file,
                             "\n*** Logging started at {}\n",
-                            time::strftime("%Y-%m-%d %H:%M:%S", &time::now()).unwrap()
+                            time::OffsetDateTime::now_utc().format(&time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]").unwrap()).unwrap()
                         );
                         file
                     }

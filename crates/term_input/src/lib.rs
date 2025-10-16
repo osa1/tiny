@@ -22,6 +22,8 @@ use tokio::io::unix::AsyncFd;
 use tokio::io::Interest;
 use tokio_stream::Stream;
 
+use std::os::fd::AsRawFd;
+
 #[macro_use]
 extern crate log;
 
@@ -229,7 +231,9 @@ pub struct Input {
 impl Drop for Input {
     fn drop(&mut self) {
         if let Some(old_flags) = self.old_stdin_flags.take() {
-            if let Err(err) = fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(old_flags)) {
+            // Criar um descritor que implementa AsFd
+            let stdin_fd = unsafe { std::os::fd::BorrowedFd::borrow_raw(libc::STDIN_FILENO) };
+            if let Err(err) = fcntl(stdin_fd.as_raw_fd(), FcntlArg::F_SETFL(old_flags)) {
                 error!("Unable to restore stdin flags: {:?}", err);
             }
         }
@@ -507,7 +511,9 @@ pub fn read_stdin(buf: &mut Vec<u8>) -> Result<(), nix::Error> {
 /// Set `stdin` to non-blocking mode. Returns old `stdin` if we were able to change the flags. Does
 /// not panic; errors are logged.
 fn set_stdin_nonblocking() -> Option<OFlag> {
-    let current_stdin_flags: OFlag = match fcntl(libc::STDIN_FILENO, FcntlArg::F_GETFL) {
+
+    let stdin_fd = unsafe { std::os::fd::BorrowedFd::borrow_raw(libc::STDIN_FILENO) };
+    let current_stdin_flags: OFlag = match fcntl(stdin_fd.as_raw_fd(), FcntlArg::F_GETFL) {
         Err(err) => {
             error!("Unable to read stdin flags: {:?}", err);
             return None;
@@ -524,7 +530,8 @@ fn set_stdin_nonblocking() -> Option<OFlag> {
     let mut new_stdin_flags = current_stdin_flags;
     new_stdin_flags.set(OFlag::O_NONBLOCK, true);
 
-    match fcntl(libc::STDIN_FILENO, FcntlArg::F_SETFL(new_stdin_flags)) {
+    let stdin_fd = unsafe { std::os::fd::BorrowedFd::borrow_raw(libc::STDIN_FILENO) };
+    match fcntl(stdin_fd.as_raw_fd(), FcntlArg::F_SETFL(new_stdin_flags)) {
         Err(err) => {
             // On Linux we don't really need to enable non-blocking mode so things should still
             // work. On WSL things may or may not work.. see #269.

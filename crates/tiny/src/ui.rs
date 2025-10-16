@@ -8,7 +8,6 @@ use libtiny_logger::Logger;
 use libtiny_tui::TUI;
 
 use libtiny_tui::config::TabConfig;
-use time::Tm;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
@@ -55,32 +54,32 @@ impl UI {
     delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
     delegate!(close_user_tab(serv: &str, nick: &str,));
     delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
-    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
+    delegate!(add_msg(msg: &str, ts: time::OffsetDateTime, target: &MsgTarget,));
     delegate!(add_privmsg(
         sender: &str,
         msg: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         target: &MsgTarget,
         highlight: bool,
         is_action: bool,
     ));
-    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
+    delegate!(add_nick(nick: &str, ts: Option<time::OffsetDateTime>, target: &MsgTarget,));
+    delegate!(remove_nick(nick: &str, ts: Option<time::OffsetDateTime>, target: &MsgTarget,));
     delegate!(rename_nick(
         old_nick: &str,
         new_nick: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         target: &MsgTarget,
     ));
     delegate!(set_topic(
         topic: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         serv: &str,
         chan: &ChanNameRef,
     ));
 
     delegate_ui!(draw());
-    delegate_ui!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
+    delegate_ui!(add_err_msg(msg: &str, ts: time::OffsetDateTime, target: &MsgTarget,));
     delegate_ui!(add_client_err_msg(msg: &str, target: &MsgTarget,));
     delegate_ui!(clear_nicks(serv: &str,));
     delegate_ui!(set_nick(serv: &str, nick: &str,));
@@ -197,7 +196,7 @@ pub(crate) fn send_msg(
         }
     };
 
-    let ts = time::now();
+    let ts = time::OffsetDateTime::now_utc();
     let extra_len = msg_target.len()
         + if is_action {
             9 // "\0x1ACTION \0x1".len()

@@ -493,7 +493,7 @@ pub(crate) fn parse_config(config_path: &Path) -> Result<Config, serde_yaml::Err
     // tiny creates a config file with the defaults when it can't find one, but the config file can
     // be deleted before a `/reload`.
     let contents = std::fs::read_to_string(config_path).map_err(|err| {
-        de::Error::custom(format!(
+        <serde_yaml::Error as de::Error>::custom(format!(
             "Can't read config file '{}': {}",
             config_path.to_string_lossy(),
             err
