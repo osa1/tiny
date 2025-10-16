@@ -158,7 +158,7 @@ impl<'de> Deserialize<'de> for PassOrCmd {
                     ))),
                 },
                 _ => Err(D::Error::custom(
-                    "Expeted a 'cmd' key in password map with string value",
+                    "Expected a 'cmd' key in password map with string value",
                 )),
             },
             _ => Err(D::Error::custom("Password field must be a string or map")),
@@ -231,7 +231,7 @@ impl Config<PassOrCmd> {
 
         if self.defaults.nicks.is_empty() {
             errors.push(
-                "Default nick list can't be empty, please add at least one defaut nick".to_owned(),
+                "Default nick list can't be empty, please add at least one default nick".to_owned(),
             );
         }
 
