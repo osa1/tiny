@@ -453,7 +453,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 if params.iter().any(|cap| cap.as_str() == "sasl") {
                     let msg_target = MsgTarget::Server { serv };
                     ui.add_err_msg(
-                        "Server rejected using SASL authenication capability",
+                        "Server rejected using SASL authentication capability",
                         time::now(),
                         &msg_target,
                     );
@@ -463,7 +463,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 if !params.iter().any(|cap| cap.as_str() == "sasl") {
                     let msg_target = MsgTarget::Server { serv };
                     ui.add_err_msg(
-                        "Server does not support SASL authenication",
+                        "Server does not support SASL authentication",
                         time::now(),
                         &msg_target,
                     );
