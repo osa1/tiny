@@ -22,5 +22,5 @@ rustls-native-certs = { version = "0.6", optional = true }
 rustls-pemfile = { version = "1.0.3", optional = true }
 tokio = { version = "1.17", default-features = false, features = ["net", "rt", "io-util", "macros"] }
 tokio-native-tls = { version = "0.3", optional = true }
-tokio-rustls = { version = "0.24", optional = true }
+tokio-rustls = { version = ">=0.24", optional = true, default-features = false, features = ["ring", "logging", "tls12"] }
 tokio-stream = { version = "0.1" }
