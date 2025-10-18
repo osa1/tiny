@@ -11,7 +11,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
-use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style, TabConfig, TabConfigs};
 use crate::editor;
@@ -1321,7 +1320,7 @@ impl TUI {
         &mut self,
         sender: &str,
         msg: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         target: &MsgTarget,
         highlight: bool,
         is_action: bool,
@@ -1345,7 +1344,7 @@ impl TUI {
 
     /// A message without any explicit sender info. Useful for e.g. in server
     /// and debug log tabs. Timestamped and logged.
-    pub fn add_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
+    pub fn add_msg(&mut self, msg: &str, ts: time::OffsetDateTime, target: &MsgTarget) {
         self.apply_to_target(target, true, &mut |tab: &mut Tab, _| {
             tab.widget.add_msg(msg, Timestamp::from(ts));
         });
@@ -1353,13 +1352,13 @@ impl TUI {
 
     /// Error messages related with the protocol - e.g. can't join a channel,
     /// nickname is in use etc. Timestamped and logged.
-    pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Tm, target: &MsgTarget) {
+    pub(crate) fn add_err_msg(&mut self, msg: &str, ts: time::OffsetDateTime, target: &MsgTarget) {
         self.apply_to_target(target, true, &mut |tab: &mut Tab, _| {
             tab.widget.add_err_msg(msg, Timestamp::from(ts));
         });
     }
 
-    pub(crate) fn set_topic(&mut self, title: &str, ts: Tm, serv: &str, chan: &ChanNameRef) {
+    pub(crate) fn set_topic(&mut self, title: &str, ts: time::OffsetDateTime, serv: &str, chan: &ChanNameRef) {
         let target = MsgTarget::Chan { serv, chan };
         self.apply_to_target(&target, false, &mut |tab: &mut Tab, _| {
             tab.widget.show_topic(title, Timestamp::from(ts));
@@ -1373,7 +1372,7 @@ impl TUI {
         });
     }
 
-    pub(crate) fn add_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
+    pub(crate) fn add_nick(&mut self, nick: &str, ts: Option<time::OffsetDateTime>, target: &MsgTarget) {
         let ignore = self
             .get_tab_config(
                 target.serv_name().unwrap_or_default(),
@@ -1387,7 +1386,7 @@ impl TUI {
         });
     }
 
-    pub(crate) fn remove_nick(&mut self, nick: &str, ts: Option<Tm>, target: &MsgTarget) {
+    pub(crate) fn remove_nick(&mut self, nick: &str, ts: Option<time::OffsetDateTime>, target: &MsgTarget) {
         let ignore = self
             .get_tab_config(
                 target.serv_name().unwrap_or_default(),
@@ -1405,7 +1404,7 @@ impl TUI {
         &mut self,
         old_nick: &str,
         new_nick: &str,
-        ts: Tm,
+        ts: time::OffsetDateTime,
         target: &MsgTarget,
     ) {
         self.apply_to_target(target, false, &mut |tab: &mut Tab, _| {

@@ -34,7 +34,7 @@ fn main() {
         tui.new_chan_tab("debug", ChanNameRef::new("chan"));
         tui.set_topic(
             "This is channel topic",
-            time::now(),
+            time::OffsetDateTime::now_utc(),
             SERV,
             ChanNameRef::new(CHAN),
         );
@@ -46,7 +46,7 @@ fn main() {
             file.read_to_string(&mut text).unwrap();
 
             for (line_idx, line) in text.lines().enumerate() {
-                let now = time::now();
+                let now = time::OffsetDateTime::now_utc();
                 let nick = format!("nick_{}", line_idx);
                 tui.add_nick(&nick, Some(now), &chan_target);
                 tui.add_privmsg(&nick, line, now, &chan_target, false, false);
