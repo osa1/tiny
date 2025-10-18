@@ -1,3 +1,4 @@
+use tokio_rustls::rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use lazy_static::lazy_static;
 use std::{
     net::SocketAddr,
@@ -39,34 +40,38 @@ lazy_static! {
 #[cfg(feature = "tls-rustls")]
 fn tls_connector(sasl: Option<&Vec<u8>>) -> tokio_rustls::TlsConnector {
     use std::io::{Cursor, Seek, SeekFrom};
-    use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
+    use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 
     let mut roots = RootCertStore::empty();
     for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
-        roots.add(&Certificate(cert.0)).unwrap();
+        roots.add(cert).unwrap();
+//        roots.add(CertificateDer::from(cert.0)).unwrap();
     }
 
     let builder = ClientConfig::builder()
-        .with_safe_defaults()
         .with_root_certificates(roots);
 
     let config = if let Some(pem) = sasl {
         let mut buf = Cursor::new(pem);
         // extract certificate
-        let cert = rustls_pemfile::certs(&mut buf)
-            .expect("Could not parse PKCS8 PEM")
-            .pop()
+        let certs = rustls_pemfile::certs(&mut buf).collect::<Result<Vec<_>, _>>()
+//        let certs = rustls_pemfile::certs(&mut buf)
+            .expect("Could not parse PKCS8 PEM");
+        let cert = certs.into_iter()
+            .next()
             .expect("Cert PEM must have at least one cert");
 
         // extract private key
         buf.seek(SeekFrom::Start(0)).unwrap();
-        let key = rustls_pemfile::pkcs8_private_keys(&mut buf)
-            .expect("Could not parse PKCS8 PEM")
-            .pop()
+        let keys = rustls_pemfile::pkcs8_private_keys(&mut buf).collect::<Result<Vec<_>, _>>()
+ //       let keys = rustls_pemfile::pkcs8_private_keys(&mut buf)
+            .expect("Could not parse PKCS8 PEM");
+        let key = keys.into_iter()
+            .next()
             .expect("Cert PEM must have at least one private key");
 
         builder
-            .with_client_auth_cert(vec![Certificate(cert)], PrivateKey(key))
+            .with_client_auth_cert(vec![CertificateDer::from(cert)], PrivatePkcs8KeyDer::from(key).into())
             .expect("Client auth cert")
     } else {
         builder.with_no_client_auth()
@@ -131,15 +136,18 @@ impl Stream {
         host_name: &str,
         sasl: Option<&Vec<u8>>,
     ) -> Result<Stream, StreamError> {
-        use tokio_rustls::rustls::ServerName;
-
+        use tokio_rustls::rustls::pki_types::ServerName;
         let tcp_stream = TcpStream::connect(addr).await?;
-        let name = ServerName::try_from(host_name).unwrap();
+        let name = ServerName::try_from(host_name.to_owned())
+            .map_err(|e| std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid server name: {}: {}", host_name, e)
+            ))?;
         // If SASL EXTERNAL is enabled create a new TLS connector with client auth cert
         let tls_stream = if sasl.is_some() {
-            tls_connector(sasl).connect(name, tcp_stream).await?
+            tls_connector(sasl).connect(name.clone(), tcp_stream).await?
         } else {
-            TLS_CONNECTOR.connect(name, tcp_stream).await?
+            TLS_CONNECTOR.connect(name.clone(), tcp_stream).await?
         };
         Ok(Stream::TlsStream(tls_stream.into()))
     }
