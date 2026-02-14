@@ -670,7 +670,7 @@ impl InputArea {
         assert!(cursor >= 0 && cursor <= line_len);
         self.cursor = cursor;
 
-        if self.scroll.is_some() {
+        if let Some(scroll) = self.scroll {
             let mut nick_length = 0;
             if let Some(nick) = &self.nick {
                 nick_length = nick.len(self.width);
@@ -688,8 +688,8 @@ impl InputArea {
                 };
 
                 // Shown range of the text field before updating scroll
-                let left_end = min(self.scroll.unwrap(), line_len);
-                let right_end = min(self.scroll.unwrap() + fixed_width, line_len);
+                let left_end = min(scroll, line_len);
+                let right_end = min(scroll + fixed_width, line_len);
 
                 if cursor - scrolloff < left_end {
                     self.scroll = Some(max(0, cursor - scrolloff));
@@ -707,7 +707,7 @@ impl InputArea {
             } else {
                 self.scroll = Some(0);
             }
-        };
+        }
     }
 }
 
