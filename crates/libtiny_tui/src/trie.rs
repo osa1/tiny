@@ -61,26 +61,24 @@ impl Trie {
         }
     }
 
-    // TODO: We need an Iterator instance instead.
     pub fn to_strings(&self, prefix: &str) -> Vec<String> {
-        let mut ret = {
-            if self.word {
-                vec![prefix.to_owned()]
-            } else {
-                vec![]
-            }
-        };
-
-        for &(c, ref t) in &self.vec {
-            let mut prefix_ = prefix.to_owned();
-            prefix_.push(c);
-            ret.extend(t.to_strings(&prefix_));
-        }
-
+        let mut ret = Vec::new();
+        let mut buf = String::from(prefix);
+        self.to_strings_(&mut buf, &mut ret);
         ret
     }
 
-    // TODO: We need an Iterator instance instead.
+    fn to_strings_(&self, buf: &mut String, ret: &mut Vec<String>) {
+        if self.word {
+            ret.push(buf.clone());
+        }
+        for &(c, ref t) in &self.vec {
+            buf.push(c);
+            t.to_strings_(buf, ret);
+            buf.pop();
+        }
+    }
+
     pub fn drop_pfx(&self, prefix: &mut dyn Iterator<Item = char>) -> Vec<String> {
         let mut trie = self;
         for char in prefix {
