@@ -52,6 +52,9 @@ pub(crate) struct InputArea {
     /// Current nickname. Not available on initialization (e.g. before registration with the
     /// server). Set with `set_nick`.
     nick: Option<Nickname>,
+
+    // Autocompletion character to be used when at the start of the line. Set with `set_completion_char`.
+    completion_char: Option<String>,
 }
 
 enum Mode {
@@ -120,11 +123,17 @@ impl InputArea {
             history: Vec::with_capacity(HIST_SIZE),
             mode: Mode::Edit,
             nick: None,
+            completion_char: None,
         }
     }
 
     pub(crate) fn set_nick(&mut self, value: String, color: usize) {
         self.nick = Some(Nickname::new(value, color))
+    }
+
+    /// Set completion char.
+    pub(crate) fn set_completion_char(&mut self, completion_char: Option<String>) {
+        self.completion_char = completion_char;
     }
 
     pub(crate) fn get_nick(&self) -> Option<String> {
@@ -746,7 +755,17 @@ impl InputArea {
                 }
             };
 
-            dict.drop_pfx(&mut word.iter().cloned())
+            let mut completions = dict.drop_pfx(&mut word.iter().cloned());
+
+            if let Some(completion_suffix) = &self.completion_char {
+                if cursor_left == 0 {
+                    for completion in completions.iter_mut() {
+                        completion.push_str(&format!("{} ", completion_suffix));
+                    }
+                }
+            }
+
+            completions
         };
 
         if !completions.is_empty() {
