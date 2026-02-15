@@ -27,6 +27,7 @@ log = "0.4"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_yaml = "0.8"
 shell-words = "1.1.0"
+shellexpand = "3"
 time = "0.1"
 tokio = { version = "1.36", default-features = false, features = [] }
 tokio-stream = { version = "0.1", features = [] }
