@@ -422,6 +422,17 @@ pub(crate) fn get_config_path() -> PathBuf {
     }
 }
 
+fn expand_path(path: &Path) -> PathBuf {
+    let s = path.to_string_lossy();
+    match shellexpand::full(&s) {
+        Ok(expanded) => PathBuf::from(expanded.as_ref()),
+        Err(err) => {
+            println!("Failed to expand path {path:?}: {err}");
+            path.to_owned()
+        }
+    }
+}
+
 pub(crate) fn parse_config(config_path: &Path) -> Result<Config<PassOrCmd>, serde_yaml::Error> {
     let contents = {
         let mut str = String::new();
@@ -430,7 +441,18 @@ pub(crate) fn parse_config(config_path: &Path) -> Result<Config<PassOrCmd>, serd
         str
     };
 
-    serde_yaml::from_str(&contents)
+    let mut config: Config<PassOrCmd> = serde_yaml::from_str(&contents)?;
+
+    if let Some(log_dir) = &mut config.log_dir {
+        *log_dir = expand_path(log_dir);
+    }
+    for server in &mut config.servers {
+        if let Some(SASLAuth::External { pem }) = &mut server.sasl_auth {
+            *pem = expand_path(pem);
+        }
+    }
+
+    Ok(config)
 }
 
 pub(crate) fn generate_default_config(config_path: &Path) {
@@ -522,6 +544,89 @@ mod tests {
             &errors[3],
             "'realname' can't be empty, please update 'realname' field of 'my_server'"
         );
+    }
+
+    #[test]
+    fn parse_config_expands_log_dir() {
+        let home = std::env::var("HOME").unwrap();
+        let yaml = "\
+servers:
+  - addr: irc.test.com
+    port: 6697
+    tls: true
+    realname: test
+    nicks: [test]
+    join: []
+defaults:
+  nicks: [test]
+  realname: test
+log_dir: ~/test_logs
+";
+        let dir = std::env::temp_dir().join("tiny_test_parse_config");
+        let _ = fs::create_dir_all(&dir);
+        let config_path = dir.join("config.yml");
+        fs::write(&config_path, yaml).unwrap();
+
+        let config = parse_config(&config_path).unwrap();
+        assert_eq!(
+            config.log_dir.unwrap(),
+            PathBuf::from(format!("{home}/test_logs"))
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_config_expands_sasl_pem() {
+        let home = std::env::var("HOME").unwrap();
+        let yaml = "\
+servers:
+  - addr: irc.test.com
+    port: 6697
+    tls: true
+    realname: test
+    nicks: [test]
+    join: []
+    sasl:
+      pem: ~/certs/my.pem
+defaults:
+  nicks: [test]
+  realname: test
+";
+        let dir = std::env::temp_dir().join("tiny_test_parse_config_sasl");
+        let _ = fs::create_dir_all(&dir);
+        let config_path = dir.join("config.yml");
+        fs::write(&config_path, yaml).unwrap();
+
+        let config = parse_config(&config_path).unwrap();
+        match &config.servers[0].sasl_auth {
+            Some(SASLAuth::External { pem }) => {
+                assert_eq!(*pem, PathBuf::from(format!("{home}/certs/my.pem")));
+            }
+            other => panic!("Expected SASLAuth::External, got {other:?}"),
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn expand_path_tilde() {
+        let home = std::env::var("HOME").unwrap();
+        let expanded = expand_path(Path::new("~/foo"));
+        assert_eq!(expanded, PathBuf::from(format!("{home}/foo")));
+    }
+
+    #[test]
+    fn expand_path_env_var() {
+        let home = std::env::var("HOME").unwrap();
+        let expanded = expand_path(Path::new("$HOME/foo"));
+        assert_eq!(expanded, PathBuf::from(format!("{home}/foo")));
+    }
+
+    #[test]
+    fn expand_path_no_expansion() {
+        let path = Path::new("/absolute/path/no/vars");
+        assert_eq!(expand_path(path), path);
     }
 
     #[test]
