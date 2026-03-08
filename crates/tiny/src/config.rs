@@ -59,6 +59,10 @@ pub(crate) struct Server<P> {
     #[serde(default)]
     pub(crate) pass: Option<P>,
 
+    /// Whether to auto-connect to the server
+    #[serde(default = "default_true")]
+    pub(crate) autoconnect: bool,
+
     /// User name to be used in connection registration
     /// If it is not specified, the first nick will be used instead
     #[serde(default)]
@@ -82,6 +86,10 @@ pub(crate) struct Server<P> {
     /// Authenication method
     #[serde(rename = "sasl")]
     pub(crate) sasl_auth: Option<SASLAuth<P>>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Similar to `Server`, but used when connecting via the `/connect` command.
@@ -324,6 +332,7 @@ impl Config<PassOrCmd> {
                 port,
                 tls,
                 pass,
+                autoconnect,
                 user,
                 realname,
                 nicks,
@@ -369,6 +378,7 @@ impl Config<PassOrCmd> {
                 port,
                 tls,
                 pass,
+                autoconnect,
                 user,
                 realname,
                 nicks,
@@ -490,6 +500,7 @@ mod tests {
                 port: 123,
                 tls: false,
                 pass: None,
+                autoconnect: true,
                 user: None,
                 realname: "".to_owned(),
                 nicks: vec!["".to_owned()],
