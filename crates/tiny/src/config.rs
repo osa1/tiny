@@ -60,7 +60,7 @@ pub(crate) struct Server<P> {
     pub(crate) pass: Option<P>,
 
     /// Whether or not to auto-connect to the server
-    #[serde(default = true)]
+    #[serde(default = "true")]
     pub(crate) autoconn: bool,
 
     /// User name to be used in connection registration
@@ -328,6 +328,7 @@ impl Config<PassOrCmd> {
                 port,
                 tls,
                 pass,
+                autoconn,
                 user,
                 realname,
                 nicks,
