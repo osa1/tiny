@@ -12,7 +12,7 @@
   beginning of a connection. (#448)
 - Create log files with permissions 600: readable and writable by only you.
 
-  Previuosly tiny created log files with the default mode in Rust which is 666:
+  Previously tiny created log files with the default mode in Rust which is 666:
   readable and writable by anyone.
 
   tiny does not update permissions of existing log files.
