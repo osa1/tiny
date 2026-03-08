@@ -59,6 +59,10 @@ pub(crate) struct Server<P> {
     #[serde(default)]
     pub(crate) pass: Option<P>,
 
+    /// Whether or not to auto-connect to the server
+    #[serde(default = true)]
+    pub(crate) autoconn: bool,
+
     /// User name to be used in connection registration
     /// If it is not specified, the first nick will be used instead
     #[serde(default)]
