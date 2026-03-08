@@ -9,7 +9,7 @@ servers:
       realname: yourname
       nicks: [tiny_user]
 
-      # Whether or not to autoconnect to this server on startup.
+      # Whether to auto-connect to this server on startup.
       # autoconnect: true
 
       # Server alias to show in the tab line.

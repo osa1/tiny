@@ -59,7 +59,7 @@ pub(crate) struct Server<P> {
     #[serde(default)]
     pub(crate) pass: Option<P>,
 
-    /// Whether or not to auto-connect to the server
+    /// Whether to auto-connect to the server
     #[serde(default = "default_true")]
     pub(crate) autoconnect: bool,
 
@@ -500,6 +500,7 @@ mod tests {
                 port: 123,
                 tls: false,
                 pass: None,
+                autoconnect: true,
                 user: None,
                 realname: "".to_owned(),
                 nicks: vec!["".to_owned()],
