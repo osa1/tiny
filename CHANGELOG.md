@@ -16,6 +16,8 @@
   readable and writable by anyone.
 
   tiny does not update permissions of existing log files.
+- Add new server configuration option `autoconnect` to disable automatically
+  connecting to a server on startup. (#443)
 
 # 2025/01/01: 0.13.0
 
