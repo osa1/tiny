@@ -32,7 +32,7 @@ impl TryFrom<SASLAuth<String>> for ClientSASLAuth {
         Ok(match sasl {
             SASLAuth::Plain { username, password } => ClientSASLAuth::Plain { username, password },
             SASLAuth::External { pem } => ClientSASLAuth::External {
-                pem: std::fs::read(pem).map_err(|e| format!("Could not read PEM file: {e}"))?,
+                pem: std::fs::read(expand_path(pem)).map_err(|e| format!("Could not read PEM file: {e}"))?,
             },
         })
     }
@@ -393,6 +393,13 @@ impl Config<PassOrCmd> {
             defaults,
             log_dir,
         })
+    }
+}
+
+pub(crate) fn expand_path(path: PathBuf) -> PathBuf {
+    match shellexpand::full(&path.to_string_lossy()) {
+        Err(e) => panic!("error expanding path: {e:?}"),
+        Ok(expanded) => PathBuf::from(expanded.as_ref()),
     }
 }
 

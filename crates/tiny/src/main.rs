@@ -90,7 +90,7 @@ fn run(
 ) {
     let debug_log_file = match log_dir.as_ref() {
         Some(log_dir) => {
-            let mut log_dir = log_dir.clone();
+            let mut log_dir = config::expand_path(log_dir.clone());
             log_dir.push(DEBUG_LOG_FILE);
             log_dir
         }
