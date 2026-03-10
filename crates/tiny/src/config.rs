@@ -32,7 +32,8 @@ impl TryFrom<SASLAuth<String>> for ClientSASLAuth {
         Ok(match sasl {
             SASLAuth::Plain { username, password } => ClientSASLAuth::Plain { username, password },
             SASLAuth::External { pem } => ClientSASLAuth::External {
-                pem: std::fs::read(expand_path(pem)).map_err(|e| format!("Could not read PEM file: {e}"))?,
+                pem: std::fs::read(expand_path(pem))
+                    .map_err(|e| format!("Could not read PEM file: {e}"))?,
             },
         })
     }
