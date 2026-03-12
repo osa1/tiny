@@ -32,8 +32,7 @@ impl TryFrom<SASLAuth<String>> for ClientSASLAuth {
         Ok(match sasl {
             SASLAuth::Plain { username, password } => ClientSASLAuth::Plain { username, password },
             SASLAuth::External { pem } => ClientSASLAuth::External {
-                pem: std::fs::read(expand_path(pem))
-                    .map_err(|e| format!("Could not read PEM file: {e}"))?,
+                pem: std::fs::read(pem).map_err(|e| format!("Could not read PEM file: {e}"))?,
             },
         })
     }
@@ -315,6 +314,47 @@ impl Config<PassOrCmd> {
         errors
     }
 
+    pub(crate) fn expand_fields(self) -> Option<Config<PassOrCmd>> {
+        let Config {
+            servers,
+            defaults,
+            log_dir,
+        } = self;
+
+        let mut servers_: Vec<Server<PassOrCmd>> = Vec::with_capacity(servers.len());
+
+        for server in servers {
+            let mut server_ = server.clone();
+
+            let sasl_auth = match server_.sasl_auth {
+                None => None,
+                Some(SASLAuth::Plain { username, password }) => {
+                    Some(SASLAuth::Plain { username, password })
+                }
+                Some(SASLAuth::External { pem }) => Some(SASLAuth::External {
+                    pem: expand_path(pem)?,
+                }),
+            };
+
+            server_.sasl_auth = sasl_auth;
+            servers_.push(server_);
+        }
+
+        let log_dir = match log_dir {
+            Some(dir) => {
+                let expanded = expand_path(dir)?;
+                Some(expanded)
+            }
+            None => None,
+        };
+
+        Some(Config {
+            servers: servers_,
+            defaults,
+            log_dir,
+        })
+    }
+
     /// Runs password commands and updates the config with plain passwords obtained from the
     /// commands.
     pub(crate) fn read_passwords(self) -> Option<Config<String>> {
@@ -397,10 +437,13 @@ impl Config<PassOrCmd> {
     }
 }
 
-pub(crate) fn expand_path(path: PathBuf) -> PathBuf {
+pub(crate) fn expand_path(path: PathBuf) -> Option<PathBuf> {
     match shellexpand::full(&path.to_string_lossy()) {
-        Err(e) => panic!("error expanding path: {e:?}"),
-        Ok(expanded) => PathBuf::from(expanded.as_ref()),
+        Err(e) => {
+            println!("error expanding path: {e:?}");
+            None
+        }
+        Ok(expanded) => Some(PathBuf::from(expanded.as_ref())),
     }
 }
 

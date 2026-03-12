@@ -54,6 +54,11 @@ fn main() {
                     exit(1);
                 }
 
+                let config = match config.expand_fields() {
+                    None => exit(1),
+                    Some(config) => config,
+                };
+
                 let config = match config.read_passwords() {
                     None => exit(1),
                     Some(config) => config,
@@ -90,7 +95,7 @@ fn run(
 ) {
     let debug_log_file = match log_dir.as_ref() {
         Some(log_dir) => {
-            let mut log_dir = config::expand_path(log_dir.clone());
+            let mut log_dir = log_dir.clone();
             log_dir.push(DEBUG_LOG_FILE);
             log_dir
         }
