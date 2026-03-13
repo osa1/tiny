@@ -41,7 +41,7 @@ fn main() {
                 println!("{yaml_err}");
                 exit(1);
             }
-            Ok(config) => {
+            Ok(mut config) => {
                 let config_errors = config.validate();
                 if !config_errors.is_empty() {
                     println!(
@@ -54,9 +54,13 @@ fn main() {
                     exit(1);
                 }
 
-                let config = match config.expand_fields() {
-                    None => exit(1),
-                    Some(config) => config,
+                match config.expand_fields() {
+                    Err(expand_error) => {
+                        println!("Can't expand variable:");
+                        println!("{expand_error}");
+                        exit(1);
+                    }
+                    Ok(_) => (),
                 };
 
                 let config = match config.read_passwords() {

@@ -1,6 +1,8 @@
 use libtiny_client::SASLAuth as ClientSASLAuth;
 use serde::{Deserialize, Deserializer};
 
+use shellexpand::LookupError;
+use std::env::VarError;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -314,45 +316,23 @@ impl Config<PassOrCmd> {
         errors
     }
 
-    pub(crate) fn expand_fields(self) -> Option<Config<PassOrCmd>> {
-        let Config {
-            servers,
-            defaults,
-            log_dir,
-        } = self;
-
-        let mut servers_: Vec<Server<PassOrCmd>> = Vec::with_capacity(servers.len());
-
-        for server in servers {
-            let mut server_ = server.clone();
-
-            let sasl_auth = match server_.sasl_auth {
+    pub(crate) fn expand_fields(&mut self) -> Result<(), LookupError<VarError>> {
+        for server in &mut self.servers {
+            server.sasl_auth = match &mut server.sasl_auth {
                 None => None,
-                Some(SASLAuth::Plain { username, password }) => {
-                    Some(SASLAuth::Plain { username, password })
-                }
+                Some(other @ SASLAuth::Plain { .. }) => Some(other.clone()),
                 Some(SASLAuth::External { pem }) => Some(SASLAuth::External {
-                    pem: expand_path(pem)?,
+                    pem: expand_path(pem.to_path_buf())?,
                 }),
             };
-
-            server_.sasl_auth = sasl_auth;
-            servers_.push(server_);
         }
 
-        let log_dir = match log_dir {
-            Some(dir) => {
-                let expanded = expand_path(dir)?;
-                Some(expanded)
-            }
+        self.log_dir = match &self.log_dir {
             None => None,
+            Some(dir) => Some(expand_path(dir.to_path_buf())?),
         };
 
-        Some(Config {
-            servers: servers_,
-            defaults,
-            log_dir,
-        })
+        Ok(())
     }
 
     /// Runs password commands and updates the config with plain passwords obtained from the
@@ -437,13 +417,13 @@ impl Config<PassOrCmd> {
     }
 }
 
-pub(crate) fn expand_path(path: PathBuf) -> Option<PathBuf> {
+pub(crate) fn expand_path(path: PathBuf) -> Result<PathBuf, LookupError<VarError>> {
     match shellexpand::full(&path.to_string_lossy()) {
         Err(e) => {
-            println!("error expanding path: {e:?}");
-            None
+            println!("error expanding variable {e:?}");
+            Err(e)
         }
-        Ok(expanded) => Some(PathBuf::from(expanded.as_ref())),
+        Ok(expanded) => Ok(PathBuf::from(expanded.as_ref())),
     }
 }
 
