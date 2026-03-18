@@ -1,7 +1,7 @@
 use libtiny_common::{MsgSource, TabStyle};
 use termbox_simple::{TB_UNDERLINE, Termbox};
 
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     config::{Colors, Style},
@@ -68,7 +68,8 @@ impl Tab {
             } else {
                 tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
             }
-            pos_x += 1;
+            // Account for wide characters (CJK) by using Unicode width
+            pos_x += UnicodeWidthChar::width(ch).unwrap_or(1) as i32;
         }
     }
 }

@@ -3,6 +3,7 @@ use crate::line_split::{LineDataCache, LineType};
 
 use libtiny_wire::formatting::{Color, IrcFormatEvent, parse_irc_formatting};
 use termbox_simple::{self, Termbox};
+use unicode_width::UnicodeWidthChar;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
@@ -239,7 +240,9 @@ impl Line {
                 if line_num >= first_line {
                     tb.change_cell(col, pos_y + line_num, c, sty.fg, sty.bg);
                 }
-                col += 1;
+                // Account for wide characters (CJK) by using Unicode width
+                let char_width = UnicodeWidthChar::width(c).unwrap_or(1) as i32;
+                col += char_width;
                 char_idx += 1;
             }
         }

@@ -1,0 +1,15 @@
+{
+  "project_spec": "tiny - TUI IRC client，修复 CJK 字符显示截取问题",
+  "features": [
+    {
+      "id": "F001",
+      "description": "修复 TUI 显示时 CJK+English 字符被错误截取的问题",
+      "priority": "P0",
+      "status": "in_progress",
+      "commit_hash": null,
+      "test_status": "not_run",
+      "notes": "问题表现：CJK 字符或英文字符在 TUI 显示时被错误截取，可能是宽度计算问题"
+    }
+  ],
+  "session_history": []
+}

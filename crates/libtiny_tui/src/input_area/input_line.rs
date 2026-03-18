@@ -1,6 +1,7 @@
 use crate::{config::Colors, line_split::LineDataCache, termbox, utils};
 use std::{cmp::min, ops::RangeBounds, vec::Drain};
 use termbox_simple::Termbox;
+use unicode_width::UnicodeWidthChar;
 
 #[derive(Clone, Debug)]
 pub(crate) struct InputLine {
@@ -171,7 +172,9 @@ fn draw_line_wrapped(
         tb.change_cell(col, pos_y + line_num, *c, style.fg, style.bg);
         // Check if the cursor is on this character
         check_cursor(char_idx, cursor, col, pos_y + line_num, *c);
-        col += 1;
+        // Account for wide characters (CJK) by using Unicode width
+        let char_width = UnicodeWidthChar::width(*c).unwrap_or(1) as i32;
+        col += char_width;
     }
 
     // Cursor may be (probably) after all text

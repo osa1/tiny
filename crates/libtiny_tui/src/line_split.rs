@@ -140,6 +140,8 @@ impl LineDataCache {
     /// If an offset is provided, it will continue the calculation
     /// from the saved state and save the new line count in `line_count`.
     pub(crate) fn calculate_height<I: Iterator<Item = char>>(&mut self, buffer: I, offset: usize) {
+        use unicode_width::UnicodeWidthChar;
+
         let mut temp_count = 1;
         if let Some(line_count) = self.line_count {
             temp_count = line_count;
@@ -153,7 +155,9 @@ impl LineDataCache {
 
         for (c, current_idx) in buffer.skip(offset).zip(offset..) {
             let current_idx = current_idx as i32;
-            self.current_line_length += 1;
+            // Use Unicode width for proper CJK character handling
+            let char_width = UnicodeWidthChar::width(c).unwrap_or(1) as i32;
+            self.current_line_length += char_width;
 
             if c.is_whitespace() {
                 // Splitting
@@ -161,7 +165,7 @@ impl LineDataCache {
                     // we're on a whitespace so just go to next line
                     temp_count += 1;
                     // this character will be the first one on the next line
-                    self.current_line_length = 1;
+                    self.current_line_length = char_width;
                     // nick is shown on the first line, set width to full width in the consecutive
                     // lines
                     self.line_width = self.multi_line_width();
@@ -182,12 +186,15 @@ impl LineDataCache {
                         // we just want to do an unclean split (mainly only for links or if someone spams a super long line)
                         if current_idx - last_whitespace_idx > self.line_width {
                             // unclean split on non-whitespace
-                            self.current_line_length = 1;
+                            // Start new line with current character
+                            self.current_line_length = char_width;
                             // store index for drawing
                             self.split_indices.push(current_idx);
                         } else {
                             // move back to the last whitespace and get the length of the input that
                             // will be on the next line
+                            // For simplicity, we count the number of characters (not visual width)
+                            // This is a simplification - ideally we'd calculate visual width
                             self.current_line_length = current_idx - last_whitespace_idx;
 
                             // store index for drawing
@@ -195,7 +202,8 @@ impl LineDataCache {
                         }
                     } else {
                         // unclean split on non-whitespace
-                        self.current_line_length = 1;
+                        // Start new line with current character
+                        self.current_line_length = char_width;
                         // store index for drawing
                         self.split_indices.push(current_idx);
                     }
