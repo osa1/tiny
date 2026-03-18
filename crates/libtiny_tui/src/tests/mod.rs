@@ -444,3 +444,95 @@ fn test_wide_emoji_in_message() {
     let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
     assert_eq!(emoji_count, 5, "All 5 emojis should be displayed in the message, but found {}", emoji_count);
 }
+
+// Test CJK (Chinese/Japanese/Korean) character display in input line
+// CJK characters have width 2 and should be handled correctly
+#[test]
+fn test_cjk_characters_in_input() {
+    let mut tui = TUI::new_test(30, 4);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    // Enter Chinese characters "你好世界" (Hello World)
+    // Each CJK character has width 2
+    enter_string(&mut tui, "你好世界");
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 30, 4);
+
+    // Check that all CJK characters are in the buffer
+    assert!(buffer_str.contains('你'), "Buffer should contain Chinese character '你'");
+    assert!(buffer_str.contains('好'), "Buffer should contain Chinese character '好'");
+    assert!(buffer_str.contains('世'), "Buffer should contain Chinese character '世'");
+    assert!(buffer_str.contains('界'), "Buffer should contain Chinese character '界'");
+
+    // Count CJK characters
+    let cjk_count = buffer_str.chars().filter(|&c| "你好世界".contains(c)).count();
+    assert_eq!(cjk_count, 4, "All 4 CJK characters should be displayed, but found {}", cjk_count);
+}
+
+// Test CJK characters in messages
+#[test]
+fn test_cjk_characters_in_message() {
+    let mut tui = TUI::new_test(40, 4);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+
+    // Add a message with CJK characters
+    tui.add_msg("你好，这是中文测试", ts, &target);
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 40, 4);
+
+    // Check that CJK characters are in the buffer
+    assert!(buffer_str.contains('你'), "Buffer should contain Chinese character '你'");
+    assert!(buffer_str.contains('好'), "Buffer should contain Chinese character '好'");
+    assert!(buffer_str.contains('中'), "Buffer should contain Chinese character '中'");
+    assert!(buffer_str.contains('文'), "Buffer should contain Chinese character '文'");
+}
+
+// Test mixed ASCII and CJK characters
+#[test]
+fn test_mixed_ascii_cjk_input() {
+    let mut tui = TUI::new_test(40, 4);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    // Enter mixed ASCII and CJK: "Hello你好World世界"
+    enter_string(&mut tui, "Hello你好World世界");
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 40, 4);
+
+    // Check that both ASCII and CJK characters are present
+    assert!(buffer_str.contains("Hello"), "Buffer should contain 'Hello'");
+    assert!(buffer_str.contains('你'), "Buffer should contain Chinese character '你'");
+    assert!(buffer_str.contains('好'), "Buffer should contain Chinese character '好'");
+    assert!(buffer_str.contains("World"), "Buffer should contain 'World'");
+    assert!(buffer_str.contains('世'), "Buffer should contain Chinese character '世'");
+    assert!(buffer_str.contains('界'), "Buffer should contain Chinese character '界'");
+}
