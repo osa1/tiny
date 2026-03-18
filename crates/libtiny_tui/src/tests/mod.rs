@@ -382,3 +382,65 @@ fn test_text_field_wrap() {
     // TODO: Test changing nick (osa: I don't understand how nick length is taken into account when
     // falling back to scrolling)
 }
+
+// Test for issue #379: Wide characters (emoji) should be displayed correctly
+// When pasting 🟩🟩🟩🟩🟩, all 5 squares should be visible
+#[test]
+fn test_wide_emoji_display() {
+    let mut tui = TUI::new_test(30, 4);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    // Enter green square emoji (🟩) which has width 2
+    // In a 30-char wide screen with "osa1: " prefix (6 chars), we have 24 chars remaining
+    // Each 🟩 takes 2 columns, so we can fit 12 emojis
+    enter_string(&mut tui, "🟩🟩🟩🟩🟩");
+
+    tui.draw();
+
+    // The input line should show all 5 emojis
+    // Note: In the test framework, wide characters still occupy one cell in the buffer
+    // but the cursor position and line wrapping calculations account for their width
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 30, 4);
+
+    // Check that the emojis are in the buffer
+    assert!(buffer_str.contains('🟩'), "Buffer should contain the green square emoji");
+
+    // Count how many emojis are in the buffer
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 5, "All 5 emojis should be displayed, but found {}", emoji_count);
+}
+
+// Test for issue #379: Wide characters in messages should be displayed correctly
+#[test]
+fn test_wide_emoji_in_message() {
+    let mut tui = TUI::new_test(40, 4);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+
+    // Add a message with green square emojis
+    tui.add_msg("🟩🟩🟩🟩🟩", ts, &target);
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 40, 4);
+
+    // Check that all emojis are in the buffer
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 5, "All 5 emojis should be displayed in the message, but found {}", emoji_count);
+}
