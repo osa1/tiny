@@ -54,13 +54,10 @@ fn main() {
                     exit(1);
                 }
 
-                match config.expand_fields() {
-                    Err(expand_error) => {
-                        println!("Can't expand variable:");
-                        println!("{expand_error}");
-                        exit(1);
-                    }
-                    Ok(_) => (),
+                if let Err(var_error) = config.expand_fields() {
+                    println!("Config file error: cannot expand variable:");
+                    println!("- {var_error}");
+                    exit(1);
                 };
 
                 let config = match config.read_passwords() {

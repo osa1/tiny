@@ -417,7 +417,7 @@ impl Config<PassOrCmd> {
     }
 }
 
-pub(crate) fn expand_path(path: PathBuf) -> Result<PathBuf, LookupError<VarError>> {
+fn expand_path(path: PathBuf) -> Result<PathBuf, LookupError<VarError>> {
     match shellexpand::full(&path.to_string_lossy()) {
         Err(e) => Err(e),
         Ok(expanded) => Ok(PathBuf::from(expanded.as_ref())),
