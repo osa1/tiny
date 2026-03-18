@@ -3,3 +3,7 @@ target
 logs
 stderr
 stdout
+.qwen/
+PROGRESS.md
+init.sh
+.lsp.json
