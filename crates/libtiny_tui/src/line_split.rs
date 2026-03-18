@@ -17,6 +17,9 @@ pub(crate) struct LineDataCache {
     current_line_length: i32,
     /// The type of line we're trying to calculate height for
     line_type: LineType,
+    /// Accumulates visual width since the last whitespace.
+    /// Used to correctly calculate current_line_length when splitting at a whitespace.
+    split_width_accumulator: i32,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -53,6 +56,7 @@ impl LineDataCache {
             last_whitespace_idx: None,
             current_line_length: 0,
             line_type: LineType::Input { nick_length },
+            split_width_accumulator: 0,
         }
     }
 
@@ -70,6 +74,7 @@ impl LineDataCache {
             last_whitespace_idx: None,
             current_line_length: 0,
             line_type,
+            split_width_accumulator: 0,
         }
     }
 
@@ -172,10 +177,17 @@ impl LineDataCache {
 
                     // store index for drawing
                     self.split_indices.push(current_idx);
+                    // Set accumulator to current char width since this char starts the new line
+                    self.split_width_accumulator = char_width;
+                } else {
+                    // Reset the width accumulator since we hit a whitespace (no split)
+                    self.split_width_accumulator = 0;
                 }
                 // store whitespace for splitting
                 self.last_whitespace_idx = Some(current_idx);
             } else {
+                // Accumulate width since last whitespace
+                self.split_width_accumulator += char_width;
                 // Splitting on non-whitespace
                 if self.current_line_length > self.line_width {
                     // set width to full width
@@ -193,9 +205,9 @@ impl LineDataCache {
                         } else {
                             // move back to the last whitespace and get the length of the input that
                             // will be on the next line
-                            // For simplicity, we count the number of characters (not visual width)
-                            // This is a simplification - ideally we'd calculate visual width
-                            self.current_line_length = current_idx - last_whitespace_idx;
+                            // We need to calculate the visual width from last_whitespace_idx to current_idx
+                            // This is stored in split_width_accumulator, which accumulates width since last whitespace
+                            self.current_line_length = self.split_width_accumulator;
 
                             // store index for drawing
                             self.split_indices.push(last_whitespace_idx + 1);
@@ -209,6 +221,9 @@ impl LineDataCache {
                     }
                     // invalidate whitespace since we split here
                     self.last_whitespace_idx = None;
+                    // Reset accumulator for the new line
+                    // The new line starts with the current character
+                    self.split_width_accumulator = char_width;
                     // moved to next line
                     temp_count += 1;
                 }

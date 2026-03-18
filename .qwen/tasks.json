@@ -5,11 +5,19 @@
       "id": "F001",
       "description": "修复 TUI 显示时 CJK+English 字符被错误截取的问题",
       "priority": "P0",
-      "status": "in_progress",
-      "commit_hash": null,
-      "test_status": "not_run",
-      "notes": "问题表现：CJK 字符或英文字符在 TUI 显示时被错误截取，可能是宽度计算问题"
+      "status": "completed",
+      "commit_hash": "6f0ed54",
+      "test_status": "passing",
+      "notes": "问题根因：绘制时所有字符都假设宽度为 1，但 CJK 字符实际宽度为 2。修复了 5 个文件的字符宽度计算逻辑。"
     }
   ],
-  "session_history": []
+  "session_history": [
+    {
+      "session_id": 1,
+      "date": "2026-03-18",
+      "features_completed": ["F001"],
+      "summary": "完成 CJK 字符显示修复。问题根因是绘制时未考虑 CJK 字符宽度为 2，修复了 termbox.rs、tab.rs、msg_area/line.rs、input_line.rs 的字符宽度计算。所有 75 个测试通过，release 构建成功。",
+      "blocking_issues": []
+    }
+  ]
 }

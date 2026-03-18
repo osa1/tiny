@@ -107,19 +107,26 @@ fn draw_line_scroll(
     let slice: &[char] =
         &line[scroll as usize..min(line.len(), (scroll + (width - pos_x)) as usize)];
     termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().copied());
+
+    // Calculate visual width from scroll position to cursor
+    // This is needed for proper cursor positioning with wide characters (e.g., CJK)
+    let cursor_visual_width: i32 = line[..cursor as usize]
+        .iter()
+        .map(|c| UnicodeWidthChar::width(*c).unwrap_or(1) as i32)
+        .sum();
+    let scroll_visual_width: i32 = line[..scroll as usize]
+        .iter()
+        .map(|c| UnicodeWidthChar::width(*c).unwrap_or(1) as i32)
+        .sum();
+    let cursor_x = pos_x + cursor_visual_width - scroll_visual_width;
+
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
-        tb.change_cell(
-            pos_x + cursor - scroll,
-            pos_y,
-            ' ',
-            colors.cursor.fg,
-            colors.cursor.bg,
-        );
+        tb.change_cell(cursor_x, pos_y, ' ', colors.cursor.fg, colors.cursor.bg);
     }
 
-    tb.set_cursor(Some(((pos_x + cursor - scroll) as u16, pos_y as u16)));
+    tb.set_cursor(Some((cursor_x as u16, pos_y as u16)));
 }
 
 pub(crate) struct CompletionRange {
@@ -178,7 +185,8 @@ fn draw_line_wrapped(
     }
 
     // Cursor may be (probably) after all text
-    if col == width {
+    // Use >= instead of == to handle cases where col exceeds width due to wide characters
+    if col >= width {
         // render cursor on next line
         line_num += 1;
         col = 0;
@@ -217,7 +225,30 @@ pub(crate) fn draw_line_autocomplete(
     let mut completion_iter = completion.chars();
 
     if should_scroll {
-        let cursor_x_off = cursor - scroll.unwrap();
+        // Build the combined buffer to calculate visual widths
+        let combined_buffer: Vec<char> = {
+            let iter: utils::InsertIterator<char> =
+                utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
+            iter.collect()
+        };
+
+        // Recreate iterators for drawing
+        let mut orig_buf_iter = original_buffer.get_buffer().iter().copied();
+        let mut completion_iter = completion.chars();
+        let iter: utils::InsertIterator<char> =
+            utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
+
+        // Calculate visual width from scroll position to cursor
+        let cursor_visual_width: i32 = combined_buffer[..cursor as usize]
+            .iter()
+            .map(|c| UnicodeWidthChar::width(*c).unwrap_or(1) as i32)
+            .sum();
+        let scroll_val = scroll.unwrap_or(0);
+        let scroll_visual_width: i32 = combined_buffer[..scroll_val as usize]
+            .iter()
+            .map(|c| UnicodeWidthChar::width(*c).unwrap_or(1) as i32)
+            .sum();
+        let cursor_x_off = cursor_visual_width - scroll_visual_width;
         let cursor_y_off = 0;
 
         // draw a placeholder for the cursor
@@ -229,26 +260,26 @@ pub(crate) fn draw_line_autocomplete(
             colors.user_msg.bg,
         );
 
-        let iter: utils::InsertIterator<char> =
-            utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
-
+        let mut current_visual_x = 0;
         for (char_idx, char) in iter.enumerate() {
+            let char_width = UnicodeWidthChar::width(char).unwrap_or(1) as i32;
             let x_off;
             let y_off;
             let mut can_scroll = true;
+
+            // Calculate visual position
             if should_scroll {
-                let scroll = scroll.unwrap_or(0);
-                x_off = (char_idx as i32) - scroll;
+                x_off = current_visual_x - scroll_visual_width;
                 y_off = 0;
-                if char_idx >= ((scroll + width) as usize) {
+                if current_visual_x >= scroll_visual_width + width {
                     break;
                 }
-                if char_idx < scroll as usize {
+                if current_visual_x < scroll_visual_width {
                     can_scroll = false
                 }
             } else {
-                x_off = char_idx as i32 % width;
-                y_off = char_idx as i32 / width;
+                x_off = current_visual_x % width;
+                y_off = current_visual_x / width;
             }
             if can_scroll {
                 if char_idx >= word_starts && char_idx < insertion_point + completion.len() {
@@ -269,6 +300,7 @@ pub(crate) fn draw_line_autocomplete(
                     );
                 }
             }
+            current_visual_x += char_width;
         }
         tb.set_cursor(Some((
             (pos_x + cursor_x_off) as u16,
@@ -310,7 +342,14 @@ pub(crate) fn draw_line(
     scroll: Option<i32>,
     completion_range: Option<CompletionRange>,
 ) {
-    if should_scroll || (line.len() as i32) < width - pos_x {
+    // Calculate visual width of the line, not just character count
+    // This is needed for proper handling of wide characters (e.g., CJK)
+    let visual_width: i32 = line
+        .buffer
+        .iter()
+        .map(|c| UnicodeWidthChar::width(*c).unwrap_or(1) as i32)
+        .sum();
+    if should_scroll || visual_width < width - pos_x {
         draw_line_scroll(
             tb,
             colors,
