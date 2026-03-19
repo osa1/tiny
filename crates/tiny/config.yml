@@ -49,7 +49,9 @@ servers:
       # sasl:
       #   username: tiny_user
       #   password: hunter2
-      #   pem: "/home/user/.config/tiny/oftc.pem"
+
+      # sasl:
+      #   pem: "$HOME/.config/tiny/oftc.pem"
 
       # nickserv_ident: hunter2
 

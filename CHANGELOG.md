@@ -18,6 +18,8 @@
   tiny does not update permissions of existing log files.
 - Add new server configuration option `autoconnect` to disable automatically
   connecting to a server on startup. (#443)
+- Expand tildes and shell variables in `pem` (SASL authentication) and
+  `log_dir` config fields. (#192, #463)
 
 # 2025/01/01: 0.13.0
 

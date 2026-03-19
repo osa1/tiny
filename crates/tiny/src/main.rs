@@ -41,7 +41,7 @@ fn main() {
                 println!("{yaml_err}");
                 exit(1);
             }
-            Ok(config) => {
+            Ok(mut config) => {
                 let config_errors = config.validate();
                 if !config_errors.is_empty() {
                     println!(
@@ -53,6 +53,15 @@ fn main() {
                     }
                     exit(1);
                 }
+
+                if let Err(var_error) = config.expand_fields(
+                    || dirs::home_dir().and_then(|p| p.into_os_string().into_string().ok()),
+                    |s| std::env::var(s).map(Some),
+                ) {
+                    println!("Config file error:");
+                    println!("- Cannot expand variable: {var_error}");
+                    exit(1);
+                };
 
                 let config = match config.read_passwords() {
                     None => exit(1),

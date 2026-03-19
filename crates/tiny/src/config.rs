@@ -1,6 +1,8 @@
 use libtiny_client::SASLAuth as ClientSASLAuth;
 use serde::{Deserialize, Deserializer};
 
+use shellexpand::LookupError;
+use std::env::VarError;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -314,6 +316,29 @@ impl Config<PassOrCmd> {
         errors
     }
 
+    pub(crate) fn expand_fields(
+        &mut self,
+        home_dir: impl Fn() -> Option<String>,
+        env_var: impl Fn(&str) -> Result<Option<String>, VarError>,
+    ) -> Result<(), LookupError<VarError>> {
+        for server in &mut self.servers {
+            server.sasl_auth = match &mut server.sasl_auth {
+                None => None,
+                Some(other @ SASLAuth::Plain { .. }) => Some(other.clone()),
+                Some(SASLAuth::External { pem }) => Some(SASLAuth::External {
+                    pem: expand_path(pem.to_path_buf(), &home_dir, &env_var)?,
+                }),
+            };
+        }
+
+        self.log_dir = match &self.log_dir {
+            None => None,
+            Some(dir) => Some(expand_path(dir.to_path_buf(), &home_dir, &env_var)?),
+        };
+
+        Ok(())
+    }
+
     /// Runs password commands and updates the config with plain passwords obtained from the
     /// commands.
     pub(crate) fn read_passwords(self) -> Option<Config<String>> {
@@ -394,6 +419,16 @@ impl Config<PassOrCmd> {
             log_dir,
         })
     }
+}
+
+fn expand_path(
+    path: PathBuf,
+    home_dir: &impl Fn() -> Option<String>,
+    env_var: &impl Fn(&str) -> Result<Option<String>, VarError>,
+) -> Result<PathBuf, LookupError<VarError>> {
+    let path_str = path.to_string_lossy();
+    let expanded = shellexpand::full_with_context(&path_str, home_dir, env_var)?;
+    Ok(PathBuf::from(expanded.as_ref()))
 }
 
 /// Returns tiny config file path. File may or may not exist.
@@ -558,5 +593,77 @@ mod tests {
                 "my password".to_string()
             ])
         );
+    }
+
+    #[test]
+    fn config_shell_expansion() {
+        let mut config: Config<PassOrCmd> = Config {
+            servers: vec![Server {
+                addr: "my_server".to_owned(),
+                alias: None,
+                port: 123,
+                tls: false,
+                pass: None,
+                autoconnect: true,
+                user: None,
+                realname: "".to_owned(),
+                nicks: vec!["".to_owned()],
+                join: vec![],
+                nickserv_ident: None,
+                sasl_auth: Some(SASLAuth::External {
+                    pem: "~/a/$SASL/b".into(),
+                }),
+            }],
+            defaults: Defaults {
+                nicks: vec!["".to_owned()],
+                realname: "".to_owned(),
+                join: vec![],
+                tls: false,
+            },
+            log_dir: Some("~/b/$LOG/c".into()),
+        };
+        config
+            .expand_fields(
+                || Some("/home/test".to_string()),
+                |s| match s {
+                    "SASL" => Ok(Some("sasl_val".to_string())),
+                    "LOG" => Ok(Some("log_val".to_string())),
+                    _ => Err(VarError::NotPresent),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            config.servers[0].sasl_auth,
+            Some(SASLAuth::External {
+                pem: PathBuf::from("/home/test/a/sasl_val/b"),
+            })
+        );
+        assert_eq!(
+            config.log_dir,
+            Some(PathBuf::from("/home/test/b/log_val/c"))
+        );
+    }
+
+    #[test]
+    fn config_shell_expansion_var_fail() {
+        let mut config: Config<PassOrCmd> = Config {
+            servers: vec![],
+            defaults: Defaults {
+                nicks: vec!["nick".to_owned()],
+                realname: "real".to_owned(),
+                join: vec![],
+                tls: false,
+            },
+            log_dir: Some("~/logs/$MISSING/data".into()),
+        };
+        let err = config
+            .expand_fields(
+                || Some("/home/test".to_string()),
+                |_| Err(VarError::NotPresent),
+            )
+            .unwrap_err();
+        assert_eq!(err.var_name, "MISSING");
+        assert_eq!(err.cause, VarError::NotPresent);
     }
 }
