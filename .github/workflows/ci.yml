@@ -7,7 +7,7 @@ jobs:
     name: 'Check formatting'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -16,7 +16,7 @@ jobs:
     name: Check lints
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Check lints
         run: cargo clippy --all-targets --all -- -Dwarnings
@@ -25,7 +25,7 @@ jobs:
     name: '[Linux, default] Build and test'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Build
         run: cargo build
@@ -40,7 +40,7 @@ jobs:
     name: '[Linux, native TLS + notifications] Build and test'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Install native dependencies
         run: |
@@ -61,7 +61,7 @@ jobs:
     name: '[macOS, default] Build and test'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Build
         run: cargo build
@@ -76,7 +76,7 @@ jobs:
     name: '[macOS, native TLS + notifications] Build and test'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Build
         run: |
@@ -93,7 +93,7 @@ jobs:
     name: Make statically linked executable (default)
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Install native dependencies
         run: |
@@ -113,7 +113,7 @@ jobs:
     name: '[Linux] Make statically linked executable (desktop notifications)'
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Install native dependencies
         run: |

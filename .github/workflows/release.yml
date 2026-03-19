@@ -11,7 +11,7 @@ jobs:
     name: Make release
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Install native dependencies
         run: |
