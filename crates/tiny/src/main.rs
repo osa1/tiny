@@ -154,7 +154,7 @@ fn run(
         let mut clients: Vec<Client> = Vec::with_capacity(servers.len());
 
         for server in servers.iter().cloned() {
-            if server.autoconnect == false {
+            if !server.autoconnect {
                 continue;
             }
 

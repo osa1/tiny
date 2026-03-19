@@ -12,6 +12,15 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
+  Check_lints:
+    name: Check lints
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check lints
+        run: cargo clippy --all-targets --all -- -Dwarnings
+
   Linux_default:
     name: '[Linux, default] Build and test'
     runs-on: ubuntu-22.04
