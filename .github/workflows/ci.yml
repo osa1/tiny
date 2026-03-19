@@ -9,13 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Get Rust stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            components: rustfmt
-            override: true
-
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -24,12 +17,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
-
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
 
       - name: Build
         run: cargo build
@@ -51,12 +38,6 @@ jobs:
             sudo apt-get update
             sudo apt-get install libdbus-1-dev pkg-config libssl-dev
 
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
-
       - name: Build
         run: |
           cargo build --no-default-features \
@@ -73,12 +54,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
-
       - name: Build
         run: cargo build
 
@@ -93,12 +68,6 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
 
       - name: Build
         run: |
@@ -123,12 +92,8 @@ jobs:
             sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
                 musl musl-dev musl-tools
 
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            target: x86_64-unknown-linux-musl
-            override: true
+      - name: Add musl target
+        run: rustup target add x86_64-unknown-linux-musl
 
       - name: '[Linux] Make statically linked executable'
         run: |
@@ -147,12 +112,8 @@ jobs:
             sudo apt-get install libdbus-1-dev pkg-config libssl-dev \
                 musl musl-dev musl-tools
 
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            target: x86_64-unknown-linux-musl
-            override: true
+      - name: Add musl target
+        run: rustup target add x86_64-unknown-linux-musl
 
       - name: Make statically linked executable
         run: |

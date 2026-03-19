@@ -30,12 +30,8 @@ jobs:
           draft: true
           prerelease: true
 
-      - name: Get stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            target: x86_64-unknown-linux-musl
-            override: true
+      - name: Add musl target
+        run: rustup target add x86_64-unknown-linux-musl
 
       - name: Make release tarball (default)
         run: |
