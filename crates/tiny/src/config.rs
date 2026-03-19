@@ -316,20 +316,24 @@ impl Config<PassOrCmd> {
         errors
     }
 
-    pub(crate) fn expand_fields(&mut self) -> Result<(), LookupError<VarError>> {
+    pub(crate) fn expand_fields(
+        &mut self,
+        home_dir: impl Fn() -> Option<String>,
+        env_var: impl Fn(&str) -> Result<Option<String>, VarError>,
+    ) -> Result<(), LookupError<VarError>> {
         for server in &mut self.servers {
             server.sasl_auth = match &mut server.sasl_auth {
                 None => None,
                 Some(other @ SASLAuth::Plain { .. }) => Some(other.clone()),
                 Some(SASLAuth::External { pem }) => Some(SASLAuth::External {
-                    pem: expand_path(pem.to_path_buf())?,
+                    pem: expand_path(pem.to_path_buf(), &home_dir, &env_var)?,
                 }),
             };
         }
 
         self.log_dir = match &self.log_dir {
             None => None,
-            Some(dir) => Some(expand_path(dir.to_path_buf())?),
+            Some(dir) => Some(expand_path(dir.to_path_buf(), &home_dir, &env_var)?),
         };
 
         Ok(())
@@ -417,11 +421,14 @@ impl Config<PassOrCmd> {
     }
 }
 
-fn expand_path(path: PathBuf) -> Result<PathBuf, LookupError<VarError>> {
-    match shellexpand::full(&path.to_string_lossy()) {
-        Err(e) => Err(e),
-        Ok(expanded) => Ok(PathBuf::from(expanded.as_ref())),
-    }
+fn expand_path(
+    path: PathBuf,
+    home_dir: &impl Fn() -> Option<String>,
+    env_var: &impl Fn(&str) -> Result<Option<String>, VarError>,
+) -> Result<PathBuf, LookupError<VarError>> {
+    let path_str = path.to_string_lossy();
+    let expanded = shellexpand::full_with_context(&path_str, home_dir, env_var)?;
+    Ok(PathBuf::from(expanded.as_ref()))
 }
 
 /// Returns tiny config file path. File may or may not exist.
