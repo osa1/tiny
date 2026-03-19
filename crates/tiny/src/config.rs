@@ -594,4 +594,76 @@ mod tests {
             ])
         );
     }
+
+    #[test]
+    fn config_shell_expansion() {
+        let mut config: Config<PassOrCmd> = Config {
+            servers: vec![Server {
+                addr: "my_server".to_owned(),
+                alias: None,
+                port: 123,
+                tls: false,
+                pass: None,
+                autoconnect: true,
+                user: None,
+                realname: "".to_owned(),
+                nicks: vec!["".to_owned()],
+                join: vec![],
+                nickserv_ident: None,
+                sasl_auth: Some(SASLAuth::External {
+                    pem: "~/a/$SASL/b".into(),
+                }),
+            }],
+            defaults: Defaults {
+                nicks: vec!["".to_owned()],
+                realname: "".to_owned(),
+                join: vec![],
+                tls: false,
+            },
+            log_dir: Some("~/b/$LOG/c".into()),
+        };
+        config
+            .expand_fields(
+                || Some("/home/test".to_string()),
+                |s| match s {
+                    "SASL" => Ok(Some("sasl_val".to_string())),
+                    "LOG" => Ok(Some("log_val".to_string())),
+                    _ => Err(VarError::NotPresent),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            config.servers[0].sasl_auth,
+            Some(SASLAuth::External {
+                pem: PathBuf::from("/home/test/a/sasl_val/b"),
+            })
+        );
+        assert_eq!(
+            config.log_dir,
+            Some(PathBuf::from("/home/test/b/log_val/c"))
+        );
+    }
+
+    #[test]
+    fn config_shell_expansion_var_fail() {
+        let mut config: Config<PassOrCmd> = Config {
+            servers: vec![],
+            defaults: Defaults {
+                nicks: vec!["nick".to_owned()],
+                realname: "real".to_owned(),
+                join: vec![],
+                tls: false,
+            },
+            log_dir: Some("~/logs/$MISSING/data".into()),
+        };
+        let err = config
+            .expand_fields(
+                || Some("/home/test".to_string()),
+                |_| Err(VarError::NotPresent),
+            )
+            .unwrap_err();
+        assert_eq!(err.var_name, "MISSING");
+        assert_eq!(err.cause, VarError::NotPresent);
+    }
 }

@@ -58,8 +58,8 @@ fn main() {
                     || dirs::home_dir().and_then(|p| p.into_os_string().into_string().ok()),
                     |s| std::env::var(s).map(Some),
                 ) {
-                    println!("Config file error: cannot expand variable:");
-                    println!("- {var_error}");
+                    println!("Config file error:");
+                    println!("- Cannot expand variable: {var_error}");
                     exit(1);
                 };
 
