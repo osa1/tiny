@@ -422,18 +422,6 @@ fn parse_key_comb(buf: &[u8]) -> Option<(Event, usize)> {
         // otherwise it's probably alt + key
         else {
             debug_assert!(buf.len() >= 2);
-            // Check if the byte after ESC is the start of a multi-byte UTF-8 sequence.
-            // If so, this is likely from an IME (Input Method Editor) rather than Alt+key.
-            // In this case, we don't parse it as AltChar to avoid interfering with IME input.
-            // This fixes Chinese/Japanese/Korean IME input issues.
-            let second_byte = buf[1];
-            // Multi-byte UTF-8 start bytes: 110xxxxx (0xC0-0xDF), 1110xxxx (0xE0-0xEF), 11110xxx (0xF0-0xF7)
-            // We check for bytes >= 0xC0 which indicates multi-byte UTF-8
-            if second_byte >= 0xC0 {
-                // This is likely IME input, not Alt+key.
-                // Return ESC as a separate event and let the UTF-8 bytes be parsed separately.
-                return Some((Event::Key(Key::Esc), 1));
-            }
             return utf8_char_len(buf[1]).map(|char_len| {
                 let ev = Event::Key(Key::AltChar(get_utf8_char(&buf[1..], char_len)));
                 (ev, char_len as usize + 1)

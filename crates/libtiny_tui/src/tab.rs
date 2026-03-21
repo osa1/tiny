@@ -68,7 +68,7 @@ impl Tab {
             } else {
                 tb.change_cell(pos_x, pos_y, ch, style.fg, style.bg);
             }
-            // Account for wide characters (CJK) by using Unicode width
+            // Account for wide characters (e.g. CJK, emojis) by using Unicode width
             pos_x += UnicodeWidthChar::width(ch).unwrap_or(1) as i32;
         }
     }

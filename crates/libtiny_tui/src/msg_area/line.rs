@@ -240,7 +240,7 @@ impl Line {
                 if line_num >= first_line {
                     tb.change_cell(col, pos_y + line_num, c, sty.fg, sty.bg);
                 }
-                // Account for wide characters (CJK) by using Unicode width
+                // Account for wide characters (e.g. CJK, emojis) by using Unicode width
                 let char_width = UnicodeWidthChar::width(c).unwrap_or(1) as i32;
                 col += char_width;
                 char_idx += 1;

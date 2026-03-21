@@ -386,7 +386,7 @@ fn test_text_field_wrap() {
 // Test for issue #379: Wide characters (emoji) should be displayed correctly
 // When pasting 🟩🟩🟩🟩🟩, all 5 squares should be visible
 #[test]
-fn test_wide_emoji_display() {
+fn test_wide_emoji_in_input() {
     let mut tui = TUI::new_test(30, 4);
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
@@ -535,4 +535,220 @@ fn test_mixed_ascii_cjk_input() {
     assert!(buffer_str.contains("World"), "Buffer should contain 'World'");
     assert!(buffer_str.contains('世'), "Buffer should contain Chinese character '世'");
     assert!(buffer_str.contains('界'), "Buffer should contain Chinese character '界'");
+}
+
+// Test wide character display with scrolling
+// Screen width 10, can fit 5 wide characters (🟩🟩🟩🟩🟩)
+#[test]
+fn test_wide_chars_scrolling() {
+    let mut tui = TUI::new_test(10, 4);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    // Enter 5 green square emojis (each has width 2, total width = 10)
+    enter_string(&mut tui, "🟩🟩🟩🟩🟩");
+
+    tui.draw();
+
+    // With width 10 and "osa1: " prefix (6 chars), we have 4 chars remaining
+    // But the input line scrolls to show the cursor
+    // The buffer should contain all 5 emojis
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 10, 4);
+
+    // Count emojis - should have all 5
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 5, "All 5 emojis should be visible, but found {}", emoji_count);
+
+    // Now add an ASCII character - should trigger scrolling
+    enter_string(&mut tui, "1");
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 10, 4);
+
+    // After adding '1', the line should scroll
+    // The buffer should still contain all 5 emojis (they're just scrolled)
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert!(emoji_count >= 4, "Should have at least 4 emojis visible after scrolling, but found {}", emoji_count);
+}
+
+// Test wide character line splitting
+// Screen width 10, with spaces between emojis
+#[test]
+fn test_wide_chars_line_split() {
+    let mut tui = TUI::new_test(10, 6);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    // Enter "🟩 🟩 🟩 " (emoji + space pattern)
+    // Each "🟩 " takes 3 columns (2 for emoji + 1 for space)
+    enter_string(&mut tui, "🟩 🟩 🟩 ");
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 10, 6);
+
+    // Check that emojis and spaces are present
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 3, "Should have 3 emojis, but found {}", emoji_count);
+
+    // Test resizing to width 11
+    tui.set_size(11, 6);
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 11, 6);
+
+    // With width 11, the line should still wrap similarly
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 3, "Should still have 3 emojis after resize to 11, but found {}", emoji_count);
+
+    // Test resizing to width 12
+    tui.set_size(12, 6);
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 12, 6);
+
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 3, "Should still have 3 emojis after resize to 12, but found {}", emoji_count);
+
+    // Test resizing to width 14 - should fit more
+    tui.set_size(14, 6);
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 14, 6);
+
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 3, "Should still have 3 emojis after resize to 14, but found {}", emoji_count);
+}
+
+// Test wide characters in messages with line wrapping
+#[test]
+fn test_wide_chars_message_wrapping() {
+    let mut tui = TUI::new_test(10, 6);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    let target = MsgTarget::Chan { serv, chan };
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+
+    // Add a message with wide characters that should wrap
+    tui.add_msg("🟩 🟩 🟩 🟩 🟩", ts, &target);
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 10, 6);
+
+    // All 5 emojis should be present in the message area
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 5, "All 5 emojis should be in the message, but found {}", emoji_count);
+}
+
+// Test mixed wide and narrow characters with scrolling
+#[test]
+fn test_mixed_wide_narrow_scrolling() {
+    let mut tui = TUI::new_test(10, 4);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    // Enter mixed wide and narrow: "🟩a🟩b🟩c"
+    // Width calculation: 2 + 1 + 2 + 1 + 2 + 1 = 9
+    enter_string(&mut tui, "🟩a🟩b🟩c");
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 10, 4);
+
+    // Check all characters are present
+    let emoji_count = buffer_str.chars().filter(|&c| c == '🟩').count();
+    assert_eq!(emoji_count, 3, "Should have 3 emojis, but found {}", emoji_count);
+    assert!(buffer_str.contains('a'), "Should contain 'a'");
+    assert!(buffer_str.contains('b'), "Should contain 'b'");
+    assert!(buffer_str.contains('c'), "Should contain 'c'");
+}
+
+// Test CJK characters with line splitting at different widths
+#[test]
+fn test_cjk_line_split_resize() {
+    let mut tui = TUI::new_test(10, 6);
+    let serv = "irc.server_1.org";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.set_nick(serv, "osa1");
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+
+    // Enter 5 CJK characters (each width 2, total = 10)
+    enter_string(&mut tui, "你好世界中");
+
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 10, 6);
+
+    // All CJK characters should be present
+    for c in "你好世界中".chars() {
+        assert!(buffer_str.contains(c), "Buffer should contain CJK character '{}'", c);
+    }
+
+    // Resize to width 11 - should still show all characters
+    tui.set_size(11, 6);
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 11, 6);
+
+    for c in "你好世界中".chars() {
+        assert!(buffer_str.contains(c), "Buffer should contain CJK character '{}' after resize", c);
+    }
+
+    // Resize to width 12
+    tui.set_size(12, 6);
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 12, 6);
+
+    for c in "你好世界中".chars() {
+        assert!(buffer_str.contains(c), "Buffer should contain CJK character '{}' after resize", c);
+    }
+
+    // Resize to width 14 - should fit more comfortably
+    tui.set_size(14, 6);
+    tui.draw();
+
+    let buffer = tui.get_front_buffer();
+    let buffer_str = crate::test_utils::buffer_str(&buffer, 14, 6);
+
+    for c in "你好世界中".chars() {
+        assert!(buffer_str.contains(c), "Buffer should contain CJK character '{}' after resize", c);
+    }
 }
