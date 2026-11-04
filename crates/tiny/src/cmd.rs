@@ -7,6 +7,12 @@ use libtiny_tui::config::Chan;
 
 use std::borrow::Borrow;
 
+pub(crate) fn register_completions(tui: &libtiny_tui::TUI) {
+    for cmd in &CMDS {
+        tui.add_command_completion(cmd.name);
+    }
+}
+
 pub(crate) fn run_cmd(
     cmd: &str,
     src: MsgSource,

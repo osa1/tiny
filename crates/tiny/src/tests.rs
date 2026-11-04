@@ -2,7 +2,7 @@ use crate::conn;
 use crate::ui::UI;
 use libtiny_common::ChanName;
 use libtiny_tui::TUI;
-use libtiny_tui::test_utils::expect_screen;
+use libtiny_tui::test_utils::{buffer_str, expect_screen};
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 
 use termbox_simple::CellBuf;
@@ -88,6 +88,48 @@ where
         })
         .await;
     });
+}
+
+#[test]
+fn registered_client_command_completes_in_tui() {
+    run_test(
+        "nixcheck".to_owned(),
+        |TestSetup {
+             tui,
+             snd_input_ev,
+             ..
+         }| async move {
+            crate::cmd::register_completions(&tui);
+            for key in [
+                input::Key::Char('/'),
+                input::Key::Char('j'),
+                input::Key::Char('o'),
+                input::Key::Tab,
+            ] {
+                snd_input_ev.send(input::Event::Key(key)).await.unwrap();
+            }
+            yield_(5).await;
+            tui.draw();
+
+            let screen = buffer_str(&tui.get_front_buffer(), DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
+            assert_eq!(screen.lines().nth(3).unwrap().trim_end(), "/join");
+
+            for key in [
+                input::Key::Ctrl('a'),
+                input::Key::Ctrl('k'),
+                input::Key::Char('/'),
+                input::Key::Char('w'),
+                input::Key::Char('h'),
+                input::Key::Tab,
+            ] {
+                snd_input_ev.send(input::Event::Key(key)).await.unwrap();
+            }
+            yield_(5).await;
+            tui.draw();
+            let screen = buffer_str(&tui.get_front_buffer(), DEFAULT_TUI_WIDTH, DEFAULT_TUI_HEIGHT);
+            assert_eq!(screen.lines().nth(3).unwrap().trim_end(), "/wh");
+        },
+    );
 }
 
 #[test]
