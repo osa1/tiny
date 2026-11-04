@@ -2,9 +2,11 @@ use std::cmp::{max, min};
 use std::mem;
 
 use termbox_simple::Termbox;
+use unicode_width::UnicodeWidthChar;
 
 use crate::config::{Colors, Style};
 use crate::key_map::KeyAction;
+use crate::line_split::LineDataCache;
 use crate::msg_area::MsgArea;
 use crate::termbox;
 use crate::trie::Trie;
@@ -14,7 +16,7 @@ use crate::widget::WidgetRet;
 pub(crate) mod input_line;
 use self::input_line::{InputLine, draw_line, draw_line_autocomplete};
 
-/// Inspired by vim's 'scrolloff': minimal number of characters to keep above and below the cursor.
+/// Minimal number of terminal columns to keep around the cursor when scrolling.
 const SCROLL_OFF: i32 = 5;
 
 /// Minimum width of InputArea for wrapping
@@ -87,7 +89,7 @@ impl Nickname {
     /// Width should be the width of the `InputArea`. When length of the nick is 30% or less of the
     /// `TextField` width we show it (returns width of the nick), otherwise we don't (returns 0).
     fn len(&self, input_area_width: i32) -> usize {
-        let len = self.value.len() + NICKNAME_SUFFIX.len();
+        let len = termbox::text_width(&self.value) + termbox::text_width(NICKNAME_SUFFIX);
         if len as f32 <= input_area_width as f32 * (30f32 / 100f32) {
             len
         } else {
@@ -136,6 +138,9 @@ impl InputArea {
         self.width = width;
         self.height = None;
         self.max_lines = max_lines;
+        if self.scroll.is_some() {
+            self.move_cursor(self.cursor);
+        }
     }
 
     pub(crate) fn draw(
@@ -242,7 +247,7 @@ impl InputArea {
                 if self.cursor < self.current_buffer_len() {
                     self.modify();
                     self.buffer.remove(self.cursor as usize);
-                    // TODO: We should probably call move_cursor here to update scroll?
+                    self.move_cursor(self.cursor);
                 }
                 WidgetRet::KeyHandled
             }
@@ -266,6 +271,7 @@ impl InputArea {
                 if self.cursor != self.current_buffer_len() {
                     self.modify();
                     self.buffer.drain(self.cursor as usize..);
+                    self.move_cursor(self.cursor);
                 }
                 WidgetRet::KeyHandled
             }
@@ -341,8 +347,11 @@ impl InputArea {
 
     /// Get contents of the text field and cursor location and clear it.
     pub(crate) fn flush(&mut self) -> (String, i32) {
-        let cursor = ::std::mem::replace(&mut self.cursor, 0);
-        (self.buffer.drain(..).collect(), cursor)
+        self.modify();
+        let cursor = mem::replace(&mut self.cursor, 0);
+        let contents = self.buffer.drain(..).collect();
+        self.move_cursor(0);
+        (contents, cursor)
     }
 
     /// Add a line to the text field history.
@@ -359,7 +368,7 @@ impl InputArea {
     }
 
     pub(crate) fn set_cursor(&mut self, cursor: i32) {
-        self.cursor = cursor.clamp(0, self.current_buffer_len());
+        self.move_cursor(cursor.clamp(0, self.current_buffer_len()));
     }
 
     fn consume_word_before_curs(&mut self) {
@@ -436,7 +445,8 @@ impl InputArea {
                     current_completion + 1
                 };
 
-                let cursor = (insertion_point + completions[current_completion].len()) as i32;
+                let cursor =
+                    (insertion_point + completions[current_completion].chars().count()) as i32;
 
                 self.mode = Mode::Autocomplete {
                     original_buffer,
@@ -480,7 +490,8 @@ impl InputArea {
                     current_completion - 1
                 };
 
-                let cursor = (insertion_point + completions[current_completion].len()) as i32;
+                let cursor =
+                    (insertion_point + completions[current_completion].chars().count()) as i32;
 
                 self.mode = Mode::Autocomplete {
                     original_buffer,
@@ -504,20 +515,10 @@ impl InputArea {
     }
 
     fn calculate_height_autocomplete(&self, width: i32, nick_length: usize) -> usize {
-        if let Mode::Autocomplete {
-            original_buffer,
-            completions,
-            current_completion,
-            word_starts,
-            ..
-        } = &self.mode
-        {
-            let mut temp_buffer = original_buffer.clone();
-            let completion = &completions[*current_completion];
-            for (idx, c) in completion.char_indices() {
-                temp_buffer.insert(word_starts + idx, c);
-            }
-            temp_buffer.calculate_height(width, nick_length)
+        if self.in_autocomplete() {
+            let mut layout = LineDataCache::input_line(width, nick_length);
+            layout.calculate_height(self.current_chars(), 0);
+            layout.get_line_count().unwrap()
         } else {
             1
         }
@@ -542,11 +543,10 @@ impl InputArea {
     }
 
     fn scroll_on(&mut self) {
-        // If scroll is already on, we don't need to calculate scroll
         if self.scroll.is_none() {
             self.scroll = Some(0);
-            self.move_cursor(self.cursor);
         }
+        self.move_cursor(self.cursor);
     }
 
     fn scroll_off(&mut self) {
@@ -576,8 +576,31 @@ impl InputArea {
                 ref completions,
                 current_completion,
                 ..
-            } => (original_buffer.len() + completions[current_completion].len()) as i32,
+            } => (original_buffer.len() + completions[current_completion].chars().count()) as i32,
         }
+    }
+
+    /// The displayed scalars, including an uncommitted completion, without copying the input.
+    fn current_chars(&self) -> impl Iterator<Item = char> + Clone + '_ {
+        let (before, completion, after): (&[char], &str, &[char]) = match &self.mode {
+            Mode::Edit => (self.buffer.get_buffer(), "", &[]),
+            Mode::History(index) => (self.history[*index as usize].get_buffer(), "", &[]),
+            Mode::Autocomplete {
+                original_buffer,
+                insertion_point,
+                completions,
+                current_completion,
+                ..
+            } => {
+                let (before, after) = original_buffer.get_buffer().split_at(*insertion_point);
+                (before, &completions[*current_completion], after)
+            }
+        };
+        before
+            .iter()
+            .copied()
+            .chain(completion.chars())
+            .chain(after.iter().copied())
     }
 
     fn char_at(&self, idx: usize) -> char {
@@ -591,17 +614,16 @@ impl InputArea {
                 current_completion,
                 ..
             } => {
+                let completion_len = completions[current_completion].chars().count();
                 if idx < insertion_point {
                     original_buffer.get(idx)
-                } else if idx >= insertion_point
-                    && idx < insertion_point + completions[current_completion].len()
-                {
+                } else if idx < insertion_point + completion_len {
                     completions[current_completion]
                         .chars()
                         .nth(idx - insertion_point)
                         .unwrap()
                 } else {
-                    original_buffer.get(idx - completions[current_completion].len())
+                    original_buffer.get(idx - completion_len)
                 }
             }
         }
@@ -671,42 +693,99 @@ impl InputArea {
         self.cursor = cursor;
 
         if let Some(scroll) = self.scroll {
-            let mut nick_length = 0;
-            if let Some(nick) = &self.nick {
-                nick_length = nick.len(self.width);
-            }
-            let fixed_width = self.width - nick_length as i32;
-            if self.current_buffer_len() + 1 >= fixed_width {
-                // Disable SCROLLOFF if there isn't enough space on the screen to have SCROLLOFF space on
-                // both ends
-                let scrolloff = {
-                    if self.width < 2 * SCROLL_OFF + 1 {
-                        0
-                    } else {
-                        SCROLL_OFF
-                    }
+            let nick_length = self.nick.as_ref().map_or(0, |nick| nick.len(self.width));
+            let width = (self.width - nick_length as i32).max(1);
+            let line_len = line_len as usize;
+            let cursor_idx = cursor as usize;
+            let scroll = (scroll.max(0) as usize).min(line_len);
+            let mut start = 0;
+            let mut left = 0;
+            let mut column = 0;
+            let mut base_col = 0;
+            let mut base_width = 1;
+            let mut cursor_col = 0;
+            let mut cursor_width = 1;
+            // Keep the scroll start on a base, and map a cursor on a mark back to
+            // that same base. The initial mark gets the dotted-circle column.
+            for (idx, ch) in self.current_chars().enumerate() {
+                let char_width = ch.width().unwrap_or(0) as i32;
+                let effective = if idx == 0 && char_width == 0 {
+                    1
+                } else {
+                    char_width.min(width)
                 };
-
-                // Shown range of the text field before updating scroll
-                let left_end = min(scroll, line_len);
-                let right_end = min(scroll + fixed_width, line_len);
-
-                if cursor - scrolloff < left_end {
-                    self.scroll = Some(max(0, cursor - scrolloff));
-                } else if cursor + scrolloff >= right_end {
-                    let scroll = min(
-                        // +1 because cursor should be visible, i.e.
-                        // right_end > cursor should hold after this
-                        max(0, cursor + 1 + scrolloff - fixed_width),
-                        // +1 because cursor goes one more character
-                        // after the buffer, to be able to add chars
-                        max(0, self.current_buffer_len() + 1 - fixed_width),
-                    );
-                    self.scroll = Some(scroll);
+                if idx == 0 || char_width != 0 {
+                    base_col = column;
+                    base_width = effective.max(1);
+                    if idx <= scroll {
+                        start = idx;
+                        left = column;
+                    }
                 }
-            } else {
-                self.scroll = Some(0);
+                if idx == cursor_idx {
+                    cursor_col = base_col;
+                    cursor_width = base_width;
+                }
+                column += effective;
             }
+            let total = column;
+            if scroll == line_len {
+                start = line_len;
+                left = total;
+            }
+            if cursor_idx == line_len {
+                cursor_col = total;
+                cursor_width = 1;
+            }
+            let scrolloff = if width < 2 * SCROLL_OFF + 1 {
+                0
+            } else {
+                SCROLL_OFF
+            };
+            // Find the nearest valid scalar boundary in the chosen direction.
+            let target = if total + 1 < width {
+                0
+            } else if cursor_col - scrolloff < left {
+                (cursor_col - scrolloff).max(0)
+            } else if cursor_col + cursor_width - 1 + scrolloff >= (left + width).min(total) {
+                (cursor_col + cursor_width + scrolloff - width)
+                    .max(0)
+                    .min((total + 1 - width).max(0))
+            } else {
+                left
+            };
+            if target != left {
+                let mut col = 0;
+                let mut chosen = None;
+                let mut last_boundary = 0;
+                for (idx, ch) in self
+                    .current_chars()
+                    .chain(std::iter::once('\0'))
+                    .enumerate()
+                {
+                    if idx > cursor_idx {
+                        break;
+                    }
+                    let char_width = ch.width().unwrap_or(0) as i32;
+                    let boundary = idx == 0 || idx == line_len || char_width != 0;
+                    if boundary {
+                        last_boundary = idx;
+                        if target < left && col <= target {
+                            chosen = Some(idx);
+                        } else if target > left && idx >= start && col >= target {
+                            chosen = Some(idx);
+                            break;
+                        }
+                    }
+                    col += if idx == 0 && char_width == 0 {
+                        1
+                    } else {
+                        char_width.min(width)
+                    };
+                }
+                start = chosen.unwrap_or(if target < left { 0 } else { last_boundary });
+            }
+            self.scroll = Some(start as i32);
         }
     }
 }
@@ -750,7 +829,7 @@ impl InputArea {
         };
 
         if !completions.is_empty() {
-            let completion_len = completions[0].len();
+            let completion_len = completions[0].chars().count();
             self.mode = Mode::Autocomplete {
                 original_buffer: self.shown_line().to_owned(),
                 insertion_point: self.cursor as usize,
@@ -774,6 +853,31 @@ impl InputArea {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn nickname_width_counts_columns_and_isolated_marks() {
+        let nick = Nickname::new("日a\u{3099}".into(), 0);
+        assert_eq!(nick.len(17), 5);
+        assert_eq!(nick.len(16), 0);
+        let nick = Nickname::new("\u{3099}日".into(), 0);
+        assert_eq!(nick.len(17), 5);
+    }
+
+    #[test]
+    fn nickname_draws_suffix_after_display_columns() {
+        let nick = Nickname::new("\u{3099}日".into(), 0);
+        let colors = Colors::default();
+        let mut tb = Termbox::init_test(20, 1);
+        nick.draw(&mut tb, &colors, 0, 0, 20);
+        tb.present();
+        let cells = tb.get_front_buffer().cells;
+        assert_eq!((cells[0].ch, cells[1].ch, cells[3].ch), ('◌', '日', ':'));
+        assert!(
+            String::from_utf8(tb.take_test_output())
+                .unwrap()
+                .contains("◌\u{3099}")
+        );
+    }
 
     #[test]
     fn text_field_bug() {
@@ -800,5 +904,97 @@ mod tests {
         let multiline_string_no_spaces = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         input_area.set(multiline_string_no_spaces);
         assert_eq!(input_area.get_height(input_area.width), 2);
+    }
+
+    fn visible_text(input: &InputArea) -> String {
+        (0..input.current_buffer_len() as usize)
+            .map(|idx| input.char_at(idx))
+            .collect()
+    }
+
+    #[test]
+    fn unicode_completion_cycles_at_insertion_point_and_sends_history() {
+        let mut dict = Trie::new();
+        dict.insert("日本語");
+        dict.insert("日光");
+        let mut input = InputArea::new(8, 50);
+        input.set("日!끝");
+        input.set_cursor(1);
+        input.get_height(8);
+        input.autocomplete(&dict);
+        assert_eq!(visible_text(&input), "日光!끝");
+        assert_eq!(input.cursor, 2);
+        assert_eq!(input.current_buffer_len(), 4);
+        input.keypressed(&KeyAction::InputPrevEntry);
+        assert_eq!(visible_text(&input), "日本語!끝");
+        assert_eq!(input.cursor, 3);
+        input.keypressed(&KeyAction::InputNextEntry);
+        assert_eq!(visible_text(&input), "日光!끝");
+        input.keypressed(&KeyAction::Input('中'));
+        assert_eq!(visible_text(&input), "日光中!끝");
+        input.keypressed(&KeyAction::InputDeletePrevChar);
+        input.keypressed(&KeyAction::InputDeleteNextChar);
+        assert_eq!(visible_text(&input), "日光끝");
+        match input.keypressed(&KeyAction::InputSend) {
+            WidgetRet::Input(chars) => assert_eq!(chars.iter().collect::<String>(), "日光끝"),
+            _ => panic!("expected sent input"),
+        }
+        input.keypressed(&KeyAction::InputPrevEntry);
+        assert_eq!(visible_text(&input), "日光끝");
+        input.keypressed(&KeyAction::InputMoveCursLeft);
+        input.keypressed(&KeyAction::Input('語'));
+        assert_eq!(visible_text(&input), "日光語끝");
+        input.keypressed(&KeyAction::InputPrevEntry);
+        assert_eq!(visible_text(&input), "日光끝");
+    }
+
+    #[test]
+    fn completion_height_uses_inserted_scalars() {
+        let mut dict = Trie::new();
+        dict.insert("日本語");
+        let mut input = InputArea::new(40, 50);
+        input.set("日!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM");
+        input.set_cursor(1);
+        input.autocomplete(&dict);
+        let preview = visible_text(&input);
+        let mut expected = InputLine::from_buffer(preview.chars().collect());
+        assert_eq!(
+            input.get_height(40) as usize,
+            expected.calculate_height(40, 0)
+        );
+        assert_eq!(preview, "日本語!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM");
+    }
+
+    #[test]
+    fn scrolling_uses_columns_and_preserves_combining_boundaries() {
+        let mut input = InputArea::new(6, 50);
+        input.set("A日か\u{3099}本B");
+        input.get_height(6);
+        for cursor in 0..=input.current_buffer_len() {
+            input.set_cursor(cursor);
+            let start = input.scroll.unwrap() as usize;
+            assert!(start <= cursor as usize);
+            let chars: Vec<_> = visible_text(&input).chars().collect();
+            assert!(start == 0 || start == chars.len() || chars[start].width().unwrap_or(0) != 0);
+            let columns: usize = chars[start..cursor as usize]
+                .iter()
+                .map(|ch| ch.width().unwrap_or(0))
+                .sum();
+            assert!(columns < 6);
+        }
+        input.resize(3, 50);
+        input.set_cursor(input.current_buffer_len());
+        assert!(input.scroll.unwrap() > 0);
+        input.keypressed(&KeyAction::InputDeletePrevChar);
+        input.keypressed(&KeyAction::InputMoveCursStart);
+        input.keypressed(&KeyAction::InputDeleteNextChar);
+        assert_eq!(visible_text(&input), "日か\u{3099}本");
+        input.resize(20, 50);
+        input.get_height(20);
+        assert_eq!(input.scroll, Some(0));
+        input.resize(1, 50);
+        input.set("日A");
+        input.get_height(1);
+        assert_eq!(input.scroll, Some(2));
     }
 }

@@ -1,5 +1,9 @@
 # Unreleased
 
+- Fix Unicode input, completion, wrapping, and display for wide and combining
+  characters, including UTF-8 split across terminal reads. Editing still uses
+  Unicode scalar values; ambiguous-width characters are displayed as one column.
+
 - Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
   ignored and are now synonymous with `tab` and `esc`. (#444)
 - The keystrokes `ctrl_h` and `backspace` can now be distinguished, which

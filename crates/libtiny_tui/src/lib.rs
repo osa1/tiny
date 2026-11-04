@@ -115,7 +115,9 @@ async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receive
                         return;
                     }
                     Some(tui) => {
-                        tui.borrow_mut().resize();
+                        let mut tui = tui.borrow_mut();
+                        tui.resize();
+                        tui.draw();
                     }
                 }
             },

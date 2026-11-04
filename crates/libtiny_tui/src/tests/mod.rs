@@ -8,6 +8,7 @@ use crate::tui::TUI;
 
 mod layout;
 mod resize;
+mod unicode;
 
 mod config;
 

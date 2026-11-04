@@ -1,13 +1,10 @@
 //! Implements Termbox's "cell" abstraction in Rust.
 //!
-//! A note on wide characters: if you put a character like `Ｈ` that takes more than one column to
-//! render (according to [Unicode Standard Annex #11](http://www.unicode.org/reports/tr11/)), the
-//! character takes more than one cell in termbox's internal grid and the character you put next to
-//! it gets shifted in the grid. The character above takes 2 columns to render so if you put it on
-//! column 0 and on column 1 you put `e`, this is what you get: `Ｈe` where the first character is
-//! on column 0 and second character is on column 2.
+//! Coordinates are terminal columns. A wide character occupies its starting cell and the
+//! following cell; replacing either cell invalidates the whole character.
 
 use std::cmp::min;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use unicode_width::UnicodeWidthChar;
@@ -46,12 +43,15 @@ pub struct Termbox {
     // value.
     terminal_cursor: (u16, u16),
     output_buffer: Vec<u8>,
+    test_output: Option<Vec<u8>>,
     // total_flushed: u64,
 }
 
 #[derive(Clone)]
 pub struct CellBuf {
     pub cells: Box<[Cell]>,
+    // Only cells with combining characters allocate an entry.
+    combining: HashMap<usize, Vec<Combining>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -59,6 +59,13 @@ pub struct Cell {
     pub ch: char,
     pub fg: u16,
     pub bg: u16,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Combining {
+    ch: char,
+    fg: u16,
+    bg: u16,
 }
 
 const EMPTY_CELL: Cell = Cell {
@@ -71,6 +78,7 @@ impl CellBuf {
     fn new(w: u16, h: u16) -> CellBuf {
         CellBuf {
             cells: vec![EMPTY_CELL; usize::from(w) * usize::from(h)].into_boxed_slice(),
+            combining: HashMap::new(),
         }
     }
 
@@ -80,6 +88,7 @@ impl CellBuf {
             cell.fg = u16::from(fg);
             cell.bg = u16::from(bg);
         }
+        self.combining.clear();
     }
 
     fn resize(&mut self, old_w: u16, old_h: u16, w: u16, h: u16) {
@@ -87,21 +96,31 @@ impl CellBuf {
             return;
         }
 
-        // Old cells should be visible at the top-left corner
+        // Old cells should be visible at the top-left corner.
         let mut new_cells = vec![EMPTY_CELL; usize::from(w) * usize::from(h)].into_boxed_slice();
         let minw = usize::from(min(old_w, w));
         let minh = usize::from(min(old_h, h));
-        {
-            let w = usize::from(w);
-            let self_w = usize::from(old_w);
-            for i in 0..minh {
-                for j in 0..minw {
-                    new_cells[i * w + j] = self.cells[i * self_w + j];
-                }
+        for y in 0..minh {
+            for x in 0..minw {
+                new_cells[y * usize::from(w) + x] = self.cells[y * usize::from(old_w) + x];
+            }
+            // A wide character clipped by the new right edge cannot occupy two cells.
+            if minw > 0
+                && UnicodeWidthChar::width(new_cells[y * usize::from(w) + minw - 1].ch) == Some(2)
+            {
+                new_cells[y * usize::from(w) + minw - 1].ch = '�';
             }
         }
-
+        let mut combining = HashMap::new();
+        for (idx, marks) in std::mem::take(&mut self.combining) {
+            let x = idx % usize::from(old_w);
+            let y = idx / usize::from(old_w);
+            if x < minw && y < minh {
+                combining.insert(y * usize::from(w) + x, marks);
+            }
+        }
         self.cells = new_cells;
+        self.combining = combining;
     }
 }
 
@@ -166,6 +185,7 @@ impl Termbox {
             cursor: Some((0, 0)),
             terminal_cursor: (0, 0),
             output_buffer: Vec::with_capacity(32 * 1024),
+            test_output: None,
             // total_flushed: 0,
         };
 
@@ -192,6 +212,7 @@ impl Termbox {
             cursor: Some((0, 0)),
             terminal_cursor: (0, 0),
             output_buffer: Vec::with_capacity(32 * 1024),
+            test_output: Some(Vec::new()),
         }
     }
 
@@ -270,45 +291,51 @@ impl Termbox {
             self.buffer_size_change_request = false;
         }
 
+        let width = usize::from(self.term_width);
         for y in 0..usize::from(self.term_height) {
             let mut x = 0;
-            while x < usize::from(self.term_width) {
-                let front_cell =
-                    &mut self.front_buffer.cells[(y * usize::from(self.term_width)) + x];
-                let back_cell = self.back_buffer.cells[(y * usize::from(self.term_width)) + x];
-                // TODO: For 0-width chars maybe only move to the next cell in the back buffer?
-                let cw0 = UnicodeWidthChar::width(back_cell.ch).unwrap_or(1);
-                let cw = std::cmp::max(cw0, 1);
-                // eprintln!("UnicodeWidthChar({:?}) = {}", back_cell.ch, cw);
-                if *front_cell == back_cell {
-                    x += cw;
-                    continue;
-                }
-                *front_cell = back_cell;
-
-                self.send_attr(back_cell.fg, back_cell.bg);
-
-                if cw > 1 && (x + (cw - 1)) >= usize::from(self.term_width) {
-                    // Not enough room for wide ch, send spaces
-                    for i in x..usize::from(self.term_width) {
-                        self.send_char(i as u16, y as u16, ' ', 1);
+            let mut force = false;
+            while x < width {
+                let idx = y * width + x;
+                let back = self.back_buffer.cells[idx];
+                let front = self.front_buffer.cells[idx];
+                let cw = UnicodeWidthChar::width(back.ch).unwrap_or(1).max(1);
+                let dirty = force
+                    || front != back
+                    || self.front_buffer.combining.get(&idx)
+                        != self.back_buffer.combining.get(&idx)
+                    || (cw == 2
+                        && self.front_buffer.cells[idx + 1] != self.back_buffer.cells[idx + 1]);
+                force = false;
+                if dirty {
+                    // Overwriting one half of an old wide character may erase its other half
+                    // in the terminal, even when that cell's logical value is unchanged.
+                    if cw == 1 && UnicodeWidthChar::width(front.ch) == Some(2) {
+                        force = true;
+                    } else if cw == 2
+                        && UnicodeWidthChar::width(self.front_buffer.cells[idx + 1].ch) == Some(2)
+                    {
+                        force = true;
                     }
-                } else if cw0 == 0 {
-                    self.send_char(x as u16, y as u16, ' ', 1);
-                } else {
-                    self.send_char(x as u16, y as u16, back_cell.ch, cw as u16);
-                    // We're going to skip `cw` cells so for wide chars fill the slop in the front
-                    // buffer so that if we put a non-wide character lto this cell later next
-                    // columns won't be bogus.
-                    for i in 1..cw {
-                        let front_cell = &mut self.front_buffer.cells
-                            [(y * usize::from(self.term_width)) + x + i];
-                        front_cell.ch = ' ';
-                        front_cell.fg = back_cell.fg;
-                        front_cell.bg = back_cell.bg;
+                    self.send_attr(back.fg, back.bg);
+                    self.send_char(x as u16, y as u16, back.ch, cw as u16);
+                    let count = self.back_buffer.combining.get(&idx).map_or(0, Vec::len);
+                    for i in 0..count {
+                        let mark = self.back_buffer.combining[&idx][i];
+                        self.send_attr(mark.fg, mark.bg);
+                        write!(&mut self.output_buffer, "{}", mark.ch).unwrap();
+                    }
+                    self.front_buffer.cells[idx] = back;
+                    if let Some(marks) = self.back_buffer.combining.get(&idx) {
+                        self.front_buffer.combining.insert(idx, marks.clone());
+                    } else {
+                        self.front_buffer.combining.remove(&idx);
+                    }
+                    if cw == 2 {
+                        self.front_buffer.cells[idx + 1] = self.back_buffer.cells[idx + 1];
+                        self.front_buffer.combining.remove(&(idx + 1));
                     }
                 }
-
                 x += cw;
             }
         }
@@ -355,21 +382,96 @@ impl Termbox {
         }
     }
 
-    // TODO: parameters should be u32
+    /// Changes the cell at a terminal-column coordinate.
+    ///
+    /// Replacing either half of a wide character clears both halves. A wide character at
+    /// the right edge is displayed as `�`. Combining characters may instead be added to a
+    /// previously written base with [`Termbox::append_combining`].
     pub fn change_cell(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
-        debug_assert!(x >= 0);
-        debug_assert!(y >= 0);
-        let cell =
-            &mut self.back_buffer.cells[(y as usize) * (self.term_width as usize) + (x as usize)];
-        cell.ch = ch;
-        cell.fg = fg;
-        cell.bg = bg;
+        if x < 0 || y < 0 || x >= self.width() || y >= self.height() {
+            return;
+        }
+        let width = usize::from(self.term_width);
+        let x = x as usize;
+        let idx = y as usize * width + x;
+        let mark = ch;
+        let zero_width = UnicodeWidthChar::width(ch) == Some(0);
+        let ch = if zero_width {
+            '◌'
+        } else if UnicodeWidthChar::width(ch) == Some(2) && x + 1 == width {
+            '�'
+        } else {
+            ch
+        };
+        let cw = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
+        self.erase_cell(idx, x);
+        if cw == 2 {
+            self.erase_cell(idx + 1, x + 1);
+        }
+        self.back_buffer.cells[idx] = Cell { ch, fg, bg };
+        if cw == 2 {
+            self.back_buffer.cells[idx + 1] = Cell { ch: ' ', fg, bg };
+        }
+        if zero_width {
+            self.append_combining(x as i32, y, mark, fg, bg);
+        }
+    }
+
+    fn erase_cell(&mut self, idx: usize, x: usize) {
+        let start =
+            if x > 0 && UnicodeWidthChar::width(self.back_buffer.cells[idx - 1].ch) == Some(2) {
+                idx - 1
+            } else {
+                idx
+            };
+        let count = UnicodeWidthChar::width(self.back_buffer.cells[start].ch)
+            .unwrap_or(1)
+            .max(1);
+        for i in start..start + count {
+            self.back_buffer.cells[i].ch = ' ';
+            self.back_buffer.combining.remove(&i);
+        }
+    }
+
+    /// Appends a zero-width character to a base cell, retaining the character's own style.
+    pub fn append_combining(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
+        if x < 0
+            || y < 0
+            || x >= self.width()
+            || y >= self.height()
+            || UnicodeWidthChar::width(ch) != Some(0)
+        {
+            return;
+        }
+        let idx = y as usize * usize::from(self.term_width) + x as usize;
+        self.back_buffer
+            .combining
+            .entry(idx)
+            .or_default()
+            .push(Combining { ch, fg, bg });
+    }
+
+    /// Changes a base cell's style without removing its combining characters.
+    pub fn set_cell_attributes(&mut self, x: i32, y: i32, fg: u16, bg: u16) {
+        if x < 0 || y < 0 || x >= self.width() || y >= self.height() {
+            return;
+        }
+        let idx = y as usize * usize::from(self.term_width) + x as usize;
+        let count = UnicodeWidthChar::width(self.back_buffer.cells[idx].ch)
+            .unwrap_or(1)
+            .max(1);
+        for cell in &mut self.back_buffer.cells[idx..idx + count] {
+            cell.fg = fg;
+            cell.bg = bg;
+        }
     }
 
     fn flush_output_buffer(&mut self) {
         // self.total_flushed += self.output_buffer.len() as u64;
-        if let Some(ref mut tty) = self.tty {
+        if let Some(tty) = &mut self.tty {
             tty.write_all(&self.output_buffer).unwrap();
+        } else if let Some(output) = &mut self.test_output {
+            output.extend_from_slice(&self.output_buffer);
         }
         self.output_buffer.clear();
     }
@@ -540,5 +642,14 @@ impl Termbox {
         self.back_buffer.resize(old_w, old_h, w, h);
         self.front_buffer.resize(old_w, old_h, w, h);
         self.front_buffer.clear(self.clear_fg, self.clear_bg);
+        self.send_clear();
+    }
+
+    /// Takes the bytes emitted by a test instance since the previous call.
+    pub fn take_test_output(&mut self) -> Vec<u8> {
+        self.test_output
+            .as_mut()
+            .map(std::mem::take)
+            .unwrap_or_default()
     }
 }
