@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add a Nix flake for building tiny and entering a Rust development shell.
 - Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
   ignored and are now synonymous with `tab` and `esc`. (#444)
 - The keystrokes `ctrl_h` and `backspace` can now be distinguished, which

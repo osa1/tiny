@@ -88,6 +88,34 @@ of tiny through the AUR.
 
 tiny is tested on Linux and OSX.
 
+### Nix
+
+With Nix flakes enabled, build the default rustls-based package or enter the
+development shell from the repository root:
+
+```sh
+nix build
+./result/bin/tiny --version
+nix develop
+```
+
+The shell includes Rust tooling and the Linux dependencies needed for native
+TLS and desktop notifications. For example, inside the shell:
+
+```sh
+cargo test --workspace
+cargo test -p tiny --no-default-features --features "tls-native desktop-notifications"
+```
+
+`flake.lock` pins nixpkgs and `Cargo.lock` pins Rust dependencies. The flake
+defines Linux and macOS packages for x86_64 and aarch64. In a Git checkout,
+Nix includes only files known to Git, so add newly created source files before
+building. Format the Nix expressions with:
+
+```sh
+nix fmt -- flake.nix shell.nix nix/package.nix
+```
+
 ## Configuration
 
 tiny looks for these places for a config file:
