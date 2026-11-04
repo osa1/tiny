@@ -2,9 +2,14 @@
   description = "tiny IRC client";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.home-manager.url = "github:nix-community/home-manager/release-26.05";
 
   outputs =
-    { self, nixpkgs }:
+    {
+      self,
+      nixpkgs,
+      home-manager,
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -15,6 +20,8 @@
       eachSystem = nixpkgs.lib.genAttrs systems;
     in
     {
+      homeManagerModules.default = import ./nix/home-manager.nix { inherit self; };
+
       packages = eachSystem (
         system:
         let
@@ -29,6 +36,10 @@
 
       checks = eachSystem (system: {
         inherit (self.packages.${system}) tiny;
+        home-manager = import ./nix/tests/home-manager.nix {
+          pkgs = home-manager.inputs.nixpkgs.legacyPackages.${system};
+          inherit self home-manager;
+        };
       });
 
       devShells = eachSystem (system: {
