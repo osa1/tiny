@@ -3,6 +3,19 @@ servers:
     - addr: irc.oftc.net
       port: 6697
       tls: true
+
+      # Optional proxy: http, https, socks4, or socks5.
+      # HTTPS proxy TLS is independent of the IRC tls setting above.
+      # Credentials sent to non-HTTPS proxies are not encrypted in transit.
+      # SOCKS4 uses SOCKS4a by default; socks4a: false resolves locally.
+      # SOCKS5 may select no authentication even when credentials are provided.
+      # proxy:
+      #   type: socks5
+      #   addr: 127.0.0.1
+      #   port: 1080
+      #   username: example
+      #   password:
+      #     command: 'pass show proxy-password'
       # Username parameter of USER command sent to the server at the beginning
       # of connection. When not provided, first nick will be used instead.
       # user: username

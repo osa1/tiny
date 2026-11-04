@@ -11,7 +11,7 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-use libtiny_client::{Client, SASLAuth, ServerInfo};
+use libtiny_client::{Client, ProxyConfig, SASLAuth, ServerInfo};
 use libtiny_common::MsgTarget;
 use libtiny_logger::{Logger, LoggerInitError};
 use libtiny_tui::TUI;
@@ -74,6 +74,17 @@ fn main() {
                     log_dir,
                 } = config;
 
+                let server_proxies = servers
+                    .iter()
+                    .map(|server| {
+                        (
+                            server.addr.clone(),
+                            server.port,
+                            server.proxy.clone().map(Into::into),
+                        )
+                    })
+                    .collect();
+
                 let servers = if !server_args.is_empty() {
                     // Connect only to servers that match at least one of the given patterns
                     servers
@@ -83,7 +94,7 @@ fn main() {
                 } else {
                     servers
                 };
-                run(servers, defaults, config_path, log_dir)
+                run(servers, server_proxies, defaults, config_path, log_dir)
             }
         }
     }
@@ -93,6 +104,7 @@ const DEBUG_LOG_FILE: &str = "tiny_debug_logs.txt";
 
 fn run(
     servers: Vec<config::Server<String>>,
+    server_proxies: Vec<(String, u16, Option<ProxyConfig>)>,
     defaults: config::Defaults,
     config_path: PathBuf,
     log_dir: Option<PathBuf>,
@@ -175,6 +187,7 @@ fn run(
                 addr: server.addr,
                 port: server.port,
                 tls,
+                proxy: server.proxy.map(Into::into),
                 pass: server.pass,
                 user: server.user,
                 realname: server.realname,
@@ -196,7 +209,7 @@ fn run(
         }
 
         // Block on TUI task
-        ui::task(defaults, tui, clients, rcv_tui_ev).await;
+        ui::task(defaults, server_proxies, tui, clients, rcv_tui_ev).await;
     });
 
     runtime.block_on(local);

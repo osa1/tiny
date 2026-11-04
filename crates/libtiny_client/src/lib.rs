@@ -6,6 +6,9 @@ mod state;
 mod stream;
 mod utils;
 
+#[cfg(test)]
+mod stream_tests;
+
 use libtiny_common::{ChanName, ChanNameRef};
 pub use libtiny_wire as wire;
 
@@ -13,7 +16,7 @@ use pinger::Pinger;
 use state::State;
 use stream::{Stream, StreamError};
 
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, SocketAddr, SocketAddrV4, ToSocketAddrs};
 use std::time::Duration;
 
 use futures_util::future::FutureExt;
@@ -33,6 +36,40 @@ extern crate log;
 /// `Client` tries to reconnect on error after this many seconds.
 pub const RECONNECT_SECS: u64 = 30;
 
+/// Protocol used to reach the IRC server through a proxy.
+#[derive(Debug, Clone)]
+pub enum ProxyProtocol {
+    Http,
+    Https,
+    Socks4 { remote_dns: bool },
+    Socks5,
+}
+
+/// Credentials sent to a proxy. Debug output never contains the credentials.
+#[derive(Clone)]
+pub enum ProxyAuth {
+    UserId(String),
+    UserPass { username: String, password: String },
+}
+
+impl std::fmt::Debug for ProxyAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UserId(_) => f.write_str("UserId([REDACTED])"),
+            Self::UserPass { .. } => f.write_str("UserPass([REDACTED])"),
+        }
+    }
+}
+
+/// Proxy endpoint and optional authentication.
+#[derive(Debug, Clone)]
+pub struct ProxyConfig {
+    pub protocol: ProxyProtocol,
+    pub addr: String,
+    pub port: u16,
+    pub auth: Option<ProxyAuth>,
+}
+
 #[derive(Debug, Clone)]
 pub struct ServerInfo {
     /// Server address
@@ -43,6 +80,9 @@ pub struct ServerInfo {
 
     /// Use TLS?
     pub tls: bool,
+
+    /// Optional proxy; absent means a direct connection.
+    pub proxy: Option<ProxyConfig>,
 
     /// Server password.
     pub pass: Option<String>,
@@ -84,29 +124,35 @@ pub enum SASLAuth {
 
 /// IRC client events. Returned by `Client` to the users via a channel.
 ///
-/// Note that Client only returns when it can't resolve the domain name. In all other cases (no
-/// matter what the error is) it continues, in case of a connection error either by trying another
-/// IP address of the same domain, or by waiting `RECONNECT_SECS` seconds and then trying again.
-/// The latter happens after sending a `Disconnected` event.
+/// When endpoint resolution returns no addresses, the client stops. Resolution
+/// errors are retried after `RECONNECT_SECS`; connection errors are tried against
+/// the remaining addresses before a `Disconnected` event and retry delay.
 #[derive(Debug)]
 pub enum Event {
     /// Client resolving domain name
     ResolvingHost,
+    /// Client resolving the configured proxy's domain name.
+    ResolvingProxy,
     /// Domain name resolved, client trying to connect to the given IP address
     Connecting(SocketAddr),
-    /// TCP connection established *and* the introduction sequence with the IRC server started.
+    /// Client trying to connect to the configured proxy.
+    ConnectingProxy(SocketAddr),
+    /// The IRC server accepted registration (numeric 001).
     Connected,
-    /// Disconnected from the server. Usually sent right after an `Event::IoErr`. Client tries to
-    /// reconnect after `RECONNECT_SECS` seconds after sending this event.
+    /// Disconnected from the server. The client retries after `RECONNECT_SECS` seconds.
     Disconnected,
     /// An IO error happened.
     IoErr(std::io::Error),
+    /// A proxy resolution, connection, or negotiation error happened.
+    ProxyErr(std::io::Error),
     /// A TLS error happened
     TlsErr(stream::TlsError),
     /// Remote end closed the connection
     ConnectionClosed,
     /// Client couldn't resolve host address. The client stops after sending this event.
     CantResolveAddr,
+    /// The proxy address resolved to no addresses. The client stops after this event.
+    CantResolveProxy,
     /// Nick changed.
     NickChange { new_nick: String },
     /// A message from the server
@@ -122,6 +168,7 @@ impl From<StreamError> for Event {
         match err {
             StreamError::TlsError(tls_err) => Event::TlsErr(tls_err),
             StreamError::IoError(io_err) => Event::IoErr(io_err),
+            StreamError::ProxyError(io_err) => Event::ProxyErr(io_err),
         }
     }
 }
@@ -285,6 +332,25 @@ enum Cmd {
 }
 
 fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
+    connect_inner(
+        server_info,
+        #[cfg(test)]
+        None,
+    )
+}
+
+#[cfg(test)]
+fn connect_with_test_root(
+    server_info: ServerInfo,
+    root: Vec<u8>,
+) -> (Client, mpsc::Receiver<Event>) {
+    connect_inner(server_info, Some(root))
+}
+
+fn connect_inner(
+    server_info: ServerInfo,
+    #[cfg(test)] root: Option<Vec<u8>>,
+) -> (Client, mpsc::Receiver<Event>) {
     let serv_name = server_info.addr.clone();
 
     //
@@ -304,7 +370,14 @@ fn connect(server_info: ServerInfo) -> (Client, mpsc::Receiver<Event>) {
     let irc_state = State::new(server_info.clone());
     let irc_state_clone = irc_state.clone();
 
-    let task = main_loop(server_info, irc_state_clone, snd_ev, rcv_cmd);
+    let task = main_loop(
+        server_info,
+        irc_state_clone,
+        snd_ev,
+        rcv_cmd,
+        #[cfg(test)]
+        root,
+    );
     tokio::task::spawn_local(task);
 
     (
@@ -322,6 +395,7 @@ async fn main_loop(
     irc_state: State,
     mut snd_ev: mpsc::Sender<Event>,
     rcv_cmd: mpsc::Receiver<Cmd>,
+    #[cfg(test)] root: Option<Vec<u8>>,
 ) {
     let mut rcv_cmd = ReceiverStream::new(rcv_cmd).fuse();
 
@@ -351,65 +425,110 @@ async fn main_loop(
         // trailing "\r\n") and the task directly sends them to the server.
         let (mut snd_msg, rcv_msg) = mpsc::channel::<String>(100);
 
-        //
-        // Resolve IP address
-        //
+        // Resolve the endpoint we will actually connect to. Proxied IRC names are
+        // otherwise left for the proxy to resolve.
+        let proxy = server_info.proxy.as_ref();
+        let (endpoint, endpoint_port) = if let Some(proxy) = proxy {
+            snd_ev.send(Event::ResolvingProxy).await.unwrap();
+            (proxy.addr.clone(), proxy.port)
+        } else {
+            snd_ev.send(Event::ResolvingHost).await.unwrap();
+            (server_info.addr.clone(), port)
+        };
 
-        snd_ev.send(Event::ResolvingHost).await.unwrap();
-
-        let serv_name = server_info.addr.clone();
-
-        debug!("Resolving address");
-
-        let serv_name_clone = serv_name.clone();
-
-        let addr_iter = match resolve_addr(serv_name_clone, port, &mut rcv_cmd).await {
-            TaskResult::Done(Ok(addr_iter)) => {
-                debug!("resolve_addr: done");
-                addr_iter
-            }
+        let addr_iter = match resolve_addr(endpoint, endpoint_port, &mut rcv_cmd).await {
+            TaskResult::Done(Ok(addr_iter)) => addr_iter,
             TaskResult::Done(Err(err)) => {
-                debug!("resolve_addr: {err:?}");
-                snd_ev.send(Event::IoErr(err)).await.unwrap();
+                if proxy.is_some() {
+                    snd_ev
+                        .send(Event::ProxyErr(std::io::Error::new(
+                            err.kind(),
+                            "Failed to resolve proxy address",
+                        )))
+                        .await
+                        .unwrap();
+                } else {
+                    debug!("resolve_addr: {err:?}");
+                    snd_ev.send(Event::IoErr(err)).await.unwrap();
+                }
                 wait = true;
                 continue;
             }
             TaskResult::Reconnect(mb_port) => {
-                debug!("resolve_addr: try again");
                 port = mb_port.unwrap_or(port);
                 wait = false;
                 continue;
             }
-            TaskResult::Return => {
-                debug!("resolve_addr: return");
-                return;
-            }
+            TaskResult::Return => return,
         };
 
         let addrs = addr_iter.collect::<Vec<_>>();
-
         if addrs.is_empty() {
-            snd_ev.send(Event::CantResolveAddr).await.unwrap();
+            snd_ev
+                .send(if proxy.is_some() {
+                    Event::CantResolveProxy
+                } else {
+                    Event::CantResolveAddr
+                })
+                .await
+                .unwrap();
             return;
         }
 
-        debug!("Address resolved: {addrs:?}");
-
-        //
-        // Establish TCP connection to the server
-        //
-
-        let sasl_pem = if let Some(SASLAuth::External { pem }) = &server_info.sasl_auth {
-            Some(pem)
+        // Standard SOCKS4 requires a locally resolved IPv4 destination. SOCKS4a,
+        // HTTP CONNECT and SOCKS5 instead pass the original name to the proxy.
+        let socks4_targets = if proxy.is_some_and(|proxy| {
+            matches!(&proxy.protocol, ProxyProtocol::Socks4 { remote_dns: false })
+        }) {
+            let host = server_info.addr.as_str();
+            let literal = host
+                .strip_prefix('[')
+                .and_then(|s| s.strip_suffix(']'))
+                .unwrap_or(host);
+            let targets = if matches!(literal.parse::<IpAddr>(), Ok(IpAddr::V6(_))) {
+                Vec::new()
+            } else {
+                snd_ev.send(Event::ResolvingHost).await.unwrap();
+                match resolve_addr(server_info.addr.clone(), port, &mut rcv_cmd).await {
+                    TaskResult::Done(Ok(addrs)) => addrs
+                        .filter_map(|addr| match addr {
+                            SocketAddr::V4(addr) => Some(Some(addr)),
+                            SocketAddr::V6(_) => None,
+                        })
+                        .collect::<Vec<_>>(),
+                    TaskResult::Done(Err(_)) => Vec::new(),
+                    TaskResult::Reconnect(mb_port) => {
+                        port = mb_port.unwrap_or(port);
+                        wait = false;
+                        continue;
+                    }
+                    TaskResult::Return => return,
+                }
+            };
+            if targets.is_empty() {
+                snd_ev
+                    .send(Event::ProxyErr(std::io::Error::new(
+                        std::io::ErrorKind::AddrNotAvailable,
+                        "SOCKS4 requires an IPv4 destination",
+                    )))
+                    .await
+                    .unwrap();
+                snd_ev.send(Event::Disconnected).await.unwrap();
+                wait = true;
+                continue;
+            }
+            targets
         } else {
-            None
+            vec![None]
         };
 
         let stream = match try_connect(
             addrs,
-            &serv_name,
-            server_info.tls,
-            sasl_pem,
+            &server_info,
+            port,
+            socks4_targets,
+            #[cfg(test)]
+            root.as_deref(),
             &mut rcv_cmd,
             &mut snd_ev,
         )
@@ -640,26 +759,40 @@ async fn resolve_addr<S: StreamExt<Item = Cmd> + Unpin>(
 
 async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
     addrs: Vec<SocketAddr>,
-    serv_name: &str,
-    use_tls: bool,
-    sasl_pem: Option<&Vec<u8>>,
+    server_info: &ServerInfo,
+    port: u16,
+    socks4_targets: Vec<Option<SocketAddrV4>>,
+    #[cfg(test)] root: Option<&[u8]>,
     rcv_cmd: &mut S,
     snd_ev: &mut mpsc::Sender<Event>,
 ) -> TaskResult<Option<Stream>> {
     let connect_task = async move {
         for addr in addrs {
-            snd_ev.send(Event::Connecting(addr)).await.unwrap();
-            let mb_stream = if use_tls {
-                Stream::new_tls(addr, serv_name, sasl_pem).await
-            } else {
-                Stream::new_tcp(addr).await
-            };
-            match mb_stream {
-                Err(err) => {
-                    snd_ev.send(Event::from(err)).await.unwrap();
-                }
-                Ok(stream) => {
-                    return Some(stream);
+            for &socks4_target in &socks4_targets {
+                snd_ev
+                    .send(if server_info.proxy.is_some() {
+                        Event::ConnectingProxy(addr)
+                    } else {
+                        Event::Connecting(addr)
+                    })
+                    .await
+                    .unwrap();
+                #[cfg(test)]
+                let result = if let Some(root) = root {
+                    Stream::connect_with_test_root(addr, server_info, port, socks4_target, root)
+                        .await
+                } else {
+                    Stream::connect(addr, server_info, port, socks4_target).await
+                };
+                #[cfg(not(test))]
+                let result = Stream::connect(addr, server_info, port, socks4_target).await;
+                match result {
+                    Err(err) => {
+                        snd_ev.send(Event::from(err)).await.unwrap();
+                    }
+                    Ok(stream) => {
+                        return Some(stream);
+                    }
                 }
             }
         }

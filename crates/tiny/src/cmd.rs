@@ -1,7 +1,7 @@
 use crate::config::Defaults;
 use crate::ui::UI;
 use crate::utils;
-use libtiny_client::{Client, ServerInfo};
+use libtiny_client::{Client, ProxyConfig, ServerInfo};
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget};
 use libtiny_tui::config::Chan;
 
@@ -11,6 +11,7 @@ pub(crate) fn run_cmd(
     cmd: &str,
     src: MsgSource,
     defaults: &Defaults,
+    server_proxies: &[(String, u16, Option<ProxyConfig>)],
     ui: &UI,
     clients: &mut Vec<Client>,
 ) {
@@ -19,6 +20,7 @@ pub(crate) fn run_cmd(
             let cmd_args = CmdArgs {
                 args,
                 defaults,
+                server_proxies,
                 ui,
                 clients,
                 src,
@@ -61,6 +63,7 @@ fn parse_cmd(cmd: &str) -> Option<ParsedCmd<'_>> {
 struct CmdArgs<'a> {
     args: &'a str,
     defaults: &'a Defaults,
+    server_proxies: &'a [(String, u16, Option<ProxyConfig>)],
     ui: &'a UI,
     clients: &'a mut Vec<Client>,
     src: MsgSource,
@@ -190,6 +193,7 @@ fn connect(args: CmdArgs) {
     let CmdArgs {
         args,
         defaults,
+        server_proxies,
         ui,
         clients,
         src,
@@ -199,8 +203,15 @@ fn connect(args: CmdArgs) {
 
     match words.len() {
         0 => reconnect(ui, clients, src),
-        1 => connect_(words[0], None, defaults, ui, clients),
-        2 => connect_(words[0], Some(words[1]), defaults, ui, clients),
+        1 => connect_(words[0], None, defaults, server_proxies, ui, clients),
+        2 => connect_(
+            words[0],
+            Some(words[1]),
+            defaults,
+            server_proxies,
+            ui,
+            clients,
+        ),
         _ => ui.add_client_err_msg(
             &format!("Usage: {}", CONNECT_CMD.usage),
             &MsgTarget::CurrentTab,
@@ -220,10 +231,38 @@ fn reconnect(ui: &UI, clients: &mut [Client], src: MsgSource) {
     }
 }
 
+fn select_proxy<'a>(
+    servers: &'a [(String, u16, Option<ProxyConfig>)],
+    host: &str,
+    port: u16,
+) -> Result<Option<&'a ProxyConfig>, ()> {
+    fn normalized(host: &str) -> &str {
+        host.strip_suffix('.').unwrap_or(host)
+    }
+
+    let mut hosts = servers
+        .iter()
+        .filter(|(addr, _, _)| normalized(addr).eq_ignore_ascii_case(normalized(host)));
+    let Some(first) = hosts.next() else {
+        return Ok(None);
+    };
+    if hosts.clone().next().is_none() {
+        return Ok(first.2.as_ref());
+    }
+    let mut matching_ports = std::iter::once(first)
+        .chain(hosts)
+        .filter(|(_, configured_port, _)| *configured_port == port);
+    match (matching_ports.next(), matching_ports.next()) {
+        (Some((_, _, proxy)), None) => Ok(proxy.as_ref()),
+        _ => Err(()),
+    }
+}
+
 fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
     defaults: &Defaults,
+    server_proxies: &[(String, u16, Option<ProxyConfig>)],
     ui: &UI,
     clients: &mut Vec<Client>,
 ) {
@@ -257,6 +296,17 @@ fn connect_(
         return;
     }
 
+    let proxy = match select_proxy(server_proxies, serv_name, serv_port) {
+        Ok(proxy) => proxy.cloned(),
+        Err(()) => {
+            ui.add_client_err_msg(
+                &format!("connect: ambiguous server configuration for {serv_name}"),
+                &MsgTarget::CurrentTab,
+            );
+            return;
+        }
+    };
+
     // otherwise create a new connection
     // can't move the rest to an else branch because of borrowchk
 
@@ -269,6 +319,7 @@ fn connect_(
         addr: serv_name.to_owned(),
         port: serv_port,
         tls: defaults.tls,
+        proxy,
         user: None,
         realname: defaults.realname.clone(),
         pass: pass.map(str::to_owned),
@@ -591,4 +642,52 @@ fn test_msg_args() {
     assert_eq!(split_msg_args("foo, bar"), Some(("foo,", "bar"))); // nick not valid according to RFC but whatever
     assert_eq!(split_msg_args("foo ,bar"), Some(("foo", ",bar")));
     assert_eq!(split_msg_args("#blah blah"), None);
+}
+
+#[test]
+fn selects_proxy_for_manual_connections() {
+    use libtiny_client::ProxyProtocol;
+
+    let proxy = |addr: &str| {
+        Some(ProxyConfig {
+            protocol: ProxyProtocol::Socks5,
+            addr: addr.to_owned(),
+            port: 1080,
+            auth: None,
+        })
+    };
+    let one = vec![("irc.example.".to_owned(), 6667, proxy("first"))];
+    assert_eq!(
+        select_proxy(&one, "IRC.EXAMPLE", 6697)
+            .unwrap()
+            .unwrap()
+            .addr,
+        "first"
+    );
+    assert!(select_proxy(&one, "other.example", 6667).unwrap().is_none());
+
+    let multiple = vec![
+        ("irc.example".to_owned(), 6667, proxy("first")),
+        ("IRC.EXAMPLE.".to_owned(), 6697, proxy("second")),
+        ("irc.example".to_owned(), 7000, None),
+    ];
+    assert_eq!(
+        select_proxy(&multiple, "irc.example", 6697)
+            .unwrap()
+            .unwrap()
+            .addr,
+        "second"
+    );
+    assert!(
+        select_proxy(&multiple, "irc.example", 7000)
+            .unwrap()
+            .is_none()
+    );
+    assert!(select_proxy(&multiple, "irc.example", 1234).is_err());
+
+    let duplicate_port = vec![
+        ("irc.example".to_owned(), 6667, proxy("first")),
+        ("IRC.EXAMPLE".to_owned(), 6667, None),
+    ];
+    assert!(select_proxy(&duplicate_port, "irc.example", 6667).is_err());
 }

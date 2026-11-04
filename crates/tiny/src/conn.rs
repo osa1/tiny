@@ -56,9 +56,25 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
                 },
             );
         }
+        ResolvingProxy => {
+            ui.add_client_msg(
+                "Resolving proxy...",
+                &MsgTarget::AllServTabs {
+                    serv: client.get_serv_name(),
+                },
+            );
+        }
         Connecting(sock_addr) => {
             ui.add_client_msg(
                 &format!("Connecting to {sock_addr}"),
+                &MsgTarget::AllServTabs {
+                    serv: client.get_serv_name(),
+                },
+            );
+        }
+        ConnectingProxy(sock_addr) => {
+            ui.add_client_msg(
+                &format!("Connecting to proxy {sock_addr}"),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),
                 },
@@ -93,6 +109,15 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
                 },
             );
         }
+        ProxyErr(err) => {
+            ui.add_err_msg(
+                &format!("Proxy error: {err}"),
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv: client.get_serv_name(),
+                },
+            );
+        }
         ConnectionClosed => {
             ui.add_err_msg(
                 "Connection closed on the remote end",
@@ -114,6 +139,15 @@ fn handle_conn_ev(ui: &UI, client: &dyn Client, ev: libtiny_client::Event) {
         CantResolveAddr => {
             ui.add_err_msg(
                 "Can't resolve address",
+                time::now(),
+                &MsgTarget::AllServTabs {
+                    serv: client.get_serv_name(),
+                },
+            );
+        }
+        CantResolveProxy => {
+            ui.add_err_msg(
+                "Can't resolve proxy address",
                 time::now(),
                 &MsgTarget::AllServTabs {
                     serv: client.get_serv_name(),

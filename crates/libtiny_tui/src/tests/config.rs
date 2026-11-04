@@ -100,6 +100,54 @@ fn parsing_tab_configs() {
 }
 
 #[test]
+fn proxy_configuration_preserves_tab_settings() {
+    let config: Config = serde_yaml::from_str(
+        r##"
+servers:
+  - addr: irc.example
+    port: 6697
+    tls: true
+    realname: Test User
+    nicks: [tester]
+    proxy:
+      type: socks5
+      addr: proxy.example
+      port: 1080
+      username: proxy-user
+      password:
+        command: 'pass show proxy-password'
+    notify: mentions
+    join:
+      - name: "#tiny"
+        ignore: true
+        notify: messages
+defaults:
+  nicks: [tester]
+  realname: Test User
+  ignore: false
+  notify: off
+log_dir: null
+"##,
+    )
+    .expect("proxy configuration should also parse as TUI configuration");
+    let tabs: TabConfigs = (&config).into();
+    assert_eq!(
+        tabs.get("irc.example", None),
+        Some(TabConfig {
+            ignore: Some(false),
+            notify: Some(Notifier::Mentions),
+        })
+    );
+    assert_eq!(
+        tabs.get("irc.example", Some(ChanNameRef::new("#tiny"))),
+        Some(TabConfig {
+            ignore: Some(true),
+            notify: Some(Notifier::Messages),
+        })
+    );
+}
+
+#[test]
 fn tab_config_command() {
     assert_eq!(
         TabConfig::from_cmd_args("").unwrap(),
