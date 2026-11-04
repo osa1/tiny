@@ -24,3 +24,6 @@ tokio = { version = "1.17", default-features = false, features = ["net", "rt", "
 tokio-native-tls = { version = "0.3", optional = true }
 tokio-rustls = { version = "0.24", optional = true }
 tokio-stream = { version = "0.1" }
+
+[dev-dependencies]
+tokio-rustls = "0.24"

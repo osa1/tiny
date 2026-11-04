@@ -1,6 +1,7 @@
 use crate::conn;
 use crate::ui::UI;
 use libtiny_common::ChanName;
+use libtiny_common::MsgSource;
 use libtiny_tui::TUI;
 use libtiny_tui::test_utils::expect_screen;
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
@@ -12,7 +13,10 @@ use term_input as input;
 
 use std::future::Future;
 use std::panic::Location;
+use std::time::Duration;
 
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
@@ -88,6 +92,103 @@ where
         })
         .await;
     });
+}
+
+#[test]
+fn ipv6_connect_and_reconnect() {
+    run_test(
+        "testnick".to_owned(),
+        |TestSetup {
+             tui, snd_input_ev, ..
+         }| async move {
+            let first = match TcpListener::bind("[::1]:0").await {
+                Ok(listener) => listener,
+                Err(err)
+                    if matches!(
+                        err.kind(),
+                        std::io::ErrorKind::AddrNotAvailable | std::io::ErrorKind::Unsupported
+                    ) || matches!(err.raw_os_error(), Some(93 | 97)) =>
+                {
+                    eprintln!("Skipping IPv6 loopback test: {err}");
+                    return;
+                }
+                Err(err) => panic!("IPv6 loopback bind failed: {err}"),
+            };
+            let second = TcpListener::bind("[::1]:0").await.unwrap();
+            let defaults = crate::config::Defaults {
+                nicks: vec!["testnick".to_owned()],
+                realname: "Test User".to_owned(),
+                join: vec![],
+                tls: false,
+            };
+            let ui = UI::new(tui.clone(), None);
+            let mut clients = Vec::new();
+            let source = MsgSource::Serv {
+                serv: SERV_NAME.to_owned(),
+            };
+
+            crate::cmd::run_cmd(
+                &format!(
+                    "connect [::1]:{} testpass",
+                    first.local_addr().unwrap().port()
+                ),
+                source.clone(),
+                &defaults,
+                &ui,
+                &mut clients,
+            );
+            let first_stream = accept_registration(&first).await;
+            assert_eq!(clients.len(), 1);
+            assert_eq!(clients[0].get_serv_name(), "::1");
+
+            crate::cmd::run_cmd(
+                &format!("connect [::1]:{}", second.local_addr().unwrap().port()),
+                source,
+                &defaults,
+                &ui,
+                &mut clients,
+            );
+            let _second_stream = accept_registration(&second).await;
+            assert_eq!(clients.len(), 1);
+            assert_eq!(clients[0].get_serv_name(), "::1");
+
+            tui.draw();
+            let cells = tui.get_front_buffer();
+            let start = usize::from(DEFAULT_TUI_WIDTH * (DEFAULT_TUI_HEIGHT - 1));
+            let tab_line: String = cells.cells[start..].iter().map(|cell| cell.ch).collect();
+            assert_eq!(tab_line.matches("::1").count(), 1, "{tab_line:?}");
+            drop(first_stream);
+            drop(snd_input_ev);
+        },
+    );
+}
+
+async fn accept_registration(listener: &TcpListener) -> BufReader<TcpStream> {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut reader = BufReader::new(stream);
+        let mut lines = Vec::new();
+        while lines.len() < 3 {
+            let mut line = String::new();
+            assert_ne!(reader.read_line(&mut line).await.unwrap(), 0);
+            lines.push(line);
+        }
+        assert!(
+            lines.iter().any(|line| line == "PASS testpass\r\n"),
+            "{lines:?}"
+        );
+        assert!(
+            lines.iter().any(|line| line == "NICK testnick\r\n"),
+            "{lines:?}"
+        );
+        assert!(
+            lines.iter().any(|line| line.starts_with("USER ")),
+            "{lines:?}"
+        );
+        reader
+    })
+    .await
+    .expect("timed out waiting for IPv6 IRC registration")
 }
 
 #[test]
