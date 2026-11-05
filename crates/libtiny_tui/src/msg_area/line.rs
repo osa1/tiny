@@ -3,6 +3,7 @@ use crate::line_split::{LineDataCache, LineType};
 
 use libtiny_wire::formatting::{Color, IrcFormatEvent, parse_irc_formatting};
 use termbox_simple::{self, Termbox};
+use unicode_width::UnicodeWidthChar;
 
 /// A single line added to the widget. May be rendered as multiple lines on the
 /// screen.
@@ -127,6 +128,14 @@ impl Line {
     /// Add the text to the line. The text can contain IRC formatting characters. The text should
     /// not contain other control characters like '\n' or '\r'.
     pub(crate) fn add_text(&mut self, str: &str, style: SegStyle) {
+        self.add_text_inner(str, style, false);
+    }
+
+    pub(crate) fn add_independent_text(&mut self, str: &str, style: SegStyle) {
+        self.add_text_inner(str, style, true);
+    }
+
+    fn add_text_inner(&mut self, str: &str, style: SegStyle, mut independent: bool) {
         self.set_message_style(style);
 
         for format_event in parse_irc_formatting(str) {
@@ -139,6 +148,14 @@ impl Line {
                     // TODO
                 }
                 IrcFormatEvent::Text(text) => {
+                    if independent {
+                        if let Some(ch) = text.chars().next() {
+                            if ch.width() == Some(0) {
+                                self.current_seg.string.push('◌');
+                            }
+                            independent = false;
+                        }
+                    }
                     self.current_seg.string.push_str(text);
                 }
                 IrcFormatEvent::Color { fg, bg } => {
@@ -204,43 +221,63 @@ impl Line {
     ) {
         let mut col = pos_x;
         let mut line_num = 0;
-        let mut char_idx = 0;
-        let mut split_indices_iter = self.line_data.get_splits().iter().copied().peekable();
-
-        for seg in self
+        let mut base = None;
+        let mut splits = self.line_data.get_splits().iter().copied().peekable();
+        let mut chars = self
             .segments
             .iter()
             .chain(std::iter::once(&self.current_seg))
-        {
-            let sty = seg.style(colors);
-            for c in seg.string.chars() {
-                // If split_indices_iter yields we already know the indices for the start of each line. If it
-                // does not then we just continue outputting on this line.
-                if let Some(next_line_start) = split_indices_iter.peek()
-                    && char_idx == *next_line_start as usize
-                {
-                    // Move to next line
-                    line_num += 1;
-                    if line_num >= height {
-                        break;
-                    }
-                    // Reset column
-                    col = pos_x + self.line_data.new_line_offset();
+            .flat_map(|seg| {
+                let style = seg.style(colors);
+                seg.string.chars().map(move |c| (c, style))
+            })
+            .enumerate()
+            .peekable();
 
-                    // Move to the next line start index
-                    split_indices_iter.next();
-                    // Don't draw whitespaces
-                    if c.is_whitespace() {
-                        char_idx += 1;
-                        continue;
+        while let Some((char_idx, (c, sty))) = chars.next() {
+            if splits.peek().copied() == Some(char_idx as i32) {
+                splits.next();
+                line_num += 1;
+                if line_num >= height {
+                    break;
+                }
+                col = pos_x + self.line_data.new_line_offset();
+                base = None;
+                // Preserve the existing treatment of whitespace at a wrap, except
+                // when it is the base for a following combining scalar.
+                if c.is_whitespace()
+                    && !chars
+                        .peek()
+                        .is_some_and(|(_, (next, _))| UnicodeWidthChar::width(*next) == Some(0))
+                {
+                    continue;
+                }
+            }
+            let width = UnicodeWidthChar::width(c).unwrap_or(0) as i32;
+            let y = pos_y + line_num;
+            if width == 0 {
+                if base.is_none() {
+                    if line_num >= first_line {
+                        tb.change_cell(col, y, '◌', sty.fg, sty.bg);
                     }
+                    base = Some(col);
+                    col += 1;
                 }
-                // Write out the character
                 if line_num >= first_line {
-                    tb.change_cell(col, pos_y + line_num, c, sty.fg, sty.bg);
+                    tb.append_combining(base.unwrap(), y, c, sty.fg, sty.bg);
                 }
-                col += 1;
-                char_idx += 1;
+            } else {
+                let drawn_width = if self.line_data.display_width(line_num) == 1 {
+                    1
+                } else {
+                    width
+                };
+                let displayed = if drawn_width < width { '�' } else { c };
+                if line_num >= first_line {
+                    tb.change_cell(col, y, displayed, sty.fg, sty.bg);
+                }
+                base = Some(col);
+                col += drawn_width;
             }
         }
     }
@@ -370,4 +407,46 @@ fn align_test() {
     line.add_text("12345678", SegStyle::UserMsg);
 
     assert_eq!(line.rendered_height(3), 4);
+}
+
+#[test]
+fn unicode_drawing_wraps_by_columns_and_keeps_styled_marks() {
+    let mut line = Line::new();
+    line.add_text("Aか", SegStyle::UserMsg);
+    line.add_text("\u{3099}日B", SegStyle::Highlight);
+    assert_eq!(line.rendered_height(3), 2);
+    let mut tb = Termbox::init_test(3, 2);
+    line.draw(&mut tb, &Colors::default(), 0, 0, 0, 2);
+    tb.present();
+    let cells = tb.get_front_buffer().cells;
+    assert_eq!(
+        (cells[0].ch, cells[1].ch, cells[3].ch, cells[5].ch),
+        ('A', 'か', '日', 'B')
+    );
+    let output = String::from_utf8(tb.take_test_output()).unwrap();
+    assert!(output.contains('か'));
+    assert!(output.contains('\u{3099}'));
+    assert!(output.contains('日'));
+}
+
+#[test]
+fn unicode_drawing_handles_narrow_and_scrolled_lines() {
+    let mut line = Line::new();
+    line.add_text("\u{3099}日B", SegStyle::UserMsg);
+    assert_eq!(line.rendered_height(1), 3);
+    let mut tb = Termbox::init_test(1, 3);
+    line.draw(&mut tb, &Colors::default(), 0, 0, 1, 3);
+    tb.present();
+    let cells = tb.get_front_buffer().cells;
+    assert_eq!((cells[0].ch, cells[1].ch, cells[2].ch), (' ', '�', 'B'));
+
+    let mut tb = Termbox::init_test(1, 3);
+    line.draw(&mut tb, &Colors::default(), 0, 0, 0, 3);
+    tb.present();
+    assert_eq!(tb.get_front_buffer().cells[0].ch, '◌');
+    assert!(
+        String::from_utf8(tb.take_test_output())
+            .unwrap()
+            .contains('\u{3099}')
+    );
 }

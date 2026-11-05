@@ -754,6 +754,9 @@ impl TUI {
             return;
         }
         while self.active_idx < tab_left || self.active_idx >= tab_right {
+            if self.active_idx == tab_left && tab_left == tab_right {
+                break;
+            }
             if self.active_idx >= tab_right {
                 // scroll right
                 self.h_scroll += self.tabs[tab_left].width() + 1;
@@ -888,6 +891,9 @@ impl TUI {
             // drop any tabs that overflows from the screen
             for (tab_idx, tab) in self.tabs[i..].iter().enumerate() {
                 if tab.width() > width_left {
+                    if tab_idx == 0 && width_left > 0 {
+                        j += 1;
+                    }
                     break;
                 } else {
                     j += 1;
@@ -949,8 +955,13 @@ impl TUI {
 
         if right_arr {
             let style = arrow_style(&self.tabs[tab_right..], &self.colors);
-            self.tb
-                .change_cell(pos_x, self.height - 1, RIGHT_ARROW, style.fg, style.bg);
+            self.tb.change_cell(
+                pos_x.min(self.width - 1),
+                self.height - 1,
+                RIGHT_ARROW,
+                style.fg,
+                style.bg,
+            );
         }
 
         self.tb.present();
