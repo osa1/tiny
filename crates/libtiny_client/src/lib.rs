@@ -166,9 +166,9 @@ pub enum Event {
 impl From<StreamError> for Event {
     fn from(err: StreamError) -> Event {
         match err {
-            StreamError::TlsError(tls_err) => Event::TlsErr(tls_err),
-            StreamError::IoError(io_err) => Event::IoErr(io_err),
-            StreamError::ProxyError(io_err) => Event::ProxyErr(io_err),
+            StreamError::Tls(tls_err) => Event::TlsErr(tls_err),
+            StreamError::Io(io_err) => Event::IoErr(io_err),
+            StreamError::Proxy(io_err) => Event::ProxyErr(io_err),
         }
     }
 }
@@ -461,13 +461,13 @@ async fn main_loop(
             }
         }
 
-        if server_info.proxy.is_some() {
-            if let Err(err) = stream::validate_proxy_destination(&server_info.addr) {
-                snd_ev.send(Event::from(err)).await.unwrap();
-                snd_ev.send(Event::Disconnected).await.unwrap();
-                wait = true;
-                continue;
-            }
+        if server_info.proxy.is_some()
+            && let Err(err) = stream::validate_proxy_destination(&server_info.addr)
+        {
+            snd_ev.send(Event::from(err)).await.unwrap();
+            snd_ev.send(Event::Disconnected).await.unwrap();
+            wait = true;
+            continue;
         }
 
         // Channel for the sender task. Messages are complete IRC messages (including the

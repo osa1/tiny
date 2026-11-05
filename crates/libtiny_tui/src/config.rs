@@ -21,7 +21,7 @@ pub(crate) struct Config {
     #[serde(default)]
     pub(crate) colors: Colors,
 
-    #[serde(default = "usize::max_value")]
+    #[serde(default = "default_scrollback")]
     pub(crate) scrollback: usize,
 
     pub(crate) layout: Option<Layout>,
@@ -235,6 +235,10 @@ impl TabConfig {
         *ignore = !&*ignore;
         *ignore
     }
+}
+
+fn default_scrollback() -> usize {
+    usize::MAX
 }
 
 fn default_max_nick_length() -> usize {

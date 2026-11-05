@@ -3,12 +3,15 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.home-manager.url = "github:nix-community/home-manager/release-26.05";
+  inputs.rust-overlay.url = "github:oxalica/rust-overlay";
+  inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs =
     {
       self,
       nixpkgs,
       home-manager,
+      rust-overlay,
     }:
     let
       systems = [
@@ -18,6 +21,16 @@
         "aarch64-darwin"
       ];
       eachSystem = nixpkgs.lib.genAttrs systems;
+      pkgsBySystem = eachSystem (
+        system:
+        import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
+        }
+      );
+      rustToolchains = eachSystem (
+        system: pkgsBySystem.${system}.rust-bin.fromRustupToolchainFile ./rust-toolchain
+      );
     in
     {
       homeManagerModules.default = import ./nix/home-manager.nix { inherit self; };
@@ -25,8 +38,13 @@
       packages = eachSystem (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
-          tiny = pkgs.callPackage ./nix/package.nix { };
+          pkgs = pkgsBySystem.${system};
+          toolchain = rustToolchains.${system};
+          rustPlatform = pkgs.makeRustPlatform {
+            cargo = toolchain;
+            rustc = toolchain;
+          };
+          tiny = pkgs.callPackage ./nix/package.nix { inherit rustPlatform; };
         in
         {
           default = tiny;
@@ -44,7 +62,8 @@
 
       devShells = eachSystem (system: {
         default = import ./shell.nix {
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = pkgsBySystem.${system};
+          rustToolchain = rustToolchains.${system};
           inherit (self.packages.${system}) tiny;
         };
       });

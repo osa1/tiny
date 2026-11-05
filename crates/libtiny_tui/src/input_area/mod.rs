@@ -1092,8 +1092,10 @@ mod tests {
                 assert!(height > 1);
             }
             let mut tb = Termbox::init_test(width as u16, 8);
-            let mut colors = Colors::default();
-            colors.cursor = Style { fg: 5, bg: 6 };
+            let colors = Colors {
+                cursor: Style { fg: 5, bg: 6 },
+                ..Default::default()
+            };
             let mut messages = MsgArea::new(width, 7, 10, Layout::Compact);
             input.draw(&mut tb, &colors, 0, 0, 8, &mut messages);
             tb.present();

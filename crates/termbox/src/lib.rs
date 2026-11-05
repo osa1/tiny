@@ -310,10 +310,10 @@ impl Termbox {
                 if dirty {
                     // Overwriting one half of an old wide character may erase its other half
                     // in the terminal, even when that cell's logical value is unchanged.
-                    if cw == 1 && UnicodeWidthChar::width(front.ch) == Some(2) {
-                        force = true;
-                    } else if cw == 2
-                        && UnicodeWidthChar::width(self.front_buffer.cells[idx + 1].ch) == Some(2)
+                    if (cw == 1 && UnicodeWidthChar::width(front.ch) == Some(2))
+                        || (cw == 2
+                            && UnicodeWidthChar::width(self.front_buffer.cells[idx + 1].ch)
+                                == Some(2))
                     {
                         force = true;
                     }

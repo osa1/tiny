@@ -103,7 +103,7 @@ async fn fixture(
             tls.get_ref()
                 .1
                 .peer_certificates()
-                .map_or(true, |certs| certs.is_empty()),
+                .is_none_or(|certs| certs.is_empty()),
             "SASL client identity must not be sent to the proxy"
         );
         Box::new(tls)
@@ -253,7 +253,7 @@ async fn exercise(proxy_tls: bool, irc_tls: bool, fault: Fault) {
         }
         Fault::ProxyName | Fault::ProxyCa => {
             assert!(
-                matches!(result, Err(StreamError::ProxyError(_))),
+                matches!(result, Err(StreamError::Proxy(_))),
                 "proxy TLS failure must be a proxy error"
             );
             assert!(
@@ -267,7 +267,7 @@ async fn exercise(proxy_tls: bool, irc_tls: bool, fault: Fault) {
         }
         Fault::IrcName | Fault::IrcCa => {
             assert!(
-                matches!(&result, Err(error) if !matches!(error, StreamError::ProxyError(_))),
+                matches!(&result, Err(error) if !matches!(error, StreamError::Proxy(_))),
                 "IRC TLS verification must fail as an IRC error"
             );
             timeout(DEADLINE, tunnel_rx.recv())
@@ -341,7 +341,7 @@ async fn https_basic_client(reject: bool, scoped_proxy: bool) {
                 .get_ref()
                 .1
                 .peer_certificates()
-                .map_or(true, |certs| certs.is_empty())
+                .is_none_or(|certs| certs.is_empty())
         );
 
         let mut headers = Vec::new();
@@ -465,7 +465,7 @@ async fn stream_rejects_scoped_ipv6_before_connecting_to_proxy() {
             sasl_auth: None,
         };
         match Stream::connect(address, &info, info.port, None).await {
-            Err(StreamError::ProxyError(error)) => {
+            Err(StreamError::Proxy(error)) => {
                 assert!(error.to_string().contains("scoped IPv6"));
             }
             _ => panic!("expected a scoped IPv6 proxy error"),

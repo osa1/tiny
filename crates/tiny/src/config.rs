@@ -98,10 +98,10 @@ impl<P> Proxy<P> {
             if self.password.is_some() {
                 errors.push("SOCKS4 does not support a password".to_owned());
             }
-            if let Some(user) = username {
-                if user.is_empty() || user.len() > 255 || user.contains('\0') {
-                    errors.push("Invalid SOCKS4 USERID".to_owned());
-                }
+            if let Some(user) = username
+                && (user.is_empty() || user.len() > 255 || user.contains('\0'))
+            {
+                errors.push("Invalid SOCKS4 USERID".to_owned());
             }
             if self.socks4a.unwrap_or(true)
                 && server_addr

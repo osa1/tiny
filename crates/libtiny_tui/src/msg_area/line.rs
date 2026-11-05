@@ -148,13 +148,11 @@ impl Line {
                     // TODO
                 }
                 IrcFormatEvent::Text(text) => {
-                    if independent {
-                        if let Some(ch) = text.chars().next() {
-                            if ch.width() == Some(0) {
-                                self.current_seg.string.push('◌');
-                            }
-                            independent = false;
+                    if independent && let Some(ch) = text.chars().next() {
+                        if ch.width() == Some(0) {
+                            self.current_seg.string.push('◌');
                         }
+                        independent = false;
                     }
                     self.current_seg.string.push_str(text);
                 }

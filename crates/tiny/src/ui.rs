@@ -14,7 +14,7 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 
 macro_rules! delegate {
-    ( $name:ident ( $( $x:ident: $t:ty, )* )) => {
+    ( $name:ident ( $( $x:ident: $t:ty ),* $(,)? )) => {
         pub(crate) fn $name(&self, $($x: $t,)*) {
             self.ui.$name( $( $x, )* );
             if let Some(logger) = &self.logger {
@@ -25,7 +25,7 @@ macro_rules! delegate {
 }
 
 macro_rules! delegate_ui {
-    ( $name:ident ( $( $x:ident: $t:ty, )* ) $(->$ret:ty )? ) => {
+    ( $name:ident ( $( $x:ident: $t:ty ),* $(,)? ) $(->$ret:ty )? ) => {
         pub(crate) fn $name(&self, $($x: $t,)*) $(-> $ret)? {
             self.ui.$name( $( $x, )* )
         }
@@ -50,48 +50,38 @@ impl UI {
         }
     }
 
-    delegate!(close_server_tab(serv: &str,));
-    delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
-    delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
-    delegate!(close_user_tab(serv: &str, nick: &str,));
-    delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
-    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_privmsg(
-        sender: &str,
-        msg: &str,
-        ts: Tm,
-        target: &MsgTarget,
-        highlight: bool,
-        is_action: bool,
-    ));
-    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(rename_nick(
-        old_nick: &str,
-        new_nick: &str,
-        ts: Tm,
-        target: &MsgTarget,
-    ));
-    delegate!(set_topic(
-        topic: &str,
-        ts: Tm,
-        serv: &str,
-        chan: &ChanNameRef,
-    ));
+    delegate!(close_server_tab(serv: &str));
+    delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef));
+    delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef));
+    delegate!(close_user_tab(serv: &str, nick: &str));
+    delegate!(add_client_msg(msg: &str, target: &MsgTarget));
+    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget));
+    delegate!(
+        add_privmsg(
+            sender: &str,
+            msg: &str,
+            ts: Tm,
+            target: &MsgTarget,
+            highlight: bool,
+            is_action: bool,
+        )
+    );
+    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(rename_nick(old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget));
+    delegate!(set_topic(topic: &str, ts: Tm, serv: &str, chan: &ChanNameRef));
 
     delegate_ui!(draw());
-    delegate_ui!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate_ui!(add_client_err_msg(msg: &str, target: &MsgTarget,));
-    delegate_ui!(clear_nicks(serv: &str,));
-    delegate_ui!(set_nick(serv: &str, nick: &str,));
-    delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
-    delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
-    delegate_ui!(get_tab_config(serv_name: &str, chan_name: Option<&ChanNameRef>,) -> TabConfig);
-    delegate_ui!(set_tab_config(
-        serv_name: &str,
-        chan_name: Option<&ChanNameRef>,
-        config: TabConfig,
-    ));
+    delegate_ui!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget));
+    delegate_ui!(add_client_err_msg(msg: &str, target: &MsgTarget));
+    delegate_ui!(clear_nicks(serv: &str));
+    delegate_ui!(set_nick(serv: &str, nick: &str));
+    delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget));
+    delegate_ui!(user_tab_exists(serv_name: &str, nick: &str) -> bool);
+    delegate_ui!(get_tab_config(serv_name: &str, chan_name: Option<&ChanNameRef>) -> TabConfig);
+    delegate_ui!(
+        set_tab_config(serv_name: &str, chan_name: Option<&ChanNameRef>, config: TabConfig)
+    );
 
     pub(crate) fn current_tab(&self) -> Option<MsgSource> {
         self.ui.current_tab()

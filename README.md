@@ -99,8 +99,11 @@ nix build
 nix develop
 ```
 
-The shell includes Rust tooling and the Linux dependencies needed for native
-TLS and desktop notifications. For example, inside the shell:
+The package and shell use the same rust-overlay toolchain selected by
+`rust-toolchain` (currently `stable`). Its default profile includes `rustc`,
+`cargo`, `rustfmt`, `clippy`, and Rust documentation. The shell also includes
+the Linux dependencies needed for native TLS and desktop notifications. For
+example, inside the shell:
 
 ```sh
 cargo test --workspace
@@ -111,8 +114,8 @@ Tests that require an IPv6 loopback listener are skipped when it is unavailable;
 their IPv6 behavior is then unverified. Pass `-- --nocapture` to `cargo test`
 to see the skip diagnostics.
 
-`flake.lock` pins nixpkgs and Home Manager, and `Cargo.lock` pins Rust
-dependencies. The flake declares package outputs for x86_64 and aarch64 on
+`flake.lock` pins nixpkgs, Home Manager, and rust-overlay, and `Cargo.lock` pins
+Rust dependencies. The flake declares package outputs for x86_64 and aarch64 on
 Linux and macOS. The pinned nixpkgs 26.11 does not support `x86_64-darwin`, so
 that package cannot currently be evaluated. In a Git checkout, Nix includes
 only files known to Git, so add newly created source files before building.

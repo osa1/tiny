@@ -1,4 +1,8 @@
-{ pkgs, tiny }:
+{
+  pkgs,
+  tiny,
+  rustToolchain,
+}:
 
 pkgs.mkShell {
   inputsFrom = [ tiny ];
@@ -6,10 +10,7 @@ pkgs.mkShell {
   packages =
     with pkgs;
     [
-      cargo
-      rustc
-      rustfmt
-      clippy
+      rustToolchain
       pkg-config
     ]
     ++ lib.optionals stdenv.hostPlatform.isLinux [

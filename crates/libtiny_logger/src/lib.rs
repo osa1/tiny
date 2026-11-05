@@ -36,7 +36,7 @@ impl Logger {
 }
 
 macro_rules! delegate {
-    ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
+    ( $name:ident ( $( $x:ident: $t:ty ),* $(,)? ) ) => {
         pub fn $name(&self, $($x: $t,)*) {
             self.inner.borrow_mut().$name( $( $x, )* )
         }
@@ -44,35 +44,27 @@ macro_rules! delegate {
 }
 
 impl Logger {
-    delegate!(new_server_tab(serv: &str,));
-    delegate!(close_server_tab(serv: &str,));
-    delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
-    delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
-    delegate!(close_user_tab(serv: &str, nick: &str,));
-    delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
-    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_privmsg(
-        sender: &str,
-        msg: &str,
-        ts: Tm,
-        target: &MsgTarget,
-        highlight: bool,
-        is_action: bool,
-    ));
-    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(rename_nick(
-        old_nick: &str,
-        new_nick: &str,
-        ts: Tm,
-        target: &MsgTarget,
-    ));
-    delegate!(set_topic(
-        topic: &str,
-        ts: Tm,
-        serv: &str,
-        chan: &ChanNameRef,
-    ));
+    delegate!(new_server_tab(serv: &str));
+    delegate!(close_server_tab(serv: &str));
+    delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef));
+    delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef));
+    delegate!(close_user_tab(serv: &str, nick: &str));
+    delegate!(add_client_msg(msg: &str, target: &MsgTarget));
+    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget));
+    delegate!(
+        add_privmsg(
+            sender: &str,
+            msg: &str,
+            ts: Tm,
+            target: &MsgTarget,
+            highlight: bool,
+            is_action: bool,
+        )
+    );
+    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(rename_nick(old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget));
+    delegate!(set_topic(topic: &str, ts: Tm, serv: &str, chan: &ChanNameRef));
 }
 
 struct LoggerInner {
@@ -437,10 +429,10 @@ impl LoggerInner {
                     fd, chans, users, ..
                 }) => {
                     f(fd, &*self.report_err);
-                    for (_, fd) in chans.iter_mut() {
+                    for fd in chans.values_mut() {
                         f(fd, &*self.report_err);
                     }
-                    for (_, fd) in users.iter_mut() {
+                    for fd in users.values_mut() {
                         f(fd, &*self.report_err);
                     }
                 }

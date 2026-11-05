@@ -357,11 +357,12 @@ mod tests {
     use termbox_simple::Termbox;
 
     fn colors() -> Colors {
-        let mut colors = Colors::default();
-        colors.user_msg = Style { fg: 1, bg: 2 };
-        colors.completion = Style { fg: 3, bg: 4 };
-        colors.cursor = Style { fg: 5, bg: 6 };
-        colors
+        Colors {
+            user_msg: Style { fg: 1, bg: 2 },
+            completion: Style { fg: 3, bg: 4 },
+            cursor: Style { fg: 5, bg: 6 },
+            ..Default::default()
+        }
     }
 
     fn wrapped(text: &str, width: i32, nick: i32, cursor: i32) -> Termbox {

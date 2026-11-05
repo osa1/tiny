@@ -38,8 +38,8 @@ fn tls_server_name(host_name: &str) -> &str {
 }
 
 pub(crate) enum Stream {
-    TcpStream(Box<TcpStream>),
-    TlsStream(Box<TlsStream<TcpStream>>),
+    Tcp(Box<TcpStream>),
+    Tls(Box<TlsStream<TcpStream>>),
     Http(Box<HttpStream>),
     HttpTls(Box<TlsStream<HttpStream>>),
     Https(Box<HttpsStream>),
@@ -53,24 +53,24 @@ pub(crate) type TlsError = tokio_rustls::rustls::Error;
 
 #[derive(Debug)]
 pub(crate) enum StreamError {
-    TlsError(TlsError),
-    IoError(io::Error),
-    ProxyError(io::Error),
+    Tls(TlsError),
+    Io(io::Error),
+    Proxy(io::Error),
 }
 
 impl From<TlsError> for StreamError {
     fn from(err: TlsError) -> Self {
-        Self::TlsError(err)
+        Self::Tls(err)
     }
 }
 impl From<io::Error> for StreamError {
     fn from(err: io::Error) -> Self {
-        Self::IoError(err)
+        Self::Io(err)
     }
 }
 
 fn proxy_error(message: &'static str) -> StreamError {
-    StreamError::ProxyError(io::Error::new(io::ErrorKind::Other, message))
+    StreamError::Proxy(io::Error::other(message))
 }
 
 pub(crate) fn validate_proxy_destination(host: &str) -> Result<(), StreamError> {
@@ -78,12 +78,12 @@ pub(crate) fn validate_proxy_destination(host: &str) -> Result<(), StreamError> 
         .strip_prefix('[')
         .and_then(|host| host.strip_suffix(']'))
         .unwrap_or(host);
-    if let Some((ip, _scope)) = host.split_once('%') {
-        if ip.parse::<std::net::Ipv6Addr>().is_ok() {
-            return Err(proxy_error(
-                "scoped IPv6 destinations are not supported by proxies",
-            ));
-        }
+    if let Some((ip, _scope)) = host.split_once('%')
+        && ip.parse::<std::net::Ipv6Addr>().is_ok()
+    {
+        return Err(proxy_error(
+            "scoped IPv6 destinations are not supported by proxies",
+        ));
     }
     Ok(())
 }
@@ -203,22 +203,13 @@ fn validate_proxy(proxy: &ProxyConfig, host: &str) -> Result<(), StreamError> {
             ProxyProtocol::Http | ProxyProtocol::Https,
             Some(ProxyAuth::UserPass { username, password }),
         ) if !username.chars().any(|c| c == ':' || c.is_control())
-            && !password.chars().any(char::is_control) =>
-        {
-            ()
-        }
+            && !password.chars().any(char::is_control) => {}
         (ProxyProtocol::Socks4 { .. }, None) => (),
         (ProxyProtocol::Socks4 { .. }, Some(ProxyAuth::UserId(id)))
-            if (1..=255).contains(&id.len()) && !id.contains('\0') =>
-        {
-            ()
-        }
+            if (1..=255).contains(&id.len()) && !id.contains('\0') => {}
         (ProxyProtocol::Socks5, None) => (),
         (ProxyProtocol::Socks5, Some(ProxyAuth::UserPass { username, password }))
-            if (1..=255).contains(&username.len()) && (1..=255).contains(&password.len()) =>
-        {
-            ()
-        }
+            if (1..=255).contains(&username.len()) && (1..=255).contains(&password.len()) => {}
         _ => return Err(proxy_error("invalid proxy authentication")),
     }
     match proxy.protocol {
@@ -359,7 +350,7 @@ impl Stream {
             if info.proxy.is_some() {
                 proxy_error("proxy TCP connection failed")
             } else {
-                StreamError::IoError(e)
+                StreamError::Io(e)
             }
         })?;
         let identity = match &info.sasl_auth {
@@ -369,11 +360,11 @@ impl Stream {
         match &info.proxy {
             None => {
                 if info.tls {
-                    Ok(Stream::TlsStream(Box::new(
+                    Ok(Stream::Tls(Box::new(
                         tls_connect(tcp, &info.addr, identity, root).await?,
                     )))
                 } else {
-                    Ok(Stream::TcpStream(Box::new(tcp)))
+                    Ok(Stream::Tcp(Box::new(tcp)))
                 }
             }
             Some(proxy) => match proxy.protocol {
@@ -423,10 +414,10 @@ impl Stream {
                         Some(ProxyAuth::UserId(id)) => Some(id.as_str()),
                         _ => None,
                     };
-                    if let TargetAddr::Domain(domain, _) = &target {
-                        if domain.len() + id.map_or(0, str::len) > 503 {
-                            return Err(proxy_error("SOCKS4 target too long"));
-                        }
+                    if let TargetAddr::Domain(domain, _) = &target
+                        && domain.len() + id.map_or(0, str::len) > 503
+                    {
+                        return Err(proxy_error("SOCKS4 target too long"));
                     }
                     let tcp = match id {
                         Some(id) => {
@@ -437,11 +428,11 @@ impl Stream {
                     .map_err(|_| proxy_error("SOCKS4 proxy negotiation failed"))?
                     .into_inner();
                     if info.tls {
-                        Ok(Stream::TlsStream(Box::new(
+                        Ok(Stream::Tls(Box::new(
                             tls_connect(tcp, &info.addr, identity, root).await?,
                         )))
                     } else {
-                        Ok(Stream::TcpStream(Box::new(tcp)))
+                        Ok(Stream::Tcp(Box::new(tcp)))
                     }
                 }
                 ProxyProtocol::Socks5 => {
@@ -461,11 +452,11 @@ impl Stream {
                     .map_err(|_| proxy_error("SOCKS5 proxy negotiation failed"))?
                     .into_inner();
                     if info.tls {
-                        Ok(Stream::TlsStream(Box::new(
+                        Ok(Stream::Tls(Box::new(
                             tls_connect(tcp, &info.addr, identity, root).await?,
                         )))
                     } else {
-                        Ok(Stream::TcpStream(Box::new(tcp)))
+                        Ok(Stream::Tcp(Box::new(tcp)))
                     }
                 }
             },
@@ -480,8 +471,8 @@ impl AsyncRead for Stream {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         match &mut *self {
-            Self::TcpStream(s) => Pin::new(s).poll_read(cx, buf),
-            Self::TlsStream(s) => Pin::new(s).poll_read(cx, buf),
+            Self::Tcp(s) => Pin::new(s).poll_read(cx, buf),
+            Self::Tls(s) => Pin::new(s).poll_read(cx, buf),
             Self::Http(s) => Pin::new(s).poll_read(cx, buf),
             Self::HttpTls(s) => Pin::new(s).poll_read(cx, buf),
             Self::Https(s) => Pin::new(s).poll_read(cx, buf),
@@ -496,8 +487,8 @@ impl AsyncWrite for Stream {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         match &mut *self {
-            Self::TcpStream(s) => Pin::new(s).poll_write(cx, buf),
-            Self::TlsStream(s) => Pin::new(s).poll_write(cx, buf),
+            Self::Tcp(s) => Pin::new(s).poll_write(cx, buf),
+            Self::Tls(s) => Pin::new(s).poll_write(cx, buf),
             Self::Http(s) => Pin::new(s).poll_write(cx, buf),
             Self::HttpTls(s) => Pin::new(s).poll_write(cx, buf),
             Self::Https(s) => Pin::new(s).poll_write(cx, buf),
@@ -506,8 +497,8 @@ impl AsyncWrite for Stream {
     }
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
-            Self::TcpStream(s) => Pin::new(s).poll_flush(cx),
-            Self::TlsStream(s) => Pin::new(s).poll_flush(cx),
+            Self::Tcp(s) => Pin::new(s).poll_flush(cx),
+            Self::Tls(s) => Pin::new(s).poll_flush(cx),
             Self::Http(s) => Pin::new(s).poll_flush(cx),
             Self::HttpTls(s) => Pin::new(s).poll_flush(cx),
             Self::Https(s) => Pin::new(s).poll_flush(cx),
@@ -516,8 +507,8 @@ impl AsyncWrite for Stream {
     }
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
-            Self::TcpStream(s) => Pin::new(s).poll_shutdown(cx),
-            Self::TlsStream(s) => Pin::new(s).poll_shutdown(cx),
+            Self::Tcp(s) => Pin::new(s).poll_shutdown(cx),
+            Self::Tls(s) => Pin::new(s).poll_shutdown(cx),
             Self::Http(s) => Pin::new(s).poll_shutdown(cx),
             Self::HttpTls(s) => Pin::new(s).poll_shutdown(cx),
             Self::Https(s) => Pin::new(s).poll_shutdown(cx),
@@ -643,13 +634,13 @@ mod tests {
                             if succeeds {
                                 let mut tls = match connection {
                                     Ok(tls) => tls,
-                                    Err(StreamError::TlsError(err)) => {
+                                    Err(StreamError::Tls(err)) => {
                                         panic!("TLS handshake failed: {err}")
                                     }
-                                    Err(StreamError::IoError(err)) => {
+                                    Err(StreamError::Io(err)) => {
                                         panic!("TLS handshake failed: {err}")
                                     }
-                                    Err(StreamError::ProxyError(err)) => {
+                                    Err(StreamError::Proxy(err)) => {
                                         panic!("unexpected proxy error: {err}")
                                     }
                                 };
@@ -660,9 +651,9 @@ mod tests {
                             } else {
                                 let error = match connection {
                                     Ok(_) => panic!("certificate mismatch unexpectedly accepted"),
-                                    Err(StreamError::TlsError(err)) => err.to_string(),
-                                    Err(StreamError::IoError(err)) => err.to_string(),
-                                    Err(StreamError::ProxyError(err)) => {
+                                    Err(StreamError::Tls(err)) => err.to_string(),
+                                    Err(StreamError::Io(err)) => err.to_string(),
+                                    Err(StreamError::Proxy(err)) => {
                                         panic!("unexpected proxy error: {err}")
                                     }
                                 };

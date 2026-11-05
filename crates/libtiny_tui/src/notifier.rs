@@ -72,10 +72,8 @@ impl Notifier {
             MsgTarget::User {
                 nick: ref nick_sender,
                 ..
-            } => {
-                if *self != Notifier::Off {
-                    notify(&format!("{nick_sender} sent a private message"), &msg)
-                }
+            } if *self != Notifier::Off => {
+                notify(&format!("{nick_sender} sent a private message"), &msg)
             }
             _ => {}
         }
