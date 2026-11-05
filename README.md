@@ -51,8 +51,8 @@ tiny is an IRC client written in Rust.
 tiny works on Linux and OSX. Windows users can run it under Windows Subsystem
 for Linux.
 
-For pre-built binaries see [releases]. To build from source make sure you have
-Rust 1.48 or newer. By default tiny uses [rustls] for TLS support and enables
+For pre-built binaries see [releases]. To build from source, use a current
+stable Rust toolchain. By default tiny uses [rustls] for TLS support and enables
 desktop notifications for channel mentions and private messages. Configure
 `notify: off` or use `/notify` to change notification settings.
 
