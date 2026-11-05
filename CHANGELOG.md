@@ -20,6 +20,9 @@
   connecting to a server on startup. (#443)
 - Expand tildes and shell variables in `pem` (SASL authentication) and
   `log_dir` config fields. (#192, #463)
+- Add a Nix flake for building tiny and entering a Rust development shell.
+- Export a Home Manager 26.05 module with unchanged raw YAML configuration and
+  an overridable tiny package.
 
 # 2025/01/01: 0.13.0
 

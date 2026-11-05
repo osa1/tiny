@@ -88,6 +88,73 @@ of tiny through the AUR.
 
 tiny is tested on Linux and OSX.
 
+### Nix
+
+With Nix flakes enabled, build the default rustls-based package or enter the
+development shell from the repository root:
+
+```sh
+nix build
+./result/bin/tiny --version
+nix develop
+```
+
+The shell includes Rust tooling and the Linux dependencies needed for native
+TLS and desktop notifications. For example, inside the shell:
+
+```sh
+cargo test --workspace
+cargo test -p tiny --no-default-features --features "tls-native desktop-notifications"
+```
+
+`flake.lock` pins nixpkgs and Home Manager, and `Cargo.lock` pins Rust
+dependencies. The flake declares package outputs for x86_64 and aarch64 on
+Linux and macOS. The pinned nixpkgs 26.11 does not support `x86_64-darwin`, so
+that package cannot currently be evaluated. In a Git checkout, Nix includes
+only files known to Git, so add newly created source files before building.
+Format the Nix expressions with:
+
+```sh
+nix fmt -- flake.nix shell.nix nix/package.nix nix/home-manager.nix nix/tests/home-manager.nix
+```
+
+#### Home Manager
+
+With Home Manager 26.05, add `github:osa1/tiny` as a flake input named `tiny`.
+Use `tiny.packages.${system}.default` as a package, or include
+`tiny.homeManagerModules.default` in the modules passed to
+`home-manager.lib.homeManagerConfiguration`:
+
+```nix
+modules = [
+  tiny.homeManagerModules.default
+  {
+    programs.tiny = {
+      enable = true;
+      config = builtins.readFile ./tiny.yml;
+      # Alternatively, use an inline YAML string:
+      # config = '' ... '';
+    };
+  }
+];
+```
+
+The module extends Home Manager's existing `programs.tiny` module. Its default
+package comes from this flake; set `programs.tiny.package` to override it.
+`programs.tiny.config` writes the YAML string unchanged, including comments and
+newlines, to `$XDG_CONFIG_HOME/tiny/config.yml` on Linux or
+`~/Library/Application Support/tiny/config.yml` on macOS. It is mutually
+exclusive with the upstream `programs.tiny.settings` option; leave `config`
+unset to use `settings` instead.
+
+On `x86_64-darwin`, override the package with one from a supported package
+set, for example `programs.tiny.package = pkgs.tiny;` when `pkgs` is from
+nixpkgs 26.05. The flake's default package cannot be evaluated on that system.
+
+Home Manager places the YAML in the world-readable Nix store. Do not put
+passwords or other secrets in it. Existing Home Manager configurations should
+keep their current `home.stateVersion`.
+
 ## Configuration
 
 tiny looks for these places for a config file:
