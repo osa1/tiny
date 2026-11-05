@@ -1,5 +1,7 @@
 # Unreleased
 
+- Support bracketed IPv6 addresses in `/connect` and verify scoped IPv6 TLS
+  connections against the IP address without its scope ID.
 - Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
   ignored and are now synonymous with `tab` and `esc`. (#444)
 - The keystrokes `ctrl_h` and `backspace` can now be distinguished, which
