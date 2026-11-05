@@ -296,6 +296,10 @@ arrow keys to cycle through matches. Completion is case-sensitive, preserves
 existing arguments, and does not add a space. Nick completion remains available
 in messages and command arguments.
 
+When text and `Tab` arrive in the same terminal read, tiny treats them as pasted
+text rather than separate key presses. In that case, completion does not run;
+this preserves multiline paste handling.
+
 - `/help`: Show help messages of commands listed below.
 
 - `/msg <nick> <message>`: Send a message to a user. Creates a new tab.
