@@ -2,7 +2,7 @@
 
 use crate::cmd::run_cmd;
 use crate::config;
-use libtiny_client::Client;
+use libtiny_client::{Client, ProxyConfig};
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use libtiny_logger::Logger;
 use libtiny_tui::TUI;
@@ -100,19 +100,21 @@ impl UI {
 
 pub(crate) async fn task(
     defaults: config::Defaults,
+    server_proxies: Vec<(String, u16, Option<ProxyConfig>)>,
     ui: UI,
     mut clients: Vec<Client>,
     rcv_ev: mpsc::Receiver<libtiny_common::Event>,
 ) {
     let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
-        handle_input_ev(&defaults, &ui, &mut clients, ev);
+        handle_input_ev(&defaults, &server_proxies, &ui, &mut clients, ev);
         ui.draw();
     }
 }
 
 fn handle_input_ev(
     defaults: &config::Defaults,
+    server_proxies: &[(String, u16, Option<ProxyConfig>)],
     ui: &UI,
     clients: &mut Vec<Client>,
     ev: libtiny_common::Event,
@@ -136,7 +138,7 @@ fn handle_input_ev(
         }
 
         Cmd { cmd, source } => {
-            run_cmd(&cmd, source, defaults, ui, clients);
+            run_cmd(&cmd, source, defaults, server_proxies, ui, clients);
         }
     }
 }

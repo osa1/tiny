@@ -175,6 +175,42 @@ like `NickServ`) is better when some of the channels that you automatically
 join require identification. To use this method enter your nick password to the
 `pass` field in servers.
 
+### Per-server proxies
+
+Each server may specify a `proxy` with `type` (`http`, `https`, `socks4`, or
+`socks5`), `addr`, and `port`. Omitting `proxy` or setting it to `null` connects
+directly. For example:
+
+```yaml
+proxy:
+  type: socks5
+  addr: 127.0.0.1
+  port: 1080
+  username: example
+  password:
+    command: 'pass show proxy-password'
+```
+
+HTTP and HTTPS use Basic authentication; SOCKS5 uses username/password.
+Specify both credentials or neither. SOCKS4 accepts `username` as its USERID
+but does not accept a password. SOCKS5 proxies may choose no authentication
+even when credentials are configured.
+
+HTTPS protects the connection to the proxy independently of the server's
+`tls` setting. Credentials sent to other proxy types are not encrypted in
+transit. SOCKS4 uses remote DNS (SOCKS4a) by default; set `socks4a: false` to
+resolve the IRC host locally and use IPv4-only SOCKS4 instead.
+
+`/connect` uses a matching configured server's proxy even if that server is not
+autoconnected or was excluded by command-line filters. If multiple servers
+share a hostname, the requested port must select exactly one of them.
+Reconnecting switches to the selected server's proxy, including an explicit
+direct connection; with no matching server configuration, it keeps the current
+proxy.
+
+Scoped IPv6 destinations (such as `fe80::1%eth0`) cannot be represented safely
+by proxy protocols and are rejected when a proxy is configured.
+
 ### Using external commands for passwords
 
 When a password field in the config file is a map with a `command` key, the
