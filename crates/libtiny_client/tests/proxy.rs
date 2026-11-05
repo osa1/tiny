@@ -445,12 +445,24 @@ fn reconnect_switches_proxy_while_waiting_after_failure() {
 #[test]
 fn scoped_ipv6_destinations_are_rejected_before_connecting() {
     run(async {
-        let direct = TcpListener::bind("[::1]:0")
-            .await
-            .expect("IPv6 loopback is required for this test");
+        let direct = match TcpListener::bind("[::1]:0").await {
+            Ok(listener) => Some(listener),
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::AddrNotAvailable | std::io::ErrorKind::Unsupported
+                ) || matches!(err.raw_os_error(), Some(93 | 97)) =>
+            {
+                eprintln!("Skipping IPv6 direct-listener assertion: {err}");
+                None
+            }
+            Err(err) => panic!("IPv6 loopback bind failed: {err}"),
+        };
         let proxy_listener = listener().await;
         let proxy_addr = proxy_listener.local_addr().unwrap();
-        let direct_port = direct.local_addr().unwrap().port();
+        let direct_port = direct
+            .as_ref()
+            .map_or(6667, |listener| listener.local_addr().unwrap().port());
         for host in ["::1%1", "[::1%1]"] {
             for protocol in [
                 ProxyProtocol::Http,
@@ -475,11 +487,13 @@ fn scoped_ipv6_destinations_are_rejected_before_connecting() {
                         .await
                         .is_err()
                 );
-                assert!(
-                    timeout(Duration::from_millis(20), direct.accept())
-                        .await
-                        .is_err()
-                );
+                if let Some(direct) = &direct {
+                    assert!(
+                        timeout(Duration::from_millis(20), direct.accept())
+                            .await
+                            .is_err()
+                    );
+                }
                 client.quit(None);
             }
         }

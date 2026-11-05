@@ -216,7 +216,19 @@ fn registered_client_command_completes_in_tui() {
 #[test]
 fn expanded_ipv6_reconnect_uses_the_proxy_for_each_configured_port() {
     run_test("testnick".to_owned(), |TestSetup { tui, .. }| async move {
-        let direct_a = TcpListener::bind("[::1]:0").await.unwrap();
+        let direct_a = match TcpListener::bind("[::1]:0").await {
+            Ok(listener) => listener,
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::AddrNotAvailable | std::io::ErrorKind::Unsupported
+                ) || matches!(err.raw_os_error(), Some(93 | 97)) =>
+            {
+                eprintln!("Skipping IPv6 proxy reconnect test: {err}");
+                return;
+            }
+            Err(err) => panic!("IPv6 loopback bind failed: {err}"),
+        };
         let direct_b = TcpListener::bind("[::1]:0").await.unwrap();
         let proxy_a = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let proxy_b = TcpListener::bind("127.0.0.1:0").await.unwrap();

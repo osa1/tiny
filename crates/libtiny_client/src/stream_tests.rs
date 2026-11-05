@@ -312,13 +312,26 @@ async fn https_basic_client(reject: bool, scoped_proxy: bool) {
     let root = ca("HTTPS client fixture CA");
     let proxy_cert = leaf(if scoped_proxy { "::1" } else { "127.0.0.1" }, false);
     let config = server_config(&proxy_cert, &root, &root, false);
-    let listener = TcpListener::bind(if scoped_proxy {
+    let listener = match TcpListener::bind(if scoped_proxy {
         "[::1]:0"
     } else {
         "127.0.0.1:0"
     })
     .await
-    .expect("HTTPS proxy fixture requires loopback");
+    {
+        Ok(listener) => listener,
+        Err(err)
+            if scoped_proxy
+                && (matches!(
+                    err.kind(),
+                    io::ErrorKind::AddrNotAvailable | io::ErrorKind::Unsupported
+                ) || matches!(err.raw_os_error(), Some(93 | 97))) =>
+        {
+            eprintln!("Skipping scoped IPv6 HTTPS proxy test: {err}");
+            return;
+        }
+        Err(err) => panic!("HTTPS proxy loopback bind failed: {err}"),
+    };
     let address = listener.local_addr().unwrap();
     let server = tokio::task::spawn_local(async move {
         let (socket, _) = listener.accept().await.unwrap();

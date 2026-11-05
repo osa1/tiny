@@ -107,6 +107,10 @@ cargo test --workspace
 cargo test -p tiny --no-default-features --features "tls-native desktop-notifications"
 ```
 
+Tests that require an IPv6 loopback listener are skipped when it is unavailable;
+their IPv6 behavior is then unverified. Pass `-- --nocapture` to `cargo test`
+to see the skip diagnostics.
+
 `flake.lock` pins nixpkgs and Home Manager, and `Cargo.lock` pins Rust
 dependencies. The flake declares package outputs for x86_64 and aarch64 on
 Linux and macOS. The pinned nixpkgs 26.11 does not support `x86_64-darwin`, so
