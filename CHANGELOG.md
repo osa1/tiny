@@ -7,6 +7,8 @@
 - Support bracketed IPv6 addresses in `/connect`, reuse existing connections
   across equivalent address spellings, and verify scoped IPv6 TLS connections
   against the IP address without its scope ID.
+- Fix native TLS SASL EXTERNAL identities containing a private key and
+  certificate chain, including on macOS.
 - Fix Unicode input, completion, wrapping, and display for wide and combining
   characters, including UTF-8 split across terminal reads. Editing still uses
   Unicode scalar values; ambiguous-width characters are displayed as one column.

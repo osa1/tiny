@@ -2,7 +2,7 @@ use libtiny_client::{Client, Event, ProxyAuth, ProxyConfig, ProxyProtocol, Serve
 use std::{future::Future, net::SocketAddr, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpSocket, TcpStream},
+    net::{TcpListener, TcpStream},
     sync::mpsc,
     task::LocalSet,
     time::timeout,
@@ -190,7 +190,7 @@ async fn success_reply(stream: &mut TcpStream) {
         .await
         .unwrap();
 }
-async fn proxy_error(events: &mut mpsc::Receiver<Event>, secrets: &[&str]) {
+async fn proxy_error(events: &mut mpsc::Receiver<Event>, secrets: &[&str]) -> std::io::Error {
     loop {
         match events
             .recv()
@@ -202,7 +202,7 @@ async fn proxy_error(events: &mut mpsc::Receiver<Event>, secrets: &[&str]) {
                 for secret in secrets {
                     assert!(!text.contains(secret), "proxy error leaked sensitive data");
                 }
-                return;
+                return e;
             }
             Event::Connected => panic!("unexpected direct fallback"),
             _ => {}
@@ -570,27 +570,34 @@ fn http_rejections_are_sanitized() {
     });
 }
 
-#[test]
-fn socks_rejections_and_connection_failure_are_proxy_errors() {
-    run(async {
-        for kind in 0..3 {
-            let listener = listener().await;
-            let addr = listener.local_addr().unwrap();
-            let p = if kind == 0 {
-                proxy(
-                    addr,
-                    ProxyProtocol::Socks4 { remote_dns: true },
-                    Some(ProxyAuth::UserId("userid".into())),
-                )
-            } else {
+enum SocksRejection {
+    Socks4,
+    Socks5Auth,
+    Socks5Connect,
+}
+
+fn check_socks_rejection(kind: SocksRejection) {
+    run(async move {
+        let listener = listener().await;
+        let addr = listener.local_addr().unwrap();
+        let p = match kind {
+            SocksRejection::Socks4 => proxy(
+                addr,
+                ProxyProtocol::Socks4 { remote_dns: true },
+                Some(ProxyAuth::UserId("userid".into())),
+            ),
+            SocksRejection::Socks5Auth | SocksRejection::Socks5Connect => {
                 proxy(addr, ProxyProtocol::Socks5, credentials())
-            };
-            let (mut client, mut events) = Client::new(info("irc.invalid", 6667, Some(p)));
-            let (mut socket, _) = listener.accept().await.unwrap();
-            if kind == 0 {
+            }
+        };
+        let (mut client, mut events) = Client::new(info("irc.invalid", 6667, Some(p)));
+        let (mut socket, _) = listener.accept().await.unwrap();
+        match kind {
+            SocksRejection::Socks4 => {
                 socks4_request(&mut socket, b"irc.invalid", 6667, "userid", true).await;
                 socket.write_all(&[0, 91, 0, 0, 0, 0, 0, 0]).await.unwrap();
-            } else if kind == 1 {
+            }
+            SocksRejection::Socks5Auth => {
                 let mut greeting = [0; 2];
                 socket.read_exact(&mut greeting).await.unwrap();
                 let mut methods = vec![0; greeting[1] as usize];
@@ -604,25 +611,54 @@ fn socks_rejections_and_connection_failure_are_proxy_errors() {
                 let mut pass = vec![0; n as usize];
                 socket.read_exact(&mut pass).await.unwrap();
                 socket.write_all(&[1, 1]).await.unwrap();
-            } else {
+            }
+            SocksRejection::Socks5Connect => {
                 socks5_request(&mut socket, "irc.invalid", 6667, false, true).await;
                 socket
                     .write_all(&[5, 5, 0, 1, 0, 0, 0, 0, 0, 0])
                     .await
                     .unwrap();
             }
-            proxy_error(&mut events, &["secret", "userid"]).await;
-            client.quit(None);
         }
-        let bound = TcpSocket::new_v4().unwrap();
-        bound.bind("127.0.0.1:0".parse().unwrap()).unwrap();
-        let addr = bound.local_addr().unwrap();
+        proxy_error(&mut events, &["secret", "userid"]).await;
+        client.quit(None);
+    });
+}
+
+#[test]
+fn socks4_rejection_is_proxy_error() {
+    check_socks_rejection(SocksRejection::Socks4);
+}
+
+#[test]
+fn socks5_auth_rejection_is_proxy_error() {
+    check_socks_rejection(SocksRejection::Socks5Auth);
+}
+
+#[test]
+fn socks5_connect_rejection_is_proxy_error() {
+    check_socks_rejection(SocksRejection::Socks5Connect);
+}
+
+#[test]
+fn proxy_tcp_connection_failure_is_proxy_error() {
+    run(async {
+        let direct = listener().await;
+        let proxy_listener = listener().await;
+        let addr = proxy_listener.local_addr().unwrap();
+        drop(proxy_listener);
         let (mut client, mut events) = Client::new(info(
-            "irc.invalid",
-            6667,
-            Some(proxy(addr, ProxyProtocol::Http, None)),
+            "127.0.0.1",
+            direct.local_addr().unwrap().port(),
+            Some(proxy(addr, ProxyProtocol::Http, credentials())),
         ));
-        proxy_error(&mut events, &[]).await;
+        let error = proxy_error(&mut events, &["user", "secret"]).await;
+        assert_eq!(error.to_string(), "proxy TCP connection failed");
+        assert!(
+            timeout(Duration::from_millis(150), direct.accept())
+                .await
+                .is_err()
+        );
         client.quit(None);
     });
 }

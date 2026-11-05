@@ -7,7 +7,7 @@ edition = "2024"
 
 [features]
 default = ["tls-rustls"]
-tls-native = ["native-tls", "tokio-native-tls"]
+tls-native = ["native-tls", "tokio-native-tls", "rustls-pemfile"]
 tls-rustls = ["rustls-native-certs", "tokio-rustls", "rustls-pemfile"]
 
 [dependencies]

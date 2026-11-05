@@ -86,6 +86,15 @@ enum Fault {
     IrcCa,
 }
 
+#[derive(Clone, Copy)]
+enum ClientIdentity {
+    CertificateFirst,
+    #[cfg(feature = "tls-native")]
+    KeyFirst,
+    #[cfg(feature = "tls-native")]
+    IntermediateChain,
+}
+
 // The proxy and IRC server share a socket but negotiate separate TLS sessions.
 // Reporting the completed CONNECT distinguishes inner failures from outer failures.
 async fn fixture(
@@ -149,7 +158,7 @@ async fn fixture(
     Ok(())
 }
 
-async fn exercise(proxy_tls: bool, irc_tls: bool, fault: Fault) {
+async fn exercise(proxy_tls: bool, irc_tls: bool, fault: Fault, identity: ClientIdentity) {
     let root = ca("trusted fixture CA");
     let other = ca("untrusted fixture CA");
     let proxy = leaf(
@@ -182,11 +191,30 @@ async fn exercise(proxy_tls: bool, irc_tls: bool, fault: Fault) {
     let proxy_config = server_config(&proxy, proxy_signer, &root, false);
     let irc_config = server_config(&irc, irc_signer, &root, true);
     let root_der = root.serialize_der().unwrap();
-    let client_pem = format!(
-        "{}{}",
-        client.serialize_pem_with_signer(&root).unwrap(),
-        client.serialize_private_key_pem()
-    )
+    let client_pem = match identity {
+        ClientIdentity::CertificateFirst => format!(
+            "{}{}",
+            client.serialize_pem_with_signer(&root).unwrap(),
+            client.serialize_private_key_pem()
+        ),
+        #[cfg(feature = "tls-native")]
+        ClientIdentity::KeyFirst => format!(
+            "{}{}{}",
+            client.serialize_private_key_pem(),
+            client.serialize_pem_with_signer(&root).unwrap(),
+            leaf("other-client.test", true).serialize_private_key_pem()
+        ),
+        #[cfg(feature = "tls-native")]
+        ClientIdentity::IntermediateChain => {
+            let intermediate = ca("intermediate client CA");
+            format!(
+                "{}{}{}",
+                client.serialize_private_key_pem(),
+                client.serialize_pem_with_signer(&intermediate).unwrap(),
+                intermediate.serialize_pem_with_signer(&root).unwrap()
+            )
+        }
+    }
     .into_bytes();
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let proxy_addr = listener.local_addr().unwrap();
@@ -286,13 +314,30 @@ async fn exercise(proxy_tls: bool, irc_tls: bool, fault: Fault) {
 async fn nested_tls_and_certificate_validation() {
     tokio::task::LocalSet::new()
         .run_until(async {
-            exercise(false, true, Fault::None).await;
-            exercise(true, false, Fault::None).await;
-            exercise(true, true, Fault::None).await;
-            exercise(true, true, Fault::ProxyName).await;
-            exercise(true, true, Fault::ProxyCa).await;
-            exercise(true, true, Fault::IrcName).await;
-            exercise(true, true, Fault::IrcCa).await;
+            exercise(false, true, Fault::None, ClientIdentity::CertificateFirst).await;
+            exercise(true, false, Fault::None, ClientIdentity::CertificateFirst).await;
+            exercise(true, true, Fault::None, ClientIdentity::CertificateFirst).await;
+            exercise(
+                true,
+                true,
+                Fault::ProxyName,
+                ClientIdentity::CertificateFirst,
+            )
+            .await;
+            exercise(true, true, Fault::ProxyCa, ClientIdentity::CertificateFirst).await;
+            exercise(true, true, Fault::IrcName, ClientIdentity::CertificateFirst).await;
+            exercise(true, true, Fault::IrcCa, ClientIdentity::CertificateFirst).await;
+        })
+        .await;
+}
+
+#[cfg(feature = "tls-native")]
+#[tokio::test(flavor = "current_thread")]
+async fn native_tls_client_identity_order_and_chain() {
+    tokio::task::LocalSet::new()
+        .run_until(async {
+            exercise(true, true, Fault::None, ClientIdentity::KeyFirst).await;
+            exercise(true, true, Fault::None, ClientIdentity::IntermediateChain).await;
         })
         .await;
 }

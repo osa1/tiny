@@ -89,20 +89,66 @@ pub(crate) fn validate_proxy_destination(host: &str) -> Result<(), StreamError> 
 }
 
 #[cfg(feature = "tls-native")]
+fn split_identity_pem(pem: &[u8]) -> io::Result<(Vec<u8>, Vec<u8>)> {
+    fn append_pem(output: &mut Vec<u8>, der: &[u8], header: &[u8], footer: &[u8]) {
+        output.extend_from_slice(header);
+        for chunk in der.chunks(48) {
+            let mut encoded = [0; 64];
+            let len = STANDARD
+                .encode_slice(chunk, &mut encoded)
+                .expect("48 bytes fit in a 64-byte base64 line");
+            output.extend_from_slice(&encoded[..len]);
+            output.push(b'\n');
+        }
+        output.extend_from_slice(footer);
+    }
+
+    let mut input = pem;
+    let mut certificates = Vec::new();
+    let mut key = Vec::new();
+    while let Some(item) = rustls_pemfile::read_one(&mut input)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid client identity PEM"))?
+    {
+        match item {
+            rustls_pemfile::Item::X509Certificate(der) => append_pem(
+                &mut certificates,
+                &der,
+                b"-----BEGIN CERTIFICATE-----\n",
+                b"-----END CERTIFICATE-----\n",
+            ),
+            rustls_pemfile::Item::PKCS8Key(der) if key.is_empty() => append_pem(
+                &mut key,
+                &der,
+                b"-----BEGIN PRIVATE KEY-----\n",
+                b"-----END PRIVATE KEY-----\n",
+            ),
+            _ => {}
+        }
+    }
+    if key.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "missing client private key",
+        ));
+    }
+    if certificates.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "missing client certificate",
+        ));
+    }
+    Ok((certificates, key))
+}
+
+#[cfg(feature = "tls-native")]
 fn tls_connector(
     identity: Option<&Vec<u8>>,
     root: Option<&[u8]>,
 ) -> Result<tokio_native_tls::TlsConnector, StreamError> {
     let mut builder = native_tls::TlsConnector::builder();
     if let Some(pem) = identity {
-        const KEY: &[u8] = b"-----BEGIN PRIVATE KEY-----";
-        let key_start = pem
-            .windows(KEY.len())
-            .position(|window| window == KEY)
-            .ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "missing client private key")
-            })?;
-        builder.identity(native_tls::Identity::from_pkcs8(pem, &pem[key_start..])?);
+        let (certificates, key) = split_identity_pem(pem)?;
+        builder.identity(native_tls::Identity::from_pkcs8(&certificates, &key)?);
     }
     if let Some(der) = root {
         builder.add_root_certificate(native_tls::Certificate::from_der(der)?);
@@ -521,7 +567,6 @@ impl AsyncWrite for Stream {
 mod tests {
     use super::{Stream, StreamError, tls_server_name};
     use crate::ServerInfo;
-    use std::process::Command;
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -547,32 +592,46 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "tls-native")]
+    #[test]
+    fn invalid_client_identity_pem_is_rejected() {
+        let client = rcgen::generate_simple_self_signed(vec!["client.test".into()]).unwrap();
+        let certificate = client.serialize_pem().unwrap();
+        let key = client.serialize_private_key_pem();
+        let cases = [
+            (
+                certificate.into_bytes(),
+                std::io::ErrorKind::InvalidInput,
+                "missing client private key",
+            ),
+            (
+                key.as_bytes().to_vec(),
+                std::io::ErrorKind::InvalidInput,
+                "missing client certificate",
+            ),
+            (
+                format!(
+                    "{key}-----BEGIN CERTIFICATE-----\nsecret!invalid\n-----END CERTIFICATE-----\n"
+                )
+                .into_bytes(),
+                std::io::ErrorKind::InvalidData,
+                "invalid client identity PEM",
+            ),
+        ];
+        for (pem, kind, message) in cases {
+            let error = match super::tls_connector(Some(&pem), None) {
+                Err(StreamError::Io(error)) => error,
+                Err(error) => panic!("unexpected identity error: {error:?}"),
+                Ok(_) => panic!("invalid client identity was accepted"),
+            };
+            assert_eq!(error.kind(), kind);
+            assert_eq!(error.to_string(), message);
+            assert!(!format!("{error:?} {error}").contains("secret"));
+        }
+    }
+
     #[test]
     fn scoped_ipv6_tls() {
-        const CHILD: &str = "TINY_TEST_IPV6_TLS_CHILD";
-        if !matches!(std::env::var(CHILD).as_deref(), Ok("1")) {
-            let output = Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", "stream::tests::scoped_ipv6_tls", "--nocapture"])
-                .env(CHILD, "1")
-                .env(
-                    "SSL_CERT_FILE",
-                    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/ipv6-ca.pem"),
-                )
-                .output()
-                .expect("failed to run isolated TLS test");
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            assert!(
-                output.status.success() && stdout.contains("1 passed"),
-                "TLS test child failed: {}\nstdout:\n{}\nstderr:\n{}",
-                output.status,
-                stdout,
-                stderr,
-            );
-            eprint!("{stderr}");
-            return;
-        }
-
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -591,6 +650,12 @@ mod tests {
                     }
                     Err(err) => panic!("IPv6 loopback bind failed: {err}"),
                 };
+                let mut roots = rustls_pemfile::certs(
+                    &mut &include_bytes!("../tests/fixtures/ipv6-ca.pem")[..],
+                )
+                .expect("invalid IPv6 test CA");
+                assert_eq!(roots.len(), 1, "expected exactly one IPv6 test CA");
+                let root = roots.pop().unwrap();
                 let cert =
                     Certificate(include_bytes!("../tests/fixtures/ipv6-server.der").to_vec());
                 let key =
@@ -630,7 +695,10 @@ mod tests {
                                 nickserv_ident: None,
                                 sasl_auth: None,
                             };
-                            let connection = Stream::connect(address, &info, info.port, None).await;
+                            let connection = Stream::connect_with_test_root(
+                                address, &info, info.port, None, &root,
+                            )
+                            .await;
                             if succeeds {
                                 let mut tls = match connection {
                                     Ok(tls) => tls,
@@ -649,15 +717,44 @@ mod tests {
                                 tls.read_exact(&mut pong).await.unwrap();
                                 assert_eq!(&pong, b"pong");
                             } else {
-                                let error = match connection {
+                                match connection {
                                     Ok(_) => panic!("certificate mismatch unexpectedly accepted"),
-                                    Err(StreamError::Tls(err)) => err.to_string(),
-                                    Err(StreamError::Io(err)) => err.to_string(),
-                                    Err(StreamError::Proxy(err)) => {
-                                        panic!("unexpected proxy error: {err}")
+                                    #[cfg(feature = "tls-native")]
+                                    Err(StreamError::Tls(error)) => {
+                                        let message = error.to_string();
+                                        assert!(
+                                            message.to_lowercase().contains("certificate"),
+                                            "{message}"
+                                        );
                                     }
-                                };
-                                assert!(error.to_lowercase().contains("certificate"), "{error}");
+                                    #[cfg(feature = "tls-rustls")]
+                                    Err(StreamError::Io(error)) => {
+                                        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+                                        let tls_error = error.get_ref().and_then(|source| {
+                                            source.downcast_ref::<tokio_rustls::rustls::Error>()
+                                        });
+                                        assert!(
+                                            matches!(
+                                                tls_error,
+                                                Some(tokio_rustls::rustls::Error::InvalidCertificate(
+                                                    tokio_rustls::rustls::CertificateError::NotValidForName
+                                                ))
+                                            ),
+                                            "unexpected TLS error: {error:?}"
+                                        );
+                                    }
+                                    #[cfg(feature = "tls-rustls")]
+                                    Err(StreamError::Tls(error)) => {
+                                        panic!("unexpected TLS error: {error}")
+                                    }
+                                    #[cfg(feature = "tls-native")]
+                                    Err(StreamError::Io(error)) => {
+                                        panic!("unexpected I/O error: {error}")
+                                    }
+                                    Err(StreamError::Proxy(error)) => {
+                                        panic!("unexpected proxy error: {error}")
+                                    }
+                                }
                             }
                         };
                         tokio::join!(server, client);
