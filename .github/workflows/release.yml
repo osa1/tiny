@@ -41,7 +41,8 @@ jobs:
       - name: Make release tarball (default, statically linked)
         run: |
           (cd crates/tiny && RUST_BACKTRACE=1 \
-            cargo build --release --verbose --target=x86_64-unknown-linux-musl)
+            cargo build --release --verbose --target=x86_64-unknown-linux-musl \
+              --features=desktop-notifications-static-linking)
           tar -C target/x86_64-unknown-linux-musl/release \
             -czvf tiny-ubuntu-22.04-static.tar.gz tiny
 
