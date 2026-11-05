@@ -1,10 +1,10 @@
 use std::panic::Location;
 
 use libtiny_common::{ChanNameRef, MsgTarget};
-use term_input::{Event, Key};
+use term_input::{Arrow, Event, Key};
 
-use crate::test_utils::expect_screen;
-use crate::tui::TUI;
+use crate::test_utils::{buffer_str, expect_screen};
+use crate::tui::{TUI, TUIRet};
 
 mod layout;
 mod resize;
@@ -15,6 +15,141 @@ fn enter_string(tui: &mut TUI, s: &str) {
     for c in s.chars() {
         tui.handle_input_event(Event::Key(Key::Char(c)), &mut None);
     }
+}
+
+fn completion_input(tui: &mut TUI) -> String {
+    tui.draw();
+    let screen = buffer_str(&tui.get_front_buffer(), 80, 5);
+    screen.lines().nth(3).unwrap().trim_end().to_owned()
+}
+
+fn press(tui: &mut TUI, key: Key) {
+    tui.handle_input_event(Event::Key(key), &mut None);
+}
+
+fn submit(tui: &mut TUI) -> String {
+    match tui.handle_input_event(Event::Key(Key::Char('\r')), &mut None) {
+        Some(TUIRet::Input { msg, .. }) => msg.into_iter().collect(),
+        _ => panic!("expected submitted input"),
+    }
+}
+
+#[test]
+fn command_completion_cycles_and_commits_edits() {
+    let mut tui = TUI::new_test(80, 5);
+    tui.add_command_completion("close");
+    tui.add_command_completion("connect");
+    tui.add_command_completion("close");
+
+    enter_string(&mut tui, "/");
+    for expected in [
+        "/clear", "/close", "/connect", "/ignore", "/notify", "/quit", "/reload", "/switch",
+        "/clear",
+    ] {
+        press(&mut tui, Key::Tab);
+        assert_eq!(completion_input(&mut tui), expected);
+    }
+    press(&mut tui, Key::Ctrl('a'));
+    press(&mut tui, Key::Ctrl('k'));
+
+    enter_string(&mut tui, "/c");
+    press(&mut tui, Key::Tab);
+    assert_eq!(completion_input(&mut tui), "/clear");
+    press(&mut tui, Key::Tab);
+    assert_eq!(completion_input(&mut tui), "/close");
+    press(&mut tui, Key::Arrow(Arrow::Up));
+    assert_eq!(completion_input(&mut tui), "/connect");
+    press(&mut tui, Key::Tab);
+    assert_eq!(completion_input(&mut tui), "/clear");
+    press(&mut tui, Key::Arrow(Arrow::Down));
+    assert_eq!(completion_input(&mut tui), "/connect");
+    press(&mut tui, Key::Arrow(Arrow::Down));
+    assert_eq!(completion_input(&mut tui), "/close");
+
+    press(&mut tui, Key::Char('!'));
+    assert_eq!(completion_input(&mut tui), "/close!");
+    assert_eq!(submit(&mut tui), "/close!");
+    press(&mut tui, Key::Arrow(Arrow::Up));
+    assert_eq!(completion_input(&mut tui), "/close!");
+}
+
+#[test]
+fn command_completion_is_shared_with_existing_and_new_tabs() {
+    let mut tui = TUI::new_test(80, 5);
+    tui.new_server_tab("existing", None);
+    tui.add_command_completion("join");
+
+    enter_string(&mut tui, "/jo");
+    press(&mut tui, Key::Tab);
+    assert_eq!(completion_input(&mut tui), "/join");
+    assert_eq!(submit(&mut tui), "/join");
+
+    tui.next_tab();
+    enter_string(&mut tui, "/jo");
+    press(&mut tui, Key::Tab);
+    assert_eq!(completion_input(&mut tui), "/join");
+    assert_eq!(submit(&mut tui), "/join");
+
+    tui.new_server_tab("new", None);
+    tui.next_tab();
+    enter_string(&mut tui, "/jo");
+    press(&mut tui, Key::Tab);
+    assert_eq!(completion_input(&mut tui), "/join");
+    assert_eq!(submit(&mut tui), "/join");
+}
+
+#[test]
+fn completion_respects_command_boundaries_and_nick_contexts() {
+    let mut tui = TUI::new_test(80, 5);
+    let serv = "server";
+    let chan = ChanNameRef::new("#chan");
+    tui.new_server_tab(serv, None);
+    tui.new_chan_tab(serv, chan);
+    tui.next_tab();
+    tui.next_tab();
+    let target = MsgTarget::Chan { serv, chan };
+    tui.add_nick("Jack", None, &target);
+    tui.add_nick("jane", None, &target);
+    tui.add_nick("nina", None, &target);
+    tui.add_command_completion("join");
+
+    for (text, cursor, expected) in [
+        ("/jn café λ", Some(2), "/join café λ"),
+        ("/jo\u{2003}café", Some(3), "/join\u{2003}café"),
+        ("/jz", Some(2), "/jz"),
+        ("/ja", None, "/ja"),
+        ("/J", None, "/J"),
+        ("/jo", Some(0), "Jack/jo"),
+        ("/msg ni", None, "/msg nina"),
+        ("/msg /ni", None, "/msg /nina"),
+        ("hello ni", None, "hello nina"),
+        ("hello /ni", None, "hello /nina"),
+    ] {
+        enter_string(&mut tui, text);
+        if let Some(cursor) = cursor {
+            press(&mut tui, Key::Ctrl('a'));
+            for _ in 0..cursor {
+                press(&mut tui, Key::Arrow(Arrow::Right));
+            }
+        }
+        press(&mut tui, Key::Tab);
+        assert_eq!(completion_input(&mut tui), expected, "input: {text:?}");
+        assert_eq!(submit(&mut tui), expected, "input: {text:?}");
+    }
+}
+
+#[test]
+fn exit_dialogue_blocks_completion() {
+    let mut tui = TUI::new_test(80, 5);
+    tui.add_command_completion("join");
+    enter_string(&mut tui, "/jo");
+    press(&mut tui, Key::Ctrl('c'));
+    press(&mut tui, Key::Tab);
+    assert!(completion_input(&mut tui).starts_with("Really quit?"));
+    press(&mut tui, Key::Esc);
+    assert_eq!(completion_input(&mut tui), "/jo");
+    press(&mut tui, Key::Tab);
+    assert_eq!(completion_input(&mut tui), "/join");
 }
 
 #[test]
