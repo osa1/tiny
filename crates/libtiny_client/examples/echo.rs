@@ -38,6 +38,7 @@ fn main() {
         addr: server,
         port,
         tls: false,
+        proxy: None,
         pass: None,
         user: None,
         realname: "tiny echo bot".to_owned(),
