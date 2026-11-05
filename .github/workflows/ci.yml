@@ -88,6 +88,23 @@ jobs:
           cargo test --no-default-features \
             --features "tls-native desktop-notifications"
 
+  macOS_nix:
+    name: '[macOS, Nix] Build and smoke'
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Verify runner architecture
+        run: |
+          test "$RUNNER_ARCH" = "ARM64"
+          test "$(nix eval --impure --raw --expr builtins.currentSystem)" = "aarch64-darwin"
+      - name: Build with Nix
+        run: nix build --print-build-logs --no-update-lock-file .#packages.aarch64-darwin.default
+      - name: Run built binary
+        run: ./result/bin/tiny --version
+
   # Updating dependencies can break the static build.
   Linux_static_build_default:
     name: Make statically linked executable (default)
