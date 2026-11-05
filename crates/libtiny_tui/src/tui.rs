@@ -20,6 +20,7 @@ use crate::messaging::{MessagingUI, Timestamp};
 use crate::msg_area::Layout;
 use crate::notifier::Notifier;
 use crate::tab::Tab;
+use crate::trie::Trie;
 use crate::widget::WidgetRet;
 
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
@@ -92,6 +93,7 @@ pub struct TUI {
     h_scroll: i32,
 
     key_map: KeyMap,
+    command_completions: Trie,
 
     /// Config file path
     config_path: Option<PathBuf>,
@@ -154,6 +156,11 @@ impl TUI {
         let width = tb.width();
         let height = tb.height();
 
+        let mut command_completions = Trie::new();
+        for command in &TUI_COMMANDS {
+            command_completions.insert(command.name);
+        }
+
         let mut tui = TUI {
             tb,
             colors: Colors::default(),
@@ -165,6 +172,7 @@ impl TUI {
             height,
             h_scroll: 0,
             key_map: KeyMap::default(),
+            command_completions,
             config_path,
             tab_configs: TabConfigs::default(),
         };
@@ -179,6 +187,10 @@ impl TUI {
 
         tui.reload_config();
         tui
+    }
+
+    pub(crate) fn add_command_completion(&mut self, name: &str) {
+        self.command_completions.insert(name);
     }
 
     fn ignore(&mut self, src: &MsgSource) {
@@ -668,7 +680,10 @@ impl TUI {
 
         let key_action = key_action?;
 
-        match self.tabs[self.active_idx].widget.keypressed(&key_action) {
+        match self.tabs[self.active_idx]
+            .widget
+            .keypressed(&key_action, &self.command_completions)
+        {
             WidgetRet::KeyHandled => None,
 
             WidgetRet::KeyIgnored => {

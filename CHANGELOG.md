@@ -12,6 +12,8 @@
   Multiline paste with an incomplete UTF-8 suffix no longer sends Enter early;
   combining marks in nick completion and at message boundaries are preserved,
   and resizing with an oversized tab no longer freezes.
+- Complete slash command names with Tab while retaining nick completion in
+  messages and command arguments.
 - Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
   ignored and are now synonymous with `tab` and `esc`. (#444)
 - The keystrokes `ctrl_h` and `backspace` can now be distinguished, which

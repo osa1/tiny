@@ -63,7 +63,7 @@ enum Mode {
     /// Browsing history
     History(i32),
 
-    /// Auto-completing a nick in channel
+    /// Auto-completing a command or a nick in a channel
     Autocomplete {
         original_buffer: InputLine,
         insertion_point: usize,
@@ -791,7 +791,7 @@ impl InputArea {
 }
 
 impl InputArea {
-    pub(crate) fn autocomplete(&mut self, dict: &Trie) {
+    pub(crate) fn autocomplete(&mut self, nicks: &Trie, command_completions: &Trie) {
         if self.in_autocomplete() {
             // scroll next if you hit the KeyAction::InputAutoComplete key again
             self.completion_prev_entry();
@@ -802,30 +802,56 @@ impl InputArea {
         self.height = None;
 
         let cursor_right = self.cursor;
-        let mut cursor_left = max(0, cursor_right - 1);
+        let (completions, word_starts) = {
+            let line = self.shown_line().get_buffer();
+            let command_end = if line.first() == Some(&'/') && cursor_right > 0 {
+                let end = line
+                    .iter()
+                    .position(|c| c.is_whitespace())
+                    .unwrap_or(line.len());
+                (cursor_right as usize <= end).then_some(end)
+            } else {
+                None
+            };
 
-        let completions = {
-            let line = &self.shown_line().get_buffer();
+            if let Some(end) = command_end {
+                let cursor = cursor_right as usize;
+                let suffix: String = line[cursor..end].iter().collect();
+                let completions = command_completions
+                    .drop_pfx(&mut line[1..cursor].iter().copied())
+                    .into_iter()
+                    .filter_map(|mut completion| {
+                        if completion.ends_with(&suffix) {
+                            completion.truncate(completion.len() - suffix.len());
+                            Some(completion)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                (completions, 1)
+            } else {
+                let mut cursor_left = max(0, cursor_right - 1);
+                while cursor_left >= 0
+                    && line
+                        .get(cursor_left as usize)
+                        .map(|c| utils::is_nick_char(*c))
+                        .unwrap_or(false)
+                {
+                    cursor_left -= 1;
+                }
 
-            while cursor_left >= 0
-                && line
-                    .get(cursor_left as usize)
-                    .map(|c| utils::is_nick_char(*c))
-                    .unwrap_or(false)
-            {
-                cursor_left -= 1;
-            }
-
-            let word = {
-                if cursor_left == cursor_right {
+                let word = if cursor_left == cursor_right {
                     &[]
                 } else {
                     cursor_left += 1;
                     &line[(cursor_left as usize)..(cursor_right as usize)]
-                }
-            };
-
-            dict.drop_pfx(&mut word.iter().cloned())
+                };
+                (
+                    nicks.drop_pfx(&mut word.iter().copied()),
+                    cursor_left as usize,
+                )
+            }
         };
 
         if !completions.is_empty() {
@@ -833,7 +859,7 @@ impl InputArea {
             self.mode = Mode::Autocomplete {
                 original_buffer: self.shown_line().to_owned(),
                 insertion_point: self.cursor as usize,
-                word_starts: cursor_left as usize,
+                word_starts,
                 completions,
                 current_completion: 0,
             };
@@ -880,6 +906,84 @@ mod tests {
     }
 
     #[test]
+    fn command_completion_preserves_suffix_and_unicode_arguments() {
+        let mut commands = Trie::new();
+        commands.insert("join");
+        let mut input = InputArea::new(80, 10);
+        input.set("/jn \u{6771}\u{4eac}");
+        input.set_cursor(2);
+
+        input.autocomplete(&Trie::new(), &commands);
+        match input.keypressed(&KeyAction::InputSend) {
+            WidgetRet::Input(line) => {
+                assert_eq!(line.iter().collect::<String>(), "/join \u{6771}\u{4eac}")
+            }
+            _ => panic!("expected submitted input"),
+        }
+    }
+
+    #[test]
+    fn command_completion_does_not_fall_back_to_nicks() {
+        let mut commands = Trie::new();
+        commands.insert("join");
+        let mut nicks = Trie::new();
+        nicks.insert("jane");
+        let mut input = InputArea::new(80, 10);
+        input.set("/ja");
+
+        input.autocomplete(&nicks, &commands);
+        match input.keypressed(&KeyAction::InputSend) {
+            WidgetRet::Input(line) => assert_eq!(line.iter().collect::<String>(), "/ja"),
+            _ => panic!("expected submitted input"),
+        }
+    }
+
+    #[test]
+    fn unmatched_command_completion_keeps_history_navigation() {
+        let mut commands = Trie::new();
+        commands.insert("join");
+        let mut input = InputArea::new(80, 10);
+        input.set("draft");
+        input.add_history("/ja");
+        input.keypressed(&KeyAction::InputPrevEntry);
+
+        input.autocomplete(&Trie::new(), &commands);
+        input.keypressed(&KeyAction::InputNextEntry);
+        match input.keypressed(&KeyAction::InputSend) {
+            WidgetRet::Input(line) => assert_eq!(line.iter().collect::<String>(), "draft"),
+            _ => panic!("expected submitted input"),
+        }
+    }
+
+    #[test]
+    fn command_completion_from_history_keeps_the_original_entry() {
+        let mut commands = Trie::new();
+        commands.insert("join");
+        let mut input = InputArea::new(80, 10);
+        input.add_history("/jo\u{2003}café λ");
+        input.keypressed(&KeyAction::InputPrevEntry);
+        input.set_cursor(3);
+
+        input.autocomplete(&Trie::new(), &commands);
+        input.keypressed(&KeyAction::Input('!'));
+        match input.keypressed(&KeyAction::InputSend) {
+            WidgetRet::Input(line) => {
+                assert_eq!(line.iter().collect::<String>(), "/join!\u{2003}café λ")
+            }
+            _ => panic!("expected submitted input"),
+        }
+
+        input.keypressed(&KeyAction::InputPrevEntry);
+        input.keypressed(&KeyAction::InputPrevEntry);
+        match input.keypressed(&KeyAction::InputSend) {
+            WidgetRet::Input(line) => {
+                assert_eq!(line.iter().collect::<String>(), "/jo\u{2003}café λ")
+            }
+            _ => panic!("expected submitted input"),
+        }
+    }
+
+    #[test]
     fn text_field_bug() {
         let mut text_field = InputArea::new(10, 50);
         text_field.keypressed(&KeyAction::Input('a'));
@@ -921,7 +1025,7 @@ mod tests {
         input.set("日!끝");
         input.set_cursor(1);
         input.get_height(8);
-        input.autocomplete(&dict);
+        input.autocomplete(&dict, &Trie::new());
         assert_eq!(visible_text(&input), "日光!끝");
         assert_eq!(input.cursor, 2);
         assert_eq!(input.current_buffer_len(), 4);
@@ -955,7 +1059,7 @@ mod tests {
         let mut input = InputArea::new(40, 50);
         input.set("say か\u{3099} !");
         input.set_cursor(6);
-        input.autocomplete(&dict);
+        input.autocomplete(&dict, &Trie::new());
         assert_eq!(visible_text(&input), "say か\u{3099}め !");
         match input.keypressed(&KeyAction::InputSend) {
             WidgetRet::Input(chars) => {
@@ -966,13 +1070,90 @@ mod tests {
     }
 
     #[test]
+    fn command_completion_preserves_unicode_during_wrap_and_horizontal_scroll() {
+        use crate::msg_area::Layout;
+
+        let mut commands = Trie::new();
+        commands.insert("join");
+        let suffix = format!("東京か\u{3099}{}", "漢字".repeat(10));
+        for (width, scrolling) in [(40, false), (12, true)] {
+            let mut input = InputArea::new(width, 50);
+            input.set(&format!("/jn {suffix}"));
+            input.set_cursor(2);
+            input.get_height(width);
+            input.autocomplete(&Trie::new(), &commands);
+
+            let completed = format!("/join {suffix}");
+            assert_eq!(visible_text(&input), completed);
+            assert_eq!(input.cursor, 4);
+            let height = input.get_height(width);
+            assert_eq!(input.scroll.is_some(), scrolling);
+            if !scrolling {
+                assert!(height > 1);
+            }
+            let mut tb = Termbox::init_test(width as u16, 8);
+            let mut colors = Colors::default();
+            colors.cursor = Style { fg: 5, bg: 6 };
+            let mut messages = MsgArea::new(width, 7, 10, Layout::Compact);
+            input.draw(&mut tb, &colors, 0, 0, 8, &mut messages);
+            tb.present();
+            let cells = tb.get_front_buffer().cells;
+            let row = (8 - height) as usize * width as usize;
+            assert_eq!(cells[row + 4].ch, 'n');
+            assert_eq!(cells[row + 4].fg, colors.cursor.fg);
+            let suffix_start = cells.iter().position(|cell| cell.ch == '東').unwrap();
+            assert_eq!(cells[suffix_start + 2].ch, '京');
+            assert_eq!(cells[suffix_start + 4].ch, 'か');
+            assert!(
+                String::from_utf8(tb.take_test_output())
+                    .unwrap()
+                    .contains('\u{3099}')
+            );
+
+            input.keypressed(&KeyAction::InputMoveCursEnd);
+            input.keypressed(&KeyAction::Input('!'));
+            let edited = format!("{completed}!");
+            match input.keypressed(&KeyAction::InputSend) {
+                WidgetRet::Input(chars) => assert_eq!(chars.iter().collect::<String>(), edited),
+                _ => panic!("expected submitted input"),
+            }
+            input.keypressed(&KeyAction::InputPrevEntry);
+            assert_eq!(visible_text(&input), edited);
+        }
+    }
+
+    #[test]
+    fn unicode_nick_completion_cycles_in_messages_and_command_arguments() {
+        let mut nicks = Trie::new();
+        nicks.insert("日本人");
+        nicks.insert("日本語");
+        for prefix in ["hello 日", "/msg 日"] {
+            let mut input = InputArea::new(20, 50);
+            input.set(prefix);
+            input.autocomplete(&nicks, &Trie::new());
+            assert_eq!(visible_text(&input), format!("{prefix}本人"));
+            input.keypressed(&KeyAction::InputPrevEntry);
+            let completed = format!("{prefix}本語");
+            assert_eq!(visible_text(&input), completed);
+            match input.keypressed(&KeyAction::InputSend) {
+                WidgetRet::Input(chars) => {
+                    assert_eq!(chars.iter().collect::<String>(), completed)
+                }
+                _ => panic!("expected submitted input"),
+            }
+            input.keypressed(&KeyAction::InputPrevEntry);
+            assert_eq!(visible_text(&input), completed);
+        }
+    }
+
+    #[test]
     fn completion_height_uses_inserted_scalars() {
         let mut dict = Trie::new();
         dict.insert("日本語");
         let mut input = InputArea::new(40, 50);
         input.set("日!abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM");
         input.set_cursor(1);
-        input.autocomplete(&dict);
+        input.autocomplete(&dict, &Trie::new());
         let preview = visible_text(&input);
         let mut expected = InputLine::from_buffer(preview.chars().collect());
         assert_eq!(

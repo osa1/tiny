@@ -225,7 +225,8 @@ async fn input_handler<S>(
 }
 
 macro_rules! delegate {
-    ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
+    ( $(#[$attr:meta])* $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
+        $(#[$attr])*
         pub fn $name(&self, $($x: $t,)*) {
             if let Some(inner) = self.inner.upgrade() {
                 inner.borrow_mut().$name( $( $x, )* );
@@ -236,6 +237,10 @@ macro_rules! delegate {
 
 impl TUI {
     delegate!(draw());
+    delegate!(
+        /// Registers a command name for completion. `name` must not include the leading `/`.
+        add_command_completion(name: &str,)
+    );
     delegate!(new_server_tab(serv_name: &str, alias: Option<String>,));
     delegate!(close_server_tab(serv_name: &str,));
     delegate!(new_chan_tab(serv_name: &str, chan: &ChanNameRef,));

@@ -25,7 +25,7 @@ tiny is an IRC client written in Rust.
   channels, registering the nickname etc. See [configuration
   section](#configuration) below.
 
-- Nick tab-completion in channels
+- Tab-completion for command names and channel nicks
 
 - Nicks in channels are colored.
 
@@ -290,6 +290,11 @@ Default key bindings:
 ## Commands
 
 Commands start with `/` character.
+
+Press `Tab` within a command name to complete it. Press `Tab` or the up/down
+arrow keys to cycle through matches. Completion is case-sensitive, preserves
+existing arguments, and does not add a space. Nick completion remains available
+in messages and command arguments.
 
 - `/help`: Show help messages of commands listed below.
 
