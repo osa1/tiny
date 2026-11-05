@@ -342,6 +342,69 @@ async fn native_tls_client_identity_order_and_chain() {
         .await;
 }
 
+#[cfg(all(feature = "tls-native", not(target_os = "macos")))]
+#[tokio::test(flavor = "current_thread")]
+async fn pkcs12_identity_authenticates_with_intermediate() {
+    tokio::task::LocalSet::new()
+        .run_until(async {
+            timeout(DEADLINE, async {
+                let root = ca("PKCS#12 root");
+                let intermediate = ca("PKCS#12 intermediate");
+                let client = leaf("client.test", true);
+                let irc = leaf(IRC_NAME, false);
+                let pem = format!(
+                    "{}{}{}",
+                    client.serialize_private_key_pem(),
+                    client.serialize_pem_with_signer(&intermediate).unwrap(),
+                    intermediate.serialize_pem_with_signer(&root).unwrap()
+                );
+                let (archive, password) = crate::stream::identity_pkcs12(pem.as_bytes()).unwrap();
+                let identity = native_tls::Identity::from_pkcs12(&archive, &password).unwrap();
+                let mut builder = native_tls::TlsConnector::builder();
+                builder.identity(identity);
+                builder.add_root_certificate(
+                    native_tls::Certificate::from_der(&root.serialize_der().unwrap()).unwrap(),
+                );
+                let connector = tokio_native_tls::TlsConnector::from(builder.build().unwrap());
+
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let addr = listener.local_addr().unwrap();
+                let config = server_config(&irc, &root, &root, true);
+                let (tunnel_tx, _tunnel_rx) = mpsc::unbounded_channel();
+                let server = tokio::task::spawn_local(fixture(
+                    listener,
+                    false,
+                    true,
+                    config.clone(),
+                    config,
+                    tunnel_tx,
+                ));
+                let mut transport = tokio::net::TcpStream::connect(addr).await.unwrap();
+                transport
+                    .write_all(b"CONNECT irc.test:6697 HTTP/1.1\r\n\r\n")
+                    .await
+                    .unwrap();
+                let expected = b"HTTP/1.1 200 Connection Established\r\n\r\n";
+                let mut response = vec![0; expected.len()];
+                transport.read_exact(&mut response).await.unwrap();
+                assert_eq!(&response, expected);
+
+                let mut tls = connector.connect(IRC_NAME, transport).await.unwrap();
+                tls.write_all(b"NICK tiny\r\nUSER tiny 0 * :Tiny\r\n")
+                    .await
+                    .unwrap();
+                let mut greeting = vec![0; b":server 001 tiny :Welcome\r\nPING :probe\r\n".len()];
+                tls.read_exact(&mut greeting).await.unwrap();
+                assert_eq!(greeting, b":server 001 tiny :Welcome\r\nPING :probe\r\n");
+                tls.write_all(b"PONG :probe\r\n").await.unwrap();
+                server.await.unwrap().unwrap();
+            })
+            .await
+            .expect("PKCS#12 TLS exchange timed out");
+        })
+        .await;
+}
+
 async fn read_line<S: AsyncRead + Unpin>(stream: &mut S) -> Vec<u8> {
     let mut line = Vec::new();
     loop {

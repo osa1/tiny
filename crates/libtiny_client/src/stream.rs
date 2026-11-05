@@ -89,55 +89,80 @@ pub(crate) fn validate_proxy_destination(host: &str) -> Result<(), StreamError> 
 }
 
 #[cfg(feature = "tls-native")]
-fn split_identity_pem(pem: &[u8]) -> io::Result<(Vec<u8>, Vec<u8>)> {
-    fn append_pem(output: &mut Vec<u8>, der: &[u8], header: &[u8], footer: &[u8]) {
-        output.extend_from_slice(header);
-        for chunk in der.chunks(48) {
-            let mut encoded = [0; 64];
-            let len = STANDARD
-                .encode_slice(chunk, &mut encoded)
-                .expect("48 bytes fit in a 64-byte base64 line");
-            output.extend_from_slice(&encoded[..len]);
-            output.push(b'\n');
-        }
-        output.extend_from_slice(footer);
-    }
-
+fn read_identity_pem(pem: &[u8], mut add_certificate: impl FnMut(Vec<u8>)) -> io::Result<Vec<u8>> {
     let mut input = pem;
-    let mut certificates = Vec::new();
-    let mut key = Vec::new();
+    let mut has_certificate = false;
+    let mut key = None;
     while let Some(item) = rustls_pemfile::read_one(&mut input)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid client identity PEM"))?
     {
         match item {
-            rustls_pemfile::Item::X509Certificate(der) => append_pem(
-                &mut certificates,
-                &der,
-                b"-----BEGIN CERTIFICATE-----\n",
-                b"-----END CERTIFICATE-----\n",
-            ),
-            rustls_pemfile::Item::PKCS8Key(der) if key.is_empty() => append_pem(
-                &mut key,
-                &der,
-                b"-----BEGIN PRIVATE KEY-----\n",
-                b"-----END PRIVATE KEY-----\n",
-            ),
+            rustls_pemfile::Item::X509Certificate(der) => {
+                add_certificate(der);
+                has_certificate = true;
+            }
+            rustls_pemfile::Item::PKCS8Key(der) if key.is_none() => key = Some(der),
             _ => {}
         }
     }
-    if key.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "missing client private key",
-        ));
-    }
-    if certificates.is_empty() {
+    let key = key
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing client private key"))?;
+    if !has_certificate {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "missing client certificate",
         ));
     }
-    Ok((certificates, key))
+    Ok(key)
+}
+
+#[cfg(all(feature = "tls-native", not(target_os = "macos")))]
+fn append_pem(output: &mut Vec<u8>, der: &[u8], header: &[u8], footer: &[u8]) {
+    output.extend_from_slice(header);
+    for chunk in der.chunks(48) {
+        let mut encoded = [0; 64];
+        let len = STANDARD
+            .encode_slice(chunk, &mut encoded)
+            .expect("48 bytes fit in a 64-byte base64 line");
+        output.extend_from_slice(&encoded[..len]);
+        output.push(b'\n');
+    }
+    output.extend_from_slice(footer);
+}
+
+#[cfg(all(feature = "tls-native", any(target_os = "macos", test)))]
+pub(super) fn identity_pkcs12(pem: &[u8]) -> io::Result<(Vec<u8>, String)> {
+    use p12_keystore::{
+        Certificate, KeyStore, KeyStoreEntry, MacAlgorithm, PrivateKey, PrivateKeyChain,
+    };
+
+    let mut certificates = Vec::new();
+    let key = read_identity_pem(pem, |der| certificates.push(der))?;
+    let key = PrivateKey::from_der(&key)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid client private key"))?;
+    let certificates = certificates
+        .iter()
+        .map(|der| {
+            Certificate::from_der(der).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "invalid client certificate")
+            })
+        })
+        .collect::<io::Result<Vec<_>>>()?;
+    let chain = PrivateKeyChain::new("identity", key, certificates);
+    let mut store = KeyStore::new();
+    store.add_entry("identity", KeyStoreEntry::PrivateKeyChain(chain));
+
+    let mut random = [0; 32];
+    getrandom::fill(&mut random)
+        .map_err(|_| io::Error::other("could not initialize client identity"))?;
+    let password = STANDARD.encode(random);
+    // Security Framework requires SHA-1 for PKCS#12 MAC compatibility on some macOS versions.
+    let archive = store
+        .writer(&password)
+        .mac_algorithm(MacAlgorithm::HmacSha1)
+        .write()
+        .map_err(|_| io::Error::other("could not encode client identity"))?;
+    Ok((archive, password))
 }
 
 #[cfg(feature = "tls-native")]
@@ -147,8 +172,32 @@ fn tls_connector(
 ) -> Result<tokio_native_tls::TlsConnector, StreamError> {
     let mut builder = native_tls::TlsConnector::builder();
     if let Some(pem) = identity {
-        let (certificates, key) = split_identity_pem(pem)?;
-        builder.identity(native_tls::Identity::from_pkcs8(&certificates, &key)?);
+        #[cfg(target_os = "macos")]
+        let identity = {
+            let (archive, password) = identity_pkcs12(pem)?;
+            native_tls::Identity::from_pkcs12(&archive, &password)?
+        };
+        #[cfg(not(target_os = "macos"))]
+        let identity = {
+            let mut certificates = Vec::new();
+            let key = read_identity_pem(pem, |der| {
+                append_pem(
+                    &mut certificates,
+                    &der,
+                    b"-----BEGIN CERTIFICATE-----\n",
+                    b"-----END CERTIFICATE-----\n",
+                );
+            })?;
+            let mut key_pem = Vec::new();
+            append_pem(
+                &mut key_pem,
+                &key,
+                b"-----BEGIN PRIVATE KEY-----\n",
+                b"-----END PRIVATE KEY-----\n",
+            );
+            native_tls::Identity::from_pkcs8(&certificates, &key_pem)?
+        };
+        builder.identity(identity);
     }
     if let Some(der) = root {
         builder.add_root_certificate(native_tls::Certificate::from_der(der)?);
@@ -630,6 +679,45 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "tls-native")]
+    #[test]
+    fn pkcs12_identity_rejects_invalid_der() {
+        let client = rcgen::generate_simple_self_signed(vec!["client.test".into()]).unwrap();
+        let certificate = client.serialize_pem().unwrap();
+        let key = client.serialize_private_key_pem();
+        let cases = [
+            (
+                format!(
+                    "{certificate}-----BEGIN PRIVATE KEY-----\nAQID\n-----END PRIVATE KEY-----\n"
+                ),
+                "invalid client private key",
+            ),
+            (
+                format!("{key}-----BEGIN CERTIFICATE-----\nAQID\n-----END CERTIFICATE-----\n"),
+                "invalid client certificate",
+            ),
+        ];
+        for (pem, message) in cases {
+            let error = super::identity_pkcs12(pem.as_bytes()).unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+            assert_eq!(error.to_string(), message);
+        }
+    }
+
+    #[cfg(all(feature = "tls-native", target_os = "macos"))]
+    #[test]
+    fn mismatched_client_identity_is_rejected() {
+        let client = rcgen::generate_simple_self_signed(vec!["client.test".into()]).unwrap();
+        let other = rcgen::generate_simple_self_signed(vec!["other.test".into()]).unwrap();
+        let key = other.serialize_private_key_pem();
+        let pem = format!("{}{key}", client.serialize_pem().unwrap()).into_bytes();
+        let error = match super::tls_connector(Some(&pem), None) {
+            Err(error) => error,
+            Ok(_) => panic!("mismatched client certificate and key were accepted"),
+        };
+        assert!(!format!("{error:?}").contains(key.as_str()));
+    }
+
     #[test]
     fn scoped_ipv6_tls() {
         tokio::runtime::Builder::new_current_thread()
@@ -650,16 +738,33 @@ mod tests {
                     }
                     Err(err) => panic!("IPv6 loopback bind failed: {err}"),
                 };
-                let mut roots = rustls_pemfile::certs(
-                    &mut &include_bytes!("../tests/fixtures/ipv6-ca.pem")[..],
-                )
-                .expect("invalid IPv6 test CA");
+                let now = time::OffsetDateTime::now_utc();
+                let mut ca_params = rcgen::CertificateParams::new(Vec::new());
+                ca_params.distinguished_name = rcgen::DistinguishedName::new();
+                ca_params
+                    .distinguished_name
+                    .push(rcgen::DnType::CommonName, "tiny IPv6 test CA");
+                ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+                ca_params.key_usages = vec![
+                    rcgen::KeyUsagePurpose::KeyCertSign,
+                    rcgen::KeyUsagePurpose::DigitalSignature,
+                ];
+                ca_params.not_before = now - time::Duration::days(1);
+                ca_params.not_after = now + time::Duration::days(30);
+                let ca = rcgen::Certificate::from_params(ca_params).unwrap();
+                let ca_pem = ca.serialize_pem().unwrap();
+                let mut roots = rustls_pemfile::certs(&mut ca_pem.as_bytes()).unwrap();
                 assert_eq!(roots.len(), 1, "expected exactly one IPv6 test CA");
                 let root = roots.pop().unwrap();
-                let cert =
-                    Certificate(include_bytes!("../tests/fixtures/ipv6-server.der").to_vec());
-                let key =
-                    PrivateKey(include_bytes!("../tests/fixtures/ipv6-server-key.der").to_vec());
+
+                let mut server_params =
+                    rcgen::CertificateParams::new(vec!["localhost".into(), "::1".into()]);
+                server_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
+                server_params.not_before = now - time::Duration::days(1);
+                server_params.not_after = now + time::Duration::days(30);
+                let server = rcgen::Certificate::from_params(server_params).unwrap();
+                let cert = Certificate(server.serialize_der_with_signer(&ca).unwrap());
+                let key = PrivateKey(server.serialize_private_key_der());
                 let config = ServerConfig::builder()
                     .with_safe_defaults()
                     .with_no_client_auth()
