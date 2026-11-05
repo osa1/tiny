@@ -373,6 +373,14 @@ fn parse_chars(buf: &[u8]) -> Option<(Event, usize)> {
     debug_assert!(!buf.is_empty());
     let valid_len = match std::str::from_utf8(buf) {
         Ok(_) => buf.len(),
+        Err(err)
+            if err.error_len().is_none()
+                && buf[..err.valid_up_to()]
+                    .iter()
+                    .any(|byte| matches!(byte, b'\r' | b'\n')) =>
+        {
+            return None;
+        }
         Err(err) if err.valid_up_to() > 0 => err.valid_up_to(),
         Err(err) => {
             return err
@@ -383,7 +391,7 @@ fn parse_chars(buf: &[u8]) -> Option<(Event, usize)> {
     let text = std::str::from_utf8(&buf[..valid_len]).unwrap();
     let mut chars = text.chars();
     let first = chars.next().unwrap();
-    let event = if chars.next().is_none() {
+    let event = if chars.next().is_none() && (first != '\r' || valid_len == buf.len()) {
         Event::Key(Key::Char(first))
     } else {
         Event::String(text.to_owned())

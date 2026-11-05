@@ -949,6 +949,23 @@ mod tests {
     }
 
     #[test]
+    fn nick_completion_keeps_combining_marks_in_the_prefix() {
+        let mut dict = Trie::new();
+        dict.insert("か\u{3099}め");
+        let mut input = InputArea::new(40, 50);
+        input.set("say か\u{3099} !");
+        input.set_cursor(6);
+        input.autocomplete(&dict);
+        assert_eq!(visible_text(&input), "say か\u{3099}め !");
+        match input.keypressed(&KeyAction::InputSend) {
+            WidgetRet::Input(chars) => {
+                assert_eq!(chars.iter().collect::<String>(), "say か\u{3099}め !")
+            }
+            _ => panic!("expected sent input"),
+        }
+    }
+
+    #[test]
     fn completion_height_uses_inserted_scalars() {
         let mut dict = Trie::new();
         dict.insert("日本語");

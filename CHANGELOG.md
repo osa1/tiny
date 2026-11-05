@@ -3,6 +3,9 @@
 - Fix Unicode input, completion, wrapping, and display for wide and combining
   characters, including UTF-8 split across terminal reads. Editing still uses
   Unicode scalar values; ambiguous-width characters are displayed as one column.
+  Multiline paste with an incomplete UTF-8 suffix no longer sends Enter early;
+  combining marks in nick completion and at message boundaries are preserved,
+  and resizing with an oversized tab no longer freezes.
 
 - Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
   ignored and are now synonymous with `tab` and `esc`. (#444)

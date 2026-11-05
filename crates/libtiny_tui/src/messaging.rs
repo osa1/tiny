@@ -321,7 +321,7 @@ impl MessagingUI {
     pub(crate) fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
-        self.msg_area.add_text(topic, SegStyle::Topic);
+        self.msg_area.add_independent_text(topic, SegStyle::Topic);
 
         self.msg_area.flush_line();
     }
@@ -374,11 +374,12 @@ impl MessagingUI {
                 .add_text(&format_nick("**"), SegStyle::UserMsg);
             // separator between nick and msg
             self.msg_area.add_text("  ", SegStyle::Faded);
-            self.msg_area.add_text(sender, nick_col_style);
+            self.msg_area.add_independent_text(sender, nick_col_style);
             // a space replacing the usual ':'
             self.msg_area.add_text(" ", SegStyle::UserMsg);
         } else {
-            self.msg_area.add_text(&format_nick(sender), nick_col_style);
+            self.msg_area
+                .add_independent_text(&format_nick(sender), nick_col_style);
             // separator between nick and msg
             self.msg_area.add_text(": ", SegStyle::Faded);
         }
@@ -389,20 +390,20 @@ impl MessagingUI {
             SegStyle::UserMsg
         };
 
-        self.msg_area.add_text(msg, msg_style);
+        self.msg_area.add_independent_text(msg, msg_style);
         self.msg_area.set_current_line_alignment();
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_msg(&mut self, msg: &str, ts: Timestamp) {
         self.add_timestamp(ts);
-        self.msg_area.add_text(msg, SegStyle::UserMsg);
+        self.msg_area.add_independent_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
         self.add_timestamp(ts);
-        self.msg_area.add_text(msg, SegStyle::ErrMsg);
+        self.msg_area.add_independent_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
     }
 

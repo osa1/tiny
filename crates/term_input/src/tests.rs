@@ -135,6 +135,33 @@ fn complete_prefix_is_delivered_before_the_incomplete_suffix() {
 }
 
 #[test]
+fn incomplete_utf8_keeps_multiline_paste_from_sending_enter() {
+    for text in ["\r日", "line\r日", "line\n日", "\r\n日"] {
+        let bytes = text.as_bytes();
+        for split in bytes.len() - 2..bytes.len() {
+            let mut buf = Vec::new();
+            assert!(
+                feed(&mut buf, &bytes[..split]).is_empty(),
+                "{text:?} at {split}"
+            );
+            assert_eq!(
+                feed(&mut buf, &bytes[split..]),
+                vec![Event::String(text.to_owned())]
+            );
+            assert!(buf.is_empty());
+        }
+    }
+
+    let mut buf = Vec::new();
+    assert_eq!(
+        feed(&mut buf, &[b'\r', 0xff]),
+        vec![Event::String("\r".into()), Event::Unknown(vec![0xff])]
+    );
+    assert_eq!(feed(&mut buf, b"\r"), vec![Event::Key(Key::Char('\r'))]);
+    assert_eq!(feed(&mut buf, b"x\t"), vec![Event::String("x\t".into())]);
+}
+
+#[test]
 fn alt_waits_for_a_split_utf8_character() {
     let mut sequence = vec![27];
     sequence.extend_from_slice("日".as_bytes());

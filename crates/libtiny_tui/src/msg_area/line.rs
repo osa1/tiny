@@ -128,6 +128,14 @@ impl Line {
     /// Add the text to the line. The text can contain IRC formatting characters. The text should
     /// not contain other control characters like '\n' or '\r'.
     pub(crate) fn add_text(&mut self, str: &str, style: SegStyle) {
+        self.add_text_inner(str, style, false);
+    }
+
+    pub(crate) fn add_independent_text(&mut self, str: &str, style: SegStyle) {
+        self.add_text_inner(str, style, true);
+    }
+
+    fn add_text_inner(&mut self, str: &str, style: SegStyle, mut independent: bool) {
         self.set_message_style(style);
 
         for format_event in parse_irc_formatting(str) {
@@ -140,6 +148,14 @@ impl Line {
                     // TODO
                 }
                 IrcFormatEvent::Text(text) => {
+                    if independent {
+                        if let Some(ch) = text.chars().next() {
+                            if ch.width() == Some(0) {
+                                self.current_seg.string.push('◌');
+                            }
+                            independent = false;
+                        }
+                    }
                     self.current_seg.string.push_str(text);
                 }
                 IrcFormatEvent::Color { fg, bg } => {
