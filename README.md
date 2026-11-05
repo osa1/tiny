@@ -39,8 +39,8 @@ tiny is an IRC client written in Rust.
 
 - SASL authentication
 
-- Configurable desktop notifications on new messages (opt-in feature behind a
-  feature flag, see below)
+- Configurable desktop notifications for channel mentions and private messages
+  by default
 
 - znc compatible
 
@@ -52,18 +52,27 @@ tiny works on Linux and OSX. Windows users can run it under Windows Subsystem
 for Linux.
 
 For pre-built binaries see [releases]. To build from source make sure you have
-Rust 1.48 or newer. By default tiny uses [rustls] for TLS support, and desktop
-notifications are disabled.
+Rust 1.48 or newer. By default tiny uses [rustls] for TLS support and enables
+desktop notifications for channel mentions and private messages. Configure
+`notify: off` or use `/notify` to change notification settings.
 
 [releases]: https://github.com/osa1/tiny/releases
 [rustls]: https://github.com/ctz/rustls
 
-- To use system TLS library (OpenSSL or LibreSSL), add `--no-default-features
-  --features=tls-native` to the command you're using. Note that this requires
-  OpenSSL or LibreSSL headers and runtime libraries on Linux.
+On Linux, Cargo builds with notifications require `pkg-config` and the libdbus
+development package (for example, `libdbus-1-dev` on Debian/Ubuntu). At runtime,
+a D-Bus session and a notification service are required. On macOS,
+notifications may be attributed to Finder, so Finder's notification permission
+settings can affect their display.
 
-- To enable desktop notifications add `--features=desktop-notifications`. This
-  requires libdbus on Linux.
+- To build without notifications while retaining rustls, add
+  `--no-default-features --features=tls-rustls`.
+- To use the system TLS library (OpenSSL or LibreSSL) with notifications, add
+  `--no-default-features --features="tls-native desktop-notifications"`.
+  This also requires OpenSSL or LibreSSL headers and runtime libraries on Linux.
+- For a musl build with notifications, add
+  `--features=desktop-notifications-static-linking` to build libdbus from
+  vendored sources.
 
 To install in a clone:
 
@@ -74,7 +83,7 @@ cargo install --path crates/tiny
 If you don't want to clone the repo, you can use
 
 ```
-cargo install --git https://github.com/osa1/tiny
+cargo install --git https://github.com/sunao1222/tiny --branch dev
 ```
 
 If you have an older version installed, add `--force` to the command you're
@@ -90,8 +99,8 @@ tiny is tested on Linux and OSX.
 
 ### Nix
 
-With Nix flakes enabled, build the default rustls-based package or enter the
-development shell from the repository root:
+With Nix flakes enabled, build the default rustls-based package, which enables
+desktop notifications, or enter the development shell from the repository root:
 
 ```sh
 nix build
@@ -127,7 +136,7 @@ nix fmt -- flake.nix shell.nix nix/package.nix nix/home-manager.nix nix/tests/ho
 
 #### Home Manager
 
-With Home Manager 26.05, add `github:osa1/tiny` as a flake input named `tiny`.
+With Home Manager 26.05, add `github:sunao1222/tiny/dev` as a flake input named `tiny`.
 Use `tiny.packages.${system}.default` as a package, or include
 `tiny.homeManagerModules.default` in the modules passed to
 `home-manager.lib.homeManagerConfiguration`:

@@ -41,7 +41,10 @@
   Both use the rust-overlay toolchain selected by `rust-toolchain`.
   Keep Clippy and formatting checks compatible with this toolchain.
   On Linux, the package also supplies the build inputs for native TLS and
-  desktop notifications without changing the default features.
+  desktop notifications.
+  Desktop notifications for channel mentions and private messages are enabled
+  by default; Linux Cargo builds require `pkg-config` and libdbus development
+  headers.
 - Export a Home Manager 26.05 module with unchanged raw YAML configuration and
   an overridable tiny package.
 
