@@ -10,7 +10,6 @@ mod tests;
 
 use term_input_macros::byte_seq_parser;
 
-use std::char;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::os::unix::io::RawFd;
@@ -265,30 +264,31 @@ impl Input {
     }
 
     fn parse_buffer(&mut self) {
-        let mut buf_slice: &[u8] = &self.buf;
+        parse_input(&mut self.buf, &mut self.evs);
+    }
+}
 
-        while !buf_slice.is_empty() {
-            // Special treatment for 127 (backspace, 0x1B) and 13 ('\r', 0xD)
-            let fst = buf_slice[0];
-            let parse_fn = if (fst < 32 && fst != 13) || fst == 127 {
-                parse_key_comb
-            } else {
-                parse_chars
-            };
-
-            match parse_fn(buf_slice) {
-                Some((ev, used)) => {
-                    buf_slice = &buf_slice[used..];
-                    self.evs.push_back(ev);
-                }
-                None => {
-                    self.evs.push_back(Event::Unknown(buf_slice.to_owned()));
-                    break;
-                }
+// Keep an incomplete UTF-8 suffix in the buffer until more bytes arrive.
+fn parse_input(buf: &mut Vec<u8>, events: &mut VecDeque<Event>) {
+    let mut consumed = 0;
+    while consumed < buf.len() {
+        let remaining = &buf[consumed..];
+        let first = remaining[0];
+        let parsed = if (first < 32 && first != 13) || first == 127 {
+            parse_key_comb(remaining)
+        } else {
+            parse_chars(remaining)
+        };
+        match parsed {
+            Some((event, used)) => {
+                events.push_back(event);
+                consumed += used;
             }
+            None => break,
         }
-
-        self.buf.clear();
+    }
+    if consumed > 0 {
+        buf.drain(..consumed);
     }
 }
 
@@ -318,6 +318,7 @@ impl Stream for Input {
                         ready.clear_ready();
 
                         // Read stdin until it fails with EWOULDBLOCK or returns 0
+                        let old_len = self_.buf.len();
                         let read_ret = read_stdin(&mut self_.buf);
 
                         // Poll again so that we will be notified when stdin becomes ready again
@@ -334,7 +335,7 @@ impl Stream for Input {
                             }
                         }
 
-                        if self_.buf.is_empty() {
+                        if self_.buf.len() == old_len {
                             continue;
                         } else {
                             continue 'main;
@@ -361,10 +362,7 @@ pub(crate) fn parse_single_event(buf: &[u8]) -> Event {
         parse_chars
     };
 
-    let (ev, used) = match parse_fn(buf) {
-        Some((ev, used)) => (ev, used),
-        None => (Event::Unknown(buf.to_owned()), buf.len()),
-    };
+    let (ev, used) = parse_fn(buf).unwrap_or_else(|| (Event::Unknown(buf.to_owned()), buf.len()));
 
     assert_eq!(buf.len(), used);
 
@@ -373,37 +371,32 @@ pub(crate) fn parse_single_event(buf: &[u8]) -> Event {
 
 fn parse_chars(buf: &[u8]) -> Option<(Event, usize)> {
     debug_assert!(!buf.is_empty());
-
-    // Use a fast path for the common case: Single utf-8 character.
-    // (TODO: What about other encodings?)
-
-    utf8_char_len(buf[0]).map(|char_len| {
-        if char_len as usize == buf.len() {
-            // Fast path: single character
-            let ev = Event::Key(Key::Char(get_utf8_char(buf, char_len)));
-            (ev, char_len as usize)
-        } else {
-            // Probably a paste: allocate a string and collect chars
-            let mut string = String::with_capacity(1000);
-            let mut start_idx = 0;
-            loop {
-                if start_idx == buf.len() {
-                    break;
-                }
-                match utf8_char_len(buf[start_idx]) {
-                    Some(char_len) => {
-                        string.push(get_utf8_char(&buf[start_idx..], char_len));
-                        start_idx += char_len as usize;
-                    }
-                    None => {
-                        break;
-                    }
-                }
-            }
-            let ev = Event::String(string);
-            (ev, start_idx)
+    let valid_len = match std::str::from_utf8(buf) {
+        Ok(_) => buf.len(),
+        Err(err)
+            if err.error_len().is_none()
+                && buf[..err.valid_up_to()]
+                    .iter()
+                    .any(|byte| matches!(byte, b'\r' | b'\n')) =>
+        {
+            return None;
         }
-    })
+        Err(err) if err.valid_up_to() > 0 => err.valid_up_to(),
+        Err(err) => {
+            return err
+                .error_len()
+                .map(|len| (Event::Unknown(buf[..len].to_vec()), len));
+        }
+    };
+    let text = std::str::from_utf8(&buf[..valid_len]).unwrap();
+    let mut chars = text.chars();
+    let first = chars.next().unwrap();
+    let event = if chars.next().is_none() && (first != '\r' || valid_len == buf.len()) {
+        Event::Key(Key::Char(first))
+    } else {
+        Event::String(text.to_owned())
+    };
+    Some((event, valid_len))
 }
 
 fn parse_key_comb(buf: &[u8]) -> Option<(Event, usize)> {
@@ -414,58 +407,28 @@ fn parse_key_comb(buf: &[u8]) -> Option<(Event, usize)> {
     }
 
     if buf[0] == 27 {
-        // 0x1B, ESC
-        // 27 not followed by anything is an actual ESC
+        // Preserve the existing immediate ESC behavior. Once the first byte of an Alt
+        // character has arrived, retain the entire sequence until the character is complete.
         if buf.len() == 1 {
             return Some((Event::Key(Key::Esc), 1));
         }
-        // otherwise it's probably alt + key
-        else {
-            debug_assert!(buf.len() >= 2);
-            return utf8_char_len(buf[1]).map(|char_len| {
-                let ev = Event::Key(Key::AltChar(get_utf8_char(&buf[1..], char_len)));
-                (ev, char_len as usize + 1)
-            });
-        }
+        let text = match std::str::from_utf8(&buf[1..]) {
+            Ok(text) => text,
+            Err(err) if err.valid_up_to() > 0 => {
+                std::str::from_utf8(&buf[1..1 + err.valid_up_to()]).unwrap()
+            }
+            Err(err) => {
+                return err.error_len().map(|len| {
+                    let used = 1 + len;
+                    (Event::Unknown(buf[..used].to_vec()), used)
+                });
+            }
+        };
+        let ch = text.chars().next().unwrap();
+        return Some((Event::Key(Key::AltChar(ch)), 1 + ch.len_utf8()));
     }
 
-    None
-}
-
-fn utf8_char_len(byte: u8) -> Option<u8> {
-    if byte >> 7 == 0b0 {
-        Some(1)
-    } else if byte >> 5 == 0b110 {
-        Some(2)
-    } else if byte >> 4 == 0b1110 {
-        Some(3)
-    } else if byte >> 3 == 0b11110 {
-        Some(4)
-    } else {
-        None
-    }
-}
-
-fn get_utf8_char(buf: &[u8], len: u8) -> char {
-    let codepoint: u32 = {
-        if len == 1 {
-            u32::from(buf[0] & 0b0111_1111)
-        } else if len == 2 {
-            ((u32::from(buf[0] & 0b0001_1111)) << 6) + (u32::from(buf[1] & 0b0011_1111))
-        } else if len == 3 {
-            ((u32::from(buf[0] & 0b0000_1111)) << 12)
-                + ((u32::from(buf[1] & 0b0011_1111)) << 6)
-                + (u32::from(buf[2] & 0b0011_1111))
-        } else {
-            debug_assert!(len == 4);
-            ((u32::from(buf[0] & 0b0000_0111)) << 18)
-                + ((u32::from(buf[1] & 0b0011_1111)) << 12)
-                + ((u32::from(buf[2] & 0b0011_1111)) << 6)
-                + (u32::from(buf[3] & 0b0011_1111))
-        }
-    };
-
-    char::from_u32(codepoint).unwrap()
+    Some((Event::Unknown(buf.to_owned()), buf.len()))
 }
 
 /// How many bytes to read from `stdin` in a single `read()`
