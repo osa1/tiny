@@ -196,10 +196,20 @@ impl Client {
         connect(server_info)
     }
 
-    /// Reconnect to the server, possibly using a new port.
+    /// Reconnect to the server, possibly using a new port and keeping the current proxy.
     pub fn reconnect(&mut self, port: Option<u16>) {
         debug!("reconnect cmd received, port: {port:?}");
-        self.msg_chan.try_send(Cmd::Reconnect(port)).unwrap()
+        self.msg_chan
+            .try_send(Cmd::Reconnect(ReconnectRequest::KeepProxy { port }))
+            .unwrap()
+    }
+
+    /// Reconnect to the server using the specified port and proxy, or a direct connection.
+    pub fn reconnect_with_proxy(&mut self, port: u16, proxy: Option<ProxyConfig>) {
+        debug!("reconnect cmd received, port: {port}, proxy: {proxy:?}");
+        self.msg_chan
+            .try_send(Cmd::Reconnect(ReconnectRequest::SetProxy { port, proxy }))
+            .unwrap()
     }
 
     /// Get host name of this connection.
@@ -320,12 +330,42 @@ impl Client {
 //
 
 #[derive(Debug)]
+enum ReconnectRequest {
+    KeepProxy {
+        port: Option<u16>,
+    },
+    SetProxy {
+        port: u16,
+        proxy: Option<ProxyConfig>,
+    },
+}
+
+impl ReconnectRequest {
+    fn apply(self, port: &mut u16, proxy: &mut Option<ProxyConfig>) {
+        match self {
+            Self::KeepProxy { port: new_port } => {
+                if let Some(new_port) = new_port {
+                    *port = new_port;
+                }
+            }
+            Self::SetProxy {
+                port: new_port,
+                proxy: new_proxy,
+            } => {
+                *port = new_port;
+                *proxy = new_proxy;
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
 enum Cmd {
     /// Send this IRC message to the server. Note that this needs to be a valid IRC message
     /// (including the trailing "\r\n").
     Msg(String),
-    /// Reconnect to the server, possibly using a new port.
-    Reconnect(Option<u16>),
+    /// Reconnect to the server, possibly changing the port and proxy.
+    Reconnect(ReconnectRequest),
     /// Close the connection. This sends a QUIT message to the server (with optional "reason") and
     /// then all tasks return.
     Quit(Option<String>),
@@ -391,7 +431,7 @@ fn connect_inner(
 }
 
 async fn main_loop(
-    server_info: ServerInfo,
+    mut server_info: ServerInfo,
     irc_state: State,
     mut snd_ev: mpsc::Sender<Event>,
     rcv_cmd: mpsc::Receiver<Cmd>,
@@ -399,7 +439,7 @@ async fn main_loop(
 ) {
     let mut rcv_cmd = ReceiverStream::new(rcv_cmd).fuse();
 
-    // We allow changing ports when reconnecting, so `mut`
+    // The port and proxy may change when reconnecting.
     let mut port = server_info.port;
 
     // Whether to wait before trying to (re)connect
@@ -410,14 +450,23 @@ async fn main_loop(
         if wait {
             match wait_(&mut rcv_cmd).await {
                 TaskResult::Done(()) => {}
-                TaskResult::Reconnect(mb_port) => {
-                    port = mb_port.unwrap_or(port);
+                TaskResult::Reconnect(request) => {
+                    request.apply(&mut port, &mut server_info.proxy);
                     wait = false;
                     continue;
                 }
                 TaskResult::Return => {
                     return;
                 }
+            }
+        }
+
+        if server_info.proxy.is_some() {
+            if let Err(err) = stream::validate_proxy_destination(&server_info.addr) {
+                snd_ev.send(Event::from(err)).await.unwrap();
+                snd_ev.send(Event::Disconnected).await.unwrap();
+                wait = true;
+                continue;
             }
         }
 
@@ -454,8 +503,8 @@ async fn main_loop(
                 wait = true;
                 continue;
             }
-            TaskResult::Reconnect(mb_port) => {
-                port = mb_port.unwrap_or(port);
+            TaskResult::Reconnect(request) => {
+                request.apply(&mut port, &mut server_info.proxy);
                 wait = false;
                 continue;
             }
@@ -496,9 +545,20 @@ async fn main_loop(
                             SocketAddr::V6(_) => None,
                         })
                         .collect::<Vec<_>>(),
-                    TaskResult::Done(Err(_)) => Vec::new(),
-                    TaskResult::Reconnect(mb_port) => {
-                        port = mb_port.unwrap_or(port);
+                    TaskResult::Done(Err(err)) => {
+                        snd_ev
+                            .send(Event::ProxyErr(std::io::Error::new(
+                                err.kind(),
+                                "Failed to resolve SOCKS4 destination",
+                            )))
+                            .await
+                            .unwrap();
+                        snd_ev.send(Event::Disconnected).await.unwrap();
+                        wait = true;
+                        continue;
+                    }
+                    TaskResult::Reconnect(request) => {
+                        request.apply(&mut port, &mut server_info.proxy);
                         wait = false;
                         continue;
                     }
@@ -543,8 +603,8 @@ async fn main_loop(
             TaskResult::Return => {
                 return;
             }
-            TaskResult::Reconnect(mb_port) => {
-                port = mb_port.unwrap_or(port);
+            TaskResult::Reconnect(request) => {
+                request.apply(&mut port, &mut server_info.proxy);
                 wait = false;
                 continue;
             }
@@ -572,7 +632,7 @@ async fn main_loop(
 
         // Spawn a task for outgoing messages.
         let snd_ev_clone = snd_ev.clone();
-        tokio::task::spawn_local(async move {
+        let sender_task = tokio::task::spawn_local(async move {
             let mut rcv_msg = ReceiverStream::new(rcv_msg);
             while let Some(msg) = rcv_msg.next().await {
                 if let Err(io_err) = write_half.write_all(msg.as_bytes()).await {
@@ -602,10 +662,9 @@ async fn main_loop(
                         Some(Cmd::Msg(irc_msg)) => {
                             snd_msg.try_send(irc_msg).unwrap();
                         }
-                        Some(Cmd::Reconnect(mb_port)) => {
-                            if let Some(new_port) = mb_port {
-                                port = new_port;
-                            }
+                        Some(Cmd::Reconnect(request)) => {
+                            sender_task.abort();
+                            request.apply(&mut port, &mut server_info.proxy);
                             wait = false;
                             continue 'connect;
                         }
@@ -680,7 +739,7 @@ async fn main_loop(
 enum TaskResult<A> {
     Done(A),
     Return,
-    Reconnect(Option<u16>),
+    Reconnect(ReconnectRequest),
 }
 
 async fn wait_<S: StreamExt<Item = Cmd> + Unpin>(rcv_cmd: &mut S) -> TaskResult<()> {
@@ -703,8 +762,8 @@ async fn wait_<S: StreamExt<Item = Cmd> + Unpin>(rcv_cmd: &mut S) -> TaskResult<
                     Some(Cmd::Msg(_)) => {
                         continue;
                     }
-                    Some(Cmd::Reconnect(mb_port)) => {
-                        return TaskResult::Reconnect(mb_port);
+                    Some(Cmd::Reconnect(request)) => {
+                        return TaskResult::Reconnect(request);
                     }
                     Some(Cmd::Quit(_)) => {
                         return TaskResult::Return;
@@ -745,8 +804,8 @@ async fn resolve_addr<S: StreamExt<Item = Cmd> + Unpin>(
                     Some(Cmd::Msg(_)) => {
                         continue;
                     }
-                    Some(Cmd::Reconnect(mb_port)) => {
-                        return TaskResult::Reconnect(mb_port);
+                    Some(Cmd::Reconnect(request)) => {
+                        return TaskResult::Reconnect(request);
                     }
                     Some(Cmd::Quit(_)) => {
                         return TaskResult::Return;
@@ -817,8 +876,8 @@ async fn try_connect<S: StreamExt<Item = Cmd> + Unpin>(
                     Some(Cmd::Msg(_)) => {
                         continue;
                     }
-                    Some(Cmd::Reconnect(mb_port)) => {
-                        return TaskResult::Reconnect(mb_port);
+                    Some(Cmd::Reconnect(request)) => {
+                        return TaskResult::Reconnect(request);
                     }
                     Some(Cmd::Quit(_)) => {
                         return TaskResult::Return;

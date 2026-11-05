@@ -414,3 +414,46 @@ async fn https_basic_registration_and_rejection() {
         })
         .await;
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn stream_rejects_scoped_ipv6_before_connecting_to_proxy() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    for protocol in [
+        ProxyProtocol::Http,
+        ProxyProtocol::Https,
+        ProxyProtocol::Socks4 { remote_dns: false },
+        ProxyProtocol::Socks4 { remote_dns: true },
+        ProxyProtocol::Socks5,
+    ] {
+        let info = ServerInfo {
+            addr: "::1%1".into(),
+            port: 6667,
+            tls: false,
+            proxy: Some(ProxyConfig {
+                protocol,
+                addr: address.ip().to_string(),
+                port: address.port(),
+                auth: None,
+            }),
+            pass: None,
+            user: None,
+            realname: "Tiny".into(),
+            nicks: vec!["tiny".into()],
+            auto_join: vec![],
+            nickserv_ident: None,
+            sasl_auth: None,
+        };
+        match Stream::connect(address, &info, info.port, None).await {
+            Err(StreamError::ProxyError(error)) => {
+                assert!(error.to_string().contains("scoped IPv6"));
+            }
+            _ => panic!("expected a scoped IPv6 proxy error"),
+        }
+        assert!(
+            timeout(Duration::from_millis(20), listener.accept())
+                .await
+                .is_err()
+        );
+    }
+}

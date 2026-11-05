@@ -367,6 +367,165 @@ fn reconnect_changes_only_target_and_interrupts_handshake() {
 }
 
 #[test]
+fn reconnect_switches_proxy_and_can_return_to_direct() {
+    run(async {
+        let direct = listener().await;
+        let proxy_a = listener().await;
+        let proxy_b = listener().await;
+        let direct_port = direct.local_addr().unwrap().port();
+        let a = proxy(proxy_a.local_addr().unwrap(), ProxyProtocol::Http, None);
+        let b = proxy(proxy_b.local_addr().unwrap(), ProxyProtocol::Http, None);
+        let (mut client, _events) = Client::new(info("127.0.0.1", direct_port, None));
+
+        let (mut initial, _) = direct.accept().await.unwrap();
+        registration(&mut initial, false).await;
+        client.reconnect_with_proxy(1111, Some(a));
+        let (mut first, _) = proxy_a.accept().await.unwrap();
+        http_request(&mut first, "127.0.0.1:1111", false).await;
+        let mut byte = [0];
+        assert_eq!(initial.read(&mut byte).await.unwrap(), 0);
+
+        // Changing the proxy interrupts an unfinished tunnel negotiation.
+        client.reconnect_with_proxy(2222, Some(b));
+        let (mut second, _) = proxy_b.accept().await.unwrap();
+        http_request(&mut second, "127.0.0.1:2222", false).await;
+        assert_eq!(first.read(&mut byte).await.unwrap(), 0);
+        second.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await.unwrap();
+        registration(&mut second, false).await;
+
+        // The original API retains the selected proxy, even for a direct listener's port.
+        client.reconnect(Some(direct_port));
+        let (mut retained, _) = proxy_b.accept().await.unwrap();
+        http_request(&mut retained, &format!("127.0.0.1:{direct_port}"), false).await;
+        assert_eq!(second.read(&mut byte).await.unwrap(), 0);
+        assert!(
+            timeout(Duration::from_millis(100), direct.accept())
+                .await
+                .is_err()
+        );
+        retained
+            .write_all(b"HTTP/1.1 200 OK\r\n\r\n")
+            .await
+            .unwrap();
+        registration(&mut retained, false).await;
+
+        client.reconnect_with_proxy(direct_port, None);
+        let (mut final_direct, _) = direct.accept().await.unwrap();
+        assert_eq!(retained.read(&mut byte).await.unwrap(), 0);
+        registration(&mut final_direct, false).await;
+        client.quit(None);
+    });
+}
+
+#[test]
+fn reconnect_switches_proxy_while_waiting_after_failure() {
+    run(async {
+        let proxy_a = listener().await;
+        let proxy_b = listener().await;
+        let a = proxy(proxy_a.local_addr().unwrap(), ProxyProtocol::Http, None);
+        let b = proxy(proxy_b.local_addr().unwrap(), ProxyProtocol::Http, None);
+        let (mut client, mut events) = Client::new(info("irc.invalid", 6667, Some(a)));
+        let (mut first, _) = proxy_a.accept().await.unwrap();
+        http_request(&mut first, "irc.invalid:6667", false).await;
+        first
+            .write_all(b"HTTP/1.1 407 Forbidden\r\n\r\n")
+            .await
+            .unwrap();
+        while !matches!(events.recv().await.unwrap(), Event::Disconnected) {}
+
+        client.reconnect_with_proxy(6697, Some(b));
+        let (mut second, _) = proxy_b.accept().await.unwrap();
+        http_request(&mut second, "irc.invalid:6697", false).await;
+        second.write_all(b"HTTP/1.1 200 OK\r\n\r\n").await.unwrap();
+        registration(&mut second, false).await;
+        client.quit(None);
+    });
+}
+
+#[test]
+fn scoped_ipv6_destinations_are_rejected_before_connecting() {
+    run(async {
+        let direct = TcpListener::bind("[::1]:0")
+            .await
+            .expect("IPv6 loopback is required for this test");
+        let proxy_listener = listener().await;
+        let proxy_addr = proxy_listener.local_addr().unwrap();
+        let direct_port = direct.local_addr().unwrap().port();
+        for host in ["::1%1", "[::1%1]"] {
+            for protocol in [
+                ProxyProtocol::Http,
+                ProxyProtocol::Https,
+                ProxyProtocol::Socks4 { remote_dns: false },
+                ProxyProtocol::Socks4 { remote_dns: true },
+                ProxyProtocol::Socks5,
+            ] {
+                let (mut client, mut events) = Client::new(info(
+                    host,
+                    direct_port,
+                    Some(proxy(proxy_addr, protocol, None)),
+                ));
+                match events.recv().await.unwrap() {
+                    Event::ProxyErr(error) => {
+                        assert!(error.to_string().contains("scoped IPv6"));
+                    }
+                    other => panic!("expected scoped IPv6 proxy error before DNS: {other:?}"),
+                }
+                assert!(
+                    timeout(Duration::from_millis(20), proxy_listener.accept())
+                        .await
+                        .is_err()
+                );
+                assert!(
+                    timeout(Duration::from_millis(20), direct.accept())
+                        .await
+                        .is_err()
+                );
+                client.quit(None);
+            }
+        }
+    });
+}
+
+#[test]
+fn socks4_local_dns_errors_are_distinct_from_ipv6_rejection() {
+    run(async {
+        let proxy_listener = listener().await;
+        let proxy_addr = proxy_listener.local_addr().unwrap();
+        let host = "x".repeat(300);
+        for (host, expected) in [
+            (host.as_str(), "Failed to resolve SOCKS4 destination"),
+            ("::1", "SOCKS4 requires an IPv4 destination"),
+        ] {
+            let (mut client, mut events) = Client::new(info(
+                host,
+                6667,
+                Some(proxy(
+                    proxy_addr,
+                    ProxyProtocol::Socks4 { remote_dns: false },
+                    None,
+                )),
+            ));
+            loop {
+                match events.recv().await.unwrap() {
+                    Event::ProxyErr(error) => {
+                        assert_eq!(error.to_string(), expected);
+                        break;
+                    }
+                    Event::ConnectingProxy(_) => panic!("proxy connected before target validation"),
+                    _ => {}
+                }
+            }
+            assert!(
+                timeout(Duration::from_millis(20), proxy_listener.accept())
+                    .await
+                    .is_err()
+            );
+            client.quit(None);
+        }
+    });
+}
+
+#[test]
 fn http_rejections_are_sanitized() {
     run(async {
         let too_many = format!("HTTP/1.1 200 OK\r\n{}\r\n", "X: a\r\n".repeat(65));

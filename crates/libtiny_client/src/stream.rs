@@ -60,6 +60,21 @@ fn proxy_error(message: &'static str) -> StreamError {
     StreamError::ProxyError(io::Error::new(io::ErrorKind::Other, message))
 }
 
+pub(crate) fn validate_proxy_destination(host: &str) -> Result<(), StreamError> {
+    let host = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+    if let Some((ip, _scope)) = host.split_once('%') {
+        if ip.parse::<std::net::Ipv6Addr>().is_ok() {
+            return Err(proxy_error(
+                "scoped IPv6 destinations are not supported by proxies",
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(feature = "tls-native")]
 fn tls_connector(
     identity: Option<&Vec<u8>>,
@@ -324,6 +339,7 @@ impl Stream {
         root: Option<&[u8]>,
     ) -> Result<Stream, StreamError> {
         if let Some(proxy) = &info.proxy {
+            validate_proxy_destination(&info.addr)?;
             validate_proxy(proxy, &info.addr)?;
         }
         let tcp = TcpStream::connect(tcp_addr).await.map_err(|e| {

@@ -137,6 +137,12 @@ resolve the IRC host locally and use IPv4-only SOCKS4 instead.
 `/connect` uses a matching configured server's proxy even if that server is not
 autoconnected or was excluded by command-line filters. If multiple servers
 share a hostname, the requested port must select exactly one of them.
+Reconnecting switches to the selected server's proxy, including an explicit
+direct connection; with no matching server configuration, it keeps the current
+proxy.
+
+Scoped IPv6 destinations (such as `fe80::1%eth0`) cannot be represented safely
+by proxy protocols and are rejected when a proxy is configured.
 
 ### Using external commands for passwords
 

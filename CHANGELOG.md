@@ -1,7 +1,9 @@
 # Unreleased
 
 - Add optional per-server HTTP, HTTPS, SOCKS4/4a and SOCKS5 proxies, including
-  authenticated proxies and reuse by `/connect`.
+  authenticated proxies and reuse by `/connect`. Reconnection applies the
+  selected server's proxy, scoped IPv6 proxy destinations are rejected, and
+  SOCKS4 local DNS failures are reported separately from IPv6 rejections.
 - Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
   ignored and are now synonymous with `tab` and `esc`. (#444)
 - The keystrokes `ctrl_h` and `backspace` can now be distinguished, which
