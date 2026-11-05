@@ -24,6 +24,19 @@ use tokio_rustls::client::TlsStream;
 type HttpStream = BufReader<TcpStream>;
 type HttpsStream = BufReader<TlsStream<TcpStream>>;
 
+fn tls_server_name(host_name: &str) -> &str {
+    match host_name.split_once('%') {
+        Some((ip, scope))
+            if !scope.is_empty()
+                && !scope.contains('%')
+                && ip.parse::<std::net::Ipv6Addr>().is_ok() =>
+        {
+            ip
+        }
+        _ => host_name,
+    }
+}
+
 pub(crate) enum Stream {
     TcpStream(Box<TcpStream>),
     TlsStream(Box<TlsStream<TcpStream>>),
@@ -115,7 +128,7 @@ async fn tls_connect<S: AsyncRead + AsyncWrite + Unpin>(
         custom = tls_connector(identity, root)?;
         &custom
     };
-    Ok(connector.connect(host, stream).await?)
+    Ok(connector.connect(tls_server_name(host), stream).await?)
 }
 
 #[cfg(feature = "tls-rustls")]
@@ -166,7 +179,7 @@ async fn tls_connect<S: AsyncRead + AsyncWrite + Unpin>(
     use tokio_rustls::rustls::ServerName;
     static DEFAULT: LazyLock<Result<tokio_rustls::TlsConnector, ()>> =
         LazyLock::new(|| tls_connector(None, None).map_err(|_| ()));
-    let name = ServerName::try_from(host)
+    let name = ServerName::try_from(tls_server_name(host))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid TLS server name"))?;
     let custom;
     let connector = if identity.is_none() && root.is_none() {
@@ -510,5 +523,157 @@ impl AsyncWrite for Stream {
             Self::Https(s) => Pin::new(s).poll_shutdown(cx),
             Self::HttpsTls(s) => Pin::new(s).poll_shutdown(cx),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Stream, StreamError, tls_server_name};
+    use crate::ServerInfo;
+    use std::process::Command;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio_rustls::TlsAcceptor;
+    use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
+
+    #[test]
+    fn scoped_server_names() {
+        for (input, expected) in [
+            ("::1%1", "::1"),
+            ("fe80::1%lo", "fe80::1"),
+            ("::ffff:192.0.2.1%lo", "::ffff:192.0.2.1"),
+            ("::1", "::1"),
+            ("localhost", "localhost"),
+            ("localhost%lo", "localhost%lo"),
+            ("127.0.0.1%lo", "127.0.0.1%lo"),
+            ("::1%", "::1%"),
+            ("::1%lo%extra", "::1%lo%extra"),
+            ("not-ip%lo", "not-ip%lo"),
+        ] {
+            assert_eq!(tls_server_name(input), expected);
+        }
+    }
+
+    #[test]
+    fn scoped_ipv6_tls() {
+        const CHILD: &str = "TINY_TEST_IPV6_TLS_CHILD";
+        if !matches!(std::env::var(CHILD).as_deref(), Ok("1")) {
+            let output = Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "stream::tests::scoped_ipv6_tls", "--nocapture"])
+                .env(CHILD, "1")
+                .env(
+                    "SSL_CERT_FILE",
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/ipv6-ca.pem"),
+                )
+                .output()
+                .expect("failed to run isolated TLS test");
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "TLS test child failed: {}\nstdout:\n{}\nstderr:\n{}",
+                output.status,
+                stdout,
+                stderr,
+            );
+            eprint!("{stderr}");
+            return;
+        }
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let listener = match TcpListener::bind("[::1]:0").await {
+                    Ok(listener) => listener,
+                    Err(err)
+                        if matches!(
+                            err.kind(),
+                            std::io::ErrorKind::AddrNotAvailable | std::io::ErrorKind::Unsupported
+                        ) || matches!(err.raw_os_error(), Some(93 | 97)) =>
+                    {
+                        eprintln!("Skipping IPv6 TLS test: {err}");
+                        return;
+                    }
+                    Err(err) => panic!("IPv6 loopback bind failed: {err}"),
+                };
+                let cert =
+                    Certificate(include_bytes!("../tests/fixtures/ipv6-server.der").to_vec());
+                let key =
+                    PrivateKey(include_bytes!("../tests/fixtures/ipv6-server-key.der").to_vec());
+                let config = ServerConfig::builder()
+                    .with_safe_defaults()
+                    .with_no_client_auth()
+                    .with_single_cert(vec![cert], key)
+                    .unwrap();
+                let acceptor = TlsAcceptor::from(Arc::new(config));
+
+                for (name, succeeds) in [("::1%1", true), ("localhost", true), ("::2%1", false)] {
+                    tokio::time::timeout(Duration::from_secs(5), async {
+                        let server = async {
+                            let (tcp, _) = listener.accept().await.unwrap();
+                            let handshake = acceptor.accept(tcp).await;
+                            if succeeds {
+                                let mut tls = handshake.expect("server TLS handshake failed");
+                                let mut ping = [0; 4];
+                                tls.read_exact(&mut ping).await.unwrap();
+                                assert_eq!(&ping, b"ping");
+                                tls.write_all(b"pong").await.unwrap();
+                            }
+                        };
+                        let client = async {
+                            let address = listener.local_addr().unwrap();
+                            let info = ServerInfo {
+                                addr: name.to_owned(),
+                                port: address.port(),
+                                tls: true,
+                                proxy: None,
+                                user: None,
+                                realname: "Test User".to_owned(),
+                                pass: None,
+                                nicks: vec!["testnick".to_owned()],
+                                auto_join: vec![],
+                                nickserv_ident: None,
+                                sasl_auth: None,
+                            };
+                            let connection = Stream::connect(address, &info, info.port, None).await;
+                            if succeeds {
+                                let mut tls = match connection {
+                                    Ok(tls) => tls,
+                                    Err(StreamError::TlsError(err)) => {
+                                        panic!("TLS handshake failed: {err}")
+                                    }
+                                    Err(StreamError::IoError(err)) => {
+                                        panic!("TLS handshake failed: {err}")
+                                    }
+                                    Err(StreamError::ProxyError(err)) => {
+                                        panic!("unexpected proxy error: {err}")
+                                    }
+                                };
+                                tls.write_all(b"ping").await.unwrap();
+                                let mut pong = [0; 4];
+                                tls.read_exact(&mut pong).await.unwrap();
+                                assert_eq!(&pong, b"pong");
+                            } else {
+                                let error = match connection {
+                                    Ok(_) => panic!("certificate mismatch unexpectedly accepted"),
+                                    Err(StreamError::TlsError(err)) => err.to_string(),
+                                    Err(StreamError::IoError(err)) => err.to_string(),
+                                    Err(StreamError::ProxyError(err)) => {
+                                        panic!("unexpected proxy error: {err}")
+                                    }
+                                };
+                                assert!(error.to_lowercase().contains("certificate"), "{error}");
+                            }
+                        };
+                        tokio::join!(server, client);
+                    })
+                    .await
+                    .unwrap_or_else(|_| panic!("timed out testing TLS name {name}"));
+                }
+            });
     }
 }

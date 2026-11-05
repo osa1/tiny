@@ -72,7 +72,7 @@ pub struct ProxyConfig {
 
 #[derive(Debug, Clone)]
 pub struct ServerInfo {
-    /// Server address
+    /// Server host without a port; use unbracketed IPv6 literals, optionally with a scope ID.
     pub addr: String,
 
     /// Server port

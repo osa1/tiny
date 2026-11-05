@@ -168,6 +168,10 @@ When a config file is not found in one of these locations tiny creates one in
 the first path above with defaults and exits, printing path to the config file.
 Edit that file before re-running tiny to change the defaults.
 
+For an IPv6 server, use an unbracketed `addr`, such as `::1` or
+`fe80::1%lo`, and specify `port` separately. A scope ID is retained for the
+connection but omitted from the IP address used to verify the TLS certificate.
+
 **A note on nick identification:** Some IRC servers such as ircd-seven (used by
 Freenode) and InspIRCd (used by Mozilla) support identification via the `PASS`
 command. This way of identification (rather than sending a message to a service
@@ -296,8 +300,10 @@ Commands start with `/` character.
 - `/close`: Close the current tab. Leaves the channel if the current tab is a
   channel. Leaves the server if the tab is a server. You can use `/close <reason>` to send a goodbye message.
 
-- `/connect <hostname>:<port>`: Connect to a server. Uses `defaults` in the
-  config file for nick, realname, hostname and auto cmds.
+- `/connect <host>:<port> [<password>]` or `/connect [<IPv6>]:<port> [<password>]`:
+  Connect to a server using the nick, realname, TLS and auto-join settings in
+  `defaults`. For example, `/connect [::1]:6667` or
+  `/connect [fe80::1%lo]:6697`.
 
 - `/connect`: Reconnect to the current server. Use if you don't want to wait
   tiny to reconnect automatically after a connectivity problem.

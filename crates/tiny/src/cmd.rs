@@ -186,7 +186,7 @@ static CONNECT_CMD: Cmd = Cmd {
     name: "connect",
     cmd_fn: connect,
     description: "Connects to a server",
-    usage: "`/connect <host>:<port>` or `/connect` to reconnect",
+    usage: "`/connect <host>:<port>` or `/connect [<IPv6>]:<port>` or `/connect` to reconnect",
 };
 
 fn connect(args: CmdArgs) {
@@ -285,6 +285,22 @@ fn select_proxy<'a>(
     }
 }
 
+fn split_port(s: &str) -> Option<(&str, &str)> {
+    if let Some(bracketed) = s.strip_prefix('[') {
+        let (host, rest) = bracketed.split_once(']')?;
+        let port = rest.strip_prefix(':')?;
+        let ip = match host.split_once('%') {
+            Some((ip, scope)) if !scope.is_empty() && !scope.contains('%') => ip,
+            Some(_) => return None,
+            None => host,
+        };
+        ip.parse::<std::net::Ipv6Addr>().ok()?;
+        Some((host, port))
+    } else {
+        s.split_once(':')
+    }
+}
+
 fn connect_(
     serv_addr: &str,
     pass: Option<&str>,
@@ -293,10 +309,6 @@ fn connect_(
     ui: &UI,
     clients: &mut Vec<Client>,
 ) {
-    fn split_port(s: &str) -> Option<(&str, &str)> {
-        s.find(':').map(|split| (&s[0..split], &s[split + 1..]))
-    }
-
     // parse host name and port
     let (serv_name, serv_port) = {
         match split_port(serv_addr) {
@@ -669,6 +681,44 @@ fn test_parse_cmd() {
     let ParsedCmd { cmd, args } = parse_cmd("join #foo").unwrap();
     assert_eq!(cmd.name, "join");
     assert_eq!(args, "#foo");
+}
+
+#[test]
+fn test_split_port() {
+    for (input, host, port) in [
+        ("irc.example:6697", "irc.example", 6697),
+        ("127.0.0.1:6667", "127.0.0.1", 6667),
+        ("[::1]:6667", "::1", 6667),
+        ("[2001:db8::1]:6697", "2001:db8::1", 6697),
+        ("[::ffff:192.0.2.1]:6667", "::ffff:192.0.2.1", 6667),
+        ("[fe80::1%lo]:6667", "fe80::1%lo", 6667),
+        ("host:0", "host", 0),
+        ("host:65535", "host", 65535),
+    ] {
+        let (actual_host, actual_port) = split_port(input).unwrap();
+        assert_eq!(actual_host, host, "{input}");
+        assert_eq!(actual_port.parse::<u16>(), Ok(port), "{input}");
+    }
+
+    for input in [
+        "[::1",
+        "[::1:6667",
+        "[::1]]:6667",
+        "[]:6667",
+        "[not-ipv6]:6667",
+        "[127.0.0.1]:6667",
+        "[::1%]:6667",
+        "[::1%lo%extra]:6667",
+        "[::1]",
+        "[::1]6667",
+    ] {
+        assert_eq!(split_port(input), None, "{input}");
+    }
+
+    for input in ["[::1]:", "[::1]:abc", "[::1]:65536", "::1:6667"] {
+        let (_, port) = split_port(input).unwrap();
+        assert!(port.parse::<u16>().is_err(), "{input}");
+    }
 }
 
 #[test]

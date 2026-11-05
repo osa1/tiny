@@ -308,11 +308,17 @@ async fn read_line<S: AsyncRead + Unpin>(stream: &mut S) -> Vec<u8> {
     }
 }
 
-async fn https_basic_client(reject: bool) {
+async fn https_basic_client(reject: bool, scoped_proxy: bool) {
     let root = ca("HTTPS client fixture CA");
-    let proxy_cert = leaf("127.0.0.1", false);
+    let proxy_cert = leaf(if scoped_proxy { "::1" } else { "127.0.0.1" }, false);
     let config = server_config(&proxy_cert, &root, &root, false);
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let listener = TcpListener::bind(if scoped_proxy {
+        "[::1]:0"
+    } else {
+        "127.0.0.1:0"
+    })
+    .await
+    .expect("HTTPS proxy fixture requires loopback");
     let address = listener.local_addr().unwrap();
     let server = tokio::task::spawn_local(async move {
         let (socket, _) = listener.accept().await.unwrap();
@@ -363,7 +369,7 @@ async fn https_basic_client(reject: bool) {
         tls: false,
         proxy: Some(ProxyConfig {
             protocol: ProxyProtocol::Https,
-            addr: "127.0.0.1".into(),
+            addr: if scoped_proxy { "::1%1" } else { "127.0.0.1" }.into(),
             port: address.port(),
             auth: Some(ProxyAuth::UserPass {
                 username: "user".into(),
@@ -409,8 +415,9 @@ async fn https_basic_client(reject: bool) {
 async fn https_basic_registration_and_rejection() {
     tokio::task::LocalSet::new()
         .run_until(async {
-            https_basic_client(false).await;
-            https_basic_client(true).await;
+            https_basic_client(false, false).await;
+            https_basic_client(true, false).await;
+            https_basic_client(false, true).await;
         })
         .await;
 }
