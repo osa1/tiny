@@ -7,13 +7,13 @@ edition = "2024"
 
 [features]
 default = ["tls-rustls"]
-tls-native = ["native-tls", "tokio-native-tls"]
+tls-native = ["native-tls", "tokio-native-tls", "rustls-pemfile", "dep:p12-keystore", "dep:getrandom"]
 tls-rustls = ["rustls-native-certs", "tokio-rustls", "rustls-pemfile"]
 
 [dependencies]
 base64 = "0.21"
 futures-util = { version = "0.3", default-features = false }
-lazy_static = "1.4"
+httparse = "1"
 libtiny_common = { path = "../libtiny_common" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
@@ -23,4 +23,17 @@ rustls-pemfile = { version = "1.0.3", optional = true }
 tokio = { version = "1.17", default-features = false, features = ["net", "rt", "io-util", "macros"] }
 tokio-native-tls = { version = "0.3", optional = true }
 tokio-rustls = { version = "0.24", optional = true }
+tokio-socks = "0.5.3"
 tokio-stream = { version = "0.1" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+getrandom = { version = "0.3", optional = true }
+p12-keystore = { version = "0.4.1", default-features = false, optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.17", features = ["net", "rt", "macros", "io-util", "sync", "time"] }
+tokio-rustls = "0.24"
+rcgen = "0.11"
+time = "0.3"
+getrandom = "0.3"
+p12-keystore = { version = "0.4.1", default-features = false }

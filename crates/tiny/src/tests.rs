@@ -1,8 +1,9 @@
 use crate::conn;
 use crate::ui::UI;
 use libtiny_common::ChanName;
+use libtiny_common::MsgSource;
 use libtiny_tui::TUI;
-use libtiny_tui::test_utils::expect_screen;
+use libtiny_tui::test_utils::{buffer_str, expect_screen};
 use libtiny_wire::{Cmd, Msg, MsgTarget, Pfx};
 
 use termbox_simple::CellBuf;
@@ -12,7 +13,10 @@ use term_input as input;
 
 use std::future::Future;
 use std::panic::Location;
+use std::time::Duration;
 
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
@@ -88,6 +92,272 @@ where
         })
         .await;
     });
+}
+
+#[test]
+fn ipv6_connect_and_reconnect() {
+    run_test(
+        "testnick".to_owned(),
+        |TestSetup {
+             tui, snd_input_ev, ..
+         }| async move {
+            let first = match TcpListener::bind("[::1]:0").await {
+                Ok(listener) => listener,
+                Err(err)
+                    if matches!(
+                        err.kind(),
+                        std::io::ErrorKind::AddrNotAvailable | std::io::ErrorKind::Unsupported
+                    ) || matches!(err.raw_os_error(), Some(93 | 97)) =>
+                {
+                    eprintln!("Skipping IPv6 loopback test: {err}");
+                    return;
+                }
+                Err(err) => panic!("IPv6 loopback bind failed: {err}"),
+            };
+            let second = TcpListener::bind("[::1]:0").await.unwrap();
+            let defaults = crate::config::Defaults {
+                nicks: vec!["testnick".to_owned()],
+                realname: "Test User".to_owned(),
+                join: vec![],
+                tls: false,
+            };
+            let ui = UI::new(tui.clone(), None);
+            let mut clients = Vec::new();
+            let source = MsgSource::Serv {
+                serv: SERV_NAME.to_owned(),
+            };
+
+            crate::cmd::run_cmd(
+                &format!(
+                    "connect [::1]:{} testpass",
+                    first.local_addr().unwrap().port()
+                ),
+                source.clone(),
+                &defaults,
+                &[],
+                &ui,
+                &mut clients,
+            );
+            let first_stream = accept_registration(&first).await;
+            assert_eq!(clients.len(), 1);
+            assert_eq!(clients[0].get_serv_name(), "::1");
+
+            crate::cmd::run_cmd(
+                &format!("connect [::1]:{}", second.local_addr().unwrap().port()),
+                source,
+                &defaults,
+                &[],
+                &ui,
+                &mut clients,
+            );
+            let _second_stream = accept_registration(&second).await;
+            assert_eq!(clients.len(), 1);
+            assert_eq!(clients[0].get_serv_name(), "::1");
+
+            tui.draw();
+            let cells = tui.get_front_buffer();
+            let start = usize::from(DEFAULT_TUI_WIDTH * (DEFAULT_TUI_HEIGHT - 1));
+            let tab_line: String = cells.cells[start..].iter().map(|cell| cell.ch).collect();
+            assert_eq!(tab_line.matches("::1").count(), 1, "{tab_line:?}");
+            drop(first_stream);
+            drop(snd_input_ev);
+        },
+    );
+}
+
+#[test]
+fn registered_client_command_completes_in_tui() {
+    run_test(
+        "nixcheck".to_owned(),
+        |TestSetup {
+             tui, snd_input_ev, ..
+         }| async move {
+            crate::cmd::register_completions(&tui);
+            for key in [
+                input::Key::Char('/'),
+                input::Key::Char('j'),
+                input::Key::Char('o'),
+                input::Key::Tab,
+            ] {
+                snd_input_ev.send(input::Event::Key(key)).await.unwrap();
+            }
+            yield_(5).await;
+            tui.draw();
+
+            let screen = buffer_str(
+                &tui.get_front_buffer(),
+                DEFAULT_TUI_WIDTH,
+                DEFAULT_TUI_HEIGHT,
+            );
+            assert_eq!(screen.lines().nth(3).unwrap().trim_end(), "/join");
+
+            for key in [
+                input::Key::Ctrl('a'),
+                input::Key::Ctrl('k'),
+                input::Key::Char('/'),
+                input::Key::Char('w'),
+                input::Key::Char('h'),
+                input::Key::Tab,
+            ] {
+                snd_input_ev.send(input::Event::Key(key)).await.unwrap();
+            }
+            yield_(5).await;
+            tui.draw();
+            let screen = buffer_str(
+                &tui.get_front_buffer(),
+                DEFAULT_TUI_WIDTH,
+                DEFAULT_TUI_HEIGHT,
+            );
+            assert_eq!(screen.lines().nth(3).unwrap().trim_end(), "/wh");
+        },
+    );
+}
+
+#[test]
+fn expanded_ipv6_reconnect_uses_the_proxy_for_each_configured_port() {
+    run_test("testnick".to_owned(), |TestSetup { tui, .. }| async move {
+        let direct_a = match TcpListener::bind("[::1]:0").await {
+            Ok(listener) => listener,
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::AddrNotAvailable | std::io::ErrorKind::Unsupported
+                ) || matches!(err.raw_os_error(), Some(93 | 97)) =>
+            {
+                eprintln!("Skipping IPv6 proxy reconnect test: {err}");
+                return;
+            }
+            Err(err) => panic!("IPv6 loopback bind failed: {err}"),
+        };
+        let direct_b = TcpListener::bind("[::1]:0").await.unwrap();
+        let proxy_a = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_b = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port_a = direct_a.local_addr().unwrap().port();
+        let port_b = direct_b.local_addr().unwrap().port();
+        let make_proxy = |listener: &TcpListener| {
+            Some(client::ProxyConfig {
+                protocol: client::ProxyProtocol::Http,
+                addr: "127.0.0.1".to_owned(),
+                port: listener.local_addr().unwrap().port(),
+                auth: None,
+            })
+        };
+        let proxies = vec![
+            ("::1".to_owned(), port_a, make_proxy(&proxy_a)),
+            ("::1".to_owned(), port_b, make_proxy(&proxy_b)),
+        ];
+        let defaults = crate::config::Defaults {
+            nicks: vec!["testnick".to_owned()],
+            realname: "Test User".to_owned(),
+            join: vec![],
+            tls: false,
+        };
+        let ui = UI::new(tui, None);
+        let mut clients = Vec::new();
+        let source = MsgSource::Serv {
+            serv: SERV_NAME.to_owned(),
+        };
+
+        crate::cmd::run_cmd(
+            &format!("connect [0:0:0:0:0:0:0:1]:{port_a} testpass"),
+            source.clone(),
+            &defaults,
+            &proxies,
+            &ui,
+            &mut clients,
+        );
+        let mut first = accept_proxy_registration(&proxy_a, port_a).await;
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), direct_a.accept())
+                .await
+                .is_err()
+        );
+
+        crate::cmd::run_cmd(
+            &format!("connect [::1]:{port_b}"),
+            source,
+            &defaults,
+            &proxies,
+            &ui,
+            &mut clients,
+        );
+        let _second = accept_proxy_registration(&proxy_b, port_b).await;
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(2), first.read_line(&mut String::new()))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), direct_b.accept())
+                .await
+                .is_err()
+        );
+        assert_eq!(clients.len(), 1);
+    });
+}
+
+async fn accept_proxy_registration(listener: &TcpListener, port: u16) -> BufReader<TcpStream> {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut reader = BufReader::new(stream);
+        let mut request = String::new();
+        loop {
+            let mut line = String::new();
+            assert_ne!(reader.read_line(&mut line).await.unwrap(), 0);
+            request.push_str(&line);
+            if line == "\r\n" {
+                break;
+            }
+        }
+        assert!(request.starts_with(&format!("CONNECT [::1]:{port} HTTP/1.")));
+        reader
+            .get_mut()
+            .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            .await
+            .unwrap();
+        let mut lines = Vec::new();
+        while lines.len() < 3 {
+            let mut line = String::new();
+            assert_ne!(reader.read_line(&mut line).await.unwrap(), 0);
+            lines.push(line);
+        }
+        assert!(lines.iter().any(|line| line == "PASS testpass\r\n"));
+        assert!(lines.iter().any(|line| line == "NICK testnick\r\n"));
+        assert!(lines.iter().any(|line| line.starts_with("USER ")));
+        reader
+    })
+    .await
+    .expect("timed out waiting for proxied IPv6 IRC registration")
+}
+
+async fn accept_registration(listener: &TcpListener) -> BufReader<TcpStream> {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut reader = BufReader::new(stream);
+        let mut lines = Vec::new();
+        while lines.len() < 3 {
+            let mut line = String::new();
+            assert_ne!(reader.read_line(&mut line).await.unwrap(), 0);
+            lines.push(line);
+        }
+        assert!(
+            lines.iter().any(|line| line == "PASS testpass\r\n"),
+            "{lines:?}"
+        );
+        assert!(
+            lines.iter().any(|line| line == "NICK testnick\r\n"),
+            "{lines:?}"
+        );
+        assert!(
+            lines.iter().any(|line| line.starts_with("USER ")),
+            "{lines:?}"
+        );
+        reader
+    })
+    .await
+    .expect("timed out waiting for IPv6 IRC registration")
 }
 
 #[test]

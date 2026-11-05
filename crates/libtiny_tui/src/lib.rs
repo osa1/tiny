@@ -115,7 +115,9 @@ async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receive
                         return;
                     }
                     Some(tui) => {
-                        tui.borrow_mut().resize();
+                        let mut tui = tui.borrow_mut();
+                        tui.resize();
+                        tui.draw();
                     }
                 }
             },
@@ -223,7 +225,8 @@ async fn input_handler<S>(
 }
 
 macro_rules! delegate {
-    ( $name:ident ( $( $x:ident: $t:ty, )* ) ) => {
+    ( $(#[$attr:meta])* $name:ident ( $( $x:ident: $t:ty ),* $(,)? ) ) => {
+        $(#[$attr])*
         pub fn $name(&self, $($x: $t,)*) {
             if let Some(inner) = self.inner.upgrade() {
                 inner.borrow_mut().$name( $( $x, )* );
@@ -234,40 +237,36 @@ macro_rules! delegate {
 
 impl TUI {
     delegate!(draw());
-    delegate!(new_server_tab(serv_name: &str, alias: Option<String>,));
-    delegate!(close_server_tab(serv_name: &str,));
-    delegate!(new_chan_tab(serv_name: &str, chan: &ChanNameRef,));
-    delegate!(close_chan_tab(serv_name: &str, chan: &ChanNameRef,));
-    delegate!(close_user_tab(serv_name: &str, nick: &str,));
-    delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
-    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_client_err_msg(msg: &str, target: &MsgTarget,));
-    delegate!(clear_nicks(serv_name: &str,));
-    delegate!(set_nick(serv_name: &str, new_nick: &str,));
-    delegate!(add_privmsg(
-        sender: &str,
-        msg: &str,
-        ts: Tm,
-        target: &MsgTarget,
-        highlight: bool,
-        is_action: bool,
-    ));
-    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(rename_nick(
-        old_nick: &str,
-        new_nick: &str,
-        ts: Tm,
-        target: &MsgTarget,
-    ));
-    delegate!(set_topic(
-        topic: &str,
-        ts: Tm,
-        serv_name: &str,
-        chan_name: &ChanNameRef,
-    ));
-    delegate!(set_tab_style(style: TabStyle, target: &MsgTarget,));
+    delegate!(
+        /// Registers a command name for completion. `name` must not include the leading `/`.
+        add_command_completion(name: &str,)
+    );
+    delegate!(new_server_tab(serv_name: &str, alias: Option<String>));
+    delegate!(close_server_tab(serv_name: &str));
+    delegate!(new_chan_tab(serv_name: &str, chan: &ChanNameRef));
+    delegate!(close_chan_tab(serv_name: &str, chan: &ChanNameRef));
+    delegate!(close_user_tab(serv_name: &str, nick: &str));
+    delegate!(add_client_msg(msg: &str, target: &MsgTarget));
+    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget));
+    delegate!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget));
+    delegate!(add_client_err_msg(msg: &str, target: &MsgTarget));
+    delegate!(clear_nicks(serv_name: &str));
+    delegate!(set_nick(serv_name: &str, new_nick: &str));
+    delegate!(
+        add_privmsg(
+            sender: &str,
+            msg: &str,
+            ts: Tm,
+            target: &MsgTarget,
+            highlight: bool,
+            is_action: bool,
+        )
+    );
+    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(rename_nick(old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget));
+    delegate!(set_topic(topic: &str, ts: Tm, serv_name: &str, chan_name: &ChanNameRef));
+    delegate!(set_tab_style(style: TabStyle, target: &MsgTarget));
 
     pub fn get_tab_config(&self, serv_name: &str, chan_name: Option<&ChanNameRef>) -> TabConfig {
         self.inner

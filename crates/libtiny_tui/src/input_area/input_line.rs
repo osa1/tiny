@@ -1,6 +1,7 @@
-use crate::{config::Colors, line_split::LineDataCache, termbox, utils};
-use std::{cmp::min, ops::RangeBounds, vec::Drain};
+use crate::{config::Colors, line_split::LineDataCache};
+use std::{ops::RangeBounds, vec::Drain};
 use termbox_simple::Termbox;
+use unicode_width::UnicodeWidthChar;
 
 #[derive(Clone, Debug)]
 pub(crate) struct InputLine {
@@ -69,7 +70,7 @@ impl InputLine {
     /// we're moving to the next line, without fully recalculating.
     pub(crate) fn insert(&mut self, idx: usize, element: char) {
         self.buffer.insert(idx, element);
-        if idx == self.buffer.len() - 1 {
+        if idx == self.buffer.len() - 1 && !self.line_data.is_dirty() {
             self.line_data
                 .calculate_height(&mut self.buffer.iter().copied(), idx);
         } else {
@@ -93,6 +94,116 @@ impl InputLine {
     }
 }
 
+// Both scrolling and wrapping use scalar indices but advance in terminal columns.
+fn draw_input<I: Iterator<Item = char>>(
+    tb: &mut Termbox,
+    colors: &Colors,
+    line: I,
+    line_len: usize,
+    pos_x: i32,
+    pos_y: i32,
+    width: i32,
+    cursor: i32,
+    scroll: Option<i32>,
+    splits: &[i32],
+    completion: &Option<CompletionRange>,
+) {
+    let right = width.min(tb.width());
+    if right <= 0 || pos_y < 0 || pos_y >= tb.height() {
+        return;
+    }
+    let start = scroll.unwrap_or(0).max(0) as usize;
+    let start = start.min(line_len);
+    let cursor = (cursor.max(0) as usize).min(line_len);
+    let mut x = pos_x.max(0).min(right - 1);
+    let mut y = pos_y;
+    let mut base = None;
+    let mut cursor_xy = None;
+    let mut split_iter = splits.iter().copied().peekable();
+    let mut complete = true;
+
+    for (idx, ch) in line.enumerate().skip(start) {
+        if scroll.is_none() {
+            while split_iter
+                .peek()
+                .is_some_and(|&split| split as usize == idx)
+            {
+                split_iter.next();
+                x = 0;
+                y += 1;
+                base = None;
+            }
+        }
+        if y >= tb.height() {
+            complete = false;
+            break;
+        }
+        let style = if completion
+            .as_ref()
+            .is_some_and(|range| idx >= range.start_idx && idx < range.end_idx)
+        {
+            colors.completion
+        } else {
+            colors.user_msg
+        };
+        let char_width = UnicodeWidthChar::width(ch).unwrap_or(0) as i32;
+        if char_width == 0 {
+            if base.is_none() {
+                if x >= right {
+                    complete = false;
+                    break;
+                }
+                tb.change_cell(x, y, '◌', style.fg, style.bg);
+                base = Some((x, y));
+                x += 1;
+            }
+            let (bx, by) = base.unwrap();
+            if idx == cursor {
+                cursor_xy = Some((bx, by));
+            }
+            tb.append_combining(bx, by, ch, style.fg, style.bg);
+            continue;
+        }
+        let available = right - x;
+        let row_width = if y == pos_y {
+            right - pos_x.max(0)
+        } else {
+            right
+        };
+        if available <= 0 || (char_width > available && row_width > 1) {
+            complete = false;
+            break;
+        }
+        let displayed = if char_width > available { '�' } else { ch };
+        if idx == cursor {
+            cursor_xy = Some((x, y));
+        }
+        tb.change_cell(x, y, displayed, style.fg, style.bg);
+        base = Some((x, y));
+        x += if displayed == '�' && char_width > available {
+            1
+        } else {
+            char_width
+        };
+    }
+
+    if cursor == line_len && complete {
+        if scroll.is_none() && x >= right {
+            x = 0;
+            y += 1;
+        }
+        cursor_xy = Some((x.min(right - 1), y.min(tb.height() - 1)));
+    }
+    let (cx, cy) = cursor_xy.unwrap_or((x.min(right - 1), y.min(tb.height() - 1)));
+    // Styling rather than replacing the cell preserves any combining marks on it.
+    if cursor >= line_len && complete && x < right {
+        tb.change_cell(cx, cy, ' ', colors.cursor.fg, colors.cursor.bg);
+    } else {
+        tb.set_cell_attributes(cx, cy, colors.cursor.fg, colors.cursor.bg);
+    }
+    tb.set_cursor(Some((cx as u16, cy as u16)));
+}
+
 fn draw_line_scroll(
     tb: &mut Termbox,
     colors: &Colors,
@@ -102,23 +213,21 @@ fn draw_line_scroll(
     width: i32,
     cursor: i32,
     scroll: i32,
+    completion_range: &Option<CompletionRange>,
 ) {
-    let slice: &[char] =
-        &line[scroll as usize..min(line.len(), (scroll + (width - pos_x)) as usize)];
-    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().copied());
-    // On my terminal the cursor is only shown when there's a character
-    // under it.
-    if cursor as usize >= line.len() {
-        tb.change_cell(
-            pos_x + cursor - scroll,
-            pos_y,
-            ' ',
-            colors.cursor.fg,
-            colors.cursor.bg,
-        );
-    }
-
-    tb.set_cursor(Some(((pos_x + cursor - scroll) as u16, pos_y as u16)));
+    draw_input(
+        tb,
+        colors,
+        line.iter().copied(),
+        line.len(),
+        pos_x,
+        pos_y,
+        width,
+        cursor,
+        Some(scroll),
+        &[],
+        completion_range,
+    );
 }
 
 pub(crate) struct CompletionRange {
@@ -136,61 +245,19 @@ fn draw_line_wrapped(
     line: &InputLine,
     completion_range: &Option<CompletionRange>,
 ) {
-    let mut col = pos_x;
-    let mut line_num = 0;
-
-    let mut cursor_xychar = (0, 0, ' ');
-    let mut check_cursor = |char_idx: usize, cursor: i32, pos_x: i32, pos_y: i32, c: char| {
-        if char_idx == cursor as usize {
-            cursor_xychar = (pos_x, pos_y, c);
-        }
-    };
-    let mut split_indices_iter = line.line_data.get_splits().iter().copied().peekable();
-    for (char_idx, c) in line.buffer.iter().enumerate() {
-        let mut style = colors.user_msg;
-        // for autocompletion highlighting
-        if let Some(completion_range) = completion_range
-            && char_idx >= completion_range.start_idx
-            && char_idx < completion_range.end_idx
-        {
-            style = colors.completion;
-        }
-        // If split_indices_iter yields we already know the indices for the start of each line. If it
-        // does not then we just continue outputting on this line.
-        if let Some(next_line_start) = split_indices_iter.peek()
-            && char_idx == *next_line_start as usize
-        {
-            // move to next line
-            line_num += 1;
-            // reset column
-            col = 0;
-            // move to the next line start index
-            split_indices_iter.next();
-        }
-        // Write out the character
-        tb.change_cell(col, pos_y + line_num, *c, style.fg, style.bg);
-        // Check if the cursor is on this character
-        check_cursor(char_idx, cursor, col, pos_y + line_num, *c);
-        col += 1;
-    }
-
-    // Cursor may be (probably) after all text
-    if col == width {
-        // render cursor on next line
-        line_num += 1;
-        col = 0;
-    }
-    check_cursor(line.buffer.len(), cursor, col, pos_y + line_num, ' ');
-
-    tb.change_cell(
-        cursor_xychar.0,
-        cursor_xychar.1,
-        cursor_xychar.2,
-        colors.cursor.fg,
-        colors.cursor.bg,
+    draw_input(
+        tb,
+        colors,
+        line.buffer.iter().copied(),
+        line.buffer.len(),
+        pos_x,
+        pos_y,
+        width,
+        cursor,
+        None,
+        line.line_data.get_splits(),
+        completion_range,
     );
-
-    tb.set_cursor(Some(((cursor_xychar.0) as u16, (cursor_xychar.1) as u16)));
 }
 
 pub(crate) fn draw_line_autocomplete(
@@ -208,91 +275,40 @@ pub(crate) fn draw_line_autocomplete(
     should_scroll: bool,
     scroll: Option<i32>,
 ) {
-    let completion: &str = &completions[current_completion];
-
-    let mut orig_buf_iter = original_buffer.get_buffer().iter().copied();
-    let mut completion_iter = completion.chars();
-
-    if should_scroll {
-        let cursor_x_off = cursor - scroll.unwrap();
-        let cursor_y_off = 0;
-
-        // draw a placeholder for the cursor
-        tb.change_cell(
-            pos_x + cursor_x_off,
-            pos_y + cursor_y_off,
-            ' ',
-            colors.user_msg.fg,
-            colors.user_msg.bg,
-        );
-
-        let iter: utils::InsertIterator<char> =
-            utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
-
-        for (char_idx, char) in iter.enumerate() {
-            let x_off;
-            let y_off;
-            let mut can_scroll = true;
-            if should_scroll {
-                let scroll = scroll.unwrap_or(0);
-                x_off = (char_idx as i32) - scroll;
-                y_off = 0;
-                if char_idx >= ((scroll + width) as usize) {
-                    break;
-                }
-                if char_idx < scroll as usize {
-                    can_scroll = false
-                }
-            } else {
-                x_off = char_idx as i32 % width;
-                y_off = char_idx as i32 / width;
-            }
-            if can_scroll {
-                if char_idx >= word_starts && char_idx < insertion_point + completion.len() {
-                    tb.change_cell(
-                        pos_x + x_off,
-                        pos_y + y_off,
-                        char,
-                        colors.completion.fg,
-                        colors.completion.bg,
-                    );
-                } else {
-                    tb.change_cell(
-                        pos_x + x_off,
-                        pos_y + y_off,
-                        char,
-                        colors.user_msg.fg,
-                        colors.user_msg.bg,
-                    );
-                }
-            }
-        }
-        tb.set_cursor(Some((
-            (pos_x + cursor_x_off) as u16,
-            (pos_y + cursor_y_off) as u16,
-        )));
-    } else {
-        // TODO: Think of a better way to handle this inefficiency
-        let iter: utils::InsertIterator<char> =
-            utils::insert_iter(&mut orig_buf_iter, &mut completion_iter, insertion_point);
-
-        let mut line = InputLine::from_buffer(iter.collect());
-        line.calculate_height(width, pos_x as usize);
-        let completion_range = CompletionRange {
-            start_idx: word_starts,
-            end_idx: (insertion_point + completion.len()),
-        };
-        draw_line_wrapped(
-            tb,
-            colors,
-            pos_x,
-            pos_y,
-            width,
-            cursor,
-            &line,
-            &Some(completion_range),
-        );
+    let completion = &completions[current_completion];
+    let original = original_buffer.get_buffer();
+    let (before, after) = original.split_at(insertion_point);
+    let chars = before
+        .iter()
+        .copied()
+        .chain(completion.chars())
+        .chain(after.iter().copied());
+    let completion_len = completion.chars().count();
+    let completion_range = Some(CompletionRange {
+        start_idx: word_starts,
+        end_idx: insertion_point + completion_len,
+    });
+    let mut layout = LineDataCache::input_line(width, pos_x.max(0) as usize);
+    if !should_scroll {
+        layout.calculate_height(chars.clone(), 0);
     }
+    draw_input(
+        tb,
+        colors,
+        chars,
+        original.len() + completion_len,
+        pos_x,
+        pos_y,
+        width,
+        cursor,
+        if should_scroll {
+            Some(scroll.unwrap_or(0))
+        } else {
+            None
+        },
+        layout.get_splits(),
+        &completion_range,
+    );
 }
 
 pub(crate) fn draw_line(
@@ -307,7 +323,7 @@ pub(crate) fn draw_line(
     scroll: Option<i32>,
     completion_range: Option<CompletionRange>,
 ) {
-    if should_scroll || (line.len() as i32) < width - pos_x {
+    if should_scroll {
         draw_line_scroll(
             tb,
             colors,
@@ -317,6 +333,7 @@ pub(crate) fn draw_line(
             width,
             cursor,
             scroll.unwrap_or(0),
+            &completion_range,
         );
     } else {
         draw_line_wrapped(
@@ -335,6 +352,160 @@ pub(crate) fn draw_line(
 #[cfg(test)]
 mod tests {
     use super::InputLine;
+    use super::{CompletionRange, draw_line, draw_line_autocomplete};
+    use crate::config::{Colors, Style};
+    use termbox_simple::Termbox;
+
+    fn colors() -> Colors {
+        Colors {
+            user_msg: Style { fg: 1, bg: 2 },
+            completion: Style { fg: 3, bg: 4 },
+            cursor: Style { fg: 5, bg: 6 },
+            ..Default::default()
+        }
+    }
+
+    fn wrapped(text: &str, width: i32, nick: i32, cursor: i32) -> Termbox {
+        let mut tb = Termbox::init_test(width as u16, 6);
+        let mut line = InputLine::from_buffer(text.chars().collect());
+        line.calculate_height(width, nick as usize);
+        draw_line(
+            &mut tb,
+            &colors(),
+            &line,
+            nick,
+            0,
+            width,
+            cursor,
+            false,
+            None,
+            None,
+        );
+        tb.present();
+        tb
+    }
+
+    #[test]
+    fn wrapped_unicode_columns_and_cursor() {
+        let tb = wrapped("A日中한B", 5, 1, 2);
+        let buf = tb.get_front_buffer();
+        assert_eq!(buf.cells[1].ch, 'A');
+        assert_eq!(buf.cells[2].ch, '日');
+        assert_eq!(buf.cells[5].ch, '中');
+        assert_eq!(buf.cells[7].ch, '한');
+        assert_eq!(buf.cells[9].ch, 'B');
+        assert_eq!(buf.cells[5].fg, colors().cursor.fg);
+
+        let tb = wrapped("A日B", 4, 0, 3);
+        let buf = tb.get_front_buffer();
+        assert_eq!(buf.cells[0].ch, 'A');
+        assert_eq!(buf.cells[1].ch, '日');
+        assert_eq!(buf.cells[3].ch, 'B');
+        assert_eq!(buf.cells[4].fg, colors().cursor.fg);
+
+        let tb = wrapped("A日B", 2, 0, 1);
+        let buf = tb.get_front_buffer();
+        assert_eq!(buf.cells[0].ch, 'A');
+        assert_eq!(buf.cells[2].ch, '日');
+        assert_eq!(buf.cells[2].fg, colors().cursor.fg);
+        assert_eq!(buf.cells[4].ch, 'B');
+
+        let tb = wrapped("日B", 1, 0, 1);
+        let buf = tb.get_front_buffer();
+        assert_eq!(buf.cells[0].ch, '�');
+        assert_eq!(buf.cells[1].ch, 'B');
+        assert_eq!(buf.cells[1].fg, colors().cursor.fg);
+    }
+
+    #[test]
+    fn combining_marks_survive_cursor_and_style_boundaries() {
+        let mut tb = Termbox::init_test(2, 4);
+        let mut line = InputLine::from_buffer("Aか\u{3099}B".chars().collect());
+        line.calculate_height(2, 0);
+        draw_line(
+            &mut tb,
+            &colors(),
+            &line,
+            0,
+            0,
+            2,
+            2,
+            false,
+            None,
+            Some(CompletionRange {
+                start_idx: 2,
+                end_idx: 3,
+            }),
+        );
+        tb.present();
+        let output = String::from_utf8_lossy(&tb.take_test_output()).into_owned();
+        assert!(output.contains('\u{3099}'));
+        let buf = tb.get_front_buffer();
+        assert_eq!(buf.cells[2].ch, 'か');
+        assert_eq!(buf.cells[2].fg, colors().cursor.fg);
+        assert_eq!(buf.cells[4].ch, 'B');
+
+        let mut tb = wrapped("A\u{3099}B", 1, 0, 1);
+        assert!(String::from_utf8_lossy(&tb.take_test_output()).contains('\u{3099}'));
+        assert_eq!(tb.get_front_buffer().cells[0].ch, 'A');
+
+        let mut tb = wrapped("\u{3099}A", 3, 0, 0);
+        assert!(String::from_utf8_lossy(&tb.take_test_output()).contains('\u{3099}'));
+        assert_eq!(tb.get_front_buffer().cells[0].ch, '◌');
+    }
+
+    #[test]
+    fn scrolling_uses_scalar_indices_and_column_widths() {
+        let mut tb = Termbox::init_test(5, 2);
+        let line = InputLine::from_buffer("A日中한B".chars().collect());
+        draw_line(&mut tb, &colors(), &line, 0, 0, 5, 2, true, Some(1), None);
+        tb.present();
+        let buf = tb.get_front_buffer();
+        assert_eq!(buf.cells[0].ch, '日');
+        assert_eq!(buf.cells[2].ch, '中');
+        assert_eq!(buf.cells[2].fg, colors().cursor.fg);
+        assert_eq!(buf.cells[4].ch, ' ');
+
+        let mut tb = Termbox::init_test(1, 2);
+        draw_line(&mut tb, &colors(), &line, 0, 0, 1, 1, true, Some(1), None);
+        tb.present();
+        assert_eq!(tb.get_front_buffer().cells[0].ch, '�');
+    }
+
+    #[test]
+    fn completion_preview_inserts_scalars_and_styles_both_modes() {
+        let original = InputLine::from_buffer("A日B".chars().collect());
+        let candidates = vec!["中한".to_owned(), "語".to_owned()];
+        for scroll in [false, true] {
+            for (candidate, expected) in [(0, '中'), (1, '語')] {
+                let mut tb = Termbox::init_test(10, 3);
+                draw_line_autocomplete(
+                    &original,
+                    2,
+                    1,
+                    &candidates,
+                    candidate,
+                    &mut tb,
+                    &colors(),
+                    0,
+                    0,
+                    10,
+                    0,
+                    scroll,
+                    Some(0),
+                );
+                tb.present();
+                let buf = tb.get_front_buffer();
+                assert_eq!(buf.cells[1].ch, '日');
+                assert_eq!(buf.cells[3].ch, expected);
+                assert_eq!(buf.cells[1].fg, colors().completion.fg);
+                assert_eq!(buf.cells[3].fg, colors().completion.fg);
+                let b = if candidate == 0 { 7 } else { 5 };
+                assert_eq!(buf.cells[b].ch, 'B');
+                assert_eq!(buf.cells[b].fg, colors().user_msg.fg);
+            }
+        }
+    }
     #[test]
     fn test_calculate_height() {
         let buffer: Vec<char> = String::from("012345").chars().collect();
@@ -387,5 +558,30 @@ mod tests {
         // " 12 "
         // "34"
         assert_eq!(line.calculate_height(4, 0), 5);
+    }
+
+    #[test]
+    fn appended_input_matches_recalculation_after_edits() {
+        for width in [1, 2, 3, 5, 8] {
+            let mut line = InputLine::new();
+            line.calculate_height(width, 0);
+            for ch in "A日か\u{3099} 本 B中 한".chars() {
+                line.insert(line.len(), ch);
+                let mut fresh = InputLine::from_buffer(line.get_buffer().to_vec());
+                assert_eq!(
+                    line.calculate_height(width, 0),
+                    fresh.calculate_height(width, 0)
+                );
+                assert_eq!(line.line_data.get_splits(), fresh.line_data.get_splits());
+            }
+            line.remove(1);
+            line.insert(line.len(), '語');
+            let mut fresh = InputLine::from_buffer(line.get_buffer().to_vec());
+            assert_eq!(
+                line.calculate_height(width, 0),
+                fresh.calculate_height(width, 0)
+            );
+            assert_eq!(line.line_data.get_splits(), fresh.line_data.get_splits());
+        }
     }
 }

@@ -2,7 +2,7 @@
 
 use crate::cmd::run_cmd;
 use crate::config;
-use libtiny_client::Client;
+use libtiny_client::{Client, ProxyConfig};
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use libtiny_logger::Logger;
 use libtiny_tui::TUI;
@@ -14,7 +14,7 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 
 macro_rules! delegate {
-    ( $name:ident ( $( $x:ident: $t:ty, )* )) => {
+    ( $name:ident ( $( $x:ident: $t:ty ),* $(,)? )) => {
         pub(crate) fn $name(&self, $($x: $t,)*) {
             self.ui.$name( $( $x, )* );
             if let Some(logger) = &self.logger {
@@ -25,7 +25,7 @@ macro_rules! delegate {
 }
 
 macro_rules! delegate_ui {
-    ( $name:ident ( $( $x:ident: $t:ty, )* ) $(->$ret:ty )? ) => {
+    ( $name:ident ( $( $x:ident: $t:ty ),* $(,)? ) $(->$ret:ty )? ) => {
         pub(crate) fn $name(&self, $($x: $t,)*) $(-> $ret)? {
             self.ui.$name( $( $x, )* )
         }
@@ -50,48 +50,38 @@ impl UI {
         }
     }
 
-    delegate!(close_server_tab(serv: &str,));
-    delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef,));
-    delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef,));
-    delegate!(close_user_tab(serv: &str, nick: &str,));
-    delegate!(add_client_msg(msg: &str, target: &MsgTarget,));
-    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate!(add_privmsg(
-        sender: &str,
-        msg: &str,
-        ts: Tm,
-        target: &MsgTarget,
-        highlight: bool,
-        is_action: bool,
-    ));
-    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget,));
-    delegate!(rename_nick(
-        old_nick: &str,
-        new_nick: &str,
-        ts: Tm,
-        target: &MsgTarget,
-    ));
-    delegate!(set_topic(
-        topic: &str,
-        ts: Tm,
-        serv: &str,
-        chan: &ChanNameRef,
-    ));
+    delegate!(close_server_tab(serv: &str));
+    delegate!(new_chan_tab(serv: &str, chan: &ChanNameRef));
+    delegate!(close_chan_tab(serv: &str, chan: &ChanNameRef));
+    delegate!(close_user_tab(serv: &str, nick: &str));
+    delegate!(add_client_msg(msg: &str, target: &MsgTarget));
+    delegate!(add_msg(msg: &str, ts: Tm, target: &MsgTarget));
+    delegate!(
+        add_privmsg(
+            sender: &str,
+            msg: &str,
+            ts: Tm,
+            target: &MsgTarget,
+            highlight: bool,
+            is_action: bool,
+        )
+    );
+    delegate!(add_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(remove_nick(nick: &str, ts: Option<Tm>, target: &MsgTarget));
+    delegate!(rename_nick(old_nick: &str, new_nick: &str, ts: Tm, target: &MsgTarget));
+    delegate!(set_topic(topic: &str, ts: Tm, serv: &str, chan: &ChanNameRef));
 
     delegate_ui!(draw());
-    delegate_ui!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget,));
-    delegate_ui!(add_client_err_msg(msg: &str, target: &MsgTarget,));
-    delegate_ui!(clear_nicks(serv: &str,));
-    delegate_ui!(set_nick(serv: &str, nick: &str,));
-    delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget,));
-    delegate_ui!(user_tab_exists(serv_name: &str, nick: &str,) -> bool);
-    delegate_ui!(get_tab_config(serv_name: &str, chan_name: Option<&ChanNameRef>,) -> TabConfig);
-    delegate_ui!(set_tab_config(
-        serv_name: &str,
-        chan_name: Option<&ChanNameRef>,
-        config: TabConfig,
-    ));
+    delegate_ui!(add_err_msg(msg: &str, ts: Tm, target: &MsgTarget));
+    delegate_ui!(add_client_err_msg(msg: &str, target: &MsgTarget));
+    delegate_ui!(clear_nicks(serv: &str));
+    delegate_ui!(set_nick(serv: &str, nick: &str));
+    delegate_ui!(set_tab_style(style: TabStyle, target: &MsgTarget));
+    delegate_ui!(user_tab_exists(serv_name: &str, nick: &str) -> bool);
+    delegate_ui!(get_tab_config(serv_name: &str, chan_name: Option<&ChanNameRef>) -> TabConfig);
+    delegate_ui!(
+        set_tab_config(serv_name: &str, chan_name: Option<&ChanNameRef>, config: TabConfig)
+    );
 
     pub(crate) fn current_tab(&self) -> Option<MsgSource> {
         self.ui.current_tab()
@@ -100,19 +90,21 @@ impl UI {
 
 pub(crate) async fn task(
     defaults: config::Defaults,
+    server_proxies: Vec<(String, u16, Option<ProxyConfig>)>,
     ui: UI,
     mut clients: Vec<Client>,
     rcv_ev: mpsc::Receiver<libtiny_common::Event>,
 ) {
     let mut rcv_ev = ReceiverStream::new(rcv_ev);
     while let Some(ev) = rcv_ev.next().await {
-        handle_input_ev(&defaults, &ui, &mut clients, ev);
+        handle_input_ev(&defaults, &server_proxies, &ui, &mut clients, ev);
         ui.draw();
     }
 }
 
 fn handle_input_ev(
     defaults: &config::Defaults,
+    server_proxies: &[(String, u16, Option<ProxyConfig>)],
     ui: &UI,
     clients: &mut Vec<Client>,
     ev: libtiny_common::Event,
@@ -136,7 +128,7 @@ fn handle_input_ev(
         }
 
         Cmd { cmd, source } => {
-            run_cmd(&cmd, source, defaults, ui, clients);
+            run_cmd(&cmd, source, defaults, server_proxies, ui, clients);
         }
     }
 }

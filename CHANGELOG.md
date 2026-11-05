@@ -1,5 +1,22 @@
 # Unreleased
 
+- Add optional per-server HTTP, HTTPS, SOCKS4/4a and SOCKS5 proxies, including
+  authenticated proxies and reuse by `/connect`. Reconnection applies the
+  selected server's proxy, scoped IPv6 proxy destinations are rejected, and
+  SOCKS4 local DNS failures are reported separately from IPv6 rejections.
+- Support bracketed IPv6 addresses in `/connect`, reuse existing connections
+  across equivalent address spellings, and verify scoped IPv6 TLS connections
+  against the IP address without its scope ID.
+- Fix native TLS SASL EXTERNAL identities containing a private key and
+  certificate chain, including on macOS.
+- Fix Unicode input, completion, wrapping, and display for wide and combining
+  characters, including UTF-8 split across terminal reads. Editing still uses
+  Unicode scalar values; ambiguous-width characters are displayed as one column.
+  Multiline paste with an incomplete UTF-8 suffix no longer sends Enter early;
+  combining marks in nick completion and at message boundaries are preserved,
+  and resizing with an oversized tab no longer freezes.
+- Complete slash command names with Tab while retaining nick completion in
+  messages and command arguments.
 - Key bindings for `ctrl_i` and `ctrl_[` in the config file are no longer
   ignored and are now synonymous with `tab` and `esc`. (#444)
 - The keystrokes `ctrl_h` and `backspace` can now be distinguished, which
@@ -20,6 +37,16 @@
   connecting to a server on startup. (#443)
 - Expand tildes and shell variables in `pem` (SASL authentication) and
   `log_dir` config fields. (#192, #463)
+- Add a Nix flake for building tiny and entering a Rust development shell.
+  Both use the rust-overlay toolchain selected by `rust-toolchain`.
+  Keep Clippy and formatting checks compatible with this toolchain.
+  On Linux, the package also supplies the build inputs for native TLS and
+  desktop notifications.
+  Desktop notifications for channel mentions and private messages are enabled
+  by default; Linux Cargo builds require `pkg-config` and libdbus development
+  headers.
+- Export a Home Manager 26.05 module with unchanged raw YAML configuration and
+  an overridable tiny package.
 
 # 2025/01/01: 0.13.0
 

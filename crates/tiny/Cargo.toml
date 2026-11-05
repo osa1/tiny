@@ -9,7 +9,7 @@ description = "An IRC client"
 edition = "2024"
 
 [features]
-default = ["tls-rustls"]
+default = ["tls-rustls", "desktop-notifications"]
 tls-native = ["libtiny_client/tls-native"]
 tls-rustls = ["libtiny_client/tls-rustls"]
 desktop-notifications = ["libtiny_tui/desktop-notifications"]

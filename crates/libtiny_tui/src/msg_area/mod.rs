@@ -203,6 +203,10 @@ impl MsgArea {
         self.line_buf.add_text(str, style);
     }
 
+    pub(crate) fn add_independent_text(&mut self, str: &str, style: SegStyle) {
+        self.line_buf.add_independent_text(str, style);
+    }
+
     pub(crate) fn flush_line(&mut self) -> usize {
         let line_height = self.line_buf.rendered_height(self.width);
         // Check if we're about to overflow

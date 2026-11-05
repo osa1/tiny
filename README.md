@@ -25,7 +25,7 @@ tiny is an IRC client written in Rust.
   channels, registering the nickname etc. See [configuration
   section](#configuration) below.
 
-- Nick tab-completion in channels
+- Tab-completion for command names and channel nicks
 
 - Nicks in channels are colored.
 
@@ -39,8 +39,8 @@ tiny is an IRC client written in Rust.
 
 - SASL authentication
 
-- Configurable desktop notifications on new messages (opt-in feature behind a
-  feature flag, see below)
+- Configurable desktop notifications for channel mentions and private messages
+  by default
 
 - znc compatible
 
@@ -51,19 +51,28 @@ tiny is an IRC client written in Rust.
 tiny works on Linux and OSX. Windows users can run it under Windows Subsystem
 for Linux.
 
-For pre-built binaries see [releases]. To build from source make sure you have
-Rust 1.48 or newer. By default tiny uses [rustls] for TLS support, and desktop
-notifications are disabled.
+For pre-built binaries see [releases]. To build from source, use a current
+stable Rust toolchain. By default tiny uses [rustls] for TLS support and enables
+desktop notifications for channel mentions and private messages. Configure
+`notify: off` or use `/notify` to change notification settings.
 
 [releases]: https://github.com/osa1/tiny/releases
 [rustls]: https://github.com/ctz/rustls
 
-- To use system TLS library (OpenSSL or LibreSSL), add `--no-default-features
-  --features=tls-native` to the command you're using. Note that this requires
-  OpenSSL or LibreSSL headers and runtime libraries on Linux.
+On Linux, Cargo builds with notifications require `pkg-config` and the libdbus
+development package (for example, `libdbus-1-dev` on Debian/Ubuntu). At runtime,
+a D-Bus session and a notification service are required. On macOS,
+notifications may be attributed to Finder, so Finder's notification permission
+settings can affect their display.
 
-- To enable desktop notifications add `--features=desktop-notifications`. This
-  requires libdbus on Linux.
+- To build without notifications while retaining rustls, add
+  `--no-default-features --features=tls-rustls`.
+- To use the system TLS library (OpenSSL or LibreSSL) with notifications, add
+  `--no-default-features --features="tls-native desktop-notifications"`.
+  This also requires OpenSSL or LibreSSL headers and runtime libraries on Linux.
+- For a musl build with notifications, add
+  `--features=desktop-notifications-static-linking` to build libdbus from
+  vendored sources.
 
 To install in a clone:
 
@@ -74,7 +83,7 @@ cargo install --path crates/tiny
 If you don't want to clone the repo, you can use
 
 ```
-cargo install --git https://github.com/osa1/tiny
+cargo install --git https://github.com/sunao1222/tiny --branch dev
 ```
 
 If you have an older version installed, add `--force` to the command you're
@@ -87,6 +96,80 @@ of tiny through the AUR.
 [development]: https://aur.archlinux.org/packages/tiny-git/
 
 tiny is tested on Linux and OSX.
+
+### Nix
+
+With Nix flakes enabled, build the default rustls-based package, which enables
+desktop notifications, or enter the development shell from the repository root:
+
+```sh
+nix build
+./result/bin/tiny --version
+nix develop
+```
+
+The package and shell use the same rust-overlay toolchain selected by
+`rust-toolchain` (currently `stable`). Its default profile includes `rustc`,
+`cargo`, `rustfmt`, `clippy`, and Rust documentation. The shell also includes
+the Linux dependencies needed for native TLS and desktop notifications. For
+example, inside the shell:
+
+```sh
+cargo test --workspace
+cargo test -p tiny --no-default-features --features "tls-native desktop-notifications"
+```
+
+Tests that require an IPv6 loopback listener are skipped when it is unavailable;
+their IPv6 behavior is then unverified. Pass `-- --nocapture` to `cargo test`
+to see the skip diagnostics.
+
+`flake.lock` pins nixpkgs, Home Manager, and rust-overlay, and `Cargo.lock` pins
+Rust dependencies. The flake declares package outputs for x86_64 and aarch64 on
+Linux and macOS. The pinned nixpkgs 26.11 does not support `x86_64-darwin`, so
+that package cannot currently be evaluated. In a Git checkout, Nix includes
+only files known to Git, so add newly created source files before building.
+Format the Nix expressions with:
+
+```sh
+nix fmt -- flake.nix shell.nix nix/package.nix nix/home-manager.nix nix/tests/home-manager.nix
+```
+
+#### Home Manager
+
+With Home Manager 26.05, add `github:sunao1222/tiny/dev` as a flake input named `tiny`.
+Use `tiny.packages.${system}.default` as a package, or include
+`tiny.homeManagerModules.default` in the modules passed to
+`home-manager.lib.homeManagerConfiguration`:
+
+```nix
+modules = [
+  tiny.homeManagerModules.default
+  {
+    programs.tiny = {
+      enable = true;
+      config = builtins.readFile ./tiny.yml;
+      # Alternatively, use an inline YAML string:
+      # config = '' ... '';
+    };
+  }
+];
+```
+
+The module extends Home Manager's existing `programs.tiny` module. Its default
+package comes from this flake; set `programs.tiny.package` to override it.
+`programs.tiny.config` writes the YAML string unchanged, including comments and
+newlines, to `$XDG_CONFIG_HOME/tiny/config.yml` on Linux or
+`~/Library/Application Support/tiny/config.yml` on macOS. It is mutually
+exclusive with the upstream `programs.tiny.settings` option; leave `config`
+unset to use `settings` instead.
+
+On `x86_64-darwin`, override the package with one from a supported package
+set, for example `programs.tiny.package = pkgs.tiny;` when `pkgs` is from
+nixpkgs 26.05. The flake's default package cannot be evaluated on that system.
+
+Home Manager places the YAML in the world-readable Nix store. Do not put
+passwords or other secrets in it. Existing Home Manager configurations should
+keep their current `home.stateVersion`.
 
 ## Configuration
 
@@ -101,12 +184,52 @@ When a config file is not found in one of these locations tiny creates one in
 the first path above with defaults and exits, printing path to the config file.
 Edit that file before re-running tiny to change the defaults.
 
+For an IPv6 server, use an unbracketed `addr`, such as `::1` or
+`fe80::1%lo`, and specify `port` separately. A scope ID is retained for the
+connection but omitted from the IP address used to verify the TLS certificate.
+
 **A note on nick identification:** Some IRC servers such as ircd-seven (used by
 Freenode) and InspIRCd (used by Mozilla) support identification via the `PASS`
 command. This way of identification (rather than sending a message to a service
 like `NickServ`) is better when some of the channels that you automatically
 join require identification. To use this method enter your nick password to the
 `pass` field in servers.
+
+### Per-server proxies
+
+Each server may specify a `proxy` with `type` (`http`, `https`, `socks4`, or
+`socks5`), `addr`, and `port`. Omitting `proxy` or setting it to `null` connects
+directly. For example:
+
+```yaml
+proxy:
+  type: socks5
+  addr: 127.0.0.1
+  port: 1080
+  username: example
+  password:
+    command: 'pass show proxy-password'
+```
+
+HTTP and HTTPS use Basic authentication; SOCKS5 uses username/password.
+Specify both credentials or neither. SOCKS4 accepts `username` as its USERID
+but does not accept a password. SOCKS5 proxies may choose no authentication
+even when credentials are configured.
+
+HTTPS protects the connection to the proxy independently of the server's
+`tls` setting. Credentials sent to other proxy types are not encrypted in
+transit. SOCKS4 uses remote DNS (SOCKS4a) by default; set `socks4a: false` to
+resolve the IRC host locally and use IPv4-only SOCKS4 instead.
+
+`/connect` uses a matching configured server's proxy even if that server is not
+autoconnected or was excluded by command-line filters. If multiple servers
+share a hostname, the requested port must select exactly one of them.
+Reconnecting switches to the selected server's proxy, including an explicit
+direct connection; with no matching server configuration, it keeps the current
+proxy.
+
+Scoped IPv6 destinations (such as `fe80::1%eth0`) cannot be represented safely
+by proxy protocols and are rejected when a proxy is configured.
 
 ### Using external commands for passwords
 
@@ -184,6 +307,15 @@ Default key bindings:
 
 Commands start with `/` character.
 
+Press `Tab` within a command name to complete it. Press `Tab` or the up/down
+arrow keys to cycle through matches. Completion is case-sensitive, preserves
+existing arguments, and does not add a space. Nick completion remains available
+in messages and command arguments.
+
+When text and `Tab` arrive in the same terminal read, tiny treats them as pasted
+text rather than separate key presses. In that case, completion does not run;
+this preserves multiline paste handling.
+
 - `/help`: Show help messages of commands listed below.
 
 - `/msg <nick> <message>`: Send a message to a user. Creates a new tab.
@@ -193,8 +325,10 @@ Commands start with `/` character.
 - `/close`: Close the current tab. Leaves the channel if the current tab is a
   channel. Leaves the server if the tab is a server. You can use `/close <reason>` to send a goodbye message.
 
-- `/connect <hostname>:<port>`: Connect to a server. Uses `defaults` in the
-  config file for nick, realname, hostname and auto cmds.
+- `/connect <host>:<port> [<password>]` or `/connect [<IPv6>]:<port> [<password>]`:
+  Connect to a server using the nick, realname, TLS and auto-join settings in
+  `defaults`. For example, `/connect [::1]:6667` or
+  `/connect [fe80::1%lo]:6697`.
 
 - `/connect`: Reconnect to the current server. Use if you don't want to wait
   tiny to reconnect automatically after a connectivity problem.

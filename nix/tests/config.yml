@@ -1,0 +1,8 @@
+# tiny home-manager test
+servers: []
+defaults:
+  nicks: [nixcheck]
+  realname: "Nix User"
+key_map:
+  ctrl_e:
+    command: quit

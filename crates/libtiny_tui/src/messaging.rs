@@ -3,6 +3,7 @@ use termbox_simple::Termbox;
 use std::convert::From;
 
 use time::{self, Tm};
+use unicode_width::UnicodeWidthChar;
 
 use crate::config::Colors;
 use crate::exit_dialogue::ExitDialogue;
@@ -12,6 +13,65 @@ use crate::msg_area::line::SegStyle;
 use crate::msg_area::{Layout, MsgArea};
 use crate::trie::Trie;
 use crate::widget::WidgetRet;
+
+fn aligned_nick(nick: &str, columns: usize) -> String {
+    let width = crate::termbox::text_width(nick);
+    // Padding and preceding message segments must not become the base of a leading mark.
+    let dotted = if nick
+        .chars()
+        .next()
+        .is_some_and(|ch| UnicodeWidthChar::width(ch) == Some(0))
+    {
+        "◌"
+    } else {
+        ""
+    };
+    if width <= columns {
+        return format!("{}{}{}", " ".repeat(columns - width), dotted, nick);
+    }
+    if columns == 0 {
+        return String::new();
+    }
+
+    // Keep every zero-width character following a retained base, even across the cutoff.
+    let available = columns - 1; // The ellipsis occupies one column.
+    let mut used = 0;
+    let mut end = 0;
+    let mut has_base = false;
+    for (i, ch) in nick.char_indices() {
+        let width = UnicodeWidthChar::width(ch).unwrap_or(1);
+        let cost = if width == 0 && !has_base { 1 } else { width };
+        if used + cost > available {
+            break;
+        }
+        used += cost;
+        has_base = true;
+        end = i + ch.len_utf8();
+    }
+    format!(
+        "{}{}{}…",
+        " ".repeat(available - used),
+        if end > 0 { dotted } else { "" },
+        &nick[..end]
+    )
+}
+
+#[cfg(test)]
+mod aligned_nick_tests {
+    use super::aligned_nick;
+
+    #[test]
+    fn aligns_and_truncates_on_column_boundaries() {
+        assert_eq!(aligned_nick("日a", 5), "  日a");
+        assert_eq!(aligned_nick("日本語", 5), "日本…");
+        assert_eq!(aligned_nick("日本語", 4), " 日…");
+        assert_eq!(aligned_nick("日本語", 1), "…");
+        assert_eq!(aligned_nick("日本語", 0), "");
+        assert_eq!(aligned_nick("abcde", 4), "abc…");
+        assert_eq!(aligned_nick("か\u{3099}日a", 4), " か\u{3099}…");
+        assert_eq!(aligned_nick("\u{3099}日a", 2), "◌\u{3099}…");
+    }
+}
 
 /// An input field and an area for showing messages and activities of a tab (channel, server,
 /// mentions tab).
@@ -132,7 +192,11 @@ impl MessagingUI {
         self.msg_area.draw(tb, colors, pos_x, pos_y);
     }
 
-    pub(crate) fn keypressed(&mut self, key_action: &KeyAction) -> WidgetRet {
+    pub(crate) fn keypressed(
+        &mut self,
+        key_action: &KeyAction,
+        command_completions: &Trie,
+    ) -> WidgetRet {
         match key_action {
             KeyAction::Exit => {
                 self.toggle_exit_dialogue();
@@ -164,7 +228,8 @@ impl MessagingUI {
             }
             KeyAction::InputAutoComplete => {
                 if self.exit_dialogue.is_none() {
-                    self.input_field.autocomplete(&self.nicks);
+                    self.input_field
+                        .autocomplete(&self.nicks, command_completions);
                 }
                 WidgetRet::KeyHandled
             }
@@ -261,7 +326,7 @@ impl MessagingUI {
     pub(crate) fn show_topic(&mut self, topic: &str, ts: Timestamp) {
         self.add_timestamp(ts);
 
-        self.msg_area.add_text(topic, SegStyle::Topic);
+        self.msg_area.add_independent_text(topic, SegStyle::Topic);
 
         self.msg_area.flush_line();
     }
@@ -304,12 +369,7 @@ impl MessagingUI {
         let layout = self.msg_area.layout();
         let format_nick = |s: &str| -> String {
             if let Layout::Aligned { max_nick_len, .. } = layout {
-                let mut aligned = format!("{s:>max_nick_len$.max_nick_len$}");
-                if s.len() > max_nick_len {
-                    aligned.pop();
-                    aligned.push('…');
-                }
-                aligned
+                aligned_nick(s, max_nick_len)
             } else {
                 s.to_string()
             }
@@ -319,11 +379,12 @@ impl MessagingUI {
                 .add_text(&format_nick("**"), SegStyle::UserMsg);
             // separator between nick and msg
             self.msg_area.add_text("  ", SegStyle::Faded);
-            self.msg_area.add_text(sender, nick_col_style);
+            self.msg_area.add_independent_text(sender, nick_col_style);
             // a space replacing the usual ':'
             self.msg_area.add_text(" ", SegStyle::UserMsg);
         } else {
-            self.msg_area.add_text(&format_nick(sender), nick_col_style);
+            self.msg_area
+                .add_independent_text(&format_nick(sender), nick_col_style);
             // separator between nick and msg
             self.msg_area.add_text(": ", SegStyle::Faded);
         }
@@ -334,20 +395,20 @@ impl MessagingUI {
             SegStyle::UserMsg
         };
 
-        self.msg_area.add_text(msg, msg_style);
+        self.msg_area.add_independent_text(msg, msg_style);
         self.msg_area.set_current_line_alignment();
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_msg(&mut self, msg: &str, ts: Timestamp) {
         self.add_timestamp(ts);
-        self.msg_area.add_text(msg, SegStyle::UserMsg);
+        self.msg_area.add_independent_text(msg, SegStyle::UserMsg);
         self.msg_area.flush_line();
     }
 
     pub(crate) fn add_err_msg(&mut self, msg: &str, ts: Timestamp) {
         self.add_timestamp(ts);
-        self.msg_area.add_text(msg, SegStyle::ErrMsg);
+        self.msg_area.add_independent_text(msg, SegStyle::ErrMsg);
         self.msg_area.flush_line();
     }
 
