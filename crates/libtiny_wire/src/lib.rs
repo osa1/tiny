@@ -305,7 +305,7 @@ enum MsgType<'a> {
     Num(u16),
 }
 
-static CRLF: [u8; 2] = [b'\r', b'\n'];
+static CRLF: [u8; 2] = *b"\r\n";
 
 /// Try to read an IRC message off a buffer. Drops the message when parsing is successful.
 /// Otherwise the buffer is left unchanged.

@@ -437,10 +437,10 @@ impl LoggerInner {
                     fd, chans, users, ..
                 }) => {
                     f(fd, &*self.report_err);
-                    for (_, fd) in chans.iter_mut() {
+                    for fd in chans.values_mut() {
                         f(fd, &*self.report_err);
                     }
-                    for (_, fd) in users.iter_mut() {
+                    for fd in users.values_mut() {
                         f(fd, &*self.report_err);
                     }
                 }

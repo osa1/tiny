@@ -137,3 +137,14 @@ fn tab_config_command() {
         }
     );
 }
+
+#[test]
+fn scrollback_default_and_override() {
+    let default: Config =
+        serde_yaml::from_str("servers: []\ndefaults: {}\n").expect("default scrollback config");
+    assert_eq!(default.scrollback, usize::MAX);
+
+    let overridden: Config = serde_yaml::from_str("servers: []\ndefaults: {}\nscrollback: 42\n")
+        .expect("overridden scrollback config");
+    assert_eq!(overridden.scrollback, 42);
+}
