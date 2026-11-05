@@ -40,6 +40,8 @@
 - Add a Nix flake for building tiny and entering a Rust development shell.
   Both use the rust-overlay toolchain selected by `rust-toolchain`.
   Keep Clippy and formatting checks compatible with this toolchain.
+  On Linux, the package also supplies the build inputs for native TLS and
+  desktop notifications without changing the default features.
 - Export a Home Manager 26.05 module with unchanged raw YAML configuration and
   an overridable tiny package.
 

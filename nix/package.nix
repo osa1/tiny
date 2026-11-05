@@ -1,6 +1,10 @@
 {
   lib,
   rustPlatform,
+  stdenv,
+  pkg-config,
+  dbus,
+  openssl,
   cacert,
 }:
 
@@ -12,6 +16,12 @@ rustPlatform.buildRustPackage {
   cargoLock.lockFile = ../Cargo.lock;
   cargoBuildFlags = [ "--package=tiny" ];
   cargoTestFlags = [ "--workspace" ];
+
+  nativeBuildInputs = lib.optional stdenv.hostPlatform.isLinux pkg-config;
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
+    dbus
+    openssl
+  ];
 
   preCheck = ''
     export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
