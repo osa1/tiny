@@ -630,6 +630,89 @@ mod tests {
         }
     }
 
+    #[cfg(all(target_os = "macos", feature = "tls-native"))]
+    #[test]
+    fn diagnose_macos_tls_import_and_trust() {
+        use security_framework::{
+            certificate::SecCertificate,
+            identity::SecIdentity,
+            os::macos::{
+                identity::SecIdentityExt,
+                import_export::{ImportOptions, SecItems},
+                keychain,
+            },
+            policy::SecPolicy,
+            secure_transport::SslProtocolSide,
+            trust::SecTrust,
+        };
+        use std::io::Write;
+
+        let mut roots =
+            rustls_pemfile::certs(&mut &include_bytes!("../tests/fixtures/ipv6-ca.pem")[..])
+                .unwrap();
+        assert_eq!(roots.len(), 1);
+        let root = SecCertificate::from_der(&roots.pop().unwrap()).unwrap();
+        let server =
+            SecCertificate::from_der(include_bytes!("../tests/fixtures/ipv6-server.der")).unwrap();
+        let mut trust_results = Vec::new();
+        for host in ["::1", "localhost", "::2"] {
+            let policy = SecPolicy::create_ssl(SslProtocolSide::SERVER, Some(host));
+            let mut trust =
+                SecTrust::create_with_certificates(&[server.clone()], &[policy]).unwrap();
+            trust.set_anchor_certificates(&[root.clone()]).unwrap();
+            trust.set_trust_anchor_certificates_only(false).unwrap();
+            let result = trust.evaluate_with_error();
+            writeln!(std::io::stderr(), "macOS TLS trust for {host}: {result:?}").unwrap();
+            trust_results.push(result.is_ok());
+        }
+
+        let client = rcgen::generate_simple_self_signed(vec!["client.test".into()]).unwrap();
+        let pem = format!(
+            "{}{}",
+            client.serialize_pem().unwrap(),
+            client.serialize_private_key_pem()
+        );
+        let (certificate, key) = super::split_identity_pem(pem.as_bytes()).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let keychain = keychain::CreateOptions::new()
+            .password("fixture-only")
+            .create(dir.path().join("diagnostic.keychain"))
+            .unwrap();
+        let mut items = SecItems::default();
+        let key_result = ImportOptions::new()
+            .filename("key.pem")
+            .items(&mut items)
+            .keychain(&keychain)
+            .import(&key);
+        let certificate_result = ImportOptions::new()
+            .filename("chain.pem")
+            .items(&mut items)
+            .keychain(&keychain)
+            .import(&certificate);
+        let identity_result = items
+            .certificates
+            .first()
+            .map(|cert| SecIdentity::with_certificate(&[keychain], cert).map(|_| ()));
+        writeln!(std::io::stderr(), "macOS PKCS#8 key import: {key_result:?}").unwrap();
+        writeln!(
+            std::io::stderr(),
+            "macOS certificate import: {certificate_result:?}"
+        )
+        .unwrap();
+        writeln!(
+            std::io::stderr(),
+            "macOS identity lookup: {identity_result:?}"
+        )
+        .unwrap();
+        assert!(
+            trust_results == [true, true, false]
+                && key_result.is_ok()
+                && certificate_result.is_ok()
+                && matches!(identity_result, Some(Ok(()))),
+            "macOS identity or trust diagnostic failed"
+        );
+    }
+
     #[test]
     fn scoped_ipv6_tls() {
         tokio::runtime::Builder::new_current_thread()
