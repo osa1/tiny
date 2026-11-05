@@ -262,7 +262,7 @@ fn expanded_ipv6_reconnect_uses_the_proxy_for_each_configured_port() {
         );
 
         crate::cmd::run_cmd(
-            &format!("connect [0:0:0:0:0:0:0:1]:{port_b}"),
+            &format!("connect [::1]:{port_b}"),
             source,
             &defaults,
             &proxies,

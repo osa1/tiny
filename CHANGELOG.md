@@ -4,8 +4,9 @@
   authenticated proxies and reuse by `/connect`. Reconnection applies the
   selected server's proxy, scoped IPv6 proxy destinations are rejected, and
   SOCKS4 local DNS failures are reported separately from IPv6 rejections.
-- Support bracketed IPv6 addresses in `/connect` and verify scoped IPv6 TLS
-  connections against the IP address without its scope ID.
+- Support bracketed IPv6 addresses in `/connect`, reuse existing connections
+  across equivalent address spellings, and verify scoped IPv6 TLS connections
+  against the IP address without its scope ID.
 - Fix Unicode input, completion, wrapping, and display for wide and combining
   characters, including UTF-8 split across terminal reads. Editing still uses
   Unicode scalar values; ambiguous-width characters are displayed as one column.

@@ -345,8 +345,16 @@ fn connect_(
         }
     };
 
-    if let Some(client) = find_client(clients, serv_name) {
-        ui.add_client_msg("Connecting...", &MsgTarget::AllServTabs { serv: serv_name });
+    if let Some(client) = clients
+        .iter_mut()
+        .find(|client| same_server_host(client.get_serv_name(), serv_name))
+    {
+        ui.add_client_msg(
+            "Connecting...",
+            &MsgTarget::AllServTabs {
+                serv: client.get_serv_name(),
+            },
+        );
         match proxy {
             ProxySelection::Unconfigured => client.reconnect(Some(serv_port)),
             ProxySelection::Configured(proxy) => {
